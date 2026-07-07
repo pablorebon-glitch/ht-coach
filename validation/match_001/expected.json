@@ -1,0 +1,11 @@
+{
+  "ratings": {
+    "left_defense": 7,
+    "central_defense": 40,
+    "right_defense": 7,
+    "midfield": 42,
+    "left_attack": 24,
+    "central_attack": 26,
+    "right_attack": 24
+  }
+}

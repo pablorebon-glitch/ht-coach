@@ -1,0 +1,20 @@
+{
+  "CENTRAL_DEFENDER": {
+    "NORMAL": {
+      "central_defense": {
+        "defending": 1.00,
+        "playmaking": 0.20,
+        "passing": 0.10
+      },
+      "left_defense": {
+        "defending": 0.15
+      },
+      "right_defense": {
+        "defending": 0.15
+      },
+      "midfield": {
+        "playmaking": 0.10
+      }
+    }
+  }
+}

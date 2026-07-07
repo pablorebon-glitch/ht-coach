@@ -1,0 +1,16 @@
+from enum import Enum
+
+
+class Position(Enum):
+
+    GOALKEEPER = "GOALKEEPER"
+
+    CENTRAL_DEFENDER = "CENTRAL_DEFENDER"
+
+    WING_BACK = "WING_BACK"
+
+    INNER_MIDFIELDER = "INNER_MIDFIELDER"
+
+    WINGER = "WINGER"
+
+    FORWARD = "FORWARD"
