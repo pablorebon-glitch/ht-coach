@@ -80,6 +80,7 @@ class MatchPageSmokeTest(unittest.TestCase):
                         opponent_expected_goals=1.2,
                         lineup=[
                             LineupPlayerResult(
+                                number=1,
                                 position="GOALKEEPER",
                                 side="CENTER",
                                 order="Normal",

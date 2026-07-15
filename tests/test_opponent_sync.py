@@ -78,6 +78,8 @@ class FakeMatchView(QObject):
         browse_players_requested = Signal()
         load_players_requested = Signal()
         analyze_requested = Signal()
+        copy_summary_requested = Signal()
+        copy_lineup_requested = Signal()
         workspace_changed = Signal()
 
     def __init__(self):
@@ -86,6 +88,7 @@ class FakeMatchView(QObject):
         self.selected_name = ""
         self.supported_formations = []
         self.settings = None
+        self.last_result = None
 
     def set_opponents(self, opponent_names, selected_name=None):
         self.opponent_names = list(opponent_names)
@@ -106,6 +109,9 @@ class FakeMatchView(QObject):
         self.settings = settings
         if settings.opponent_name in self.opponent_names:
             self.selected_name = settings.opponent_name
+
+    def show_results(self, result, restored=False):
+        self.last_result = result
 
     def selected_opponent_name(self):
         return self.selected_name

@@ -2,6 +2,10 @@ import json
 from dataclasses import asdict, dataclass, field
 
 from ht_coach_app.core.paths import user_data_dir
+from ht_coach_app.services.match_workspace_service import (
+    match_analysis_result_from_dict,
+    match_analysis_result_to_dict,
+)
 
 
 @dataclass
@@ -14,9 +18,12 @@ class MatchWorkspaceSettings:
 
 
 class MatchWorkspaceRepository:
-    def __init__(self, storage_path=None):
+    def __init__(self, storage_path=None, result_storage_path=None):
         self.storage_path = storage_path or (
             user_data_dir() / "match_workspace.json"
+        )
+        self.result_storage_path = result_storage_path or (
+            user_data_dir() / "match_last_result.json"
         )
 
     def load(self):
@@ -56,3 +63,35 @@ class MatchWorkspaceRepository:
             )
 
         return settings
+
+    def load_last_result(self):
+        if not self.result_storage_path.exists():
+            return None
+
+        with open(
+            self.result_storage_path,
+            "r",
+            encoding="utf-8"
+        ) as file:
+            data = json.load(file)
+
+        return match_analysis_result_from_dict(data)
+
+    def save_last_result(self, result):
+        self.result_storage_path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        with open(
+            self.result_storage_path,
+            "w",
+            encoding="utf-8"
+        ) as file:
+            json.dump(
+                match_analysis_result_to_dict(result),
+                file,
+                indent=2
+            )
+
+        return result

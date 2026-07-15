@@ -134,6 +134,7 @@ Suggested services:
   - Converts engine results into view models.
   - Does not alter engine calculations.
   - Initially exposes the Alpha 0.2 supported formations: 3-5-2 and 4-5-1.
+  - Formats copy-ready match summaries and recommended lineup text from view models.
 
 - `ReportService`
   - Formats recommendation summaries for display and future export.
@@ -217,6 +218,7 @@ Suggested repositories:
 
 - `MatchWorkspaceRepository`
   - Stores the last selected players CSV path, opponent, and formations.
+  - Stores the last successful analysis result as serializable view-model JSON.
   - Uses JSON under the application data directory.
   - Keeps workspace persistence separate from widgets and engine code.
 
@@ -325,8 +327,9 @@ User clicks Analyze Match
   -> MatchAnalysisWorker runs MatchWorkspaceService off the UI thread
   -> MatchWorkspaceService loads players with importers.csv_importer
   -> MatchWorkspaceService calls FormationOptimizer.optimize_against
-  -> Service maps engine result to MatchAnalysisResult view models
-  -> MatchPage renders comparison cards and the recommended XI
+  -> Service maps engine result to serializable MatchAnalysisResult view models
+  -> MatchWorkspaceRepository persists the last successful result
+  -> MatchPage renders recommended summary, comparison table and recommended XI
 ```
 
 The engine remains unaware of the desktop application.
@@ -371,7 +374,8 @@ Avoid brittle screenshot tests early. Prefer fast unit tests for services and st
 7. Port opponent manager to PySide6.
 8. Port match analysis with background workers. The first usable Match Workspace now
    supports players CSV selection, saved opponents, 3-5-2/4-5-1 analysis, progress
-   feedback, comparison cards, and recommended XI rendering.
+   feedback, comparison cards, recommended XI rendering, copy actions, and last-result
+   restore.
 9. Add reports and exports.
 10. Retire or freeze Tkinter app once PySide6 reaches feature parity.
 

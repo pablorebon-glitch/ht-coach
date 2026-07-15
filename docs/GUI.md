@@ -119,9 +119,12 @@ Content:
 - Formation checklist for 3-5-2 and 4-5-1.
 - Analyze Match action.
 - Progress indicator.
-- Formation comparison cards.
+- Prominent recommended-result summary.
+- Formation comparison table with deltas versus the recommendation.
 - Recommended lineup.
 - Probabilities, xG, possession, and tactic.
+- Analysis metadata: opponent, CSV filename, player count, formations, and completion
+  time.
 
 Expected controls:
 
@@ -131,7 +134,9 @@ Expected controls:
 - Formation checkboxes.
 - Primary Analyze Match button.
 - Busy state while worker runs.
+- Copy Summary and Copy Lineup actions.
 - Result table and recommended XI table inside the page.
+- Empty, loading, success, and error states.
 
 ### Reports View
 
@@ -293,6 +298,7 @@ Recommended files:
 
 - `opponents.json`
 - `match_workspace.json`
+- `match_last_result.json`
 - `settings.json`
 - `recent_files.json`
 
@@ -302,6 +308,7 @@ Persistence rules:
 - Include schema versions once data evolves.
 - Keep persistence format hidden behind repositories.
 - Do not let views read or write JSON directly.
+- Persist only serializable view-model data for the last successful match analysis.
 
 ## Background Work
 
@@ -321,6 +328,7 @@ UI requirements:
 - Disable duplicate optimize actions while running.
 - Show busy state.
 - Preserve the last successful result until a new result is ready.
+- Restore the last successful result when the app reopens.
 - Display errors without crashing.
 
 ## UI Consistency
