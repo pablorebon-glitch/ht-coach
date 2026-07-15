@@ -114,22 +114,24 @@ Purpose:
 
 Content:
 
+- Players CSV selector and load status.
 - Selected opponent selector.
-- Editable opponent ratings for quick what-if changes.
-- Optimize action.
+- Formation checklist for 3-5-2 and 4-5-1.
+- Analyze Match action.
 - Progress indicator.
-- Result summary.
+- Formation comparison cards.
 - Recommended lineup.
-- Formation ranking.
 - Probabilities, xG, possession, and tactic.
 
 Expected controls:
 
+- File picker button.
+- Load Players button.
 - Opponent combo box.
-- Rating input grid.
-- Primary optimize button.
+- Formation checkboxes.
+- Primary Analyze Match button.
 - Busy state while worker runs.
-- Result table and details panel.
+- Result table and recommended XI table inside the page.
 
 ### Reports View
 
@@ -254,7 +256,7 @@ Suggested services:
 
 - `RosterService`
 - `OpponentService`
-- `OptimizationService`
+- `MatchWorkspaceService`
 - `ReportService`
 - `SettingsService`
 
@@ -290,6 +292,7 @@ Initial persistence should use JSON repositories.
 Recommended files:
 
 - `opponents.json`
+- `match_workspace.json`
 - `settings.json`
 - `recent_files.json`
 
@@ -346,7 +349,8 @@ All user-facing errors should be clear and actionable.
 
 Examples:
 
-- "Select a roster CSV before analyzing formations."
+- "Select a players.csv file."
+- "Select at least one formation."
 - "Opponent name is required."
 - "All opponent ratings must be numeric."
 - "Optimization failed. See diagnostics for details."

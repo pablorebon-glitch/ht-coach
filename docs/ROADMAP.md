@@ -149,8 +149,11 @@ Goal: port the complete opponent optimization workflow.
 Deliverables:
 
 - Match Analysis view
+- Players CSV selector and loaded player count
 - Opponent selector
+- Formation selector for 3-5-2 and 4-5-1
 - Optimization worker
+- Workspace settings persistence
 - Progress state
 - Result summary
 - Recommended lineup, orders, tactic, possession, xG, and probabilities
@@ -160,6 +163,8 @@ Acceptance criteria:
 - Optimization runs off the UI thread.
 - Users see progress or busy status.
 - Results are readable and comparable.
+- The Analyze Match action requires a CSV, opponent, and at least one formation.
+- Last selected CSV path, opponent, and formations are restored.
 - Engine calculations remain unchanged.
 
 ### Epic 7: Reports

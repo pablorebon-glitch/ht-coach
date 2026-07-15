@@ -67,6 +67,27 @@ def _application_stylesheet():
             color: #027a48;
         }
 
+        QFrame#workspacePanel,
+        QFrame#resultCard {
+            background: #ffffff;
+            border: 1px solid #e4e7ec;
+            border-radius: 8px;
+        }
+
+        QPushButton#primaryAction {
+            background: #2563eb;
+            border: 1px solid #2563eb;
+            border-radius: 6px;
+            color: #ffffff;
+            font-weight: 650;
+            padding: 8px 14px;
+        }
+
+        QPushButton#primaryAction:disabled {
+            background: #98a2b3;
+            border-color: #98a2b3;
+        }
+
         QFrame#pageHeader {
             background: #ffffff;
             border-bottom: 1px solid #e4e7ec;

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.controllers.navigation_controller import NavigationController
+from ht_coach_app.controllers.match_controller import MatchController
 from ht_coach_app.controllers.opponent_controller import OpponentController
 from ht_coach_app.core.constants import (
     WINDOW_MINIMUM_HEIGHT,
@@ -19,6 +20,12 @@ from ht_coach_app.core.constants import (
 )
 from ht_coach_app.core.paths import application_icon_path
 from ht_coach_app.persistence.opponent_repository import OpponentRepository
+from ht_coach_app.persistence.match_workspace_repository import (
+    MatchWorkspaceRepository,
+)
+from ht_coach_app.services.match_workspace_service import (
+    MatchWorkspaceService,
+)
 from ht_coach_app.services.opponent_service import OpponentService
 from ht_coach_app.views.dashboard_page import DashboardPage
 from ht_coach_app.views.match_page import MatchPage
@@ -144,6 +151,22 @@ class MainWindow(QMainWindow):
                 OpponentController(
                     widget,
                     service,
+                    self
+                )
+            )
+
+        if page["key"] == "match":
+            opponent_service = OpponentService(
+                OpponentRepository()
+            )
+            service = MatchWorkspaceService(
+                opponent_service
+            )
+            self._controllers.append(
+                MatchController(
+                    widget,
+                    service,
+                    MatchWorkspaceRepository(),
                     self
                 )
             )

@@ -105,7 +105,8 @@ Initial controllers:
 - `NavigationController`: switches central pages without opening new windows.
 - `SquadController`: load players, refresh squad state, handle CSV import errors.
 - `OpponentController`: create, update, duplicate, delete, and select opponents.
-- `MatchController`: run matchup optimization against selected opponent.
+- `MatchController`: persist match workspace inputs and run matchup optimization against
+  the selected opponent through a background worker.
 - `ReportsController`: prepare recommendation summaries and exports.
 - `SettingsController`: manage user preferences and app-level configuration.
 
@@ -128,10 +129,11 @@ Suggested services:
   - Owns validation rules for opponent names and rating values.
   - Delegates storage to persistence repositories.
 
-- `OptimizationService`
+- `MatchWorkspaceService`
   - Calls `FormationOptimizer`, `LineupOptimizer`, and matchup optimization entry points.
   - Converts engine results into view models.
   - Does not alter engine calculations.
+  - Initially exposes the Alpha 0.2 supported formations: 3-5-2 and 4-5-1.
 
 - `ReportService`
   - Formats recommendation summaries for display and future export.
@@ -157,7 +159,8 @@ Initial views:
     confirmation.
 
 - `MatchView`
-  - Selected opponent, optimization controls, progress, and result comparison.
+  - Players CSV selector, saved opponent selector, formation selection, progress, result
+    comparison, and recommended XI.
 
 - `ReportsView`
   - Saved reports, future exports, and recommendation summaries.
@@ -211,6 +214,11 @@ Suggested repositories:
 
 - `SettingsRepository`
   - Stores UI preferences and last-used paths.
+
+- `MatchWorkspaceRepository`
+  - Stores the last selected players CSV path, opponent, and formations.
+  - Uses JSON under the application data directory.
+  - Keeps workspace persistence separate from widgets and engine code.
 
 - `RecentFilesRepository`
   - Tracks recent CSV imports.
@@ -311,14 +319,14 @@ persistence -> views
 Match analysis should flow like this:
 
 ```text
-User clicks Optimize
-  -> MatchAnalysisView emits optimize_requested
-  -> MatchAnalysisController reads AppState
-  -> OptimizationService builds engine request
-  -> Background worker calls FormationOptimizer.optimize_against
-  -> Service maps engine result to MatchAnalysisViewModel
-  -> AppState stores latest result
-  -> MatchAnalysisView renders result panels
+User clicks Analyze Match
+  -> MatchPage emits analyze_requested
+  -> MatchController validates selected CSV, opponent, and formations
+  -> MatchAnalysisWorker runs MatchWorkspaceService off the UI thread
+  -> MatchWorkspaceService loads players with importers.csv_importer
+  -> MatchWorkspaceService calls FormationOptimizer.optimize_against
+  -> Service maps engine result to MatchAnalysisResult view models
+  -> MatchPage renders comparison cards and the recommended XI
 ```
 
 The engine remains unaware of the desktop application.
@@ -361,7 +369,9 @@ Avoid brittle screenshot tests early. Prefer fast unit tests for services and st
 5. Add state and service boundaries.
 6. Port squad loading.
 7. Port opponent manager to PySide6.
-8. Port match analysis with background workers.
+8. Port match analysis with background workers. The first usable Match Workspace now
+   supports players CSV selection, saved opponents, 3-5-2/4-5-1 analysis, progress
+   feedback, comparison cards, and recommended XI rendering.
 9. Add reports and exports.
 10. Retire or freeze Tkinter app once PySide6 reaches feature parity.
 
