@@ -4,6 +4,13 @@
 
 ### Added
 
+- Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
+- Added roster CSV browsing, loading, reload, last-path persistence, and export of
+  visible Squad rows.
+- Added Squad search, minimum form/stamina filters, specialty filter, and position
+  ranking filter.
+- Added player detail and position analysis using existing engine analyzer APIs.
+- Added Squad-to-Match roster path synchronization through application events.
 - Added the Alpha 0.2 Match Results UX milestone for the PySide6 Match Workspace.
 - Added a prominent recommended-result summary with probabilities, possession and xG.
 - Added formation comparison rows with deltas versus the recommended formation.

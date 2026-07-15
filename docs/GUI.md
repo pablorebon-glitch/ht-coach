@@ -72,8 +72,16 @@ Purpose:
 Content:
 
 - CSV path selector.
-- Load button.
-- Player table.
+- Load and reload buttons.
+- Export visible rows button.
+- Sortable player table with core skills, form, stamina, experience, leadership, TSI,
+  salary and specialty.
+- Search by player name.
+- Minimum form and stamina filters.
+- Specialty filter.
+- Position ranking filter.
+- Player detail panel with complete skills, best position and rankings by supported
+  position.
 - Player count and import status.
 - Optional player detail panel.
 
@@ -82,6 +90,9 @@ Expected controls:
 - File picker button.
 - Refresh/load button.
 - Sortable table columns.
+- Search and filter controls.
+- Position ranking selector.
+- Export visible table action.
 - Clear error display for invalid CSV.
 
 ### Opponents View

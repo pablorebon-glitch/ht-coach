@@ -59,6 +59,9 @@ class MatchController(QObject):
             self._app_events.opponents_changed.connect(
                 self._sync_opponents
             )
+            self._app_events.roster_changed.connect(
+                self._sync_roster
+            )
 
     def refresh(self):
         self._refresh_opponents()
@@ -98,6 +101,18 @@ class MatchController(QObject):
 
         self._refresh_opponents(
             selected_name=selected_name
+        )
+        self._save_current_settings()
+
+    def _sync_roster(self, players_csv_path, player_count):
+        self._view.set_players_csv_path(
+            players_csv_path
+        )
+        self._view.set_players_loaded_count(
+            player_count
+        )
+        self._view.show_status(
+            f"Roster updated from Squad: {player_count} players."
         )
         self._save_current_settings()
 
