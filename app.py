@@ -15,6 +15,18 @@ from models.formations import FORMATIONS
 from models.team_ratings import TeamRatings
 
 
+
+OPPONENT_RATING_FIELDS = [
+    ('Def. Izq.','left_defense',25),
+    ('Def. Central','central_defense',35),
+    ('Def. Der.','right_defense',24),
+    ('Mediocampo','midfield',40),
+    ('Ataque Izq.','left_attack',25),
+    ('Ataque Central','central_attack',30),
+    ('Ataque Der.','right_attack',24)
+]
+
+
 class HTCoachApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -119,7 +131,15 @@ class HTCoachApp(tk.Tk):
         self.model_text.insert('end','HT COACH usa un modelo configurable de ocasiones, conversión, tácticas y probabilidades.\n\nEjecutá run_tests.bat para validar el motor completo.\n')
 
     def _opponent_fields(self):
-        return [('Def. Izq.','left_defense',25),('Def. Central','central_defense',35),('Def. Der.','right_defense',24),('Mediocampo','midfield',40),('Ataque Izq.','left_attack',25),('Ataque Central','central_attack',30),('Ataque Der.','right_attack',24)]
+        return OPPONENT_RATING_FIELDS
+
+    def _default_opponent_ratings(self):
+        return TeamRatings(
+            **{
+                key: value
+                for _, key, value in self._opponent_fields()
+            }
+        )
 
     def browse_csv(self):
         p=filedialog.askopenfilename(filetypes=[('CSV','*.csv'),('Todos','*.*')])
@@ -162,7 +182,7 @@ class HTCoachApp(tk.Tk):
         self.opponent_name.set('')
         self._write_opponent_ratings(
             self.opponent_vars,
-            TeamRatings(**{key:val for _,key,val in self._opponent_fields()})
+            self._default_opponent_ratings()
         )
 
     def load_opponent_from_list(self):

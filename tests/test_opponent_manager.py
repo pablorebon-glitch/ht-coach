@@ -111,6 +111,35 @@ def test_empty_name_is_rejected(tmp_path):
         )
 
 
+def test_get_empty_name_returns_none(tmp_path):
+
+    manager = OpponentManager(
+        tmp_path / "opponents.json"
+    )
+
+    assert manager.get("") is None
+    assert manager.get(" ") is None
+
+
+def test_save_does_not_mutate_input_opponent(tmp_path):
+
+    manager = OpponentManager(
+        tmp_path / "opponents.json"
+    )
+
+    opponent = Opponent(
+        name="  Rival FC  ",
+        ratings=TeamRatings()
+    )
+
+    saved = manager.save(
+        opponent
+    )
+
+    assert opponent.name == "  Rival FC  "
+    assert saved.name == "Rival FC"
+
+
 def test_saved_file_is_sorted_by_name(tmp_path):
 
     storage_path = tmp_path / "opponents.json"

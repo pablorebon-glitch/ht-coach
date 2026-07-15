@@ -27,6 +27,10 @@ class OpponentManager:
         name
     ):
 
+        if not str(name).strip():
+
+            return None
+
         normalized_name = self._normalize_name(
             name
         )
@@ -56,8 +60,11 @@ class OpponentManager:
                 "opponent must be an Opponent"
             )
 
-        opponent.name = self._normalize_name(
-            opponent.name
+        opponent = Opponent(
+            name=self._normalize_name(
+                opponent.name
+            ),
+            ratings=opponent.ratings
         )
 
         opponents = [
