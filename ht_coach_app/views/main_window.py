@@ -27,6 +27,7 @@ from ht_coach_app.services.match_workspace_service import (
     MatchWorkspaceService,
 )
 from ht_coach_app.services.opponent_service import OpponentService
+from ht_coach_app.state.app_events import AppEvents
 from ht_coach_app.views.dashboard_page import DashboardPage
 from ht_coach_app.views.match_page import MatchPage
 from ht_coach_app.views.opponents_page import OpponentsPage
@@ -55,6 +56,7 @@ class MainWindow(QMainWindow):
         )
         self._apply_application_icon()
         self._controllers = []
+        self._app_events = AppEvents(self)
         self._build_toolbar()
         self._build_status_bar()
         self._build_shell()
@@ -151,6 +153,7 @@ class MainWindow(QMainWindow):
                 OpponentController(
                     widget,
                     service,
+                    self._app_events,
                     self
                 )
             )
@@ -167,6 +170,7 @@ class MainWindow(QMainWindow):
                     widget,
                     service,
                     MatchWorkspaceRepository(),
+                    self._app_events,
                     self
                 )
             )

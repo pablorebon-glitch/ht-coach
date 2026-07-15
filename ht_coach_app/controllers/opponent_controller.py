@@ -4,10 +4,11 @@ from ht_coach_app.services.opponent_service import OpponentValidationError
 
 
 class OpponentController(QObject):
-    def __init__(self, view, service, parent=None):
+    def __init__(self, view, service, app_events=None, parent=None):
         super().__init__(parent)
         self._view = view
         self._service = service
+        self._app_events = app_events
         self._connect_view()
         self.refresh()
 
@@ -81,6 +82,11 @@ class OpponentController(QObject):
             self.refresh(
                 selected_name=saved.name
             )
+            self._publish_opponents_changed(
+                "updated" if original_name else "created",
+                original_name or "",
+                saved.name
+            )
             self._view.show_status(
                 f"Saved opponent: {saved.name}"
             )
@@ -96,6 +102,11 @@ class OpponentController(QObject):
             )
             self.refresh(
                 selected_name=duplicated.name
+            )
+            self._publish_opponents_changed(
+                "duplicated",
+                "",
+                duplicated.name
             )
             self._view.show_status(
                 f"Duplicated opponent: {duplicated.name}"
@@ -120,6 +131,11 @@ class OpponentController(QObject):
         try:
             self._service.delete_opponent(name)
             self.refresh()
+            self._publish_opponents_changed(
+                "deleted",
+                name,
+                ""
+            )
             self._view.show_status(
                 f"Deleted opponent: {name}"
             )
@@ -128,3 +144,15 @@ class OpponentController(QObject):
                 str(exc)
             )
 
+    def _publish_opponents_changed(
+        self,
+        action,
+        previous_name,
+        current_name
+    ):
+        if self._app_events is not None:
+            self._app_events.opponents_changed.emit(
+                action,
+                previous_name,
+                current_name
+            )

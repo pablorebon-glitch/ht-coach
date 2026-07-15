@@ -131,8 +131,12 @@ class MatchPage(BasePage):
             1
         )
 
-    def set_opponents(self, opponent_names):
-        current = self.selected_opponent_name()
+    def set_opponents(self, opponent_names, selected_name=None):
+        current = (
+            self.selected_opponent_name()
+            if selected_name is None
+            else selected_name
+        )
         self.opponent_combo.blockSignals(True)
         self.opponent_combo.clear()
         self.opponent_combo.addItem("")
@@ -143,6 +147,8 @@ class MatchPage(BasePage):
         index = self.opponent_combo.findText(current)
         if index >= 0:
             self.opponent_combo.setCurrentIndex(index)
+        else:
+            self.opponent_combo.setCurrentIndex(0)
 
         self.opponent_combo.blockSignals(False)
 

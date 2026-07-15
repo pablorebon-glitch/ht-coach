@@ -17,16 +17,19 @@ class MatchController(QObject):
         view,
         service,
         settings_repository,
+        app_events=None,
         parent=None
     ):
         super().__init__(parent)
         self._view = view
         self._service = service
         self._settings_repository = settings_repository
+        self._app_events = app_events
         self._thread = None
         self._worker = None
 
         self._connect_view()
+        self._connect_app_events()
         self.refresh()
 
     def _connect_view(self):
@@ -43,17 +46,45 @@ class MatchController(QObject):
             self._save_current_settings
         )
 
+    def _connect_app_events(self):
+        if self._app_events is not None:
+            self._app_events.opponents_changed.connect(
+                self._sync_opponents
+            )
+
     def refresh(self):
-        opponents = self._service.list_opponents()
-        self._view.set_opponents(
-            [opponent.name for opponent in opponents]
-        )
+        self._refresh_opponents()
         self._view.set_supported_formations(
             self._service.supported_formations()
         )
         self._view.apply_settings(
             self._settings_repository.load()
         )
+
+    def _refresh_opponents(self, selected_name=None):
+        opponents = self._service.list_opponents()
+        self._view.set_opponents(
+            [opponent.name for opponent in opponents],
+            selected_name=selected_name
+        )
+
+    def _sync_opponents(
+        self,
+        action,
+        previous_name,
+        current_name
+    ):
+        selected_name = self._view.selected_opponent_name()
+
+        if action == "updated" and selected_name == previous_name:
+            selected_name = current_name
+        elif action == "deleted" and selected_name == previous_name:
+            selected_name = ""
+
+        self._refresh_opponents(
+            selected_name=selected_name
+        )
+        self._save_current_settings()
 
     def _browse_players(self):
         path = self._view.choose_players_file()
