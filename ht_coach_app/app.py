@@ -1,0 +1,84 @@
+import sys
+
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QApplication
+
+from ht_coach_app.core.constants import APP_NAME
+from ht_coach_app.views.main_window import MainWindow
+
+
+def create_application(argv=None):
+    app = QApplication(argv or sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setOrganizationName("HT Coach")
+    app.setFont(QFont("Segoe UI", 10))
+    app.setStyleSheet(_application_stylesheet())
+    return app
+
+
+def run(argv=None):
+    app = create_application(argv)
+    window = MainWindow()
+    window.show()
+    return app.exec()
+
+
+def _application_stylesheet():
+    return """
+        QMainWindow {
+            background: #f5f6f8;
+        }
+
+        QToolBar {
+            background: #ffffff;
+            border-bottom: 1px solid #d8dde6;
+            spacing: 8px;
+            padding: 6px;
+        }
+
+        QStatusBar {
+            background: #ffffff;
+            border-top: 1px solid #d8dde6;
+            color: #384252;
+        }
+
+        QLabel#pageTitle {
+            color: #1f2937;
+            font-size: 22px;
+            font-weight: 650;
+        }
+
+        QLabel#pageSubtitle {
+            color: #667085;
+            font-size: 12px;
+        }
+
+        QFrame#pageHeader {
+            background: #ffffff;
+            border-bottom: 1px solid #e4e7ec;
+        }
+
+        QListWidget#navigationList {
+            background: #111827;
+            border: 0;
+            color: #d1d5db;
+            font-size: 13px;
+            outline: 0;
+        }
+
+        QListWidget#navigationList::item {
+            border-radius: 6px;
+            margin: 3px 8px;
+            padding: 10px 12px;
+        }
+
+        QListWidget#navigationList::item:selected {
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+        QListWidget#navigationList::item:hover:!selected {
+            background: #1f2937;
+            color: #ffffff;
+        }
+    """
