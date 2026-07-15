@@ -1,6 +1,7 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -25,6 +26,8 @@ class MatchPage(BasePage):
     browse_players_requested = Signal()
     load_players_requested = Signal()
     analyze_requested = Signal()
+    copy_summary_requested = Signal()
+    copy_lineup_requested = Signal()
     workspace_changed = Signal()
 
     def __init__(self, parent=None):
@@ -35,6 +38,7 @@ class MatchPage(BasePage):
         )
         self._applying_settings = False
         self._formation_checks = {}
+        self._state = "empty"
         self._build_inputs()
         self._build_results()
 
@@ -103,13 +107,9 @@ class MatchPage(BasePage):
         layout.addWidget(self.analyze_button, 4, 3)
         layout.setColumnStretch(1, 1)
 
-        self.body_layout.addWidget(controls)
+        self.body_layout.addWidget(controls, 0)
 
     def _build_results(self):
-        title = QLabel("Results")
-        title.setObjectName("sectionTitle")
-        self.body_layout.addWidget(title)
-
         self.results_scroll = QScrollArea()
         self.results_scroll.setWidgetResizable(True)
         self.results_scroll.setFrameShape(QFrame.NoFrame)
@@ -233,6 +233,9 @@ class MatchPage(BasePage):
             "Analyzing..." if is_processing else "Analyze Match"
         )
 
+        if is_processing:
+            self.show_loading()
+
     def show_status(self, message):
         self.status_label.setProperty(
             "state",
@@ -247,6 +250,7 @@ class MatchPage(BasePage):
         )
 
     def show_error(self, message):
+        self._state = "error"
         self.status_label.setProperty(
             "state",
             "error"
@@ -259,131 +263,273 @@ class MatchPage(BasePage):
             self.status_label
         )
         self.set_processing(False)
+        self._clear_results_widgets()
+        self._show_state_message(
+            "Analysis could not complete",
+            message
+        )
 
     def clear_results(self):
         self._clear_results_widgets()
         self._show_empty_results()
 
-    def show_results(self, result):
+    def show_loading(self):
+        self._state = "loading"
+        self._clear_results_widgets()
+        self._show_state_message(
+            "Analyzing match",
+            "Optimizing formations, lineup, individual orders and tactic."
+        )
+
+    def show_results(self, result, restored=False):
+        self._state = "success"
         self._clear_results_widgets()
 
-        summary = QLabel(
-            f"{result.player_count} players analyzed against {result.opponent_name}"
+        header = QHBoxLayout()
+        title = QLabel(
+            "Last analysis" if restored else "Analysis results"
         )
-        summary.setObjectName("sectionTitle")
-        self.results_layout.addWidget(summary)
+        title.setObjectName("sectionTitle")
+        header.addWidget(title)
+        header.addStretch(1)
 
-        for formation in result.formations:
+        copy_summary = QPushButton("Copy Summary")
+        copy_summary.clicked.connect(
+            self.copy_summary_requested
+        )
+        header.addWidget(copy_summary)
+
+        copy_lineup = QPushButton("Copy Lineup")
+        copy_lineup.clicked.connect(
+            self.copy_lineup_requested
+        )
+        header.addWidget(copy_lineup)
+
+        header_widget = QWidget()
+        header_widget.setLayout(header)
+        self.results_layout.addWidget(header_widget)
+
+        recommended = result.recommended_formation
+
+        if recommended is not None:
             self.results_layout.addWidget(
-                self._build_formation_card(formation)
+                self._build_recommended_summary(
+                    recommended
+                )
+            )
+
+        self.results_layout.addWidget(
+            self._build_metadata_panel(result)
+        )
+
+        self.results_layout.addWidget(
+            self._build_comparison_table(result)
+        )
+
+        if recommended is not None:
+            self.results_layout.addWidget(
+                self._build_lineup_table(recommended)
             )
 
         self.results_layout.addStretch(1)
 
-    def _build_formation_card(self, formation):
+    def _build_recommended_summary(self, formation):
+        card = QFrame()
+        card.setObjectName("recommendedCard")
+        layout = QGridLayout(card)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setHorizontalSpacing(14)
+        layout.setVerticalSpacing(8)
+
+        badge = QLabel("Recommended")
+        badge.setObjectName("recommendedBadge")
+        layout.addWidget(badge, 0, 0)
+
+        title = QLabel(
+            f"{formation.formation_name} - {formation.recommended_tactic}"
+        )
+        title.setObjectName("resultHeadline")
+        layout.addWidget(title, 0, 1, 1, 4)
+
+        values = [
+            ("Tactic level", f"{formation.tactic_level:.2f}"),
+            ("Win", self._format_percent(formation.win_probability)),
+            ("Draw", self._format_percent(formation.draw_probability)),
+            ("Loss", self._format_percent(formation.loss_probability)),
+            ("Possession", self._format_percent(formation.possession)),
+            ("xG", f"{formation.expected_goals:.2f}"),
+            ("Opp xG", f"{formation.opponent_expected_goals:.2f}"),
+        ]
+
+        for index, (label, value) in enumerate(values):
+            metric = self._build_metric(label, value)
+            layout.addWidget(metric, 1 + index // 4, index % 4)
+
+        return card
+
+    def _build_metadata_panel(self, result):
+        panel = QFrame()
+        panel.setObjectName("metadataPanel")
+        layout = QGridLayout(panel)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setHorizontalSpacing(18)
+        layout.setVerticalSpacing(6)
+
+        items = [
+            ("Opponent", result.opponent_name),
+            ("CSV", result.players_csv_filename),
+            ("Players", str(result.player_count)),
+            ("Formations", ", ".join(result.analyzed_formations)),
+            ("Completed", result.completed_at),
+        ]
+
+        for index, (label, value) in enumerate(items):
+            layout.addWidget(QLabel(label), 0, index)
+            value_label = QLabel(value)
+            value_label.setObjectName("metadataValue")
+            layout.addWidget(value_label, 1, index)
+
+        return panel
+
+    def _build_comparison_table(self, result):
         card = QFrame()
         card.setObjectName("resultCard")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        badge = "Recommended" if formation.is_recommended else ""
-        title = QLabel(
-            f"{formation.formation_name} {badge}".strip()
-        )
+        title = QLabel("Formation comparison")
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
-        comparison = QTableWidget(1, 9)
-        comparison.setHorizontalHeaderLabels(
+        table = QTableWidget(
+            len(result.formations),
+            9
+        )
+        table.setObjectName("comparisonTable")
+        table.setHorizontalHeaderLabels(
             [
+                "",
                 "Formation",
                 "Tactic",
-                "Level",
-                "Win",
-                "Draw",
-                "Loss",
+                "Win / Draw / Loss",
                 "Possession",
                 "xG",
                 "Opp xG",
+                "Win diff",
+                "xG diff",
             ]
         )
-        comparison.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
+        self._configure_table(table)
+        table.setMinimumHeight(
+            86 + 28 * max(1, len(result.formations))
         )
-        comparison.setSelectionMode(
-            QAbstractItemView.NoSelection
-        )
-        comparison.verticalHeader().setVisible(False)
-        comparison.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
-        )
-        comparison.setMaximumHeight(92)
 
-        values = [
-            formation.formation_name,
-            formation.recommended_tactic,
-            f"{formation.tactic_level:.2f}",
-            self._format_percent(formation.win_probability),
-            self._format_percent(formation.draw_probability),
-            self._format_percent(formation.loss_probability),
-            self._format_percent(formation.possession),
-            f"{formation.expected_goals:.2f}",
-            f"{formation.opponent_expected_goals:.2f}",
-        ]
-
-        for column, value in enumerate(values):
-            comparison.setItem(
-                0,
-                column,
-                QTableWidgetItem(value)
-            )
-
-        layout.addWidget(comparison)
-
-        lineup = QTableWidget(
-            len(formation.lineup),
-            5
-        )
-        lineup.setHorizontalHeaderLabels(
-            [
-                "Position",
-                "Side",
-                "Order",
-                "Order Side",
-                "Player",
-            ]
-        )
-        lineup.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
-        )
-        lineup.setSelectionMode(
-            QAbstractItemView.NoSelection
-        )
-        lineup.verticalHeader().setVisible(False)
-        lineup.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
-        )
-        lineup.setMinimumHeight(280)
-
-        for row, player in enumerate(formation.lineup):
+        for row, formation in enumerate(result.formations):
             row_values = [
-                player.position,
-                player.side,
-                player.order,
-                player.order_side,
-                player.player_name,
+                "*" if formation.is_recommended else "",
+                formation.formation_name,
+                formation.recommended_tactic,
+                (
+                    f"{self._format_percent(formation.win_probability)} / "
+                    f"{self._format_percent(formation.draw_probability)} / "
+                    f"{self._format_percent(formation.loss_probability)}"
+                ),
+                self._format_percent(formation.possession),
+                f"{formation.expected_goals:.2f}",
+                f"{formation.opponent_expected_goals:.2f}",
+                self._format_delta_percent(
+                    formation.win_probability_delta
+                ),
+                self._format_delta_number(
+                    formation.expected_goals_delta
+                ),
             ]
 
             for column, value in enumerate(row_values):
-                lineup.setItem(
+                item = QTableWidgetItem(value)
+                if formation.is_recommended:
+                    item.setData(256, "recommended")
+                table.setItem(row, column, item)
+
+        layout.addWidget(table)
+        return card
+
+    def _build_lineup_table(self, formation):
+        card = QFrame()
+        card.setObjectName("resultCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        title = QLabel("Recommended XI")
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title)
+
+        table = QTableWidget(
+            len(formation.lineup),
+            6
+        )
+        table.setHorizontalHeaderLabels(
+            [
+                "No.",
+                "Side",
+                "Position",
+                "Player",
+                "Order",
+                "Order Side",
+            ]
+        )
+        self._configure_table(table)
+        table.setMinimumHeight(330)
+
+        for row, player in enumerate(formation.lineup):
+            row_values = [
+                str(player.number),
+                player.side,
+                player.position,
+                player.player_name,
+                player.order,
+                player.order_side or "-",
+            ]
+
+            for column, value in enumerate(row_values):
+                table.setItem(
                     row,
                     column,
                     QTableWidgetItem(value)
                 )
 
-        layout.addWidget(lineup)
+        layout.addWidget(table)
         return card
+
+    def _build_metric(self, label, value):
+        frame = QFrame()
+        frame.setObjectName("metricTile")
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(2)
+
+        label_widget = QLabel(label)
+        label_widget.setObjectName("metricLabel")
+        value_widget = QLabel(value)
+        value_widget.setObjectName("metricValue")
+
+        layout.addWidget(label_widget)
+        layout.addWidget(value_widget)
+        return frame
+
+    def _configure_table(self, table):
+        table.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        table.setSelectionMode(
+            QAbstractItemView.NoSelection
+        )
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
 
     def _clear_results_widgets(self):
         while self.results_layout.count():
@@ -394,19 +540,82 @@ class MatchPage(BasePage):
                 widget.setParent(None)
 
     def _show_empty_results(self):
-        empty_results_label = QLabel(
-            "Run an analysis to see formation comparison and recommended XI."
+        self._state = "empty"
+        self._show_state_message(
+            "No analysis yet",
+            "Run an analysis to see the recommended formation, comparison and XI."
         )
-        empty_results_label.setWordWrap(True)
-        self.results_layout.addWidget(
-            empty_results_label
-        )
+
+    def _show_state_message(self, title, message):
+        panel = QFrame()
+        panel.setObjectName("statePanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(6)
+
+        title_label = QLabel(title)
+        title_label.setObjectName("sectionTitle")
+        message_label = QLabel(message)
+        message_label.setWordWrap(True)
+
+        layout.addWidget(title_label)
+        layout.addWidget(message_label)
+        self.results_layout.addWidget(panel)
         self.results_layout.addStretch(1)
 
-    def _emit_workspace_changed(self):
-        if not self._applying_settings:
-            self.workspace_changed.emit()
+    def copy_text_to_clipboard(self, text):
+        QApplication.clipboard().setText(text)
+
+    def current_state(self):
+        return self._state
+
+    def recommended_rows(self, result):
+        return [
+            formation.formation_name
+            for formation in result.formations
+            if formation.is_recommended
+        ]
+
+    def comparison_rows(self, result):
+        return [
+            {
+                "formation": formation.formation_name,
+                "recommended": formation.is_recommended,
+                "win_delta": formation.win_probability_delta,
+                "xg_delta": formation.expected_goals_delta,
+            }
+            for formation in result.formations
+        ]
+
+    def lineup_rows(self, formation):
+        return [
+            {
+                "number": player.number,
+                "side": player.side,
+                "position": player.position,
+                "player": player.player_name,
+                "order": player.order,
+                "order_side": player.order_side,
+            }
+            for player in formation.lineup
+        ]
+
+    def _format_delta_percent(self, value):
+        if abs(value) < 0.0001:
+            return "0.0 pp"
+
+        return f"{value * 100:+.1f} pp"
+
+    def _format_delta_number(self, value):
+        if abs(value) < 0.0001:
+            return "0.00"
+
+        return f"{value:+.2f}"
 
     @staticmethod
     def _format_percent(value):
         return f"{value * 100:.1f}%"
+
+    def _emit_workspace_changed(self):
+        if not self._applying_settings:
+            self.workspace_changed.emit()

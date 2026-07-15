@@ -156,6 +156,10 @@ Deliverables:
 - Workspace settings persistence
 - Progress state
 - Result summary
+- Recommended-result summary
+- Formation comparison deltas
+- Copy summary and copy lineup actions
+- Last successful result persistence
 - Recommended lineup, orders, tactic, possession, xG, and probabilities
 
 Acceptance criteria:
@@ -165,6 +169,7 @@ Acceptance criteria:
 - Results are readable and comparable.
 - The Analyze Match action requires a CSV, opponent, and at least one formation.
 - Last selected CSV path, opponent, and formations are restored.
+- Last successful analysis is restored from serializable view-model data.
 - Engine calculations remain unchanged.
 
 ### Epic 7: Reports

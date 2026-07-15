@@ -68,10 +68,55 @@ def _application_stylesheet():
         }
 
         QFrame#workspacePanel,
-        QFrame#resultCard {
+        QFrame#resultCard,
+        QFrame#metadataPanel,
+        QFrame#statePanel {
             background: #ffffff;
             border: 1px solid #e4e7ec;
             border-radius: 8px;
+        }
+
+        QFrame#recommendedCard {
+            background: #eef6ff;
+            border: 2px solid #2563eb;
+            border-radius: 8px;
+        }
+
+        QLabel#recommendedBadge {
+            background: #2563eb;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 650;
+            padding: 4px 8px;
+        }
+
+        QLabel#resultHeadline {
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 650;
+        }
+
+        QFrame#metricTile {
+            background: #ffffff;
+            border: 1px solid #d8dde6;
+            border-radius: 6px;
+        }
+
+        QLabel#metricLabel {
+            color: #667085;
+            font-size: 11px;
+        }
+
+        QLabel#metricValue {
+            color: #111827;
+            font-size: 16px;
+            font-weight: 650;
+        }
+
+        QLabel#metadataValue {
+            color: #111827;
+            font-weight: 650;
         }
 
         QPushButton#primaryAction {

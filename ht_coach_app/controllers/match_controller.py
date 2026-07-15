@@ -5,6 +5,8 @@ from ht_coach_app.persistence.match_workspace_repository import (
 )
 from ht_coach_app.services.match_workspace_service import (
     MatchWorkspaceValidationError,
+    format_match_summary,
+    format_recommended_lineup,
 )
 from ht_coach_app.workers.match_analysis_worker import (
     MatchAnalysisWorker,
@@ -42,6 +44,12 @@ class MatchController(QObject):
         self._view.analyze_requested.connect(
             self._analyze
         )
+        self._view.copy_summary_requested.connect(
+            self._copy_summary
+        )
+        self._view.copy_lineup_requested.connect(
+            self._copy_lineup
+        )
         self._view.workspace_changed.connect(
             self._save_current_settings
         )
@@ -60,6 +68,13 @@ class MatchController(QObject):
         self._view.apply_settings(
             self._settings_repository.load()
         )
+        last_result = self._settings_repository.load_last_result()
+
+        if last_result is not None:
+            self._view.show_results(
+                last_result,
+                restored=True
+            )
 
     def _refresh_opponents(self, selected_name=None):
         opponents = self._service.list_opponents()
@@ -179,6 +194,9 @@ class MatchController(QObject):
         self._view.set_processing(
             False
         )
+        self._settings_repository.save_last_result(
+            result
+        )
         self._view.show_results(
             result
         )
@@ -192,6 +210,38 @@ class MatchController(QObject):
         )
         self._view.show_error(
             message
+        )
+
+    def _copy_summary(self):
+        result = self._settings_repository.load_last_result()
+
+        if result is None:
+            self._view.show_error(
+                "Run an analysis before copying the summary."
+            )
+            return
+
+        self._view.copy_text_to_clipboard(
+            format_match_summary(result)
+        )
+        self._view.show_status(
+            "Match summary copied."
+        )
+
+    def _copy_lineup(self):
+        result = self._settings_repository.load_last_result()
+
+        if result is None:
+            self._view.show_error(
+                "Run an analysis before copying the lineup."
+            )
+            return
+
+        self._view.copy_text_to_clipboard(
+            format_recommended_lineup(result)
+        )
+        self._view.show_status(
+            "Recommended lineup copied."
         )
 
     def _clear_worker_refs(self):

@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from engine.optimizers.formation_optimizer import FormationOptimizer
@@ -18,6 +19,7 @@ class MatchWorkspaceValidationError(ValueError):
 
 @dataclass(frozen=True)
 class LineupPlayerResult:
+    number: int
     position: str
     side: str
     order: str
@@ -36,6 +38,8 @@ class FormationAnalysisResult:
     possession: float
     expected_goals: float
     opponent_expected_goals: float
+    win_probability_delta: float = 0.0
+    expected_goals_delta: float = 0.0
     lineup: list[LineupPlayerResult] = field(
         default_factory=list
     )
@@ -47,6 +51,22 @@ class MatchAnalysisResult:
     player_count: int
     opponent_name: str
     formations: list[FormationAnalysisResult]
+    players_csv_filename: str = ""
+    analyzed_formations: list[str] = field(
+        default_factory=list
+    )
+    completed_at: str = ""
+
+    @property
+    def recommended_formation(self):
+        if not self.formations:
+            return None
+
+        for formation in self.formations:
+            if formation.is_recommended:
+                return formation
+
+        return self.formations[0]
 
 
 class MatchWorkspaceService:
@@ -109,7 +129,10 @@ class MatchWorkspaceService:
         return MatchAnalysisResult(
             player_count=len(players),
             opponent_name=opponent.name,
-            formations=mapped_results
+            formations=mapped_results,
+            players_csv_filename=Path(players_csv_path).name,
+            analyzed_formations=list(formation_names),
+            completed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
 
     def validate_inputs(
@@ -166,7 +189,23 @@ class MatchWorkspaceService:
     def _map_results(self, engine_results):
         mapped = []
 
+        if engine_results:
+            recommended_probabilities = engine_results[0].probabilities
+            recommended_evaluation = engine_results[0].match_evaluation
+            recommended_win = float(recommended_probabilities.win)
+            recommended_xg = float(recommended_evaluation.expected_goals)
+        else:
+            recommended_win = 0.0
+            recommended_xg = 0.0
+
         for index, result in enumerate(engine_results):
+            win_probability = float(
+                result.probabilities.win
+            )
+            expected_goals = float(
+                result.match_evaluation.expected_goals
+            )
+
             mapped.append(
                 FormationAnalysisResult(
                     formation_name=result.formation.name,
@@ -176,9 +215,7 @@ class MatchWorkspaceService:
                     tactic_level=float(
                         result.tactic_level
                     ),
-                    win_probability=float(
-                        result.probabilities.win
-                    ),
+                    win_probability=win_probability,
                     draw_probability=float(
                         result.probabilities.draw
                     ),
@@ -188,15 +225,23 @@ class MatchWorkspaceService:
                     possession=float(
                         result.match_evaluation.possession
                     ),
-                    expected_goals=float(
-                        result.match_evaluation.expected_goals
-                    ),
+                    expected_goals=expected_goals,
                     opponent_expected_goals=float(
                         result.match_evaluation.opponent_expected_goals
                     ),
+                    win_probability_delta=(
+                        win_probability - recommended_win
+                    ),
+                    expected_goals_delta=(
+                        expected_goals - recommended_xg
+                    ),
                     lineup=[
-                        self._map_lineup_player(lineup_player)
-                        for lineup_player in result.lineup.players
+                        self._map_lineup_player(
+                            index + 1,
+                            lineup_player
+                        )
+                        for index, lineup_player
+                        in enumerate(result.lineup.players)
                     ],
                     is_recommended=(index == 0)
                 )
@@ -204,8 +249,9 @@ class MatchWorkspaceService:
 
         return mapped
 
-    def _map_lineup_player(self, lineup_player):
+    def _map_lineup_player(self, number, lineup_player):
         return LineupPlayerResult(
+            number=number,
             position=self._enum_value(
                 lineup_player.position
             ),
@@ -230,3 +276,109 @@ class MatchWorkspaceService:
             "value",
             value
         )
+
+
+def match_analysis_result_to_dict(result):
+    return asdict(result)
+
+
+def match_analysis_result_from_dict(data):
+    return MatchAnalysisResult(
+        player_count=int(data.get("player_count", 0)),
+        opponent_name=data.get("opponent_name", ""),
+        players_csv_filename=data.get("players_csv_filename", ""),
+        analyzed_formations=list(data.get("analyzed_formations", [])),
+        completed_at=data.get("completed_at", ""),
+        formations=[
+            FormationAnalysisResult(
+                formation_name=item.get("formation_name", ""),
+                recommended_tactic=item.get("recommended_tactic", ""),
+                tactic_level=float(item.get("tactic_level", 0.0)),
+                win_probability=float(item.get("win_probability", 0.0)),
+                draw_probability=float(item.get("draw_probability", 0.0)),
+                loss_probability=float(item.get("loss_probability", 0.0)),
+                possession=float(item.get("possession", 0.0)),
+                expected_goals=float(item.get("expected_goals", 0.0)),
+                opponent_expected_goals=float(
+                    item.get("opponent_expected_goals", 0.0)
+                ),
+                win_probability_delta=float(
+                    item.get("win_probability_delta", 0.0)
+                ),
+                expected_goals_delta=float(
+                    item.get("expected_goals_delta", 0.0)
+                ),
+                is_recommended=bool(item.get("is_recommended", False)),
+                lineup=[
+                    LineupPlayerResult(
+                        number=int(player.get("number", index + 1)),
+                        position=player.get("position", ""),
+                        side=player.get("side", ""),
+                        order=player.get("order", ""),
+                        order_side=player.get("order_side", ""),
+                        player_name=player.get("player_name", "")
+                    )
+                    for index, player in enumerate(
+                        item.get("lineup", [])
+                    )
+                ],
+            )
+            for item in data.get("formations", [])
+        ]
+    )
+
+
+def format_match_summary(result):
+    recommended = result.recommended_formation
+
+    if recommended is None:
+        return "No match analysis result available."
+
+    return "\n".join(
+        [
+            "HT Coach Match Summary",
+            f"Opponent: {result.opponent_name}",
+            f"Players CSV: {result.players_csv_filename}",
+            f"Players loaded: {result.player_count}",
+            f"Formations analyzed: {', '.join(result.analyzed_formations)}",
+            f"Completed: {result.completed_at}",
+            "",
+            f"Recommended formation: {recommended.formation_name}",
+            f"Recommended tactic: {recommended.recommended_tactic}",
+            f"Tactic level: {recommended.tactic_level:.2f}",
+            f"Win: {recommended.win_probability * 100:.1f}%",
+            f"Draw: {recommended.draw_probability * 100:.1f}%",
+            f"Loss: {recommended.loss_probability * 100:.1f}%",
+            f"Possession: {recommended.possession * 100:.1f}%",
+            f"xG: {recommended.expected_goals:.2f}",
+            f"Opponent xG: {recommended.opponent_expected_goals:.2f}",
+        ]
+    )
+
+
+def format_recommended_lineup(result):
+    recommended = result.recommended_formation
+
+    if recommended is None:
+        return "No recommended lineup available."
+
+    lines = [
+        f"Recommended XI - {recommended.formation_name}",
+        "No. | Side | Position | Player | Order | Order side",
+    ]
+
+    for player in recommended.lineup:
+        lines.append(
+            " | ".join(
+                [
+                    str(player.number),
+                    player.side,
+                    player.position,
+                    player.player_name,
+                    player.order,
+                    player.order_side or "-",
+                ]
+            )
+        )
+
+    return "\n".join(lines)
