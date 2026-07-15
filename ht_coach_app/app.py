@@ -53,6 +53,20 @@ def _application_stylesheet():
             font-size: 12px;
         }
 
+        QLabel#sectionTitle {
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        QLabel[state="error"] {
+            color: #b42318;
+        }
+
+        QLabel[state="ok"] {
+            color: #027a48;
+        }
+
         QFrame#pageHeader {
             background: #ffffff;
             border-bottom: 1px solid #e4e7ec;

@@ -11,12 +11,15 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.controllers.navigation_controller import NavigationController
+from ht_coach_app.controllers.opponent_controller import OpponentController
 from ht_coach_app.core.constants import (
     WINDOW_MINIMUM_HEIGHT,
     WINDOW_MINIMUM_WIDTH,
     WINDOW_TITLE,
 )
 from ht_coach_app.core.paths import application_icon_path
+from ht_coach_app.persistence.opponent_repository import OpponentRepository
+from ht_coach_app.services.opponent_service import OpponentService
 from ht_coach_app.views.dashboard_page import DashboardPage
 from ht_coach_app.views.match_page import MatchPage
 from ht_coach_app.views.opponents_page import OpponentsPage
@@ -44,6 +47,7 @@ class MainWindow(QMainWindow):
             WINDOW_MINIMUM_HEIGHT
         )
         self._apply_application_icon()
+        self._controllers = []
         self._build_toolbar()
         self._build_status_bar()
         self._build_shell()
@@ -109,9 +113,12 @@ class MainWindow(QMainWindow):
         )
 
         for page in self.PAGES:
+            widget = self._create_page(
+                page
+            )
             self.navigation_controller.register_page(
                 page["key"],
-                page["factory"]()
+                widget
             )
 
         self.sidebar.navigation_requested.connect(
@@ -126,3 +133,19 @@ class MainWindow(QMainWindow):
             5000
         )
 
+    def _create_page(self, page):
+        widget = page["factory"]()
+
+        if page["key"] == "opponents":
+            service = OpponentService(
+                OpponentRepository()
+            )
+            self._controllers.append(
+                OpponentController(
+                    widget,
+                    service,
+                    self
+                )
+            )
+
+        return widget

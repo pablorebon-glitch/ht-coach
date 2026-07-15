@@ -6,7 +6,8 @@ HT Coach Alpha 0.2 should feel like a focused desktop coaching tool: calm, struc
 fast to scan, and reliable during long calculations.
 
 The GUI should be built with PySide6. The existing Tkinter app is useful as workflow
-reference, but it should not define the long-term architecture.
+reference, but it should not define the long-term architecture or receive new Alpha 0.2
+features.
 
 ## Primary Navigation
 
@@ -94,13 +95,14 @@ Content:
 - Opponent list.
 - Opponent name field.
 - Seven-sector rating editor.
-- Save, new, delete, and select actions.
+- Save, new, duplicate, delete, and select actions.
 
 Expected controls:
 
 - List selection.
 - Text input for name.
 - Numeric rating inputs.
+- Duplicate action.
 - Confirmation dialog for delete.
 - Validation messages for empty name or invalid rating.
 

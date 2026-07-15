@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 
 def project_root():
@@ -17,3 +18,11 @@ def application_icon_path():
 
     return None
 
+
+def user_data_dir():
+    base_path = os.environ.get("LOCALAPPDATA")
+
+    if base_path:
+        return Path(base_path) / "HT Coach" / "Alpha"
+
+    return Path.home() / ".ht-coach" / "alpha"

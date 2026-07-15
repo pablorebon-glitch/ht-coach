@@ -44,6 +44,10 @@ The current `app.py` can remain as a legacy Tkinter entry point during the migra
 The PySide6 application should be introduced beside it and become the primary desktop
 surface once feature parity is reached.
 
+As of Epic 1, the PySide6 application is the primary Alpha 0.2 surface. The legacy
+Tkinter `app.py` is preserved for backward compatibility only and should not receive new
+features.
+
 ## Layer Responsibilities
 
 ### Desktop Shell
@@ -100,7 +104,7 @@ Initial controllers:
 
 - `NavigationController`: switches central pages without opening new windows.
 - `SquadController`: load players, refresh squad state, handle CSV import errors.
-- `OpponentController`: create, update, delete, and select opponents.
+- `OpponentController`: create, update, duplicate, delete, and select opponents.
 - `MatchController`: run matchup optimization against selected opponent.
 - `ReportsController`: prepare recommendation summaries and exports.
 - `SettingsController`: manage user preferences and app-level configuration.
@@ -149,7 +153,8 @@ Initial views:
   - CSV loading, player table, roster filters, and player details.
 
 - `OpponentsView`
-  - Saved opponent list, opponent editor, ratings editor, and delete confirmation.
+  - Saved opponent list, opponent editor, duplicate action, ratings editor, and delete
+    confirmation.
 
 - `MatchView`
   - Selected opponent, optimization controls, progress, and result comparison.
@@ -202,6 +207,7 @@ Suggested repositories:
   - Reads and writes saved opponents.
   - Preserves stable JSON shape.
   - Handles migrations if fields are added later.
+  - Stores data under the application data directory.
 
 - `SettingsRepository`
   - Stores UI preferences and last-used paths.
@@ -354,7 +360,7 @@ Avoid brittle screenshot tests early. Prefer fast unit tests for services and st
 4. Implement PySide6 shell and navigation.
 5. Add state and service boundaries.
 6. Port squad loading.
-7. Port opponent manager.
+7. Port opponent manager to PySide6.
 8. Port match analysis with background workers.
 9. Add reports and exports.
 10. Retire or freeze Tkinter app once PySide6 reaches feature parity.

@@ -130,14 +130,17 @@ Deliverables:
 - Opponents view
 - Opponent list
 - Rating editor
-- Save, update, delete, and select actions
+- Save, update, duplicate, delete, and select actions
+- Repository/service/controller boundaries
 - Validation feedback
+- JSON persistence under the application data directory
 
 Acceptance criteria:
 
 - Users can maintain multiple opponents.
 - Empty or invalid opponent names are rejected.
 - Saved opponents are available to Match Analysis.
+- No new opponent workflow is added to the legacy Tkinter app.
 
 ### Epic 6: Match Analysis
 
