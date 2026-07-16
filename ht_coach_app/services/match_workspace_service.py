@@ -4,6 +4,11 @@ from pathlib import Path
 
 from engine.optimizers.formation_optimizer import FormationOptimizer
 from ht_coach_app.core.position_formatting import format_position
+from ht_coach_app.core.position_formatting import normalize_position_key
+from ht_coach_app.core.side_formatting import normalize_side_value
+from ht_coach_app.widgets.formation_board.formation_layouts import (
+    get_formation_layout,
+)
 from models.formations import (
     DEFAULT_FORMATION_NAMES,
     FORMATION_BY_NAME,
@@ -369,7 +374,7 @@ def format_recommended_lineup(result):
         "No. | Side | Position | Player | Order | Order side",
     ]
 
-    for player in recommended.lineup:
+    for player in _lineup_in_pitch_order(recommended):
         lines.append(
             " | ".join(
                 [
@@ -384,3 +389,46 @@ def format_recommended_lineup(result):
         )
 
     return "\n".join(lines)
+
+
+def _lineup_in_pitch_order(formation):
+    try:
+        layouts = sorted(
+            get_formation_layout(formation.formation_name),
+            key=lambda slot: (-slot.normalized_y, slot.normalized_x),
+        )
+    except Exception:
+        return formation.lineup
+
+    remaining = list(formation.lineup)
+    ordered = []
+
+    for slot in layouts:
+        match = _pop_lineup_match(
+            remaining,
+            slot.position,
+            slot.side,
+        )
+
+        if match is not None:
+            ordered.append(match)
+
+    ordered.extend(remaining)
+    return ordered
+
+
+def _pop_lineup_match(players, position, side):
+    for player in players:
+        if (
+            normalize_position_key(player.position) == position
+            and normalize_side_value(player.side) == side
+        ):
+            players.remove(player)
+            return player
+
+    for player in players:
+        if normalize_position_key(player.position) == position:
+            players.remove(player)
+            return player
+
+    return None

@@ -24,6 +24,12 @@
   order side.
 - Added copy actions for match summary and recommended lineup.
 - Added analysis metadata and last successful result restore from JSON view-model data.
+- Added the Alpha 0.4 Formation Viewer milestone with a read-only PySide6 pitch board,
+  compact player cards, formation switching, selection, and a player inspector.
+- Added centralized formation-board layouts for all supported formations using normalized
+  pitch coordinates.
+- Added product vision and Formation Viewer documentation for the Calculate, Explain,
+  Visualize, and Experiment product pillars.
 
 ### Changed
 
@@ -36,6 +42,10 @@
   already saved different formations.
 - Improved Match page empty, loading, success and error states.
 - Kept optimization work on the existing background worker path.
+- Match results now open on a Formation Board tab while preserving the Comparison and
+  Detailed XI tabs.
+- Copy Lineup output now follows pitch order: goalkeeper, defenders, midfielders and
+  forwards from left to right.
 
 ### Notes
 

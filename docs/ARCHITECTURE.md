@@ -139,6 +139,11 @@ Suggested services:
   - Preserves 3-5-2 and 4-5-1 as the default recommended selection for existing users.
   - Formats copy-ready match summaries and recommended lineup text from view models.
 
+- `FormationBoardMapper`
+  - Converts serializable match analysis results into immutable board view models.
+  - Reuses centralized position, side and order formatting.
+  - Does not call optimizers, persistence, or engine calculators.
+
 - `ReportService`
   - Formats recommendation summaries for display and future export.
   - Keeps report formatting out of controllers.
@@ -190,6 +195,10 @@ Suggested widgets:
 - `OpponentList`: saved opponent list with empty state.
 - `FormationResultTable`: sortable formation comparison.
 - `MatchResultPanel`: win/draw/loss, xG, possession, tactic, and lineup summary.
+- `FormationBoard`: read-only football pitch visualization for analyzed lineups.
+- `PitchWidget`: custom PySide6-painted vertical pitch.
+- `PlayerCard`: compact selectable card for a recommended XI player.
+- `PlayerInspectorPanel`: read-only selected-player detail surface.
 - `StatusBanner`: non-blocking validation and task messages.
 - `BusyOverlay` or `ProgressPanel`: long-running optimization feedback.
 
@@ -345,7 +354,8 @@ User clicks Analyze Match
   -> MatchWorkspaceService calls FormationOptimizer.optimize_against
   -> Service maps engine result to serializable MatchAnalysisResult view models
   -> MatchWorkspaceRepository persists the last successful result
-  -> MatchPage renders recommended summary, comparison table and recommended XI
+  -> MatchPage renders recommended summary, Formation Board, comparison table and
+     detailed XI
 ```
 
 The engine remains unaware of the desktop application.
@@ -361,6 +371,10 @@ Examples:
 - `FormationResultRowViewModel`
 - `MatchAnalysisResultViewModel`
 - `LineupRecommendationViewModel`
+- `FormationBoardViewModel`
+- `FormationSlotViewModel`
+- `PlayerCardViewModel`
+- `PlayerInspectorViewModel`
 
 View models should contain formatted values where appropriate, such as percentages,
 rating strings, labels, and table rows. This avoids formatting duplication across views.

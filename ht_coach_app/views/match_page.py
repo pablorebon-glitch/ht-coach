@@ -13,13 +13,16 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.views.base_page import BasePage
+from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 
 
 class MatchPage(BasePage):
@@ -39,6 +42,7 @@ class MatchPage(BasePage):
         self._applying_settings = False
         self._formation_checks = {}
         self._favorite_formations = []
+        self._formation_board_mapper = FormationBoardMapper()
         self._state = "empty"
         self._build_inputs()
         self._build_results()
@@ -396,15 +400,70 @@ class MatchPage(BasePage):
         )
 
         self.results_layout.addWidget(
-            self._build_comparison_table(result)
+            self._build_result_tabs(result, restored=restored)
         )
 
+        self.results_layout.addStretch(1)
+
+    def _build_result_tabs(self, result, restored=False):
+        tabs = QTabWidget()
+        tabs.setObjectName("matchResultTabs")
+
+        tabs.addTab(
+            self._build_formation_board_tab(result, restored),
+            "Formation Board",
+        )
+        tabs.addTab(
+            self._build_comparison_table(result),
+            "Comparison",
+        )
+
+        recommended = result.recommended_formation
         if recommended is not None:
-            self.results_layout.addWidget(
-                self._build_lineup_table(recommended)
+            tabs.addTab(
+                self._build_lineup_table(recommended),
+                "Detailed XI",
             )
 
-        self.results_layout.addStretch(1)
+        return tabs
+
+    def _build_formation_board_tab(self, result, restored=False):
+        try:
+            boards = [
+                self._formation_board_mapper.to_board(
+                    formation,
+                    restored=restored,
+                )
+                for formation in result.formations
+            ]
+            board = FormationBoard()
+            recommended = result.recommended_formation
+            board.set_boards(
+                boards,
+                selected_formation_name=(
+                    recommended.formation_name
+                    if recommended is not None
+                    else ""
+                ),
+            )
+            return board
+        except Exception as exc:
+            panel = QFrame()
+            panel.setObjectName("statePanel")
+            layout = QVBoxLayout(panel)
+            layout.setContentsMargins(18, 18, 18, 18)
+            layout.setSpacing(6)
+
+            title = QLabel("Formation board could not render")
+            title.setObjectName("sectionTitle")
+            message = QLabel(
+                "The comparison and Detailed XI tabs are still available. "
+                f"Board error: {exc}"
+            )
+            message.setWordWrap(True)
+            layout.addWidget(title)
+            layout.addWidget(message)
+            return panel
 
     def _build_recommended_summary(self, formation):
         card = QFrame()
@@ -617,7 +676,7 @@ class MatchPage(BasePage):
         self._state = "empty"
         self._show_state_message(
             "No analysis yet",
-            "Run an analysis to see the recommended formation, comparison and XI."
+            "Run a match analysis to view the recommended formation."
         )
 
     def _show_state_message(self, title, message):
