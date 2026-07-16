@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceRepository,
+    MatchWorkspaceSettings,
 )
 from ht_coach_app.services.match_workspace_service import (
     FormationAnalysisResult,
@@ -201,6 +202,28 @@ class MatchResultsUxTest(unittest.TestCase):
             lineup
         )
 
+    def test_result_mapping_handles_more_than_two_formations(self):
+        result = self.service.analyze(
+            self.csv_path,
+            "Rival FC",
+            ["2-5-3", "3-5-2", "4-5-1"]
+        )
+
+        self.assertEqual(
+            [
+                formation.formation_name
+                for formation in result.formations
+            ],
+            ["2-5-3", "3-5-2", "4-5-1"]
+        )
+        self.assertEqual(
+            [
+                formation.is_recommended
+                for formation in result.formations
+            ],
+            [True, False, False]
+        )
+
     def test_deterministic_rendering_data(self):
         result = self.service.analyze(
             self.csv_path,
@@ -329,6 +352,63 @@ class MatchResultsViewStateTest(unittest.TestCase):
                 )
             ),
             ["3-5-2"]
+        )
+
+    def test_formation_selector_presets(self):
+        page = MatchPage()
+        formations = [
+            "2-5-3",
+            "3-4-3",
+            "3-5-2",
+            "4-3-3",
+            "4-4-2",
+            "4-5-1",
+            "5-2-3",
+            "5-3-2",
+            "5-4-1",
+        ]
+
+        page.set_supported_formations(
+            formations,
+            favorite_formations=["3-5-2", "4-5-1"]
+        )
+
+        page.select_all_formations()
+        self.assertEqual(
+            page.selected_formations(),
+            formations
+        )
+        self.assertIn(
+            "longer",
+            page.formation_warning_label.text()
+        )
+
+        page.clear_all_formations()
+        self.assertEqual(
+            page.selected_formations(),
+            []
+        )
+
+        page.select_favorite_formations()
+        self.assertEqual(
+            page.selected_formations(),
+            ["3-5-2", "4-5-1"]
+        )
+
+    def test_formation_selector_applies_persisted_selection(self):
+        page = MatchPage()
+        page.set_supported_formations(
+            ["2-5-3", "3-5-2", "4-5-1"]
+        )
+        page.apply_settings(
+            MatchWorkspaceSettings(
+                selected_formations=["2-5-3"]
+            )
+        )
+
+        self.assertEqual(
+            page.selected_formations(),
+            ["2-5-3"]
         )
 
 

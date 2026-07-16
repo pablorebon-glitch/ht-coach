@@ -49,6 +49,10 @@ class PositionFormattingTest(unittest.TestCase):
             format_position("LEFT_CENTER_BACK"),
             "Left Center Back"
         )
+        self.assertEqual(
+            format_position("EXTRA_DEFENSIVE_MID"),
+            "Extra Defensive Mid"
+        )
 
     def test_already_formatted_position_is_preserved(self):
         self.assertEqual(

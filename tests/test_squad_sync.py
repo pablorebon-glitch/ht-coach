@@ -111,7 +111,11 @@ class FakeMatchView(QObject):
     def set_opponents(self, opponent_names, selected_name=None):
         self.opponents = list(opponent_names)
 
-    def set_supported_formations(self, formation_names):
+    def set_supported_formations(
+        self,
+        formation_names,
+        favorite_formations=None
+    ):
         pass
 
     def apply_settings(self, settings):
@@ -170,6 +174,9 @@ class FakeMatchService:
         return []
 
     def supported_formations(self):
+        return ["3-5-2"]
+
+    def default_formations(self):
         return ["3-5-2"]
 
 

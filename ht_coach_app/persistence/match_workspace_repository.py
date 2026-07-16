@@ -6,6 +6,7 @@ from ht_coach_app.services.match_workspace_service import (
     match_analysis_result_from_dict,
     match_analysis_result_to_dict,
 )
+from models.formations import DEFAULT_FORMATION_NAMES
 
 
 @dataclass
@@ -13,7 +14,7 @@ class MatchWorkspaceSettings:
     players_csv_path: str = ""
     opponent_name: str = ""
     selected_formations: list[str] = field(
-        default_factory=lambda: ["3-5-2"]
+        default_factory=lambda: list(DEFAULT_FORMATION_NAMES)
     )
 
 
@@ -41,7 +42,10 @@ class MatchWorkspaceRepository:
             players_csv_path=data.get("players_csv_path", ""),
             opponent_name=data.get("opponent_name", ""),
             selected_formations=list(
-                data.get("selected_formations", ["3-5-2"])
+                data.get(
+                    "selected_formations",
+                    DEFAULT_FORMATION_NAMES
+                )
             ),
         )
 

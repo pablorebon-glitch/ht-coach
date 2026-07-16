@@ -66,7 +66,8 @@ class MatchController(QObject):
     def refresh(self):
         self._refresh_opponents()
         self._view.set_supported_formations(
-            self._service.supported_formations()
+            self._service.supported_formations(),
+            favorite_formations=self._service.default_formations()
         )
         self._view.apply_settings(
             self._settings_repository.load()

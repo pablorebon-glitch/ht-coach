@@ -158,7 +158,8 @@ Deliverables:
 - Match Analysis view
 - Players CSV selector and loaded player count
 - Opponent selector
-- Formation selector for 3-5-2 and 4-5-1
+- Formation selector generated from the full supported catalog
+- Select All, Clear All, and Favorites preset for 3-5-2 and 4-5-1
 - Optimization worker
 - Workspace settings persistence
 - Progress state
@@ -177,6 +178,7 @@ Acceptance criteria:
 - The Analyze Match action requires a CSV, opponent, and at least one formation.
 - Last selected CSV path, opponent, and formations are restored.
 - Last successful analysis is restored from serializable view-model data.
+- Any supported formation can be analyzed and restored from persisted results.
 - Engine calculations remain unchanged.
 
 ### Epic 7: Reports
