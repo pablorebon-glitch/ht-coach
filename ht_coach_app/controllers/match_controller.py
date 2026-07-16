@@ -5,6 +5,7 @@ from ht_coach_app.persistence.match_workspace_repository import (
 )
 from ht_coach_app.services.match_workspace_service import (
     MatchWorkspaceValidationError,
+    format_decision_lab,
     format_match_summary,
     format_recommended_lineup,
 )
@@ -46,6 +47,9 @@ class MatchController(QObject):
         )
         self._view.copy_summary_requested.connect(
             self._copy_summary
+        )
+        self._view.copy_decision_lab_requested.connect(
+            self._copy_decision_lab
         )
         self._view.copy_lineup_requested.connect(
             self._copy_lineup
@@ -258,6 +262,22 @@ class MatchController(QObject):
         )
         self._view.show_status(
             "Recommended lineup copied."
+        )
+
+    def _copy_decision_lab(self):
+        result = self._settings_repository.load_last_result()
+
+        if result is None:
+            self._view.show_error(
+                "Run an analysis before copying Decision Lab."
+            )
+            return
+
+        self._view.copy_text_to_clipboard(
+            format_decision_lab(result)
+        )
+        self._view.show_status(
+            "Decision Lab copied."
         )
 
     def _clear_worker_refs(self):

@@ -24,6 +24,11 @@
   order side.
 - Added copy actions for match summary and recommended lineup.
 - Added analysis metadata and last successful result restore from JSON view-model data.
+- Added HT Coach Alpha 0.3 Decision Lab as a deterministic reasoning layer over Match
+  analysis results.
+- Added Decision Lab recommendation reasons, risks, tactical observations, confidence,
+  sector matchup interpretation, optimization gain breakdown, and copy-ready text.
+- Added persisted Decision Lab view-model data with backward-compatible restore.
 
 ### Changed
 
@@ -35,9 +40,12 @@
 - Existing users still default to the familiar 3-5-2 and 4-5-1 selections unless they
   already saved different formations.
 - Improved Match page empty, loading, success and error states.
+- Extended Match copy summary output with a concise Decision Lab section.
 - Kept optimization work on the existing background worker path.
 
 ### Notes
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
+- Decision Lab explanations are deterministic and rule-based; no AI service, LLM,
+  network dependency, or external API is used.

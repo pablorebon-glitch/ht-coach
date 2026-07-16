@@ -134,6 +134,8 @@ Content:
 - Analyze Match action.
 - Progress indicator.
 - Prominent recommended-result summary.
+- Decision Lab section with recommendation, confidence badge, reasons, risks, tactical
+  observations, sector matchup notes, and optimization gain breakdown.
 - Formation comparison table with deltas versus the recommendation.
 - Recommended lineup.
 - Probabilities, xG, possession, and tactic.
@@ -150,6 +152,7 @@ Expected controls:
 - Primary Analyze Match button.
 - Busy state while worker runs.
 - Copy Summary and Copy Lineup actions.
+- Copy Decision Lab action.
 - Result table and recommended XI table inside the page.
 - Empty, loading, success, and error states.
 
@@ -240,6 +243,17 @@ Responsibilities:
 - Show win/draw/loss.
 - Show expected goals and possession.
 - Show tactic and tactic level.
+
+### DecisionLabPanel
+
+Responsibilities:
+
+- Display the deterministic recommendation explanation.
+- Show confidence as a recommendation-confidence badge, not a statistical certainty.
+- List the highest-value reasons and meaningful risks.
+- Show tactical observations, strongest attacking channel, greatest vulnerability, and
+  optimization gain breakdown.
+- Keep copy-ready text plain and readable.
 
 ### LineupTable
 
