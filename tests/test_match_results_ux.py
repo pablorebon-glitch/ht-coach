@@ -12,6 +12,7 @@ from ht_coach_app.services.match_workspace_service import (
     LineupPlayerResult,
     MatchAnalysisResult,
     MatchWorkspaceService,
+    format_decision_lab,
     format_match_summary,
     format_recommended_lineup,
 )
@@ -184,10 +185,23 @@ class MatchResultsUxTest(unittest.TestCase):
 
         summary = format_match_summary(result)
         lineup = format_recommended_lineup(result)
+        decision_lab = format_decision_lab(result)
 
         self.assertIn(
             "Recommended formation: 3-5-2",
             summary
+        )
+        self.assertIn(
+            "Decision Lab",
+            summary
+        )
+        self.assertIn(
+            "HT COACH DECISION LAB",
+            decision_lab
+        )
+        self.assertIn(
+            "Recommendation confidence",
+            decision_lab
         )
         self.assertIn(
             "Win: 55.0%",
@@ -222,6 +236,9 @@ class MatchResultsUxTest(unittest.TestCase):
                 for formation in result.formations
             ],
             [True, False, False]
+        )
+        self.assertIsNotNone(
+            result.decision_lab
         )
 
     def test_deterministic_rendering_data(self):
@@ -353,6 +370,40 @@ class MatchResultsViewStateTest(unittest.TestCase):
             ),
             ["3-5-2"]
         )
+
+    def test_decision_lab_rendering_data_is_deterministic(self):
+        page = MatchPage()
+        result = MatchAnalysisResult(
+            player_count=0,
+            opponent_name="",
+            formations=[
+                FormationAnalysisResult(
+                    formation_name="3-5-2",
+                    recommended_tactic="Normal",
+                    tactic_level=0,
+                    win_probability=0.56,
+                    draw_probability=0.24,
+                    loss_probability=0.20,
+                    possession=0.55,
+                    expected_goals=1.5,
+                    opponent_expected_goals=1.0,
+                    is_recommended=True,
+                )
+            ],
+        )
+        from ht_coach_app.reasoning.decision_lab import DecisionLab
+
+        result = MatchAnalysisResult(
+            player_count=result.player_count,
+            opponent_name=result.opponent_name,
+            formations=result.formations,
+            decision_lab=DecisionLab().analyze(result),
+        )
+
+        rows = page.decision_lab_rows(result)
+
+        self.assertEqual(rows["formation"], "3-5-2")
+        self.assertEqual(rows["confidence"], "MEDIUM")
 
     def test_formation_selector_presets(self):
         page = MatchPage()
