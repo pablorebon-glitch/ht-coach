@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ht_coach_app.reasoning.explanation_formatter import (
+    optimization_gain_lines,
+)
 from ht_coach_app.views.base_page import BasePage
 
 
@@ -466,7 +469,9 @@ class MatchPage(BasePage):
         title.setObjectName("sectionTitle")
         layout.addWidget(title, 0, 0, 1, 3)
 
-        confidence = QLabel(decision_lab.confidence.level)
+        confidence = QLabel(
+            f"Recommendation confidence: {decision_lab.confidence.level}"
+        )
         confidence.setObjectName("recommendedBadge")
         layout.addWidget(confidence, 0, 3)
 
@@ -507,17 +512,74 @@ class MatchPage(BasePage):
         layout.addWidget(observations, 4, 0, 1, 4)
 
         gains = self._build_text_list(
-            "Optimization breakdown",
+            "Optimization impact",
             [
-                f"Lineup gain: {self._format_delta_percent(decision_lab.lineup_gain)}",
-                f"Order gain: {self._format_delta_percent(decision_lab.order_gain)}",
-                f"Tactic gain: {self._format_delta_percent(decision_lab.tactic_gain)}",
-                f"Total gain: {self._format_delta_percent(decision_lab.total_gain)}",
+                line.removeprefix("- ")
+                for line in optimization_gain_lines(decision_lab)
             ]
         )
-        layout.addWidget(gains, 5, 0, 1, 4)
+        layout.addWidget(gains, 5, 0, 1, 2)
+
+        sector = self._build_text_list(
+            "Sector matchup",
+            self._sector_lines(decision_lab)
+        )
+        layout.addWidget(sector, 5, 2, 1, 2)
 
         return card
+
+    def _sector_lines(self, decision_lab):
+        favorable = [
+            item for item in decision_lab.opponent_weaknesses
+            if item.classification in {
+                "Slight advantage",
+                "Strong advantage",
+            }
+        ]
+        vulnerabilities = [
+            item for item in decision_lab.our_vulnerabilities
+            if "disadvantage" in item.classification.lower()
+        ]
+
+        lines = []
+
+        if favorable:
+            best = max(
+                favorable,
+                key=lambda item: item.relative_difference
+            )
+            lines.append(
+                f"Best attacking channel: {best.sector} "
+                f"({best.classification})."
+            )
+        elif all(
+            item.classification == "Balanced"
+            for item in decision_lab.opponent_weaknesses
+        ):
+            lines.append("No clear attacking channel advantage.")
+        else:
+            least_bad = max(
+                decision_lab.opponent_weaknesses,
+                key=lambda item: item.relative_difference
+            )
+            lines.append(
+                "No attacking advantage detected. Least unfavorable "
+                f"channel: {least_bad.sector}."
+            )
+
+        if vulnerabilities:
+            concern = min(
+                vulnerabilities,
+                key=lambda item: item.relative_difference
+            )
+            lines.append(
+                f"Main defensive concern: {concern.sector} "
+                f"({concern.classification})."
+            )
+        else:
+            lines.append("No clear defensive vulnerability detected.")
+
+        return lines
 
     def _build_text_list(self, title, lines):
         frame = QFrame()

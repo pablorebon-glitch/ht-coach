@@ -29,6 +29,9 @@
 - Added Decision Lab recommendation reasons, risks, tactical observations, confidence,
   sector matchup interpretation, optimization gain breakdown, and copy-ready text.
 - Added persisted Decision Lab view-model data with backward-compatible restore.
+- Added polished Decision Lab language for attacking channels, defensive vulnerabilities,
+  xG interpretation bands, tactic-gain explanations, recommendation confidence, and
+  copy-ready coaching summaries.
 
 ### Changed
 
@@ -41,6 +44,8 @@
   already saved different formations.
 - Improved Match page empty, loading, success and error states.
 - Extended Match copy summary output with a concise Decision Lab section.
+- Reduced Decision Lab duplication between reasons, risks, tactical observations, and
+  sector matchup presentation.
 - Kept optimization work on the existing background worker path.
 
 ### Notes

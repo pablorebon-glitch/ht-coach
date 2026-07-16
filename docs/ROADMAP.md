@@ -244,6 +244,9 @@ Deliverables:
 - Deterministic reasoning layer under `ht_coach_app/reasoning`.
 - Recommendation reasons, risks, tactical observations, confidence assessment, sector
   matchup interpretation, and formation comparison conclusions.
+- Polished coaching language that avoids misleading best-channel labels when every
+  sector is unfavorable.
+- xG interpretation bands, tactic-gain wording, and clean optimization impact display.
 - Decision Lab section in Match results.
 - Copy-ready Decision Lab summary.
 - Persisted serializable reasoning data with backward-compatible restore.

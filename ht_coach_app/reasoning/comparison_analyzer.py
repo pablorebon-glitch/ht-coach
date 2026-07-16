@@ -16,6 +16,10 @@ class ReasoningThresholds:
     meaningful_opponent_xg: float = 0.15
     slight_sector_gap: float = 0.05
     strong_sector_gap: float = 0.15
+    low_xg: float = 0.80
+    moderate_xg: float = 1.20
+    dangerous_xg: float = 1.70
+    visible_gain_points: float = 0.0005
 
 
 THRESHOLDS = ReasoningThresholds()
@@ -163,27 +167,36 @@ class ComparisonAnalyzer:
             - alternative.opponent_expected_goals
         )
 
-        if (
+        if abs(win_delta) < self._thresholds.negligible_probability_points:
+            conclusion = (
+                "The formations are effectively tied; choose based on risk "
+                "preference."
+            )
+        elif (
             win_delta >= self._thresholds.meaningful_probability_points
             and xg_delta >= self._thresholds.meaningful_xg
+            and opp_xg_delta <= self._thresholds.meaningful_opponent_xg
         ):
             conclusion = (
-                f"{base.formation_name} creates substantially more attacking "
-                "output while improving the overall recommendation."
-            )
-        elif abs(win_delta) < self._thresholds.negligible_probability_points:
-            conclusion = (
-                "The difference is too small to justify a strong preference."
+                f"{base.formation_name} is the stronger option because it "
+                f"adds {xg_delta:.2f} xG without increasing opponent xG."
             )
         elif opp_xg_delta < -self._thresholds.meaningful_opponent_xg:
             conclusion = (
-                f"{base.formation_name} improves the result but accepts more "
-                "defensive exposure."
+                f"{alternative.formation_name} is safer defensively, while "
+                f"{base.formation_name} offers the higher winning ceiling."
+            )
+        elif base.possession - alternative.possession >= (
+            self._thresholds.meaningful_possession_points
+        ):
+            conclusion = (
+                f"{base.formation_name} gains possession, but most of its "
+                "advantage comes from stronger attacking output."
             )
         else:
             conclusion = (
-                f"{base.formation_name} offers the better overall balance "
-                "among the analyzed alternatives."
+                f"{base.formation_name} offers the best overall balance "
+                "against this opponent."
             )
 
         tactic_difference = (

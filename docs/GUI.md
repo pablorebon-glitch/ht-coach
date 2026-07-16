@@ -249,10 +249,10 @@ Responsibilities:
 Responsibilities:
 
 - Display the deterministic recommendation explanation.
-- Show confidence as a recommendation-confidence badge, not a statistical certainty.
+- Show recommendation confidence as a badge, not a statistical certainty.
 - List the highest-value reasons and meaningful risks.
-- Show tactical observations, strongest attacking channel, greatest vulnerability, and
-  optimization gain breakdown.
+- Show a compact top recommendation card, coaching-style reasons, meaningful risks,
+  tactic-specific observations, sector matchup notes, and optimization impact.
 - Keep copy-ready text plain and readable.
 
 ### LineupTable

@@ -38,6 +38,20 @@ Initial interpretation bands:
 - slight sector gap: 5 percent relative difference;
 - strong sector gap: 15 percent relative difference.
 
+xG interpretation bands:
+
+- below 0.80: low;
+- 0.80 to below 1.20: moderate;
+- 1.20 to below 1.70: dangerous;
+- 1.70 or higher: very dangerous.
+
+Optimization-gain display:
+
+- hide individual gains below 0.05 percentage points;
+- display visible gains as Better XI, Individual orders, Team tactic and Total
+  improvement;
+- avoid `+0.0 pp` and negative zero in user-facing text.
+
 ## Confidence
 
 Confidence is deterministic and uses:
@@ -72,6 +86,11 @@ Classifications:
 
 These labels are explanations of rating gaps only. They do not create new probabilities.
 
+Decision Lab never labels a disadvantage as a best attacking advantage. If all attacking
+channels are balanced, it says there is no clear attacking channel advantage. If all
+channels are unfavorable, it says no attacking advantage was detected and may identify
+the least unfavorable channel.
+
 ## Tactic Observations
 
 Tactic observations describe behavior already represented by the engine:
@@ -83,6 +102,10 @@ Tactic observations describe behavior already represented by the engine:
 - Counter-Attacks;
 - Play Creatively;
 - Long Shots.
+
+The observation also explains why the tactic was selected in this analysis by using the
+stored tactic gain. If that gain is negligible, the wording explicitly says the
+improvement is marginal.
 
 ## Persistence
 
