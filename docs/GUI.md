@@ -136,6 +136,8 @@ Content:
 - Prominent recommended-result summary.
 - Formation Board tab with a vertical pitch, compact player cards, formation switching
   across analyzed alternatives, click-to-inspect behavior, and original HT Coach styling.
+- Decision Lab section with recommendation, confidence badge, reasons, risks, tactical
+  observations, sector matchup notes, and optimization gain breakdown.
 - Formation comparison table with deltas versus the recommendation.
 - Detailed XI table for inspection and accessibility.
 - Probabilities, xG, possession, and tactic.
@@ -152,6 +154,7 @@ Expected controls:
 - Primary Analyze Match button.
 - Busy state while worker runs.
 - Copy Summary and Copy Lineup actions.
+- Copy Decision Lab action.
 - Result table and recommended XI table inside the page.
 - Formation Board, Comparison and Detailed XI result tabs.
 - Empty, loading, success, and error states.
@@ -243,6 +246,17 @@ Responsibilities:
 - Show win/draw/loss.
 - Show expected goals and possession.
 - Show tactic and tactic level.
+
+### DecisionLabPanel
+
+Responsibilities:
+
+- Display the deterministic recommendation explanation.
+- Show recommendation confidence as a badge, not a statistical certainty.
+- List the highest-value reasons and meaningful risks.
+- Show a compact top recommendation card, coaching-style reasons, meaningful risks,
+  tactic-specific observations, sector matchup notes, and optimization impact.
+- Keep copy-ready text plain and readable.
 
 ### LineupTable
 

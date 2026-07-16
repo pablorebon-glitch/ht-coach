@@ -235,6 +235,31 @@ Acceptance criteria:
 
 ## Post Alpha 0.2 Candidates
 
+### Alpha 0.3: Decision Lab
+
+Goal: explain why a recommendation is selected and what trade-offs it creates.
+
+Deliverables:
+
+- Deterministic reasoning layer under `ht_coach_app/reasoning`.
+- Recommendation reasons, risks, tactical observations, confidence assessment, sector
+  matchup interpretation, and formation comparison conclusions.
+- Polished coaching language that avoids misleading best-channel labels when every
+  sector is unfavorable.
+- xG interpretation bands, tactic-gain wording, and clean optimization impact display.
+- Decision Lab section in Match results.
+- Copy-ready Decision Lab summary.
+- Persisted serializable reasoning data with backward-compatible restore.
+
+Acceptance criteria:
+
+- Reasoning never reruns optimizers or changes engine formulas.
+- Every explanation is traceable to displayed match metrics.
+- Confidence describes recommendation strength relative to analyzed alternatives.
+- No external AI service, LLM, network dependency, or API call is introduced.
+
+### Alpha 0.4: Formation Viewer
+
 - Alpha 0.4.1 Formation Viewer: read-only pitch board for match recommendations.
 - Alpha 0.4.2 Player Inspector: richer selected-player context from roster data.
 - Alpha 0.4.3 Editable Lineup Board: prepare lineup edits without recalculation.

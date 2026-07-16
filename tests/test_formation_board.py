@@ -16,6 +16,12 @@ from ht_coach_app.services.match_workspace_service import (
     MatchAnalysisResult,
     format_recommended_lineup,
 )
+from ht_coach_app.reasoning.models import (
+    ConfidenceAssessment,
+    DecisionLabResult,
+    DecisionReason,
+    RecommendedDecision,
+)
 from ht_coach_app.widgets.formation_board.formation_layouts import (
     get_formation_layout,
     supported_formation_layouts,
@@ -282,7 +288,7 @@ class FormationBoardFormattingTest(unittest.TestCase):
 
 
 try:
-    from PySide6.QtWidgets import QApplication, QTabWidget
+    from PySide6.QtWidgets import QApplication, QLabel, QTabWidget
 
     from ht_coach_app.views.match_page import MatchPage
     from ht_coach_app.widgets.formation_board.formation_board import (
@@ -352,6 +358,61 @@ class FormationBoardQtSmokeTest(unittest.TestCase):
         self.assertEqual(tabs.tabText(1), "Comparison")
         self.assertEqual(tabs.tabText(2), "Detailed XI")
         self.assertEqual(tabs.currentIndex(), 0)
+
+    def test_decision_lab_remains_visible_above_result_tabs(self):
+        page = MatchPage()
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[
+                formation_result("3-5-2", recommended=True),
+                formation_result("4-5-1", recommended=False),
+            ],
+            analyzed_formations=["3-5-2", "4-5-1"],
+            players_csv_filename="players.csv",
+            completed_at="2026-07-16 12:00:00",
+            decision_lab=DecisionLabResult(
+                recommended_formation=RecommendedDecision(
+                    formation="3-5-2",
+                    tactic="Pressing",
+                    win_probability=0.55,
+                    confidence="HIGH",
+                ),
+                headline="3-5-2 is recommended",
+                summary="Decision Lab summary",
+                confidence=ConfidenceAssessment(
+                    level="HIGH",
+                    score=0.9,
+                    explanation="Clear advantage.",
+                ),
+                confidence_score=0.9,
+                reasons=[
+                    DecisionReason(
+                        code="win",
+                        title="Highest win probability",
+                        description="Best result among analyzed formations.",
+                        importance="high",
+                    )
+                ],
+            ),
+        )
+
+        page.show_results(result)
+        widgets = [
+            page.results_layout.itemAt(index).widget()
+            for index in range(page.results_layout.count())
+            if page.results_layout.itemAt(index).widget() is not None
+        ]
+        tabs = page.findChild(QTabWidget, "matchResultTabs")
+        tabs_index = widgets.index(tabs)
+        labels_before_tabs = [
+            label.text()
+            for widget in widgets[:tabs_index]
+            for label in widget.findChildren(QLabel)
+        ]
+
+        self.assertIn("Decision Lab", labels_before_tabs)
+        self.assertEqual(tabs.tabText(0), "Formation Board")
 
 
 if __name__ == "__main__":

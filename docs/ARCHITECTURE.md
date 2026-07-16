@@ -26,6 +26,7 @@ ht_coach_app/
   core/
   controllers/
   services/
+  reasoning/
   state/
   views/
   widgets/
@@ -138,6 +139,24 @@ Suggested services:
   - Exposes the centralized formation catalog from `models.formations`.
   - Preserves 3-5-2 and 4-5-1 as the default recommended selection for existing users.
   - Formats copy-ready match summaries and recommended lineup text from view models.
+  - Runs Decision Lab reasoning after optimization finishes, using only serializable
+    analysis view-model data and existing engine outputs.
+
+### Reasoning
+
+`ht_coach_app/reasoning/`
+
+The reasoning layer turns match analysis view models into deterministic explanations.
+It does not call widgets, mutate engine results, call optimizers, or introduce external
+AI/network dependencies.
+
+Modules:
+
+- `models.py`: immutable serializable Decision Lab view models.
+- `comparison_analyzer.py`: sector matchup and formation-comparison interpretation.
+- `decision_lab.py`: rule-based recommendation reasons, risks, tactical observations,
+  gain explanations, and confidence assessment.
+- `explanation_formatter.py`: plain-text copy/report output helpers.
 
 - `FormationBoardMapper`
   - Converts serializable match analysis results into immutable board view models.
@@ -319,6 +338,7 @@ Allowed dependency flow:
 views/widgets -> controllers -> services -> engine/models/importers/persistence
 controllers -> state / application events
 services -> state view models
+services -> reasoning -> existing analysis view models
 persistence -> models or persistence DTOs
 ```
 
@@ -353,9 +373,10 @@ User clicks Analyze Match
   -> MatchWorkspaceService loads players with importers.csv_importer
   -> MatchWorkspaceService calls FormationOptimizer.optimize_against
   -> Service maps engine result to serializable MatchAnalysisResult view models
+  -> Decision Lab creates deterministic explanations from those view models
   -> MatchWorkspaceRepository persists the last successful result
-  -> MatchPage renders recommended summary, Formation Board, comparison table and
-     detailed XI
+  -> MatchPage renders Decision Lab, recommended summary, Formation Board,
+     comparison table and detailed XI
 ```
 
 The engine remains unaware of the desktop application.
@@ -375,6 +396,9 @@ Examples:
 - `FormationSlotViewModel`
 - `PlayerCardViewModel`
 - `PlayerInspectorViewModel`
+- `DecisionLabResult`
+- `FormationComparison`
+- `SectorComparison`
 
 View models should contain formatted values where appropriate, such as percentages,
 rating strings, labels, and table rows. This avoids formatting duplication across views.

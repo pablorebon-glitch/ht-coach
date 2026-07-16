@@ -30,6 +30,14 @@
   pitch coordinates.
 - Added product vision and Formation Viewer documentation for the Calculate, Explain,
   Visualize, and Experiment product pillars.
+- Added HT Coach Alpha 0.3 Decision Lab as a deterministic reasoning layer over Match
+  analysis results.
+- Added Decision Lab recommendation reasons, risks, tactical observations, confidence,
+  sector matchup interpretation, optimization gain breakdown, and copy-ready text.
+- Added persisted Decision Lab view-model data with backward-compatible restore.
+- Added polished Decision Lab language for attacking channels, defensive vulnerabilities,
+  xG interpretation bands, tactic-gain explanations, recommendation confidence, and
+  copy-ready coaching summaries.
 
 ### Changed
 
@@ -41,6 +49,9 @@
 - Existing users still default to the familiar 3-5-2 and 4-5-1 selections unless they
   already saved different formations.
 - Improved Match page empty, loading, success and error states.
+- Extended Match copy summary output with a concise Decision Lab section.
+- Reduced Decision Lab duplication between reasons, risks, tactical observations, and
+  sector matchup presentation.
 - Kept optimization work on the existing background worker path.
 - Match results now open on a Formation Board tab while preserving the Comparison and
   Detailed XI tabs.
@@ -51,3 +62,5 @@
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
+- Decision Lab explanations are deterministic and rule-based; no AI service, LLM,
+  network dependency, or external API is used.

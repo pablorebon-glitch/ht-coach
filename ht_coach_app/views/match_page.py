@@ -21,6 +21,9 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
+from ht_coach_app.reasoning.explanation_formatter import (
+    optimization_gain_lines,
+)
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 
@@ -30,6 +33,7 @@ class MatchPage(BasePage):
     load_players_requested = Signal()
     analyze_requested = Signal()
     copy_summary_requested = Signal()
+    copy_decision_lab_requested = Signal()
     copy_lineup_requested = Signal()
     workspace_changed = Signal()
 
@@ -376,6 +380,12 @@ class MatchPage(BasePage):
         )
         header.addWidget(copy_summary)
 
+        copy_decision_lab = QPushButton("Copy Decision Lab")
+        copy_decision_lab.clicked.connect(
+            self.copy_decision_lab_requested
+        )
+        header.addWidget(copy_decision_lab)
+
         copy_lineup = QPushButton("Copy Lineup")
         copy_lineup.clicked.connect(
             self.copy_lineup_requested
@@ -392,6 +402,13 @@ class MatchPage(BasePage):
             self.results_layout.addWidget(
                 self._build_recommended_summary(
                     recommended
+                )
+            )
+
+        if result.decision_lab is not None:
+            self.results_layout.addWidget(
+                self._build_decision_lab_panel(
+                    result.decision_lab
                 )
             )
 
@@ -498,6 +515,148 @@ class MatchPage(BasePage):
             layout.addWidget(metric, 1 + index // 4, index % 4)
 
         return card
+
+    def _build_decision_lab_panel(self, decision_lab):
+        card = QFrame()
+        card.setObjectName("resultCard")
+        layout = QGridLayout(card)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setHorizontalSpacing(16)
+        layout.setVerticalSpacing(10)
+
+        title = QLabel("Decision Lab")
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title, 0, 0, 1, 3)
+
+        confidence = QLabel(
+            f"Recommendation confidence: {decision_lab.confidence.level}"
+        )
+        confidence.setObjectName("recommendedBadge")
+        layout.addWidget(confidence, 0, 3)
+
+        headline = QLabel(decision_lab.headline)
+        headline.setObjectName("resultHeadline")
+        headline.setWordWrap(True)
+        layout.addWidget(headline, 1, 0, 1, 4)
+
+        summary = QLabel(decision_lab.summary)
+        summary.setWordWrap(True)
+        layout.addWidget(summary, 2, 0, 1, 4)
+
+        reasons = self._build_text_list(
+            "Why this formation?",
+            [
+                f"{reason.title}: {reason.description}"
+                for reason in decision_lab.reasons[:5]
+            ]
+        )
+        layout.addWidget(reasons, 3, 0, 1, 2)
+
+        risks = self._build_text_list(
+            "Main risks",
+            [
+                f"{risk.title}: {risk.description}"
+                for risk in decision_lab.risks[:3]
+            ] or ["No major risk flagged by the configured rules."]
+        )
+        layout.addWidget(risks, 3, 2, 1, 2)
+
+        observations = self._build_text_list(
+            "Tactical observations",
+            [
+                f"{item.title}: {item.description}"
+                for item in decision_lab.tactical_observations[:3]
+            ]
+        )
+        layout.addWidget(observations, 4, 0, 1, 4)
+
+        gains = self._build_text_list(
+            "Optimization impact",
+            [
+                line.removeprefix("- ")
+                for line in optimization_gain_lines(decision_lab)
+            ]
+        )
+        layout.addWidget(gains, 5, 0, 1, 2)
+
+        sector = self._build_text_list(
+            "Sector matchup",
+            self._sector_lines(decision_lab)
+        )
+        layout.addWidget(sector, 5, 2, 1, 2)
+
+        return card
+
+    def _sector_lines(self, decision_lab):
+        favorable = [
+            item for item in decision_lab.opponent_weaknesses
+            if item.classification in {
+                "Slight advantage",
+                "Strong advantage",
+            }
+        ]
+        vulnerabilities = [
+            item for item in decision_lab.our_vulnerabilities
+            if "disadvantage" in item.classification.lower()
+        ]
+
+        lines = []
+
+        if favorable:
+            best = max(
+                favorable,
+                key=lambda item: item.relative_difference
+            )
+            lines.append(
+                f"Best attacking channel: {best.sector} "
+                f"({best.classification})."
+            )
+        elif all(
+            item.classification == "Balanced"
+            for item in decision_lab.opponent_weaknesses
+        ):
+            lines.append("No clear attacking channel advantage.")
+        else:
+            least_bad = max(
+                decision_lab.opponent_weaknesses,
+                key=lambda item: item.relative_difference
+            )
+            lines.append(
+                "No attacking advantage detected. Least unfavorable "
+                f"channel: {least_bad.sector}."
+            )
+
+        if vulnerabilities:
+            concern = min(
+                vulnerabilities,
+                key=lambda item: item.relative_difference
+            )
+            lines.append(
+                f"Main defensive concern: {concern.sector} "
+                f"({concern.classification})."
+            )
+        else:
+            lines.append("No clear defensive vulnerability detected.")
+
+        return lines
+
+    def _build_text_list(self, title, lines):
+        frame = QFrame()
+        frame.setObjectName("metadataPanel")
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(4)
+
+        title_label = QLabel(title)
+        title_label.setObjectName("metadataValue")
+        layout.addWidget(title_label)
+
+        for line in lines:
+            label = QLabel(f"- {line}")
+            label.setWordWrap(True)
+            layout.addWidget(label)
+
+        return frame
 
     def _build_metadata_panel(self, result):
         panel = QFrame()
@@ -719,6 +878,31 @@ class MatchPage(BasePage):
             }
             for formation in result.formations
         ]
+
+    def decision_lab_rows(self, result):
+        if result.decision_lab is None:
+            return {}
+
+        return {
+            "formation": result.decision_lab.recommended_formation.formation,
+            "confidence": result.decision_lab.confidence.level,
+            "reasons": [
+                reason.title
+                for reason in result.decision_lab.reasons
+            ],
+            "risks": [
+                risk.title
+                for risk in result.decision_lab.risks
+            ],
+            "comparisons": [
+                comparison.alternative_formation
+                for comparison in result.decision_lab.comparisons
+            ],
+            "weaknesses": [
+                weakness.classification
+                for weakness in result.decision_lab.opponent_weaknesses
+            ],
+        }
 
     def lineup_rows(self, formation):
         return [

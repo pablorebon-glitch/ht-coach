@@ -98,6 +98,7 @@ class FakeMatchView(QObject):
         load_players_requested = Signal()
         analyze_requested = Signal()
         copy_summary_requested = Signal()
+        copy_decision_lab_requested = Signal()
         copy_lineup_requested = Signal()
         workspace_changed = Signal()
 
