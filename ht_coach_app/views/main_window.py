@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from ht_coach_app.controllers.navigation_controller import NavigationController
 from ht_coach_app.controllers.match_controller import MatchController
 from ht_coach_app.controllers.opponent_controller import OpponentController
+from ht_coach_app.controllers.squad_controller import SquadController
 from ht_coach_app.core.constants import (
     WINDOW_MINIMUM_HEIGHT,
     WINDOW_MINIMUM_WIDTH,
@@ -27,6 +28,7 @@ from ht_coach_app.services.match_workspace_service import (
     MatchWorkspaceService,
 )
 from ht_coach_app.services.opponent_service import OpponentService
+from ht_coach_app.services.squad_service import SquadService
 from ht_coach_app.state.app_events import AppEvents
 from ht_coach_app.views.dashboard_page import DashboardPage
 from ht_coach_app.views.match_page import MatchPage
@@ -155,6 +157,16 @@ class MainWindow(QMainWindow):
                     service,
                     self._app_events,
                     self
+                )
+            )
+
+        if page["key"] == "squad":
+            self._controllers.append(
+                SquadController(
+                    widget,
+                    SquadService(),
+                    MatchWorkspaceRepository(),
+                    self._app_events
                 )
             )
 

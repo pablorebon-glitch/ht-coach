@@ -114,12 +114,19 @@ Deliverables:
 - Player table
 - Import status
 - Recent CSV path support
+- Search, form, stamina, specialty, and position/ranking filters
+- Position analysis using existing player analyzer APIs
+- Player detail panel
+- Export visible rows to CSV
+- Squad-to-Match roster path synchronization through app events
 
 Acceptance criteria:
 
 - Users can load `players.csv`.
 - Player table supports sorting.
 - Import errors do not crash the app.
+- Match receives roster path changes without restarting the app.
+- No engine formulas or optimizer calculations are changed.
 
 ### Epic 5: Opponent Manager
 

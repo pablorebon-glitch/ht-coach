@@ -103,7 +103,8 @@ Controllers should not:
 Initial controllers:
 
 - `NavigationController`: switches central pages without opening new windows.
-- `SquadController`: load players, refresh squad state, handle CSV import errors.
+- `SquadController`: load players, refresh squad state, handle CSV import errors,
+  apply filters, export visible rows, and publish roster path changes.
 - `OpponentController`: create, update, duplicate, delete, and select opponents.
 - `MatchController`: persist match workspace inputs and run matchup optimization against
   the selected opponent through a background worker.
@@ -119,10 +120,11 @@ workflows.
 
 Suggested services:
 
-- `RosterService`
+- `SquadService`
   - Loads players through `importers.csv_importer`.
   - Normalizes import errors for the UI.
-  - Exposes roster summaries.
+  - Exposes roster summaries, sortable/filterable row view models, player details,
+    position rankings through existing analyzers, and CSV export formatting.
 
 - `OpponentService`
   - Manages saved opponents.
@@ -153,7 +155,8 @@ Initial views:
   - Overview of loaded roster, selected opponent, and latest recommendation.
 
 - `SquadView`
-  - CSV loading, player table, roster filters, and player details.
+  - CSV loading, player table, roster filters, position ranking, export, and player
+    details.
 
 - `OpponentsView`
   - Saved opponent list, opponent editor, duplicate action, ratings editor, and delete
@@ -181,6 +184,8 @@ Suggested widgets:
 
 - `RatingInputGrid`: seven sector ratings with validation and consistent labels.
 - `PlayerTable`: roster table with sorting and selection.
+- `PlayerDetailPanel`: complete player skills, best position, and ranking by supported
+  position.
 - `OpponentList`: saved opponent list with empty state.
 - `FormationResultTable`: sortable formation comparison.
 - `MatchResultPanel`: win/draw/loss, xG, possession, tactic, and lineup summary.
@@ -301,7 +306,7 @@ Allowed dependency flow:
 
 ```text
 views/widgets -> controllers -> services -> engine/models/importers/persistence
-controllers -> state
+controllers -> state / application events
 services -> state view models
 persistence -> models or persistence DTOs
 ```
@@ -314,6 +319,15 @@ models -> ht_coach_app
 views -> engine
 widgets -> persistence
 persistence -> views
+```
+
+Roster synchronization flows through application-level events:
+
+```text
+SquadController loads roster
+  -> MatchWorkspaceRepository saves players CSV path
+  -> AppEvents.roster_changed emits path and player count
+  -> MatchController updates MatchPage path and loaded-player count
 ```
 
 ## Data Flow Example

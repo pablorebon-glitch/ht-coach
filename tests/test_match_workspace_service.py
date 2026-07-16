@@ -171,6 +171,10 @@ class MatchWorkspaceServiceTest(unittest.TestCase):
         self.assertEqual(formation.possession, 0.61)
         self.assertTrue(formation.is_recommended)
         self.assertEqual(
+            formation.lineup[0].position,
+            "Goalkeeper (GK)"
+        )
+        self.assertEqual(
             formation.lineup[1].order_side,
             "LEFT"
         )

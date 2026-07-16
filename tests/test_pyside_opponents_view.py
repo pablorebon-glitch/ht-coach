@@ -81,7 +81,7 @@ class MatchPageSmokeTest(unittest.TestCase):
                         lineup=[
                             LineupPlayerResult(
                                 number=1,
-                                position="GOALKEEPER",
+                                position="Goalkeeper (GK)",
                                 side="CENTER",
                                 order="Normal",
                                 order_side="",
