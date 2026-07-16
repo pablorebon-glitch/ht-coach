@@ -3,16 +3,20 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
+from ht_coach_app.core.position_formatting import (
+    format_position,
+    normalize_position_value,
+)
 from models.position import Position
 
 
 SUPPORTED_POSITIONS = {
-    "GOALKEEPER": Position.GOALKEEPER.value,
-    "CENTRAL_DEFENDER": Position.CENTRAL_DEFENDER.value,
-    "WING_BACK": Position.WING_BACK.value,
-    "INNER_MIDFIELDER": Position.INNER_MIDFIELDER.value,
-    "WINGER": Position.WINGER.value,
-    "FORWARD": Position.FORWARD.value,
+    format_position(Position.GOALKEEPER): Position.GOALKEEPER.value,
+    format_position(Position.CENTRAL_DEFENDER): Position.CENTRAL_DEFENDER.value,
+    format_position(Position.WING_BACK): Position.WING_BACK.value,
+    format_position(Position.INNER_MIDFIELDER): Position.INNER_MIDFIELDER.value,
+    format_position(Position.WINGER): Position.WINGER.value,
+    format_position(Position.FORWARD): Position.FORWARD.value,
 }
 
 
@@ -147,7 +151,9 @@ class SquadService:
                     speciality=player.speciality,
                     selected_position_score=ranking[0],
                     selected_position_rank=ranking[1],
-                    best_position=str(best_position),
+                    best_position=format_position(
+                        normalize_position_value(best_position)
+                    ),
                     best_position_score=float(best_score),
                 )
             )

@@ -104,7 +104,7 @@ class SquadServiceTest(unittest.TestCase):
     def test_filters_and_name_search(self):
         rows = self.service.map_players(
             self.players,
-            selected_position="INNER_MIDFIELDER"
+            selected_position="Inner Midfielder (IM)"
         )
 
         filtered = self.service.filter_rows(
@@ -113,7 +113,7 @@ class SquadServiceTest(unittest.TestCase):
             minimum_form=6,
             minimum_stamina=8,
             speciality="Quick",
-            selected_position="INNER_MIDFIELDER"
+            selected_position="Inner Midfielder (IM)"
         )
 
         self.assertEqual(
@@ -124,7 +124,7 @@ class SquadServiceTest(unittest.TestCase):
     def test_position_ranking_uses_existing_analyzer(self):
         rows = self.service.map_players(
             self.players,
-            selected_position="GOALKEEPER"
+            selected_position="Goalkeeper (GK)"
         )
         bob = next(row for row in rows if row.name == "Bob")
 
@@ -134,7 +134,7 @@ class SquadServiceTest(unittest.TestCase):
     def test_export_visible_rows_to_csv(self):
         rows = self.service.map_players(
             self.players,
-            selected_position="GOALKEEPER"
+            selected_position="Goalkeeper (GK)"
         )
         export_path = Path(self.temp_dir.name) / "visible.csv"
 

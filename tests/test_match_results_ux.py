@@ -197,7 +197,7 @@ class MatchResultsUxTest(unittest.TestCase):
             lineup
         )
         self.assertIn(
-            "1 | CENTER | GOALKEEPER | Keeper | Normal | -",
+            "1 | CENTER | Goalkeeper (GK) | Keeper | Normal | -",
             lineup
         )
 
@@ -291,7 +291,7 @@ class MatchResultsViewStateTest(unittest.TestCase):
                         lineup=[
                             LineupPlayerResult(
                                 number=1,
-                                position="GOALKEEPER",
+                                position="Goalkeeper (GK)",
                                 side="CENTER",
                                 order="Normal",
                                 order_side="",

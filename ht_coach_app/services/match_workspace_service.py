@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from engine.optimizers.formation_optimizer import FormationOptimizer
+from ht_coach_app.core.position_formatting import format_position
 from models.formations import FORMATIONS
 
 
@@ -252,7 +253,7 @@ class MatchWorkspaceService:
     def _map_lineup_player(self, number, lineup_player):
         return LineupPlayerResult(
             number=number,
-            position=self._enum_value(
+            position=format_position(
                 lineup_player.position
             ),
             side=self._enum_value(
@@ -312,7 +313,9 @@ def match_analysis_result_from_dict(data):
                 lineup=[
                     LineupPlayerResult(
                         number=int(player.get("number", index + 1)),
-                        position=player.get("position", ""),
+                        position=format_position(
+                            player.get("position", "")
+                        ),
                         side=player.get("side", ""),
                         order=player.get("order", ""),
                         order_side=player.get("order_side", ""),

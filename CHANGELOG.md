@@ -11,6 +11,8 @@
   ranking filter.
 - Added player detail and position analysis using existing engine analyzer APIs.
 - Added Squad-to-Match roster path synchronization through application events.
+- Added centralized user-facing position formatting with display names and abbreviations
+  across Squad, Match, copied lineup text, and restored result view models.
 - Added the Alpha 0.2 Match Results UX milestone for the PySide6 Match Workspace.
 - Added a prominent recommended-result summary with probabilities, possession and xG.
 - Added formation comparison rows with deltas versus the recommended formation.
