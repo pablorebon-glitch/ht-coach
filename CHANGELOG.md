@@ -23,6 +23,9 @@
 
 ### Changed
 
+- Fixed Squad player table sorting so numeric columns such as TSI, salary, skills,
+  selected position score and selected position rank sort numerically instead of
+  lexically.
 - Improved Match page empty, loading, success and error states.
 - Kept optimization work on the existing background worker path.
 

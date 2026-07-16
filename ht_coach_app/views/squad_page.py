@@ -13,12 +13,12 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QSplitter,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from ht_coach_app.views.base_page import BasePage
+from ht_coach_app.widgets.sortable_table_item import SortableTableItem
 
 
 class SquadPage(BasePage):
@@ -279,9 +279,33 @@ class SquadPage(BasePage):
                 row.selected_position_rank or "",
                 row.best_position,
             ]
+            sort_values = [
+                row.name.casefold(),
+                row.age,
+                row.form,
+                row.stamina,
+                row.experience,
+                row.leadership,
+                row.tsi,
+                row.salary,
+                row.goalkeeper,
+                row.defending,
+                row.playmaking,
+                row.winger,
+                row.passing,
+                row.scoring,
+                row.set_pieces,
+                row.speciality.casefold(),
+                row.selected_position_score,
+                row.selected_position_rank or None,
+                row.best_position.casefold(),
+            ]
 
             for column, value in enumerate(values):
-                item = QTableWidgetItem(str(value))
+                item = self._build_table_item(
+                    value,
+                    sort_values[column]
+                )
                 item.setData(256, row.name)
                 self.players_table.setItem(row_index, column, item)
 
@@ -343,11 +367,15 @@ class SquadPage(BasePage):
             for column, value in enumerate(
                 [position, f"{score:.2f}", rank]
             ):
-                self.rankings_table.setItem(
-                    row,
-                    column,
-                    QTableWidgetItem(str(value))
+                item = SortableTableItem(
+                    value,
+                    sort_value=(
+                        value
+                        if column in {1, 2}
+                        else str(value).casefold()
+                    )
                 )
+                self.rankings_table.setItem(row, column, item)
 
     def current_state(self):
         return self._state
@@ -362,3 +390,9 @@ class SquadPage(BasePage):
 
         if name:
             self.player_selected.emit(name)
+
+    def _build_table_item(self, value, sort_value):
+        return SortableTableItem(
+            value,
+            sort_value=sort_value
+        )
