@@ -127,7 +127,10 @@ Content:
 
 - Players CSV selector and load status.
 - Selected opponent selector.
-- Formation checklist for 3-5-2 and 4-5-1.
+- Formation checklist generated from the centralized formation catalog.
+- Select All, Clear All, and Favorites controls. Favorites preserve the familiar
+  3-5-2 and 4-5-1 starting point.
+- Compact warning when many formations are selected.
 - Analyze Match action.
 - Progress indicator.
 - Prominent recommended-result summary.
@@ -143,6 +146,7 @@ Expected controls:
 - Load Players button.
 - Opponent combo box.
 - Formation checkboxes.
+- Formation preset buttons.
 - Primary Analyze Match button.
 - Busy state while worker runs.
 - Copy Summary and Copy Lineup actions.

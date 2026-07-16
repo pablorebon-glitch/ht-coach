@@ -4,14 +4,10 @@ from pathlib import Path
 
 from engine.optimizers.formation_optimizer import FormationOptimizer
 from ht_coach_app.core.position_formatting import format_position
-from models.formations import FORMATIONS
-
-
-SUPPORTED_FORMATIONS = {
-    formation.name: formation
-    for formation in FORMATIONS
-    if formation.name in {"3-5-2", "4-5-1"}
-}
+from models.formations import (
+    DEFAULT_FORMATION_NAMES,
+    FORMATION_BY_NAME,
+)
 
 
 class MatchWorkspaceValidationError(ValueError):
@@ -82,7 +78,10 @@ class MatchWorkspaceService:
         self._optimizer = optimizer
 
     def supported_formations(self):
-        return list(SUPPORTED_FORMATIONS.keys())
+        return list(FORMATION_BY_NAME.keys())
+
+    def default_formations(self):
+        return list(DEFAULT_FORMATION_NAMES)
 
     def list_opponents(self):
         return self._opponent_service.list_opponents()
@@ -113,7 +112,7 @@ class MatchWorkspaceService:
             )
 
         formations = [
-            SUPPORTED_FORMATIONS[name]
+            FORMATION_BY_NAME[name]
             for name in formation_names
         ]
 
@@ -167,7 +166,7 @@ class MatchWorkspaceService:
 
         unsupported = [
             name for name in formation_names
-            if name not in SUPPORTED_FORMATIONS
+            if name not in FORMATION_BY_NAME
         ]
 
         if unsupported:

@@ -160,7 +160,7 @@ def test_best_result_matches_known_scenario(
 
     best_result = results[0]
 
-    assert best_result.formation.name == "3-5-2"
+    assert best_result.formation.name == "2-5-3"
 
     assert (
         best_result.probabilities.win

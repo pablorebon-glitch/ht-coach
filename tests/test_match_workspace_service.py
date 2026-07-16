@@ -145,12 +145,28 @@ class MatchWorkspaceServiceTest(unittest.TestCase):
             self.service.validate_inputs(
                 self.csv_path,
                 "Rival FC",
-                ["2-5-3"]
+                ["1-1-8"]
             )
 
-    def test_supported_formations_are_initial_alpha_scope(self):
+    def test_supported_formations_are_full_catalog(self):
         self.assertEqual(
             self.service.supported_formations(),
+            [
+                "2-5-3",
+                "3-4-3",
+                "3-5-2",
+                "4-3-3",
+                "4-4-2",
+                "4-5-1",
+                "5-2-3",
+                "5-3-2",
+                "5-4-1",
+            ]
+        )
+
+    def test_default_formations_preserve_existing_user_selection(self):
+        self.assertEqual(
+            self.service.default_formations(),
             ["3-5-2", "4-5-1"]
         )
 
@@ -177,6 +193,10 @@ class MatchWorkspaceServiceTest(unittest.TestCase):
         self.assertEqual(
             formation.lineup[1].order_side,
             "LEFT"
+        )
+        self.assertEqual(
+            formation.lineup[0].position,
+            "Goalkeeper (GK)"
         )
 
 
@@ -206,6 +226,19 @@ class MatchWorkspaceRepositoryTest(unittest.TestCase):
                 settings.opponent_name,
                 "Rival FC"
             )
+            self.assertEqual(
+                settings.selected_formations,
+                ["3-5-2", "4-5-1"]
+            )
+
+    def test_settings_default_to_favorites_for_existing_users(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = MatchWorkspaceRepository(
+                Path(temp_dir) / "missing.json"
+            )
+
+            settings = repository.load()
+
             self.assertEqual(
                 settings.selected_formations,
                 ["3-5-2", "4-5-1"]

@@ -38,6 +38,7 @@ class MatchPage(BasePage):
         )
         self._applying_settings = False
         self._formation_checks = {}
+        self._favorite_formations = []
         self._state = "empty"
         self._build_inputs()
         self._build_results()
@@ -78,12 +79,47 @@ class MatchPage(BasePage):
         )
 
         formation_label = QLabel("Formations")
+        formation_actions = QHBoxLayout()
+        formation_actions.setContentsMargins(0, 0, 0, 0)
+        formation_actions.setSpacing(8)
+
+        select_all_button = QPushButton("Select All")
+        select_all_button.clicked.connect(
+            self.select_all_formations
+        )
+        formation_actions.addWidget(select_all_button)
+
+        clear_all_button = QPushButton("Clear All")
+        clear_all_button.clicked.connect(
+            self.clear_all_formations
+        )
+        formation_actions.addWidget(clear_all_button)
+
+        favorites_button = QPushButton("Favorites")
+        favorites_button.clicked.connect(
+            self.select_favorite_formations
+        )
+        formation_actions.addWidget(favorites_button)
+        formation_actions.addStretch(1)
+
+        formation_actions_widget = QWidget()
+        formation_actions_widget.setLayout(
+            formation_actions
+        )
+
         self.formations_container = QWidget()
         self.formations_layout = QHBoxLayout(
             self.formations_container
         )
         self.formations_layout.setContentsMargins(0, 0, 0, 0)
         self.formations_layout.setSpacing(12)
+
+        self.formation_warning_label = QLabel("")
+        self.formation_warning_label.setWordWrap(True)
+        self.formation_warning_label.setProperty(
+            "state",
+            "warning"
+        )
 
         self.status_label = QLabel("Ready")
         self.status_label.setWordWrap(True)
@@ -102,9 +138,11 @@ class MatchPage(BasePage):
         layout.addWidget(opponent_label, 2, 0)
         layout.addWidget(self.opponent_combo, 2, 1, 1, 3)
         layout.addWidget(formation_label, 3, 0)
-        layout.addWidget(self.formations_container, 3, 1, 1, 3)
-        layout.addWidget(self.status_label, 4, 0, 1, 3)
-        layout.addWidget(self.analyze_button, 4, 3)
+        layout.addWidget(formation_actions_widget, 3, 1, 1, 3)
+        layout.addWidget(self.formations_container, 4, 1, 1, 3)
+        layout.addWidget(self.formation_warning_label, 5, 1, 1, 3)
+        layout.addWidget(self.status_label, 6, 0, 1, 3)
+        layout.addWidget(self.analyze_button, 6, 3)
         layout.setColumnStretch(1, 1)
 
         self.body_layout.addWidget(controls, 0)
@@ -152,7 +190,16 @@ class MatchPage(BasePage):
 
         self.opponent_combo.blockSignals(False)
 
-    def set_supported_formations(self, formation_names):
+    def set_supported_formations(
+        self,
+        formation_names,
+        favorite_formations=None
+    ):
+        if favorite_formations is not None:
+            self._favorite_formations = list(
+                favorite_formations
+            )
+
         while self.formations_layout.count():
             item = self.formations_layout.takeAt(0)
             widget = item.widget()
@@ -171,6 +218,7 @@ class MatchPage(BasePage):
             self.formations_layout.addWidget(checkbox)
 
         self.formations_layout.addStretch(1)
+        self._update_formation_warning()
 
     def apply_settings(self, settings):
         self._applying_settings = True
@@ -195,6 +243,7 @@ class MatchPage(BasePage):
             )
 
         self._applying_settings = False
+        self._update_formation_warning()
 
     def players_csv_path(self):
         return self.players_path_edit.text().strip()
@@ -210,6 +259,30 @@ class MatchPage(BasePage):
             name for name, checkbox in self._formation_checks.items()
             if checkbox.isChecked()
         ]
+
+    def select_all_formations(self):
+        self._set_checked_formations(
+            set(self._formation_checks)
+        )
+
+    def clear_all_formations(self):
+        self._set_checked_formations(set())
+
+    def select_favorite_formations(self):
+        self._set_checked_formations(
+            set(self._favorite_formations)
+        )
+
+    def _set_checked_formations(self, selected):
+        self._applying_settings = True
+
+        for name, checkbox in self._formation_checks.items():
+            checkbox.setChecked(
+                name in selected
+            )
+
+        self._applying_settings = False
+        self._emit_workspace_changed()
 
     def choose_players_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -452,6 +525,7 @@ class MatchPage(BasePage):
                     item.setData(256, "recommended")
                 table.setItem(row, column, item)
 
+        table.setSortingEnabled(True)
         layout.addWidget(table)
         return card
 
@@ -617,5 +691,20 @@ class MatchPage(BasePage):
         return f"{value * 100:.1f}%"
 
     def _emit_workspace_changed(self):
+        self._update_formation_warning()
+
         if not self._applying_settings:
             self.workspace_changed.emit()
+
+    def _update_formation_warning(self):
+        if not hasattr(self, "formation_warning_label"):
+            return
+
+        selected_count = len(self.selected_formations())
+
+        if selected_count > 4:
+            self.formation_warning_label.setText(
+                "Many formations selected. Analysis can take longer."
+            )
+        else:
+            self.formation_warning_label.setText("")

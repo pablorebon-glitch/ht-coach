@@ -102,7 +102,11 @@ class FakeMatchView(QObject):
             else ""
         )
 
-    def set_supported_formations(self, formation_names):
+    def set_supported_formations(
+        self,
+        formation_names,
+        favorite_formations=None
+    ):
         self.supported_formations = list(formation_names)
 
     def apply_settings(self, settings):

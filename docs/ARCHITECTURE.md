@@ -135,7 +135,8 @@ Suggested services:
   - Calls `FormationOptimizer`, `LineupOptimizer`, and matchup optimization entry points.
   - Converts engine results into view models.
   - Does not alter engine calculations.
-  - Initially exposes the Alpha 0.2 supported formations: 3-5-2 and 4-5-1.
+  - Exposes the centralized formation catalog from `models.formations`.
+  - Preserves 3-5-2 and 4-5-1 as the default recommended selection for existing users.
   - Formats copy-ready match summaries and recommended lineup text from view models.
 
 - `ReportService`
@@ -224,6 +225,7 @@ Suggested repositories:
 - `MatchWorkspaceRepository`
   - Stores the last selected players CSV path, opponent, and formations.
   - Stores the last successful analysis result as serializable view-model JSON.
+  - Restores results for any supported formation from the centralized catalog.
   - Uses JSON under the application data directory.
   - Keeps workspace persistence separate from widgets and engine code.
 
@@ -387,9 +389,9 @@ Avoid brittle screenshot tests early. Prefer fast unit tests for services and st
 6. Port squad loading.
 7. Port opponent manager to PySide6.
 8. Port match analysis with background workers. The first usable Match Workspace now
-   supports players CSV selection, saved opponents, 3-5-2/4-5-1 analysis, progress
-   feedback, comparison cards, recommended XI rendering, copy actions, and last-result
-   restore.
+   supports players CSV selection, saved opponents, full formation catalog analysis,
+   progress feedback, comparison cards, recommended XI rendering, copy actions, and
+   last-result restore.
 9. Add reports and exports.
 10. Retire or freeze Tkinter app once PySide6 reaches feature parity.
 
