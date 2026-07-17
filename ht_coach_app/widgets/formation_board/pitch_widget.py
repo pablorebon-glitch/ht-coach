@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
@@ -20,6 +22,27 @@ from ht_coach_app.widgets.formation_board.layout_metrics import (
 from ht_coach_app.widgets.formation_board.player_card import PlayerCard
 
 
+@dataclass(frozen=True)
+class CornerArcGeometry:
+    name: str
+    anchor: QPointF
+    rect: QRectF
+    start_angle: int
+    span_angle: int
+
+
+@dataclass(frozen=True)
+class PitchGeometry:
+    external_bounds: QRectF
+    field_rect: QRectF
+    top_goal: QRectF
+    bottom_goal: QRectF
+    penalty_areas: tuple[QRectF, QRectF]
+    goal_areas: tuple[QRectF, QRectF]
+    center_circle: QRectF
+    corner_arcs: tuple[CornerArcGeometry, ...]
+
+
 class PitchWidget(QWidget):
     player_selected = Signal(str)
     empty_area_clicked = Signal()
@@ -28,12 +51,12 @@ class PitchWidget(QWidget):
         super().__init__(parent)
         self._board = None
         self._slot_widgets = []
-        self.setMinimumSize(260, 300)
+        self.setMinimumSize(360, 560)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setFocusPolicy(Qt.StrongFocus)
 
     def sizeHint(self):
-        return QSize(420, 600)
+        return QSize(480, 700)
 
     def set_board(self, board):
         self._board = board
@@ -62,6 +85,9 @@ class PitchWidget(QWidget):
         self.update()
 
     def pitch_rect(self):
+        return self.geometry_model().field_rect
+
+    def geometry_model(self):
         available = QRectF(
             PITCH_OUTER_MARGIN + PITCH_GOAL_DEPTH,
             PITCH_OUTER_MARGIN + PITCH_GOAL_DEPTH,
@@ -77,21 +103,20 @@ class PitchWidget(QWidget):
             width = available.width()
             height = width / PITCH_ASPECT_RATIO
 
-        return QRectF(
+        field_rect = QRectF(
             available.center().x() - width / 2,
             available.center().y() - height / 2,
             width,
             height,
         )
+        return self._build_geometry(field_rect)
 
     def goal_rects(self):
-        rect = self.pitch_rect()
-        goal_width = rect.width() * 0.26
-        left = rect.center().x() - goal_width / 2
-        return (
-            QRectF(left, rect.top() - PITCH_GOAL_DEPTH, goal_width, PITCH_GOAL_DEPTH),
-            QRectF(left, rect.bottom(), goal_width, PITCH_GOAL_DEPTH),
-        )
+        geometry = self.geometry_model()
+        return (geometry.top_goal, geometry.bottom_goal)
+
+    def corner_arcs(self):
+        return self.geometry_model().corner_arcs
 
     def card_geometries(self):
         return tuple(widget.geometry() for _, widget in self._slot_widgets)
@@ -120,7 +145,8 @@ class PitchWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        rect = self.pitch_rect()
+        geometry = self.geometry_model()
+        rect = geometry.field_rect
         painter.fillRect(rect, QColor(PITCH_BACKGROUND))
 
         stripe_height = rect.height() / 8
@@ -141,57 +167,40 @@ class PitchWidget(QWidget):
 
         halfway_y = rect.center().y()
         painter.drawLine(rect.left(), halfway_y, rect.right(), halfway_y)
-        circle_radius = rect.width() * 0.12
-        painter.drawEllipse(rect.center(), circle_radius, circle_radius)
+        painter.drawEllipse(geometry.center_circle)
         painter.setBrush(QColor(PITCH_LINES))
         painter.drawEllipse(rect.center(), line_width * 1.5, line_width * 1.5)
         painter.setBrush(Qt.NoBrush)
 
-        self._draw_end_markings(painter, rect, top=True)
-        self._draw_end_markings(painter, rect, top=False)
-        self._draw_corner_arcs(painter, rect)
+        self._draw_end_markings(painter, geometry, top=True)
+        self._draw_end_markings(painter, geometry, top=False)
+        self._draw_corner_arcs(painter, geometry)
 
-    def _draw_end_markings(self, painter, rect, top):
-        penalty_width = rect.width() * 0.62
-        penalty_height = rect.height() * 0.16
-        goal_area_width = rect.width() * 0.30
-        goal_area_height = rect.height() * 0.065
-        penalty_left = rect.center().x() - penalty_width / 2
-        goal_area_left = rect.center().x() - goal_area_width / 2
-
-        if top:
-            penalty_top = rect.top()
-            goal_area_top = rect.top()
-            spot_y = rect.top() + rect.height() * 0.105
-        else:
-            penalty_top = rect.bottom() - penalty_height
-            goal_area_top = rect.bottom() - goal_area_height
-            spot_y = rect.bottom() - rect.height() * 0.105
-
-        painter.drawRect(QRectF(penalty_left, penalty_top, penalty_width, penalty_height))
-        painter.drawRect(
-            QRectF(goal_area_left, goal_area_top, goal_area_width, goal_area_height)
+    def _draw_end_markings(self, painter, geometry, top):
+        rect = geometry.field_rect
+        penalty_area = geometry.penalty_areas[0 if top else 1]
+        goal_area = geometry.goal_areas[0 if top else 1]
+        spot_y = (
+            rect.top() + rect.height() * 0.105
+            if top
+            else rect.bottom() - rect.height() * 0.105
         )
+
+        painter.drawRect(penalty_area)
+        painter.drawRect(goal_area)
         painter.setBrush(QColor(PITCH_LINES))
         painter.drawEllipse(QPointF(rect.center().x(), spot_y), 1.5, 1.5)
         painter.setBrush(Qt.NoBrush)
 
-        goal = self.goal_rects()[0 if top else 1]
+        goal = geometry.top_goal if top else geometry.bottom_goal
         painter.drawRect(goal)
 
-    def _draw_corner_arcs(self, painter, rect):
-        diameter = max(8.0, rect.width() * 0.04)
-        corners = (
-            (rect.left(), rect.top(), 0),
-            (rect.right() - diameter, rect.top(), 90 * 16),
-            (rect.left(), rect.bottom() - diameter, 270 * 16),
-            (rect.right() - diameter, rect.bottom() - diameter, 180 * 16),
-        )
-        for left, top, start_angle in corners:
+    def _draw_corner_arcs(self, painter, geometry):
+        for arc in geometry.corner_arcs:
             painter.drawArc(
-                QRectF(left, top, diameter, diameter),
-                start_angle,
-                90 * 16,
+                arc.rect,
+                arc.start_angle,
+                arc.span_angle,
             )
 
     def _position_slot_widgets(self):
@@ -243,3 +252,99 @@ class PitchWidget(QWidget):
             widget.deleteLater()
 
         self._slot_widgets = []
+
+    def _build_geometry(self, rect):
+        goal_width = rect.width() * 0.26
+        goal_left = rect.center().x() - goal_width / 2
+        top_goal = QRectF(
+            goal_left,
+            rect.top() - PITCH_GOAL_DEPTH,
+            goal_width,
+            PITCH_GOAL_DEPTH,
+        )
+        bottom_goal = QRectF(
+            goal_left,
+            rect.bottom(),
+            goal_width,
+            PITCH_GOAL_DEPTH,
+        )
+        penalty_width = rect.width() * 0.62
+        penalty_height = rect.height() * 0.16
+        goal_area_width = rect.width() * 0.30
+        goal_area_height = rect.height() * 0.065
+        penalty_left = rect.center().x() - penalty_width / 2
+        goal_area_left = rect.center().x() - goal_area_width / 2
+        top_penalty = QRectF(
+            penalty_left,
+            rect.top(),
+            penalty_width,
+            penalty_height,
+        )
+        bottom_penalty = QRectF(
+            penalty_left,
+            rect.bottom() - penalty_height,
+            penalty_width,
+            penalty_height,
+        )
+        top_goal_area = QRectF(
+            goal_area_left,
+            rect.top(),
+            goal_area_width,
+            goal_area_height,
+        )
+        bottom_goal_area = QRectF(
+            goal_area_left,
+            rect.bottom() - goal_area_height,
+            goal_area_width,
+            goal_area_height,
+        )
+        circle_radius = rect.width() * 0.12
+        center_circle = QRectF(
+            rect.center().x() - circle_radius,
+            rect.center().y() - circle_radius,
+            circle_radius * 2,
+            circle_radius * 2,
+        )
+        corner_arcs = self._corner_arcs_for(rect)
+        external_bounds = rect.united(top_goal).united(bottom_goal).adjusted(
+            -PITCH_OUTER_MARGIN,
+            -PITCH_OUTER_MARGIN,
+            PITCH_OUTER_MARGIN,
+            PITCH_OUTER_MARGIN,
+        )
+        return PitchGeometry(
+            external_bounds=external_bounds,
+            field_rect=rect,
+            top_goal=top_goal,
+            bottom_goal=bottom_goal,
+            penalty_areas=(top_penalty, bottom_penalty),
+            goal_areas=(top_goal_area, bottom_goal_area),
+            center_circle=center_circle,
+            corner_arcs=corner_arcs,
+        )
+
+    @staticmethod
+    def _corner_arcs_for(rect):
+        radius = max(5.0, rect.width() * 0.025)
+        diameter = radius * 2
+
+        def arc(name, x, y, start):
+            return CornerArcGeometry(
+                name=name,
+                anchor=QPointF(x, y),
+                rect=QRectF(
+                    x - radius,
+                    y - radius,
+                    diameter,
+                    diameter,
+                ),
+                start_angle=start * 16,
+                span_angle=90 * 16,
+            )
+
+        return (
+            arc("top_left", rect.left(), rect.top(), 270),
+            arc("top_right", rect.right(), rect.top(), 180),
+            arc("bottom_left", rect.left(), rect.bottom(), 0),
+            arc("bottom_right", rect.right(), rect.bottom(), 90),
+        )

@@ -1,8 +1,11 @@
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from types import SimpleNamespace
 from pathlib import Path
 
+from engine.analyzers.team_rater import TeamRater
 from engine.optimizers.formation_optimizer import FormationOptimizer
+from engine.optimizers.tactic_optimizer import TacticOptimizer
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import normalize_position_key
 from ht_coach_app.core.side_formatting import normalize_side_value
@@ -28,6 +31,11 @@ from models.formations import (
     DEFAULT_FORMATION_NAMES,
     FORMATION_BY_NAME,
 )
+from models.lineup import Lineup
+from models.lineup_player import LineupPlayer
+from models.order import Order
+from models.position import Position
+from models.side import Side
 
 
 class MatchWorkspaceValidationError(ValueError):
@@ -190,6 +198,94 @@ class MatchWorkspaceService:
             result
         )
 
+    def analyze_workspace(
+        self,
+        players_csv_path,
+        opponent_name,
+        workspace_state,
+    ):
+        formation_names = list(
+            workspace_state.workspace_boards.keys()
+        )
+        self.validate_inputs(
+            players_csv_path,
+            opponent_name,
+            formation_names
+        )
+
+        players = self._load_players(
+            players_csv_path
+        )
+        players_by_name = {
+            player.name: player
+            for player in players
+        }
+        opponent = self._opponent_service.get_opponent(
+            opponent_name
+        )
+
+        if opponent is None:
+            raise MatchWorkspaceValidationError(
+                "Select a saved opponent."
+            )
+
+        engine_results = []
+        for board in workspace_state.workspace_boards.values():
+            if board.formation_name not in FORMATION_BY_NAME:
+                continue
+
+            lineup = self._lineup_from_board(
+                board,
+                players_by_name,
+            )
+            ratings = TeamRater.calculate(
+                lineup
+            )
+            tactic_result = TacticOptimizer.optimize(
+                ratings,
+                opponent.ratings,
+                lineup=lineup,
+            )
+            engine_results.append(
+                SimpleNamespace(
+                    formation=FORMATION_BY_NAME[board.formation_name],
+                    lineup=lineup,
+                    tactic=tactic_result.tactic,
+                    tactic_level=tactic_result.tactic_level,
+                    ratings=tactic_result.ratings,
+                    match_evaluation=tactic_result.match_evaluation,
+                    probabilities=tactic_result.probabilities,
+                    tested_lineups=0,
+                    tested_order_configurations=0,
+                    order_finalists=0,
+                    tested_tactics=tactic_result.tested_tactics,
+                    baseline_win_probability=tactic_result.baseline_win_probability,
+                    best_normal_win_probability=tactic_result.baseline_win_probability,
+                    best_order_win_probability=tactic_result.baseline_win_probability,
+                )
+            )
+
+        engine_results.sort(
+            key=lambda result: result.probabilities.win,
+            reverse=True,
+        )
+        mapped_results = self._map_results(
+            engine_results,
+            opponent.ratings,
+        )
+        result = MatchAnalysisResult(
+            player_count=len(players),
+            opponent_name=opponent.name,
+            formations=mapped_results,
+            players_csv_filename=Path(players_csv_path).name,
+            analyzed_formations=formation_names,
+            completed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        return self._with_decision_lab(
+            result
+        )
+
     def validate_inputs(
         self,
         players_csv_path,
@@ -254,6 +350,50 @@ class MatchWorkspaceService:
         return importer(
             str(players_csv_path)
         )
+
+    def _lineup_from_board(self, board, players_by_name):
+        lineup = Lineup()
+
+        for slot in board.slots:
+            if slot.player is None:
+                raise MatchWorkspaceValidationError(
+                    "Workspace lineup must contain eleven players."
+                )
+
+            player = players_by_name.get(
+                slot.player.player_name
+            )
+            if player is None:
+                raise MatchWorkspaceValidationError(
+                    f"{slot.player.player_name} is not available in the loaded roster."
+                )
+
+            lineup.players.append(
+                LineupPlayer(
+                    player=player,
+                    position=self._position(
+                        slot.player.position
+                    ),
+                    side=self._side(
+                        slot.player.side
+                    ),
+                    order=self._order(
+                        slot.player.individual_order
+                    ),
+                    order_side=(
+                        self._side(slot.player.order_side)
+                        if slot.player.order_side
+                        else None
+                    ),
+                )
+            )
+
+        if len(lineup.players) != 11:
+            raise MatchWorkspaceValidationError(
+                "Workspace lineup must contain eleven players."
+            )
+
+        return lineup
 
     def _map_results(self, engine_results, opponent_ratings):
         mapped = []
@@ -470,6 +610,32 @@ class MatchWorkspaceService:
             "value",
             value
         )
+
+    @staticmethod
+    def _position(value):
+        normalized = normalize_position_key(value)
+        try:
+            return Position(normalized)
+        except ValueError as exc:
+            raise MatchWorkspaceValidationError(
+                "Workspace lineup contains an unsupported position."
+            ) from exc
+
+    @staticmethod
+    def _side(value):
+        normalized = normalize_side_value(value)
+        try:
+            return Side(normalized)
+        except ValueError:
+            return Side.CENTER
+
+    @staticmethod
+    def _order(value):
+        raw = getattr(value, "value", value)
+        for order in Order:
+            if raw in {order.value, order.name}:
+                return order
+        return Order.NORMAL
 
 
 def match_analysis_result_to_dict(result):

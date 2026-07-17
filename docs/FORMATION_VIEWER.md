@@ -64,10 +64,15 @@ The slot layouts are derived from the centralized formation catalog in
 `models.formations`; formation definitions are not duplicated in the UI.
 
 Alpha 0.4.2.1 compacts the normalized tactical lines while preserving their thirds and
-left/center/right meaning. The pitch fits a centered 68:105 field rectangle into the
-available board area, including both goals, both penalty and goal areas, halfway line,
-center markings and corner arcs. Resize handlers consume centralized geometry; they do
-not define formation-specific coordinates.
+left/center/right meaning. Alpha 0.4.3.1 centralizes pitch geometry into a shared model
+containing the playing field, external drawing bounds, goals, penalty areas, goal areas,
+center circle and corner arcs. The pitch fits a centered 68:105 field rectangle into the
+available board area while reserving drawing space for both goals.
+
+Goals are centered on the top and bottom goal lines and drawn outside the playing field.
+Corner arcs are anchored at the exact four pitch corners and curve inward toward the
+field. Resize handlers, painting and geometry tests consume the same source geometry;
+they do not define formation-specific coordinates.
 
 ## Player Cards
 
@@ -150,11 +155,16 @@ initial 65/35 proportion and usable minimum pane widths. The pitch never scrolls
 Intelligence uses an internal vertical scroll area, and Technical Details starts
 collapsed, so long explanations cannot force the pitch smaller.
 
-Successful and restored analyses collapse the large input form into compact analysis,
-recommendation and Decision Lab rows. `Edit analysis` restores the previous controls and
-selections without clearing the visible result or starting optimization. The supported
-desktop target is 1280x720 and above, with explicit checks at 1366x768, 1600x900 and
-1920x1080.
+Successful and restored analyses collapse Analysis Setup but keep its header available.
+The user can show or hide setup again without clearing results, resizing the lower
+workspace destructively or starting optimization. The Match page owns outer vertical
+scrolling when content is taller than the window, so the board keeps a practical minimum
+height instead of shrinking into a miniature. The supported desktop target is 1280x720
+and above, with explicit checks at 1366x768, 1600x900 and 1920x1080.
+
+Alpha 0.4.3 makes the board editable through Workspace replacements. Applied
+replacements are visually marked and can be evaluated through fixed-lineup Workspace
+recalculation without replacing the editable lineup with a newly optimized XI.
 
 ## Design Tokens
 

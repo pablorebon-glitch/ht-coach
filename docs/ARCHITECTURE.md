@@ -177,8 +177,8 @@ Modules:
 - `workspace_models.py`: workspace state, replacement preview, replacement candidates
   and modification history view models.
 - `workspace_service.py`: creates editable board copies, ranks compatible replacements
-  with existing player analyzers, applies/cancels previews, resets state and prepares
-  undo/redo history shape.
+  with existing player analyzers, applies/cancels previews, resets state, reconciles
+  evaluated fixed-lineup results and prepares undo/redo history shape.
 
 Workspace rules:
 
@@ -186,6 +186,8 @@ Workspace rules:
 - apply changes only the Workspace Lineup;
 - reset restores the original recommendation;
 - recalculation is explicit and routed back through `MatchController`;
+- Workspace recalculation evaluates the current fixed lineup through application-layer
+  orchestration around existing `TeamRater` and `TacticOptimizer` calculations;
 - no engine formulas, probability calculations, Decision Lab rules or optimizer behavior
   are changed.
 
@@ -425,6 +427,8 @@ User clicks Analyze Match
      comparison table and detailed XI
   -> FormationBoard creates an editable Workspace Lineup copy for manual replacement
      previews without changing the persisted recommendation
+  -> Recalculate Analysis evaluates the Workspace Lineup as fixed input and preserves
+     its player assignments in the refreshed board
 ```
 
 The engine remains unaware of the desktop application.

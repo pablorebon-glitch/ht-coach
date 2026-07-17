@@ -31,6 +31,7 @@ class MatchController(QObject):
         self._thread = None
         self._worker = None
         self._roster_players = []
+        self._pending_workspace_state = None
 
         self._connect_view()
         self._connect_app_events()
@@ -55,6 +56,10 @@ class MatchController(QObject):
         self._view.copy_lineup_requested.connect(
             self._copy_lineup
         )
+        if hasattr(self._view, "workspace_recalculate_requested"):
+            self._view.workspace_recalculate_requested.connect(
+                self._recalculate_workspace
+            )
         self._view.workspace_changed.connect(
             self._save_current_settings
         )
@@ -166,6 +171,7 @@ class MatchController(QObject):
             return
 
         self._save_current_settings()
+        self._pending_workspace_state = None
         self._view.clear_results()
         self._view.set_processing(
             True
@@ -215,6 +221,70 @@ class MatchController(QObject):
 
         self._thread.start()
 
+    def _recalculate_workspace(self, workspace_state):
+        try:
+            self._service.validate_inputs(
+                self._view.players_csv_path(),
+                self._view.selected_opponent_name(),
+                list(workspace_state.workspace_boards.keys())
+            )
+        except MatchWorkspaceValidationError as exc:
+            self._view.show_error(
+                str(exc)
+            )
+            return
+
+        self._save_current_settings()
+        self._pending_workspace_state = workspace_state
+        self._view.set_processing(
+            True
+        )
+        self._view.show_status(
+            "Evaluating current Workspace lineup..."
+        )
+
+        self._thread = QThread(self)
+        self._worker = MatchAnalysisWorker(
+            self._service,
+            self._view.players_csv_path(),
+            self._view.selected_opponent_name(),
+            list(workspace_state.workspace_boards.keys()),
+            workspace_state=workspace_state,
+        )
+        self._worker.moveToThread(
+            self._thread
+        )
+
+        self._thread.started.connect(
+            self._worker.run
+        )
+        self._worker.progress_changed.connect(
+            self._view.show_status
+        )
+        self._worker.finished.connect(
+            self._analysis_finished
+        )
+        self._worker.failed.connect(
+            self._analysis_failed
+        )
+        self._worker.finished.connect(
+            self._thread.quit
+        )
+        self._worker.failed.connect(
+            self._thread.quit
+        )
+        self._thread.finished.connect(
+            self._worker.deleteLater
+        )
+        self._thread.finished.connect(
+            self._thread.deleteLater
+        )
+        self._thread.finished.connect(
+            self._clear_worker_refs
+        )
+
+        self._thread.start()
+
     def _analysis_finished(self, result):
         self._view.set_processing(
             False
@@ -224,8 +294,10 @@ class MatchController(QObject):
         )
         self._load_current_roster_for_inspector(show_errors=False)
         self._view.show_results(
-            result
+            result,
+            workspace_state=self._pending_workspace_state,
         )
+        self._pending_workspace_state = None
         self._view.show_status(
             "Match analysis complete."
         )
@@ -234,6 +306,7 @@ class MatchController(QObject):
         self._view.set_processing(
             False
         )
+        self._pending_workspace_state = None
         self._view.show_error(
             message
         )

@@ -135,6 +135,8 @@ Content:
 - Progress indicator.
 - Compact recommended-result summary and analysis metadata row.
 - Analysis inputs that collapse after success and reopen without rerunning analysis.
+- Persistent collapsible Analysis Setup with a visible toggle. Showing or hiding setup
+  preserves selected values, current results and Workspace state.
 - Formation Board tab with a vertical pitch, compact player cards, formation switching
   across analyzed alternatives, click-to-inspect behavior, workspace replacement actions,
   and original HT Coach styling.
@@ -151,7 +153,8 @@ Content:
 - Detailed XI table for inspection and accessibility.
 - Probabilities, xG, possession, and tactic.
 - Analysis metadata: opponent, CSV filename, player count, formations, and completion
-  time.
+  time in copy/export surfaces. The visible compact summary keeps only high-value match
+  context such as opponent and formation count.
 
 Expected controls:
 
@@ -171,8 +174,10 @@ Expected controls:
 After analysis, the Match view prioritizes a growing horizontal tactical workspace.
 Formation Board starts at approximately 65% width and Player Intelligence at 35%; the
 user can resize both panes. The pitch maintains its 68:105 field ratio and never scrolls
-internally. The practical minimum supported application size is 1280x720. Below this
-size, cards continue to scale and elide text without changing tactical geometry.
+internally. The Match page scrolls vertically when content is taller than the window,
+letting the board keep a useful minimum height. The practical minimum supported
+application size is 1280x720. Below this size, cards continue to scale and elide text
+without changing tactical geometry.
 
 ### Reports View
 

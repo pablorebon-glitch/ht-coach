@@ -43,6 +43,7 @@ class WorkspaceState:
     replacement_preview: WorkspaceReplacementPreview | None = None
     history: tuple[WorkspaceModification, ...] = ()
     redo_stack: tuple[WorkspaceModification, ...] = ()
+    evaluation_state: str = "original"
 
     @property
     def dirty(self):
@@ -55,15 +56,19 @@ class WorkspaceState:
     @property
     def status_label(self):
         if self.replacement_preview is not None:
-            return "Unsaved Changes"
-        if self.dirty:
-            return "Modified Workspace - Ready to Recalculate"
+            return "Replacement Preview"
+        if self.evaluation_state == "evaluated":
+            return "Evaluated Workspace"
+        if self.dirty or self.evaluation_state == "pending":
+            return "Modified Workspace - Pending Recalculation"
         return "Original Recommendation"
 
     @property
     def status_state(self):
         if self.replacement_preview is not None:
+            return "preview"
+        if self.evaluation_state == "evaluated":
+            return "evaluated"
+        if self.dirty or self.evaluation_state == "pending":
             return "pending"
-        if self.dirty:
-            return "dirty"
         return "clean"

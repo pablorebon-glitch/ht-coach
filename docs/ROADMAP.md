@@ -268,6 +268,10 @@ Acceptance criteria:
 - Alpha 0.4.3 Interactive Workspace: replace players in an editable Workspace Lineup
   while preserving the immutable optimizer recommendation and requiring explicit
   recalculation.
+- Alpha 0.4.3.1 Workspace Recalculation and Match Layout Fixes: evaluate the current
+  Workspace Lineup as fixed input, add evaluated Workspace state, simplify the Match
+  summary, keep Analysis Setup collapsible, add page-level scrolling and correct pitch
+  goal/corner geometry.
 - Alpha 0.4.4 Drag and Drop: roster-to-pitch and pitch-slot movement.
 - Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against
   the optimized recommendation.

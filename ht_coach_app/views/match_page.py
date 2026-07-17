@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -12,9 +12,11 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -31,6 +33,7 @@ class MatchPage(BasePage):
     copy_summary_requested = Signal()
     copy_decision_lab_requested = Signal()
     copy_lineup_requested = Signal()
+    workspace_recalculate_requested = Signal(object)
     workspace_changed = Signal()
 
     def __init__(self, parent=None):
@@ -48,12 +51,56 @@ class MatchPage(BasePage):
         self._analysis_inputs_collapsed = False
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
+        self._build_scroll_content()
         self._build_inputs()
         self._build_results()
 
+    def _build_scroll_content(self):
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("matchPageScroll")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarAlwaysOff
+        )
+
+        self.match_content = QWidget()
+        self.match_content_layout = QVBoxLayout(
+            self.match_content
+        )
+        self.match_content_layout.setContentsMargins(0, 0, 0, 0)
+        self.match_content_layout.setSpacing(8)
+        self.scroll_area.setWidget(
+            self.match_content
+        )
+        self.body_layout.addWidget(self.scroll_area, 1)
+
     def _build_inputs(self):
-        self.analysis_inputs_panel = QFrame()
-        self.analysis_inputs_panel.setObjectName("workspacePanel")
+        self.analysis_setup_panel = QFrame()
+        self.analysis_setup_panel.setObjectName("workspacePanel")
+        setup_layout = QVBoxLayout(self.analysis_setup_panel)
+        setup_layout.setContentsMargins(14, 10, 14, 12)
+        setup_layout.setSpacing(8)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(8)
+        title = QLabel("Analysis Setup")
+        title.setObjectName("sectionTitle")
+        header.addWidget(title)
+        header.addStretch(1)
+        self.analysis_setup_toggle = QToolButton()
+        self.analysis_setup_toggle.setObjectName("analysisSetupToggle")
+        self.analysis_setup_toggle.setToolButtonStyle(
+            Qt.ToolButtonTextBesideIcon
+        )
+        self.analysis_setup_toggle.clicked.connect(
+            self.toggle_analysis_inputs
+        )
+        header.addWidget(self.analysis_setup_toggle)
+        setup_layout.addLayout(header)
+
+        self.analysis_inputs_panel = QWidget()
         layout = QGridLayout(self.analysis_inputs_panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setHorizontalSpacing(12)
@@ -153,7 +200,9 @@ class MatchPage(BasePage):
         layout.addWidget(self.analyze_button, 6, 3)
         layout.setColumnStretch(1, 1)
 
-        self.body_layout.addWidget(self.analysis_inputs_panel, 0)
+        setup_layout.addWidget(self.analysis_inputs_panel)
+        self.match_content_layout.addWidget(self.analysis_setup_panel, 0)
+        self._sync_analysis_setup_toggle()
 
     def _build_results(self):
         self.results_host = QWidget()
@@ -163,7 +212,7 @@ class MatchPage(BasePage):
         self.results_layout.setContentsMargins(0, 0, 0, 0)
         self.results_layout.setSpacing(6)
         self._show_empty_results()
-        self.body_layout.addWidget(self.results_host, 1)
+        self.match_content_layout.addWidget(self.results_host, 1)
 
     def set_opponents(self, opponent_names, selected_name=None):
         current = (
@@ -354,7 +403,7 @@ class MatchPage(BasePage):
             "Optimizing formations, lineup, individual orders and tactic."
         )
 
-    def show_results(self, result, restored=False):
+    def show_results(self, result, restored=False, workspace_state=None):
         self._state = "success"
         self._clear_results_widgets()
         self.collapse_analysis_inputs()
@@ -382,7 +431,11 @@ class MatchPage(BasePage):
             )
 
         self.results_layout.addWidget(
-            self._build_result_tabs(result, restored=restored),
+            self._build_result_tabs(
+                result,
+                restored=restored,
+                workspace_state=workspace_state,
+            ),
             1,
         )
 
@@ -390,22 +443,35 @@ class MatchPage(BasePage):
         self._analysis_inputs_collapsed = True
         self.analysis_inputs_panel.setVisible(False)
         self.set_compact_header(True)
+        self._sync_analysis_setup_toggle()
 
     def expand_analysis_inputs(self):
         self._analysis_inputs_collapsed = False
         self.analysis_inputs_panel.setVisible(True)
         self.set_compact_header(False)
+        self._sync_analysis_setup_toggle()
+
+    def toggle_analysis_inputs(self):
+        if self.analysis_inputs_expanded():
+            self.collapse_analysis_inputs()
+        else:
+            self.expand_analysis_inputs()
 
     def analysis_inputs_expanded(self):
         return not self._analysis_inputs_collapsed
 
-    def _build_result_tabs(self, result, restored=False):
+    def _build_result_tabs(self, result, restored=False, workspace_state=None):
         tabs = QTabWidget()
         tabs.setObjectName("matchResultTabs")
         tabs.setDocumentMode(True)
+        tabs.setMinimumHeight(720)
 
         tabs.addTab(
-            self._build_formation_board_tab(result, restored),
+            self._build_formation_board_tab(
+                result,
+                restored,
+                workspace_state=workspace_state,
+            ),
             "Formation Board",
         )
         tabs.addTab(
@@ -422,7 +488,12 @@ class MatchPage(BasePage):
 
         return tabs
 
-    def _build_formation_board_tab(self, result, restored=False):
+    def _build_formation_board_tab(
+        self,
+        result,
+        restored=False,
+        workspace_state=None,
+    ):
         try:
             boards = [
                 self._formation_board_mapper.to_board(
@@ -441,9 +512,10 @@ class MatchPage(BasePage):
                     else ""
                 ),
                 roster_players=self._roster_players,
+                workspace_state=workspace_state,
             )
             board.recalculate_requested.connect(
-                self.analyze_requested
+                self.workspace_recalculate_requested.emit
             )
             return board
         except Exception as exc:
@@ -580,35 +652,15 @@ class MatchPage(BasePage):
 
         items = [
             ("Opponent", result.opponent_name),
-            ("CSV", result.players_csv_filename),
-            ("Players", str(result.player_count)),
             ("Formations", str(len(result.analyzed_formations))),
-            ("Completed", result.completed_at),
         ]
 
         for label, value in items:
-            value_label = QLabel(f"{label}  {value}")
+            value_label = QLabel(f"{label}: {value}")
             value_label.setObjectName("metadataValue")
             layout.addWidget(value_label)
 
         layout.addStretch(1)
-        copy_summary = QPushButton("Copy summary")
-        copy_summary.clicked.connect(self.copy_summary_requested)
-        layout.addWidget(copy_summary)
-
-        copy_decision_lab = QPushButton("Copy Decision Lab")
-        copy_decision_lab.clicked.connect(self.copy_decision_lab_requested)
-        layout.addWidget(copy_decision_lab)
-
-        copy_lineup = QPushButton("Copy lineup")
-        copy_lineup.clicked.connect(self.copy_lineup_requested)
-        layout.addWidget(copy_lineup)
-
-        edit_button = QPushButton("Edit analysis")
-        edit_button.setObjectName("editAnalysisButton")
-        edit_button.clicked.connect(self.expand_analysis_inputs)
-        layout.addWidget(edit_button)
-
         return panel
 
     def _build_comparison_table(self, result):
@@ -872,3 +924,14 @@ class MatchPage(BasePage):
             )
         else:
             self.formation_warning_label.setText("")
+
+    def _sync_analysis_setup_toggle(self):
+        if not hasattr(self, "analysis_setup_toggle"):
+            return
+
+        if self.analysis_inputs_expanded():
+            self.analysis_setup_toggle.setText("Hide analysis setup")
+            self.analysis_setup_toggle.setArrowType(Qt.DownArrow)
+        else:
+            self.analysis_setup_toggle.setText("Show analysis setup")
+            self.analysis_setup_toggle.setArrowType(Qt.RightArrow)

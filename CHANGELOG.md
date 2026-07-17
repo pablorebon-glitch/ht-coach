@@ -14,6 +14,10 @@
   for lineup edits, dirty state, replacement ranking and future undo/redo support.
 - Added `docs/WORKSPACE.md` covering recommended versus workspace lineups, editing
   lifecycle, reset, recalculation and future Decision Delta/drag-and-drop milestones.
+- Added fixed-lineup Workspace recalculation so Recalculate Analysis evaluates the
+  current Workspace Lineup without rerunning lineup optimization or replacing applied
+  player changes.
+- Added Evaluated Workspace status after successful fixed-lineup recalculation.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -59,7 +63,15 @@
 ### Changed
 
 - Match analysis inputs now collapse after a successful or restored analysis and can be
-  reopened without rerunning optimization or clearing the current result.
+  reopened or collapsed again through a persistent Analysis Setup toggle without
+  rerunning optimization or clearing the current result.
+- Simplified the visible Match summary to high-value context labels such as
+  `Opponent:` and `Formations:`; CSV filename, player count, timestamps, copy buttons
+  and the old Edit Analysis button were removed from that row.
+- Match page content now scrolls vertically when needed so the Formation Board keeps a
+  useful minimum pitch height.
+- Corrected Formation Board pitch geometry so both goals are visible outside the field
+  and all four corner arcs are anchored to pitch corners and curve inward.
 - Match recommendation, metadata and Decision Lab presentation now use compact rows so
   the tactical workspace receives most of the available height.
 - Formation player cards now elide long names according to their rendered width while
@@ -83,14 +95,15 @@
   forwards from left to right.
 - Formation Board selection now shows Player Intelligence when roster data is available
   and preserves a clean unavailable state for restored results without roster details.
-- Formation Board now distinguishes Original Recommendation, Unsaved Changes and
-  Modified Workspace states without automatically recalculating match results.
+- Formation Board now distinguishes Original Recommendation, Replacement Preview,
+  Modified Workspace - Pending Recalculation and Evaluated Workspace states without
+  automatically recalculating match results.
 
 ### Notes
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
-- Workspace edits are local view-model changes until Recalculate Analysis explicitly runs
-  the existing analysis pipeline.
+- Workspace edits are local view-model changes until Recalculate Analysis explicitly
+  evaluates the fixed Workspace Lineup through existing calculation paths.
 - Decision Lab explanations are deterministic and rule-based; no AI service, LLM,
   network dependency, or external API is used.
