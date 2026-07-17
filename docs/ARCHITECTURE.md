@@ -27,6 +27,7 @@ ht_coach_app/
   controllers/
   services/
   reasoning/
+  player_intelligence/
   state/
   views/
   widgets/
@@ -162,6 +163,24 @@ Modules:
   - Converts serializable match analysis results into immutable board view models.
   - Reuses centralized position, side and order formatting.
   - Does not call optimizers, persistence, or engine calculators.
+
+### Player Intelligence
+
+`ht_coach_app/player_intelligence/`
+
+The Player Intelligence layer turns a selected Formation Board player plus loaded roster
+data into deterministic explanation view models. It is UI-independent and does not
+import Qt.
+
+Modules:
+
+- `models.py`: immutable serializable Player Intelligence view models.
+- `profile_classifier.py`: deterministic, modest player-profile labels.
+- `explanation_rules.py`: strengths, limitations and why-selected rules.
+- `alternative_analyzer.py`: same-role candidate ranking and effective-tie wording.
+- `contribution_formatter.py`: tactical contribution bars from existing contribution
+  calculations.
+- `service.py`: orchestrates profile, ranking, contribution and technical details.
 
 - `ReportService`
   - Formats recommendation summaries for display and future export.
@@ -339,6 +358,7 @@ views/widgets -> controllers -> services -> engine/models/importers/persistence
 controllers -> state / application events
 services -> state view models
 services -> reasoning -> existing analysis view models
+widgets -> player_intelligence -> existing roster data / player analyzers
 persistence -> models or persistence DTOs
 ```
 
@@ -396,6 +416,9 @@ Examples:
 - `FormationSlotViewModel`
 - `PlayerCardViewModel`
 - `PlayerInspectorViewModel`
+- `PlayerIntelligenceViewModel`
+- `PlayerAlternativeViewModel`
+- `PlayerContributionViewModel`
 - `DecisionLabResult`
 - `FormationComparison`
 - `SectorComparison`

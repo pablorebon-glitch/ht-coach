@@ -47,6 +47,7 @@ class MatchPage(BasePage):
         self._formation_checks = {}
         self._favorite_formations = []
         self._formation_board_mapper = FormationBoardMapper()
+        self._roster_players = []
         self._state = "empty"
         self._build_inputs()
         self._build_results()
@@ -306,6 +307,9 @@ class MatchPage(BasePage):
             f"{count} players loaded"
         )
 
+    def set_roster_players(self, players):
+        self._roster_players = list(players or [])
+
     def set_processing(self, is_processing):
         self.analyze_button.setEnabled(
             not is_processing
@@ -462,6 +466,7 @@ class MatchPage(BasePage):
                     if recommended is not None
                     else ""
                 ),
+                roster_players=self._roster_players,
             )
             return board
         except Exception as exc:

@@ -5,12 +5,15 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
+    QProgressBar,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
+from ht_coach_app.player_intelligence.service import (
+    PlayerIntelligenceService,
+)
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.widgets.formation_board.formation_board_styles import (
     formation_board_stylesheet,
@@ -24,8 +27,10 @@ class FormationBoard(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._mapper = FormationBoardMapper()
+        self._intelligence_service = PlayerIntelligenceService()
         self._boards = {}
         self._details_by_name = {}
+        self._roster_players = []
         self._current_name = ""
         self.setStyleSheet(formation_board_stylesheet())
         self._build()
@@ -83,8 +88,10 @@ class FormationBoard(QWidget):
         boards,
         selected_formation_name="",
         player_details_by_name=None,
+        roster_players=None,
     ):
         self._details_by_name = player_details_by_name or {}
+        self._roster_players = list(roster_players or [])
         self._boards = {
             board.formation_name: board
             for board in boards
@@ -137,6 +144,13 @@ class FormationBoard(QWidget):
 
     def _on_formation_changed(self):
         self._current_name = self.formation_combo.currentData() or ""
+        board = self.current_board()
+
+        if board is not None and board.selected_player_id:
+            self._boards[board.formation_name] = self._mapper.clear_selection(
+                board
+            )
+
         self.formation_changed.emit(self._current_name)
         self._render_current_board()
 
@@ -154,44 +168,126 @@ class FormationBoard(QWidget):
         self.meta_label.setText(
             f"{board.tactic_name} | Tactic level {board.tactic_level:.2f}"
         )
-        inspector = self._mapper.inspector_for_player(
-            board,
-            self._details_by_name,
+        intelligence = self._intelligence_service.analyze(
+            board.selected_player,
+            self._roster_players,
         )
-        self._render_inspector(inspector)
+        self._render_intelligence(intelligence)
 
-    def _render_inspector(self, inspector):
+    def _render_intelligence(self, intelligence):
         self._clear_inspector()
 
-        if not inspector.player_name:
+        if intelligence.availability_state != "available":
             self._render_inspector_message(
-                inspector.unavailable_message
+                intelligence.headline
             )
             return
 
-        title = QLabel(inspector.player_name)
+        title = QLabel(intelligence.player_name)
         title.setObjectName("formationBoardTitle")
         self.inspector_layout.addWidget(title)
 
-        rows = [
-            ("Position", inspector.assigned_position),
-            ("Side", inspector.assigned_side),
-            ("Order", inspector.individual_order),
-            ("Order side", inspector.order_side or "-"),
-            ("Best position", inspector.best_position or "-"),
-            ("Position score", self._format_optional_float(inspector.position_score)),
-            ("Form", self._format_optional_int(inspector.form)),
-            ("Stamina", self._format_optional_int(inspector.stamina)),
-            ("Experience", self._format_optional_int(inspector.experience)),
-            ("TSI", self._format_optional_int(inspector.tsi)),
-            ("Specialty", inspector.specialty or "-"),
-        ]
+        badge = QLabel(intelligence.profile_label)
+        badge.setObjectName("playerProfileBadge")
+        self.inspector_layout.addWidget(badge)
 
+        subtitle = QLabel(
+            f"{intelligence.current_position_label} | "
+            f"{intelligence.current_order_label} | "
+            f"Score {intelligence.overall_score_label}"
+        )
+        subtitle.setObjectName("playerInspectorMeta")
+        subtitle.setWordWrap(True)
+        self.inspector_layout.addWidget(subtitle)
+
+        note = QLabel(intelligence.headline)
+        note.setObjectName("coachNote")
+        note.setWordWrap(True)
+        self.inspector_layout.addWidget(note)
+
+        if intelligence.why_selected:
+            self._add_points(
+                "Why selected",
+                intelligence.why_selected,
+            )
+
+        if intelligence.tactical_contributions:
+            self._add_contributions(
+                intelligence.tactical_contributions
+            )
+
+        if intelligence.strengths:
+            self._add_points("Strengths", intelligence.strengths)
+
+        if intelligence.limitations:
+            self._add_points("Limitations", intelligence.limitations)
+
+        if intelligence.alternatives:
+            self._add_alternatives(intelligence.alternatives)
+
+        if intelligence.technical_attributes:
+            self._add_technical_details(
+                intelligence.technical_attributes
+            )
+
+        self.inspector_layout.addStretch(1)
+
+    def _add_points(self, title, points):
+        self.inspector_layout.addWidget(
+            self._section_label(title)
+        )
+
+        for point in points:
+            label = QLabel(
+                f"{point.title}: {point.detail}"
+            )
+            label.setWordWrap(True)
+            self.inspector_layout.addWidget(label)
+
+    def _add_contributions(self, contributions):
+        self.inspector_layout.addWidget(
+            self._section_label("Tactical profile")
+        )
+
+        for contribution in contributions:
+            label = QLabel(
+                f"{contribution.label}: {contribution.display_value} "
+                f"({contribution.interpretation})"
+            )
+            label.setWordWrap(True)
+            bar = QProgressBar()
+            bar.setObjectName("contributionBar")
+            bar.setRange(0, 100)
+            bar.setValue(
+                int(contribution.normalized_value * 100)
+            )
+            bar.setTextVisible(False)
+            self.inspector_layout.addWidget(label)
+            self.inspector_layout.addWidget(bar)
+
+    def _add_alternatives(self, alternatives):
+        self.inspector_layout.addWidget(
+            self._section_label("Closest alternatives")
+        )
+
+        for alternative in alternatives:
+            label = QLabel(
+                f"{alternative.player_name}: {alternative.score:.2f} "
+                f"({alternative.score_difference:+.2f} player score). "
+                f"{alternative.reason_not_selected}"
+            )
+            label.setWordWrap(True)
+            self.inspector_layout.addWidget(label)
+
+    def _add_technical_details(self, attributes):
+        self.inspector_layout.addWidget(
+            self._section_label("Technical details")
+        )
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(5)
 
-        for row, (label, value) in enumerate(rows):
+        for row, (label, value) in enumerate(attributes):
             label_widget = QLabel(label)
             label_widget.setObjectName("playerInspectorMeta")
             value_widget = QLabel(str(value))
@@ -201,32 +297,6 @@ class FormationBoard(QWidget):
         grid_host = QWidget()
         grid_host.setLayout(grid)
         self.inspector_layout.addWidget(grid_host)
-
-        if inspector.relevant_skills:
-            self.inspector_layout.addWidget(
-                self._section_label("Core skills")
-            )
-            for label, value in inspector.relevant_skills:
-                self.inspector_layout.addWidget(
-                    QLabel(f"{label}: {value}")
-                )
-
-        if inspector.rankings_by_position:
-            self.inspector_layout.addWidget(
-                self._section_label("Position rankings")
-            )
-            for label, score, rank in inspector.rankings_by_position:
-                self.inspector_layout.addWidget(
-                    QLabel(f"{rank}. {label}: {score:.2f}")
-                )
-
-        if inspector.unavailable_message:
-            message = QLabel(inspector.unavailable_message)
-            message.setWordWrap(True)
-            message.setObjectName("playerInspectorMeta")
-            self.inspector_layout.addWidget(message)
-
-        self.inspector_layout.addStretch(1)
 
     def _render_inspector_message(self, message):
         self._clear_inspector()
