@@ -28,6 +28,9 @@ def format_position_name(position):
 def format_position_abbreviation(position):
     value = normalize_position_value(position)
 
+    if "(" in value and ")" in value:
+        return value.rsplit("(", 1)[1].split(")", 1)[0].strip()
+
     if value in POSITION_LABELS:
         return POSITION_LABELS[value][1]
 
@@ -49,3 +52,16 @@ def format_position(position):
         return f"{name} ({abbreviation})"
 
     return format_position_name(value)
+
+
+def normalize_position_key(position):
+    value = normalize_position_value(position)
+
+    if value in POSITION_LABELS:
+        return value
+
+    for key, (name, abbreviation) in POSITION_LABELS.items():
+        if value == name or value == f"{name} ({abbreviation})":
+            return key
+
+    return value

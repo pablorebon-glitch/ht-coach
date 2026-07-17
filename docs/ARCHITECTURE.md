@@ -158,6 +158,11 @@ Modules:
   gain explanations, and confidence assessment.
 - `explanation_formatter.py`: plain-text copy/report output helpers.
 
+- `FormationBoardMapper`
+  - Converts serializable match analysis results into immutable board view models.
+  - Reuses centralized position, side and order formatting.
+  - Does not call optimizers, persistence, or engine calculators.
+
 - `ReportService`
   - Formats recommendation summaries for display and future export.
   - Keeps report formatting out of controllers.
@@ -209,6 +214,10 @@ Suggested widgets:
 - `OpponentList`: saved opponent list with empty state.
 - `FormationResultTable`: sortable formation comparison.
 - `MatchResultPanel`: win/draw/loss, xG, possession, tactic, and lineup summary.
+- `FormationBoard`: read-only football pitch visualization for analyzed lineups.
+- `PitchWidget`: custom PySide6-painted vertical pitch.
+- `PlayerCard`: compact selectable card for a recommended XI player.
+- `PlayerInspectorPanel`: read-only selected-player detail surface.
 - `StatusBanner`: non-blocking validation and task messages.
 - `BusyOverlay` or `ProgressPanel`: long-running optimization feedback.
 
@@ -366,7 +375,8 @@ User clicks Analyze Match
   -> Service maps engine result to serializable MatchAnalysisResult view models
   -> Decision Lab creates deterministic explanations from those view models
   -> MatchWorkspaceRepository persists the last successful result
-  -> MatchPage renders Decision Lab, recommended summary, comparison table and XI
+  -> MatchPage renders Decision Lab, recommended summary, Formation Board,
+     comparison table and detailed XI
 ```
 
 The engine remains unaware of the desktop application.
@@ -382,6 +392,10 @@ Examples:
 - `FormationResultRowViewModel`
 - `MatchAnalysisResultViewModel`
 - `LineupRecommendationViewModel`
+- `FormationBoardViewModel`
+- `FormationSlotViewModel`
+- `PlayerCardViewModel`
+- `PlayerInspectorViewModel`
 - `DecisionLabResult`
 - `FormationComparison`
 - `SectorComparison`

@@ -121,6 +121,24 @@ falls back without crashing the application.
 - Decision Lab does not guarantee match outcomes.
 - Reasoning quality depends on the formations and opponent data analyzed by the user.
 
+## Formation Viewer Integration
+
+Decision Lab remains the explanatory layer for match recommendations. Formation Viewer
+adds the visual layer beside it: Decision Lab explains the recommendation, while the
+board shows the selected XI in a football context.
+
+The integration rule is unchanged:
+
+- the engine calculates;
+- services map existing result data;
+- Decision Lab and Formation Viewer interpret and display;
+- neither layer changes engine probabilities, xG, tactics, orders, formations or lineup
+  selection.
+
+In the Match workspace, Decision Lab remains visible above the local result tabs.
+Formation Board is the default visualization tab, with Comparison and Detailed XI
+preserved for detailed review.
+
 ## Example
 
 `3-5-2` may be recommended because it has a meaningful win-probability edge, creates more

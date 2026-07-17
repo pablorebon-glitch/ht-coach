@@ -134,10 +134,12 @@ Content:
 - Analyze Match action.
 - Progress indicator.
 - Prominent recommended-result summary.
+- Formation Board tab with a vertical pitch, compact player cards, formation switching
+  across analyzed alternatives, click-to-inspect behavior, and original HT Coach styling.
 - Decision Lab section with recommendation, confidence badge, reasons, risks, tactical
   observations, sector matchup notes, and optimization gain breakdown.
 - Formation comparison table with deltas versus the recommendation.
-- Recommended lineup.
+- Detailed XI table for inspection and accessibility.
 - Probabilities, xG, possession, and tactic.
 - Analysis metadata: opponent, CSV filename, player count, formations, and completion
   time.
@@ -154,6 +156,7 @@ Expected controls:
 - Copy Summary and Copy Lineup actions.
 - Copy Decision Lab action.
 - Result table and recommended XI table inside the page.
+- Formation Board, Comparison and Detailed XI result tabs.
 - Empty, loading, success, and error states.
 
 ### Reports View
@@ -261,6 +264,18 @@ Responsibilities:
 
 - Display position, player, and order.
 - Support copy/export later.
+
+### FormationBoard
+
+Responsibilities:
+
+- Display the analyzed lineup on a vertical football pitch.
+- Keep goalkeeper at the bottom, defenders below midfielders, midfielders in the middle
+  and forwards at the top.
+- Preserve left, center and right semantics.
+- Render compact player cards with user-facing position, side and order labels.
+- Support read-only player selection and inspector updates.
+- Avoid engine, optimizer and persistence dependencies.
 
 ## Controllers
 

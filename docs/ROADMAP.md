@@ -258,6 +258,14 @@ Acceptance criteria:
 - Confidence describes recommendation strength relative to analyzed alternatives.
 - No external AI service, LLM, network dependency, or API call is introduced.
 
+### Alpha 0.4: Formation Viewer
+
+- Alpha 0.4.1 Formation Viewer: read-only pitch board for match recommendations.
+- Alpha 0.4.2 Player Inspector: richer selected-player context from roster data.
+- Alpha 0.4.3 Editable Lineup Board: prepare lineup edits without recalculation.
+- Alpha 0.4.4 Drag and Drop: roster-to-pitch and pitch-slot movement.
+- Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against
+  the optimized recommendation.
 - Match scenario history.
 - Exportable reports.
 - Advanced opponent scouting notes.
