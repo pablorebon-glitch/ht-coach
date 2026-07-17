@@ -4,9 +4,6 @@ from dataclasses import replace
 from engine.analyzers.player_analyzer import PlayerAnalyzer
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.side_formatting import format_side
-from ht_coach_app.widgets.formation_board.formation_board_models import (
-    FormationBoardViewModel,
-)
 from ht_coach_app.workspace.workspace_models import (
     WorkspaceModification,
     WorkspaceReplacementCandidate,
@@ -220,6 +217,7 @@ class WorkspaceService:
             replacement_preview=None,
             history=state.history + (modification,),
             redo_stack=(),
+            evaluation_state="pending",
         )
 
     def reset(self, state):
@@ -231,6 +229,30 @@ class WorkspaceService:
             original_boards=state.original_boards,
             workspace_boards=boards,
             current_formation_name=state.current_formation_name,
+        )
+
+    def with_evaluated_boards(self, state, boards):
+        selected_player_id = state.selected_player_id
+        workspace_boards = {}
+
+        for board in boards:
+            updated = self._restore_workspace_markers(
+                board,
+                state,
+            )
+            if updated.formation_name == state.current_formation_name:
+                updated = self._restore_selection(
+                    updated,
+                    selected_player_id,
+                    self._selected_player_name(state),
+                )
+            workspace_boards[updated.formation_name] = updated
+
+        return replace(
+            state,
+            workspace_boards=workspace_boards,
+            replacement_preview=None,
+            evaluation_state="evaluated",
         )
 
     def select_board_player(self, board, player_id):
@@ -274,6 +296,59 @@ class WorkspaceService:
                 for slot in board.slots
             ),
         )
+
+    def _restore_workspace_markers(self, board, state):
+        modified_slots = {
+            modification.slot_id
+            for modification in state.history
+            if modification.formation_name == board.formation_name
+        }
+
+        if not modified_slots:
+            return board
+
+        return replace(
+            board,
+            slots=tuple(
+                replace(
+                    slot,
+                    player=(
+                        replace(slot.player, is_modified=True)
+                        if slot.player is not None
+                        and slot.slot_id in modified_slots
+                        else slot.player
+                    ),
+                )
+                for slot in board.slots
+            ),
+        )
+
+    def _restore_selection(self, board, selected_player_id, selected_player_name):
+        if not selected_player_id and not selected_player_name:
+            return self.clear_board_selection(board)
+
+        for slot in board.slots:
+            if slot.player is None:
+                continue
+            if (
+                slot.player.player_id == selected_player_id
+                or slot.player.player_name == selected_player_name
+            ):
+                return self.select_board_player(
+                    board,
+                    slot.player.player_id,
+                )
+
+        return self.clear_board_selection(board)
+
+    @staticmethod
+    def _selected_player_name(state):
+        board = state.current_board
+        if board is not None and board.selected_player is not None:
+            return board.selected_player.player_name
+        if state.history:
+            return state.history[-1].replacement_player_name
+        return ""
 
     def _rank_players(self, roster_players, position, side):
         ranking = self._analyzer.rank_players(

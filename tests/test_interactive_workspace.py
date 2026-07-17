@@ -1,5 +1,7 @@
 import os
+import tempfile
 import unittest
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -8,13 +10,16 @@ from ht_coach_app.services.match_workspace_service import (
     FormationAnalysisResult,
     LineupPlayerResult,
     MatchAnalysisResult,
+    MatchWorkspaceService,
 )
 from ht_coach_app.widgets.formation_board.formation_layouts import (
     get_formation_layout,
 )
 from ht_coach_app.workspace.workspace_service import WorkspaceService
+from models.opponent import Opponent
 from models.player import Player
 from models.position import Position
+from models.team_ratings import TeamRatings
 
 
 def make_player(
@@ -99,6 +104,49 @@ def board_with_selected_forward():
     )
 
 
+def roster_for_result(result):
+    names = {
+        player.player_name
+        for player in result.lineup
+    }
+    players = [
+        make_player(name)
+        for name in sorted(names)
+    ]
+    players.extend(
+        [
+            make_player("A Replacement", scoring=11, passing=7),
+            make_player("B Replacement", scoring=10, passing=7),
+            make_player("C Replacement", scoring=9, passing=7),
+        ]
+    )
+    return players
+
+
+class FakeOpponentService:
+    def __init__(self):
+        self.opponent = Opponent(
+            name="Rival FC",
+            ratings=TeamRatings(
+                left_defense=25,
+                central_defense=35,
+                right_defense=24,
+                midfield=40,
+                left_attack=25,
+                central_attack=30,
+                right_attack=24,
+            ),
+        )
+
+    def list_opponents(self):
+        return [self.opponent]
+
+    def get_opponent(self, name):
+        if name == self.opponent.name:
+            return self.opponent
+        return None
+
+
 class WorkspaceServiceTest(unittest.TestCase):
     def setUp(self):
         self.service = WorkspaceService()
@@ -128,7 +176,10 @@ class WorkspaceServiceTest(unittest.TestCase):
         self.assertEqual(original.player_name, "Rushton")
         self.assertEqual(current.player_name, "A Replacement")
         self.assertTrue(state.dirty)
-        self.assertIn("Ready to Recalculate", state.status_label)
+        self.assertEqual(
+            state.status_label,
+            "Modified Workspace - Pending Recalculation",
+        )
 
     def test_replacement_preview_apply_cancel_and_reset(self):
         state = self.service.create([self.board], "3-5-2")
@@ -139,7 +190,7 @@ class WorkspaceServiceTest(unittest.TestCase):
 
         previewed = self.service.preview_replacement(state, candidate)
         self.assertIsNotNone(previewed.replacement_preview)
-        self.assertEqual(previewed.status_label, "Unsaved Changes")
+        self.assertEqual(previewed.status_label, "Replacement Preview")
 
         canceled = self.service.cancel_replacement(previewed)
         self.assertIsNone(canceled.replacement_preview)
@@ -161,6 +212,49 @@ class WorkspaceServiceTest(unittest.TestCase):
             reset.current_board.slots[0].player.is_modified,
             False,
         )
+
+    def test_status_transitions_original_pending_evaluated_pending_and_reset(self):
+        state = self.service.create([self.board], "3-5-2")
+        self.assertEqual(state.status_label, "Original Recommendation")
+
+        candidate = self.service.replacement_candidates(
+            state,
+            self.roster,
+        )[0]
+        state = self.service.preview_replacement(state, candidate)
+        state = self.service.apply_replacement(state, self.roster)
+        self.assertEqual(
+            state.status_label,
+            "Modified Workspace - Pending Recalculation",
+        )
+
+        evaluated_board = FormationBoardMapper().to_board(
+            formation_result(selected_forward="A Replacement")
+        )
+        state = self.service.with_evaluated_boards(
+            state,
+            [evaluated_board],
+        )
+        self.assertEqual(state.status_label, "Evaluated Workspace")
+        self.assertEqual(
+            state.current_board.selected_player.player_name,
+            "A Replacement",
+        )
+
+        next_candidate = self.service.replacement_candidates(
+            state,
+            self.roster,
+        )[0]
+        state = self.service.preview_replacement(state, next_candidate)
+        state = self.service.apply_replacement(state, self.roster)
+        self.assertEqual(
+            state.status_label,
+            "Modified Workspace - Pending Recalculation",
+        )
+
+        state = self.service.reset(state)
+        self.assertEqual(state.status_label, "Original Recommendation")
+        self.assertEqual(state.current_board.selected_player_id, "")
 
     def test_replacement_ranking_is_compatible_limited_and_deterministic(self):
         state = self.service.create([self.board], "3-5-2")
@@ -229,7 +323,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         )
         recalculate_calls = []
         board_widget.recalculate_requested.connect(
-            lambda: recalculate_calls.append("called")
+            lambda state: recalculate_calls.append(state)
         )
 
         player_id = next(
@@ -245,13 +339,13 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertEqual(recalculate_calls, [])
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Unsaved Changes",
+            "Replacement Preview",
         )
 
         board_widget.apply_replacement_button.click()
         self.assertEqual(recalculate_calls, [])
         self.assertIn(
-            "Ready to Recalculate",
+            "Pending Recalculation",
             board_widget.workspace_status_label.text(),
         )
         self.assertEqual(
@@ -260,9 +354,13 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         )
 
         board_widget.recalculate_button.click()
-        self.assertEqual(recalculate_calls, ["called"])
+        self.assertEqual(len(recalculate_calls), 1)
+        self.assertEqual(
+            recalculate_calls[0].current_board.selected_player.player_name,
+            "A Replacement",
+        )
 
-    def test_match_page_routes_workspace_recalculate_to_existing_analysis_signal(self):
+    def test_match_page_routes_workspace_recalculate_to_workspace_signal(self):
         page = MatchPage()
         result = MatchAnalysisResult(
             player_count=11,
@@ -280,6 +378,10 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         )
         calls = []
         page.analyze_requested.connect(lambda: calls.append("analyze"))
+        workspace_calls = []
+        page.workspace_recalculate_requested.connect(
+            lambda state: workspace_calls.append(state)
+        )
         page.show_results(result)
         board = page.findChild(FormationBoard)
 
@@ -294,7 +396,93 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
 
         self.assertEqual(calls, [])
         board.recalculate_button.click()
-        self.assertEqual(calls, ["analyze"])
+        self.assertEqual(calls, [])
+        self.assertEqual(len(workspace_calls), 1)
+
+    def test_recalculated_workspace_result_preserves_applied_replacement(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        service = WorkspaceService()
+        state = service.create([board], "3-5-2")
+        forward_id = next(
+            slot.player.player_id
+            for slot in state.current_board.slots
+            if slot.player.player_name == "Rushton"
+        )
+        state = service.select_player(state, forward_id)
+        roster = roster_for_result(result)
+        candidate = service.replacement_candidates(state, roster)[0]
+        state = service.preview_replacement(state, candidate)
+        state = service.apply_replacement(state, roster)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "players.csv"
+            path.write_text("placeholder", encoding="utf-8")
+            match_service = MatchWorkspaceService(
+                FakeOpponentService(),
+                importer=lambda _path: roster,
+                optimizer=lambda *_args, **_kwargs: self.fail(
+                    "lineup optimizer should not run for workspace recalculation"
+                ),
+            )
+            recalculated = match_service.analyze_workspace(
+                path,
+                "Rival FC",
+                state,
+            )
+
+        self.assertEqual(
+            recalculated.recommended_formation.lineup[
+                result.lineup.index(
+                    next(player for player in result.lineup if player.player_name == "Rushton")
+                )
+            ].player_name,
+            candidate.player_name,
+        )
+
+    def test_recalculated_workspace_preserves_multiple_replacements(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        service = WorkspaceService()
+        state = service.create([board], "3-5-2")
+        roster = roster_for_result(result) + [
+            make_player("Defender Replacement", defending=12),
+        ]
+
+        for current_name in ("Rushton", "Center Central Defender (CD) 3"):
+            player_id = next(
+                slot.player.player_id
+                for slot in state.current_board.slots
+                if slot.player.player_name == current_name
+            )
+            state = service.select_player(state, player_id)
+            candidate = service.replacement_candidates(state, roster)[0]
+            state = service.preview_replacement(state, candidate)
+            state = service.apply_replacement(state, roster)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "players.csv"
+            path.write_text("placeholder", encoding="utf-8")
+            match_service = MatchWorkspaceService(
+                FakeOpponentService(),
+                importer=lambda _path: roster,
+                optimizer=lambda *_args, **_kwargs: self.fail(
+                    "lineup optimizer should not run for workspace recalculation"
+                ),
+            )
+            recalculated = match_service.analyze_workspace(
+                path,
+                "Rival FC",
+                state,
+            )
+
+        names = [
+            player.player_name
+            for player in recalculated.recommended_formation.lineup
+        ]
+        self.assertIn("A Replacement", names)
+        self.assertIn("Defender Replacement", names)
+        self.assertNotIn("Rushton", names)
 
     @staticmethod
     def _board_model():

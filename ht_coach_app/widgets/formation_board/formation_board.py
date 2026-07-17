@@ -22,6 +22,7 @@ from ht_coach_app.widgets.formation_board.formation_board_styles import (
 )
 from ht_coach_app.widgets.formation_board.layout_metrics import (
     BOARD_MINIMUM_WIDTH,
+    BOARD_MINIMUM_HEIGHT,
     COMPACT_PANEL_PADDING,
     COMPACT_SECTION_SPACING,
     INSPECTOR_MINIMUM_WIDTH,
@@ -35,7 +36,7 @@ from ht_coach_app.workspace.workspace_service import WorkspaceService
 
 class FormationBoard(QWidget):
     formation_changed = Signal(str)
-    recalculate_requested = Signal()
+    recalculate_requested = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -47,6 +48,7 @@ class FormationBoard(QWidget):
         self._details_by_name = {}
         self._roster_players = []
         self._current_name = ""
+        self.setMinimumHeight(BOARD_MINIMUM_HEIGHT)
         self.setStyleSheet(formation_board_stylesheet())
         self._build()
 
@@ -106,7 +108,7 @@ class FormationBoard(QWidget):
         self.recalculate_button = QPushButton("Recalculate Analysis")
         self.recalculate_button.setObjectName("workspaceAction")
         self.recalculate_button.clicked.connect(
-            self.recalculate_requested
+            self._emit_recalculate_requested
         )
         header_layout.addWidget(self.recalculate_button)
         layout.addWidget(header)
@@ -176,13 +178,22 @@ class FormationBoard(QWidget):
         selected_formation_name="",
         player_details_by_name=None,
         roster_players=None,
+        workspace_state=None,
     ):
         self._details_by_name = player_details_by_name or {}
         self._roster_players = list(roster_players or [])
-        self._workspace_state = self._workspace_service.create(
-            list(boards),
-            selected_formation_name,
-        )
+        if workspace_state is None:
+            self._workspace_state = self._workspace_service.create(
+                list(boards),
+                selected_formation_name,
+            )
+        else:
+            self._workspace_state = (
+                self._workspace_service.with_evaluated_boards(
+                    workspace_state,
+                    list(boards),
+                )
+            )
         self._sync_boards_cache()
         self.formation_combo.blockSignals(True)
         self.formation_combo.clear()
@@ -196,6 +207,8 @@ class FormationBoard(QWidget):
         target = selected_formation_name or (
             boards[0].formation_name if boards else ""
         )
+        if workspace_state is not None:
+            target = workspace_state.current_formation_name or target
         index = self.formation_combo.findData(target)
         self.formation_combo.setCurrentIndex(index if index >= 0 else 0)
         self.formation_combo.blockSignals(False)
@@ -212,6 +225,9 @@ class FormationBoard(QWidget):
         if self._workspace_state is None:
             return None
         return self._workspace_state.current_board
+
+    def workspace_state(self):
+        return self._workspace_state
 
     def select_player(self, player_id):
         board = self.current_board()
@@ -589,6 +605,10 @@ class FormationBoard(QWidget):
         self.cancel_replacement_button.setEnabled(has_preview)
         self.reset_workspace_button.setEnabled(has_preview or is_dirty)
         self.recalculate_button.setEnabled(is_dirty)
+
+    def _emit_recalculate_requested(self):
+        if self._workspace_state is not None:
+            self.recalculate_requested.emit(self._workspace_state)
 
     @staticmethod
     def _section_label(text):

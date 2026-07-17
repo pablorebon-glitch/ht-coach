@@ -38,6 +38,7 @@ Workspace state contains:
 - replacement preview;
 - modification history;
 - redo stack reserved for future use.
+- evaluation state: original, pending recalculation, or evaluated.
 
 The dirty flag is derived from history. Reset creates a fresh editable copy from the
 original recommendation and clears selection, preview and pending modifications.
@@ -50,10 +51,12 @@ original recommendation and clears selection, preview and pending modifications.
 4. Choose one replacement to create a preview.
 5. Review current player, replacement player, role and player score difference.
 6. Apply Replacement modifies only the workspace lineup.
-7. Recalculate Analysis must be clicked explicitly to run the existing analysis pipeline.
+7. Recalculate Analysis must be clicked explicitly to evaluate the current Workspace
+   Lineup.
 
 No probability, xG, tactic, Decision Lab or Decision Delta value changes during preview
-or apply. Those values remain tied to the last successful optimizer result.
+or apply. Those values remain tied to the last successful result until Recalculate
+Analysis is pressed.
 
 ## Replacements
 
@@ -66,8 +69,9 @@ excluded. Up to five compatible players are shown in deterministic score/name or
 The board shows a compact status indicator:
 
 - Original Recommendation: no workspace edits.
-- Unsaved Changes: a replacement preview exists.
-- Modified Workspace - Ready to Recalculate: at least one replacement was applied.
+- Replacement Preview: a replacement candidate is selected but not applied.
+- Modified Workspace - Pending Recalculation: at least one replacement was applied.
+- Evaluated Workspace: current metrics were recalculated for the Workspace Lineup.
 
 ## Reset
 
@@ -83,11 +87,33 @@ Reset does not recalculate.
 
 ## Recalculate
 
-Recalculate Analysis emits the same Match analysis request used by Analyze Match. It runs
-through the existing worker, service and optimizer pipeline, then refreshes Decision Lab,
-Player Intelligence, comparison, Detailed XI and Formation Board from the new result.
+Recalculate Analysis sends the current Workspace Lineup to the Match worker as a fixed
+lineup. The application layer rebuilds an engine `Lineup` from the editable board,
+calculates ratings with the existing `TeamRater`, evaluates tactics with the existing
+`TacticOptimizer`, maps the result to the same serializable Match view models, and then
+refreshes Decision Lab, Player Intelligence, comparison, Detailed XI and Formation Board.
+
+Workspace recalculation deliberately bypasses lineup optimization. It does not invent
+metrics and does not change rating, probability, xG, tactic, order or Decision Lab
+formulas.
 
 Recalculation is never automatic.
+
+After recalculation, the Workspace Lineup keeps its applied player assignments and the
+original recommendation remains available as the Reset Workspace baseline.
+
+## Match Layout
+
+Alpha 0.4.3.1 keeps Analysis Setup as a persistent collapsible section. It is expanded
+before the first analysis, collapses after success, and can be shown or hidden without
+rerunning analysis, clearing results or changing workspace state.
+
+The compact match summary now shows only match context such as `Opponent: Rival FC` and
+`Formations: 2`. CSV filename, player count, completion timestamp, copy actions and the
+old Edit Analysis button are removed from the visible summary.
+
+The Match page uses an outer vertical scroll area so the Formation Board can keep a
+useful minimum height. The pitch itself does not scroll internally.
 
 ## Future Work
 

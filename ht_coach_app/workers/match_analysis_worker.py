@@ -12,6 +12,7 @@ class MatchAnalysisWorker(QObject):
         players_csv_path,
         opponent_name,
         formation_names,
+        workspace_state=None,
         parent=None
     ):
         super().__init__(parent)
@@ -19,6 +20,7 @@ class MatchAnalysisWorker(QObject):
         self._players_csv_path = players_csv_path
         self._opponent_name = opponent_name
         self._formation_names = formation_names
+        self._workspace_state = workspace_state
 
     @Slot()
     def run(self):
@@ -26,6 +28,18 @@ class MatchAnalysisWorker(QObject):
             self.progress_changed.emit(
                 "Loading players..."
             )
+            if self._workspace_state is not None:
+                self.progress_changed.emit(
+                    "Evaluating current Workspace lineup..."
+                )
+                result = self._service.analyze_workspace(
+                    self._players_csv_path,
+                    self._opponent_name,
+                    self._workspace_state,
+                )
+                self.finished.emit(result)
+                return
+
             self.progress_changed.emit(
                 "Running formation, lineup, order and tactic optimization..."
             )

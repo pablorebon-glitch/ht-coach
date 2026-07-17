@@ -75,16 +75,22 @@ def formation_board_stylesheet():
             color: {NEUTRAL};
         }}
 
-        QLabel#workspaceStatusBadge[state="pending"] {{
+        QLabel#workspaceStatusBadge[state="preview"] {{
             background: #fffaeb;
             border: 1px solid #fedf89;
             color: #b54708;
         }}
 
-        QLabel#workspaceStatusBadge[state="dirty"] {{
+        QLabel#workspaceStatusBadge[state="pending"] {{
             background: #eef6ff;
             border: 1px solid #bfdbfe;
             color: {CARD_MODIFIED_BORDER};
+        }}
+
+        QLabel#workspaceStatusBadge[state="evaluated"] {{
+            background: #ecfdf3;
+            border: 1px solid #abefc6;
+            color: {POSITIVE};
         }}
 
         QLabel#coachNote {{
