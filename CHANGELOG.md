@@ -7,6 +7,13 @@
 - Added Alpha 0.4.2.1 Compact Match Workspace with a responsive full-pitch view,
   horizontal board/inspector splitter, compact formation footer and internal Player
   Intelligence scrolling.
+- Added Alpha 0.4.3 Interactive Workspace with an editable Workspace Lineup, immutable
+  Recommended Lineup, replacement preview, apply/cancel/reset actions and explicit
+  Recalculate Analysis action.
+- Added `ht_coach_app/workspace` as a UI-independent workspace state and service layer
+  for lineup edits, dirty state, replacement ranking and future undo/redo support.
+- Added `docs/WORKSPACE.md` covering recommended versus workspace lineups, editing
+  lifecycle, reset, recalculation and future Decision Delta/drag-and-drop milestones.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -76,10 +83,14 @@
   forwards from left to right.
 - Formation Board selection now shows Player Intelligence when roster data is available
   and preserves a clean unavailable state for restored results without roster details.
+- Formation Board now distinguishes Original Recommendation, Unsaved Changes and
+  Modified Workspace states without automatically recalculating match results.
 
 ### Notes
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
+- Workspace edits are local view-model changes until Recalculate Analysis explicitly runs
+  the existing analysis pipeline.
 - Decision Lab explanations are deterministic and rule-based; no AI service, LLM,
   network dependency, or external API is used.

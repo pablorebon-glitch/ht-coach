@@ -20,6 +20,8 @@ class PlayerCardViewModel:
     specialty: str = ""
     is_selected: bool = False
     is_recommended: bool = True
+    is_modified: bool = False
+    is_replacement_preview: bool = False
 
 
 @dataclass(frozen=True)

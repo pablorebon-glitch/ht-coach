@@ -28,6 +28,7 @@ ht_coach_app/
   services/
   reasoning/
   player_intelligence/
+  workspace/
   state/
   views/
   widgets/
@@ -163,6 +164,30 @@ Modules:
   - Converts serializable match analysis results into immutable board view models.
   - Reuses centralized position, side and order formatting.
   - Does not call optimizers, persistence, or engine calculators.
+
+### Workspace
+
+`ht_coach_app/workspace/`
+
+The workspace layer owns editable lineup state for the Formation Board. It is
+UI-independent and does not import Qt.
+
+Modules:
+
+- `workspace_models.py`: workspace state, replacement preview, replacement candidates
+  and modification history view models.
+- `workspace_service.py`: creates editable board copies, ranks compatible replacements
+  with existing player analyzers, applies/cancels previews, resets state and prepares
+  undo/redo history shape.
+
+Workspace rules:
+
+- the original recommendation is immutable;
+- apply changes only the Workspace Lineup;
+- reset restores the original recommendation;
+- recalculation is explicit and routed back through `MatchController`;
+- no engine formulas, probability calculations, Decision Lab rules or optimizer behavior
+  are changed.
 
 ### Player Intelligence
 
@@ -359,6 +384,7 @@ controllers -> state / application events
 services -> state view models
 services -> reasoning -> existing analysis view models
 widgets -> player_intelligence -> existing roster data / player analyzers
+widgets -> workspace -> existing roster data / player analyzers
 persistence -> models or persistence DTOs
 ```
 
@@ -397,6 +423,8 @@ User clicks Analyze Match
   -> MatchWorkspaceRepository persists the last successful result
   -> MatchPage renders Decision Lab, recommended summary, Formation Board,
      comparison table and detailed XI
+  -> FormationBoard creates an editable Workspace Lineup copy for manual replacement
+     previews without changing the persisted recommendation
 ```
 
 The engine remains unaware of the desktop application.

@@ -265,7 +265,9 @@ Acceptance criteria:
   why-selected explanation, tactical contributions and same-role alternatives.
 - Alpha 0.4.2.1 Compact Match Workspace: responsive full-pitch scaling, collapsible
   analysis inputs and a horizontal board/inspector workspace before lineup editing.
-- Alpha 0.4.3 Editable Lineup Board: prepare lineup edits without recalculation.
+- Alpha 0.4.3 Interactive Workspace: replace players in an editable Workspace Lineup
+  while preserving the immutable optimizer recommendation and requiring explicit
+  recalculation.
 - Alpha 0.4.4 Drag and Drop: roster-to-pitch and pitch-slot movement.
 - Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against
   the optimized recommendation.

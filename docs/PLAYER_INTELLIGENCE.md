@@ -14,8 +14,9 @@ Player Intelligence answers:
 - which players are the closest alternatives;
 - why those alternatives were not selected.
 
-It is read-only. It does not edit the lineup, swap players, rerun optimization, or
-calculate what-if match deltas.
+It explains the selected player and, inside the Interactive Workspace, can provide the
+context for a replacement preview. It does not rerun optimization or calculate what-if
+match deltas.
 
 ## Architecture
 
@@ -105,6 +106,24 @@ Each alternative displays:
 - why the alternative was not selected.
 
 Score deltas are explicitly player-score differences, not win-probability deltas.
+
+## Workspace Replacement Context
+
+Alpha 0.4.3 adds a separate Workspace replacement flow beside Player Intelligence. The
+workspace layer reuses existing same-role player ranking to show up to five compatible
+replacement candidates, excluding the current player and players already in the editable
+lineup.
+
+When a replacement is previewed, the inspector shows:
+
+- current player;
+- replacement player;
+- role;
+- player score difference.
+
+The preview does not change probabilities, xG, Decision Lab, tactic, order or any engine
+calculation. Apply Replacement modifies only the Workspace Lineup. Recalculate Analysis
+must be triggered explicitly.
 
 ## Effective-Tie Thresholds
 
