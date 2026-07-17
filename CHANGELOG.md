@@ -26,6 +26,11 @@
 - Added analysis metadata and last successful result restore from JSON view-model data.
 - Added the Alpha 0.4 Formation Viewer milestone with a read-only PySide6 pitch board,
   compact player cards, formation switching, selection, and a player inspector.
+- Added Alpha 0.4.2 Player Intelligence with deterministic player profiles,
+  why-selected explanations, contribution bars, limitations and closest alternatives.
+- Added `ht_coach_app/player_intelligence` as a UI-independent application layer.
+- Added Player Intelligence documentation, including the explicit exclusion of chemistry
+  and fabricated win-probability deltas.
 - Added centralized formation-board layouts for all supported formations using normalized
   pitch coordinates.
 - Added product vision and Formation Viewer documentation for the Calculate, Explain,
@@ -57,6 +62,8 @@
   Detailed XI tabs.
 - Copy Lineup output now follows pitch order: goalkeeper, defenders, midfielders and
   forwards from left to right.
+- Formation Board selection now shows Player Intelligence when roster data is available
+  and preserves a clean unavailable state for restored results without roster details.
 
 ### Notes
 

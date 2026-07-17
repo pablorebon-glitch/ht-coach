@@ -136,6 +136,8 @@ Content:
 - Prominent recommended-result summary.
 - Formation Board tab with a vertical pitch, compact player cards, formation switching
   across analyzed alternatives, click-to-inspect behavior, and original HT Coach styling.
+- Player Intelligence inspector with profile label, coach's note, why-selected points,
+  contribution bars, strengths, limitations, alternatives and technical details.
 - Decision Lab section with recommendation, confidence badge, reasons, risks, tactical
   observations, sector matchup notes, and optimization gain breakdown.
 - Formation comparison table with deltas versus the recommendation.
@@ -274,8 +276,19 @@ Responsibilities:
   and forwards at the top.
 - Preserve left, center and right semantics.
 - Render compact player cards with user-facing position, side and order labels.
-- Support read-only player selection and inspector updates.
+- Support read-only player selection and Player Intelligence updates.
 - Avoid engine, optimizer and persistence dependencies.
+
+### PlayerIntelligencePanel
+
+Responsibilities:
+
+- Explain the selected player before showing raw attributes.
+- Show deterministic profile, why-selected reasoning, tactical contribution bars,
+  strengths, limitations and alternatives.
+- Display score deltas as player-score differences, never win-probability deltas.
+- Avoid chemistry, hidden relationships or unsupported game mechanics.
+- Preserve clean unavailable states for restored results without roster data.
 
 ## Controllers
 

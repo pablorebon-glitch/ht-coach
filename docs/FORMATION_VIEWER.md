@@ -75,6 +75,16 @@ Cards are compact and show:
 Cards support normal, hover, selected, recommended and empty-slot fallback states. Long
 names are truncated on the card and preserved in the tooltip.
 
+## Player Intelligence
+
+Alpha 0.4.2 upgrades the read-only inspector into Player Intelligence. Selecting a card
+shows a deterministic explanation of the player's profile, why the optimizer selected
+the player, tactical contributions, limitations and closest same-role alternatives.
+
+The board remains read-only. Selection does not rerun match analysis or any optimizer.
+Alternatives are informational only and use player-score differences, not fabricated
+win-probability deltas.
+
 ## Order And Side Labels
 
 The board uses centralized display formatting:

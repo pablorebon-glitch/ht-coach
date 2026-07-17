@@ -137,6 +137,10 @@ class MatchWorkspaceService:
             self._load_players(players_csv_path)
         )
 
+    def load_players(self, players_csv_path):
+        self.validate_players_csv_path(players_csv_path)
+        return self._load_players(players_csv_path)
+
     def analyze(self, players_csv_path, opponent_name, formation_names):
         self.validate_inputs(
             players_csv_path,
@@ -223,6 +227,20 @@ class MatchWorkspaceService:
         if unsupported:
             raise MatchWorkspaceValidationError(
                 "Unsupported formation selected."
+            )
+
+    def validate_players_csv_path(self, players_csv_path):
+        normalized_path = str(players_csv_path).strip()
+        path = Path(normalized_path)
+
+        if not normalized_path:
+            raise MatchWorkspaceValidationError(
+                "Select a players.csv file."
+            )
+
+        if not path.exists():
+            raise MatchWorkspaceValidationError(
+                "The selected players.csv file does not exist."
             )
 
     def _load_players(self, players_csv_path):

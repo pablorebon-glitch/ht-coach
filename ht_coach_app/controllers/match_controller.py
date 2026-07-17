@@ -30,6 +30,7 @@ class MatchController(QObject):
         self._app_events = app_events
         self._thread = None
         self._worker = None
+        self._roster_players = []
 
         self._connect_view()
         self._connect_app_events()
@@ -76,6 +77,7 @@ class MatchController(QObject):
         self._view.apply_settings(
             self._settings_repository.load()
         )
+        self._load_current_roster_for_inspector(show_errors=False)
         last_result = self._settings_repository.load_last_result()
 
         if last_result is not None:
@@ -116,6 +118,7 @@ class MatchController(QObject):
         self._view.set_players_loaded_count(
             player_count
         )
+        self._load_current_roster_for_inspector(show_errors=False)
         self._view.show_status(
             f"Roster updated from Squad: {player_count} players."
         )
@@ -130,7 +133,7 @@ class MatchController(QObject):
 
     def _load_players(self):
         try:
-            count = self._service.load_players_count(
+            players = self._service.load_players(
                 self._view.players_csv_path()
             )
         except Exception as exc:
@@ -139,11 +142,13 @@ class MatchController(QObject):
             )
             return
 
+        self._roster_players = players
+        self._set_view_roster_players(players)
         self._view.set_players_loaded_count(
-            count
+            len(players)
         )
         self._view.show_status(
-            f"Loaded {count} players."
+            f"Loaded {len(players)} players."
         )
         self._save_current_settings()
 
@@ -217,6 +222,7 @@ class MatchController(QObject):
         self._settings_repository.save_last_result(
             result
         )
+        self._load_current_roster_for_inspector(show_errors=False)
         self._view.show_results(
             result
         )
@@ -292,3 +298,22 @@ class MatchController(QObject):
                 selected_formations=self._view.selected_formations()
             )
         )
+
+    def _load_current_roster_for_inspector(self, show_errors):
+        try:
+            players = self._service.load_players(
+                self._view.players_csv_path()
+            )
+        except Exception as exc:
+            self._roster_players = []
+            self._set_view_roster_players([])
+            if show_errors:
+                self._view.show_error(str(exc))
+            return
+
+        self._roster_players = players
+        self._set_view_roster_players(players)
+
+    def _set_view_roster_players(self, players):
+        if hasattr(self._view, "set_roster_players"):
+            self._view.set_roster_players(players)
