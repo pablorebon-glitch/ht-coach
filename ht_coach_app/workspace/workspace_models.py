@@ -22,6 +22,21 @@ class WorkspaceReplacementPreview:
     current_score: float
     replacement_score: float
     score_difference: float
+    revision: int = 0
+
+
+@dataclass(frozen=True)
+class WorkspaceSwapPreview:
+    formation_name: str
+    source_slot_id: str
+    target_slot_id: str
+    source_player_id: str
+    source_player_name: str
+    target_player_id: str
+    target_player_name: str
+    source_role: str
+    target_role: str
+    revision: int = 0
 
 
 @dataclass(frozen=True)
@@ -32,6 +47,9 @@ class WorkspaceModification:
     original_player_name: str
     replacement_player_name: str
     score_difference: float
+    kind: str = "replacement"
+    source_slot_id: str = ""
+    target_slot_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -41,9 +59,12 @@ class WorkspaceState:
     current_formation_name: str = ""
     selected_player_id: str = ""
     replacement_preview: WorkspaceReplacementPreview | None = None
+    swap_preview: WorkspaceSwapPreview | None = None
     history: tuple[WorkspaceModification, ...] = ()
     redo_stack: tuple[WorkspaceModification, ...] = ()
     evaluation_state: str = "original"
+    revision: int = 0
+    last_error: str = ""
 
     @property
     def dirty(self):
@@ -55,6 +76,8 @@ class WorkspaceState:
 
     @property
     def status_label(self):
+        if self.swap_preview is not None:
+            return "Swap Preview"
         if self.replacement_preview is not None:
             return "Replacement Preview"
         if self.evaluation_state == "evaluated":
@@ -65,10 +88,14 @@ class WorkspaceState:
 
     @property
     def status_state(self):
-        if self.replacement_preview is not None:
+        if self.replacement_preview is not None or self.swap_preview is not None:
             return "preview"
         if self.evaluation_state == "evaluated":
             return "evaluated"
         if self.dirty or self.evaluation_state == "pending":
             return "pending"
         return "clean"
+
+    @property
+    def has_preview(self):
+        return self.replacement_preview is not None or self.swap_preview is not None

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
@@ -20,6 +21,7 @@ from ht_coach_app.widgets.formation_board.layout_metrics import (
     PLAYER_CARD_MIN_WIDTH,
 )
 from ht_coach_app.widgets.formation_board.player_card import PlayerCard
+from ht_coach_app.widgets.formation_board.player_card import WORKSPACE_DRAG_MIME
 
 
 @dataclass(frozen=True)
@@ -46,20 +48,24 @@ class PitchGeometry:
 class PitchWidget(QWidget):
     player_selected = Signal(str)
     empty_area_clicked = Signal()
+    player_dropped = Signal(object, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._board = None
         self._slot_widgets = []
+        self._revision = 0
         self.setMinimumSize(360, 560)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setAcceptDrops(True)
 
     def sizeHint(self):
         return QSize(480, 700)
 
-    def set_board(self, board):
+    def set_board(self, board, revision=0):
         self._board = board
+        self._revision = revision
         self._clear_slot_widgets()
 
         if board is None:
@@ -76,6 +82,11 @@ class PitchWidget(QWidget):
                 )
             else:
                 widget = PlayerCard(slot.player, self)
+                widget.set_drag_context(
+                    board.formation_name,
+                    slot.slot_id,
+                    revision,
+                )
                 widget.selected.connect(self.player_selected)
 
             widget.show()
@@ -139,6 +150,35 @@ class PitchWidget(QWidget):
             return
 
         super().keyPressEvent(event)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(WORKSPACE_DRAG_MIME):
+            event.acceptProposedAction()
+            return
+        event.ignore()
+
+    def dragMoveEvent(self, event):
+        slot_id = self._slot_id_at(event.position().toPoint())
+        if slot_id:
+            self._set_drop_target(slot_id)
+            event.acceptProposedAction()
+            return
+        self._set_drop_target("")
+        event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self._set_drop_target("")
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        slot_id = self._slot_id_at(event.position().toPoint())
+        payload = self._payload_from_event(event)
+        self._set_drop_target("")
+        if slot_id and payload:
+            self.player_dropped.emit(payload, slot_id)
+            event.acceptProposedAction()
+            return
+        event.ignore()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -252,6 +292,30 @@ class PitchWidget(QWidget):
             widget.deleteLater()
 
         self._slot_widgets = []
+
+    def _slot_id_at(self, point):
+        child = self.childAt(point)
+        for slot, widget in self._slot_widgets:
+            if widget is child and slot.player is not None:
+                return slot.slot_id
+        return ""
+
+    def _set_drop_target(self, slot_id):
+        for slot, widget in self._slot_widgets:
+            widget.setProperty(
+                "dropTarget",
+                "true" if slot.slot_id == slot_id else "false",
+            )
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+
+    @staticmethod
+    def _payload_from_event(event):
+        data = event.mimeData().data(WORKSPACE_DRAG_MIME)
+        try:
+            return json.loads(bytes(data).decode("utf-8"))
+        except (TypeError, ValueError, UnicodeDecodeError):
+            return {}
 
     def _build_geometry(self, rect):
         goal_width = rect.width() * 0.26

@@ -1,7 +1,7 @@
 # Interactive Workspace
 
-Alpha 0.4.3 introduces the HT Coach Workspace: an editable tactical layer on top of the
-stable match recommendation.
+Alpha 0.4.4 extends the HT Coach Workspace: an editable tactical layer on top of the
+stable match recommendation with click replacement and drag-and-drop lineup editing.
 
 ## Concept
 
@@ -35,10 +35,11 @@ Workspace state contains:
 - editable workspace boards;
 - current formation;
 - selected player;
-- replacement preview;
+- replacement or swap preview;
 - modification history;
 - redo stack reserved for future use.
 - evaluation state: original, pending recalculation, or evaluated.
+- revision number used to reject stale drag previews safely.
 
 The dirty flag is derived from history. Reset creates a fresh editable copy from the
 original recommendation and clears selection, preview and pending modifications.
@@ -48,9 +49,10 @@ original recommendation and clears selection, preview and pending modifications.
 1. Select a player on the Formation Board.
 2. Player Intelligence updates for the selected player.
 3. Replace Player appears with compatible same-role candidates.
-4. Choose one replacement to create a preview.
+4. Choose one replacement to create a preview, or drag a replacement candidate onto an
+   occupied slot.
 5. Review current player, replacement player, role and player score difference.
-6. Apply Replacement modifies only the workspace lineup.
+6. Apply Change modifies only the workspace lineup.
 7. Recalculate Analysis must be clicked explicitly to evaluate the current Workspace
    Lineup.
 
@@ -64,12 +66,32 @@ Available replacements reuse existing `PlayerAnalyzer.rank_players` for the sele
 position and side. The current player and players already in the workspace lineup are
 excluded. Up to five compatible players are shown in deterministic score/name order.
 
+Click replacement and drag replacement use the same workspace service operation. Drag
+payloads carry stable domain data: player ID, source type, source slot when applicable,
+formation and workspace revision. They never depend on visible button text.
+
+## Drag and Drop
+
+Alpha 0.4.4 supports two drag paths:
+
+- starting player to starting player: previews a slot swap;
+- replacement candidate to starting slot: previews a role-compatible replacement.
+
+The preview does not mutate the lineup. Apply Change commits the preview, Cancel Change
+or Escape clears it. A formation switch clears any active preview. If the workspace
+revision changed after the drag began, the apply is rejected with a safe message and the
+user can retry the gesture.
+
+Slots remain the tactical source of truth. When two players are swapped, the player moves
+but the destination slot keeps its position, side, order and normalized pitch coordinate.
+
 ## Workspace Status
 
 The board shows a compact status indicator:
 
 - Original Recommendation: no workspace edits.
 - Replacement Preview: a replacement candidate is selected but not applied.
+- Swap Preview: two occupied slots are selected for a pending swap.
 - Modified Workspace - Pending Recalculation: at least one replacement was applied.
 - Evaluated Workspace: current metrics were recalculated for the Workspace Lineup.
 
@@ -80,7 +102,7 @@ Reset Workspace restores:
 - original player assignments;
 - orders and sides from the recommendation;
 - selected player;
-- replacement preview;
+- replacement or swap preview;
 - dirty state.
 
 Reset does not recalculate.
@@ -121,9 +143,8 @@ The workspace model reserves history and redo state so later milestones can add:
 
 - Undo;
 - Redo;
-- drag and drop;
 - Decision Delta;
 - what-if comparison against the original recommendation.
 
-Alpha 0.4.3 deliberately does not include drag and drop, automatic recalculation,
-Decision Delta or animated interactions.
+Alpha 0.4.4 deliberately does not include automatic recalculation, Decision Delta or
+animated interactions.

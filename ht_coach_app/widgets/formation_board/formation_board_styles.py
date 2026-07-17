@@ -139,6 +139,12 @@ def formation_board_stylesheet():
             border: 2px solid {CARD_SELECTED_BORDER};
         }}
 
+        QPushButton#playerCard[preview="true"],
+        QPushButton#playerCard[dropTarget="true"] {{
+            background: #ecfdf3;
+            border: 2px solid {POSITIVE};
+        }}
+
         QPushButton#replacementCandidate {{
             background: #ffffff;
             border: 1px solid #d0d5dd;

@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
@@ -31,6 +33,9 @@ from ht_coach_app.widgets.formation_board.layout_metrics import (
     SPLITTER_INSPECTOR_RATIO,
 )
 from ht_coach_app.widgets.formation_board.pitch_widget import PitchWidget
+from ht_coach_app.widgets.formation_board.replacement_candidate import (
+    ReplacementCandidateButton,
+)
 from ht_coach_app.workspace.workspace_service import WorkspaceService
 
 
@@ -128,6 +133,7 @@ class FormationBoard(QWidget):
         self.pitch = PitchWidget()
         self.pitch.player_selected.connect(self.select_player)
         self.pitch.empty_area_clicked.connect(self.clear_selection)
+        self.pitch.player_dropped.connect(self._handle_player_dropped)
         pitch_layout.addWidget(self.pitch, 1)
 
         footer = QFrame()
@@ -267,7 +273,7 @@ class FormationBoard(QWidget):
         if self._workspace_state is None:
             return
 
-        self._workspace_state = self._workspace_service.apply_replacement(
+        self._workspace_state = self._workspace_service.apply_preview(
             self._workspace_state,
             self._roster_players,
         )
@@ -308,7 +314,12 @@ class FormationBoard(QWidget):
 
     def _render_current_board(self):
         board = self.current_board()
-        self.pitch.set_board(board)
+        revision = (
+            self._workspace_state.revision
+            if self._workspace_state is not None
+            else 0
+        )
+        self.pitch.set_board(board, revision=revision)
         self._update_workspace_toolbar()
 
         if board is None:
@@ -374,11 +385,18 @@ class FormationBoard(QWidget):
 
         if (
             self._workspace_state is not None
-            and self._workspace_state.replacement_preview is not None
+            and self._workspace_state.has_preview
         ):
-            self._add_preview_panel(
-                self._workspace_state.replacement_preview
-            )
+            self._add_preview_panel(self._workspace_state)
+
+        if (
+            self._workspace_state is not None
+            and self._workspace_state.last_error
+        ):
+            note = QLabel(self._workspace_state.last_error)
+            note.setObjectName("playerInspectorMeta")
+            note.setWordWrap(True)
+            self.inspector_layout.addWidget(note)
 
         note = QLabel(intelligence.headline)
         note.setObjectName("coachNote")
@@ -482,10 +500,10 @@ class FormationBoard(QWidget):
         preview = self._workspace_state.replacement_preview
 
         for candidate in candidates:
-            button = QPushButton(
-                f"{candidate.player_name}  |  "
-                f"Score {candidate.score:.2f}  "
-                f"({candidate.score_difference:+.2f})"
+            button = ReplacementCandidateButton(
+                candidate,
+                self._workspace_state.current_formation_name,
+                self._workspace_state.revision,
             )
             button.setObjectName("replacementCandidate")
             button.setProperty(
@@ -505,7 +523,7 @@ class FormationBoard(QWidget):
             )
             self.inspector_layout.addWidget(button)
 
-    def _add_preview_panel(self, preview):
+    def _add_preview_panel(self, state):
         panel = QFrame()
         panel.setObjectName("coachNote")
         layout = QGridLayout(panel)
@@ -513,12 +531,21 @@ class FormationBoard(QWidget):
         layout.setHorizontalSpacing(8)
         layout.setVerticalSpacing(3)
 
-        rows = [
-            ("Preview Replacement", preview.role),
-            ("Current Player", preview.current_player_name),
-            ("Replacement Player", preview.replacement_player_name),
-            ("Player score difference", f"{preview.score_difference:+.2f}"),
-        ]
+        if state.swap_preview is not None:
+            preview = state.swap_preview
+            rows = [
+                ("Preview Swap", preview.formation_name),
+                ("Move", f"{preview.source_player_name} to {preview.target_role}"),
+                ("Move", f"{preview.target_player_name} to {preview.source_role}"),
+            ]
+        else:
+            preview = state.replacement_preview
+            rows = [
+                ("Preview Replacement", preview.role),
+                ("Current Player", preview.current_player_name),
+                ("Replacement Player", preview.replacement_player_name),
+                ("Player score difference", f"{preview.score_difference:+.2f}"),
+            ]
         for row, (label, value) in enumerate(rows):
             key = QLabel(label)
             key.setObjectName("playerInspectorMeta")
@@ -590,7 +617,7 @@ class FormationBoard(QWidget):
         else:
             status = state.status_label
             status_state = state.status_state
-            has_preview = state.replacement_preview is not None
+            has_preview = state.has_preview
             is_dirty = state.dirty
 
         self.workspace_status_label.setText(status)
@@ -605,10 +632,85 @@ class FormationBoard(QWidget):
         self.cancel_replacement_button.setEnabled(has_preview)
         self.reset_workspace_button.setEnabled(has_preview or is_dirty)
         self.recalculate_button.setEnabled(is_dirty)
+        self.apply_replacement_button.setText(
+            "Apply Change" if has_preview else "Apply Replacement"
+        )
+        self.cancel_replacement_button.setText(
+            "Cancel Change" if has_preview else "Cancel Replacement"
+        )
 
     def _emit_recalculate_requested(self):
         if self._workspace_state is not None:
             self.recalculate_requested.emit(self._workspace_state)
+
+    def _handle_player_dropped(self, payload, target_slot_id):
+        if self._workspace_state is None:
+            return
+
+        if payload.get("source_type") == "lineup":
+            valid, message = self._workspace_service.validate_swap(
+                self._workspace_state,
+                payload,
+                target_slot_id,
+            )
+            if valid:
+                self._workspace_state = self._workspace_service.preview_swap(
+                    self._workspace_state,
+                    payload.get("source_slot_id", ""),
+                    target_slot_id,
+                )
+            else:
+                self._workspace_state = replace(
+                    self._workspace_state,
+                    last_error=message,
+                )
+        elif payload.get("source_type") == "candidate":
+            valid, message = self._workspace_service.validate_swap(
+                self._workspace_state,
+                payload,
+                target_slot_id,
+            )
+            candidate = (
+                self._workspace_service.candidate_for_player(
+                    self._workspace_state,
+                    self._roster_players,
+                    payload.get("player_id", ""),
+                    target_slot_id,
+                )
+                if valid
+                else None
+            )
+            if candidate is None:
+                self._workspace_state = replace(
+                    self._workspace_state,
+                    last_error=(
+                        message
+                        or "This player cannot replace that slot."
+                    ),
+                )
+            else:
+                self._workspace_state = (
+                    self._workspace_service.preview_replacement_for_slot(
+                        self._workspace_state,
+                        candidate,
+                        target_slot_id,
+                    )
+                )
+
+        self._sync_boards_cache()
+        self._render_current_board()
+
+    def keyPressEvent(self, event):
+        if (
+            event.key() == Qt.Key_Escape
+            and self._workspace_state is not None
+            and self._workspace_state.has_preview
+        ):
+            self.cancel_replacement()
+            event.accept()
+            return
+
+        super().keyPressEvent(event)
 
     @staticmethod
     def _section_label(text):

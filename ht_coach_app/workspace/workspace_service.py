@@ -9,6 +9,7 @@ from ht_coach_app.workspace.workspace_models import (
     WorkspaceReplacementCandidate,
     WorkspaceReplacementPreview,
     WorkspaceState,
+    WorkspaceSwapPreview,
 )
 from models.side import Side
 
@@ -54,6 +55,9 @@ class WorkspaceService:
             current_formation_name=formation_name,
             selected_player_id="",
             replacement_preview=None,
+            swap_preview=None,
+            revision=state.revision + (1 if state.has_preview else 0),
+            last_error="",
         )
 
     def select_player(self, state, player_id):
@@ -69,6 +73,8 @@ class WorkspaceService:
             workspace_boards=boards,
             selected_player_id=player_id,
             replacement_preview=None,
+            swap_preview=None,
+            last_error="",
         )
 
     def clear_selection(self, state):
@@ -84,6 +90,8 @@ class WorkspaceService:
             workspace_boards=boards,
             selected_player_id="",
             replacement_preview=None,
+            swap_preview=None,
+            last_error="",
         )
 
     def replacement_candidates(self, state, roster_players):
@@ -133,9 +141,21 @@ class WorkspaceService:
     def preview_replacement(self, state, candidate):
         board = state.current_board
         selected_slot = self._selected_slot(board)
-        selected = selected_slot.player if selected_slot is not None else None
-        if selected is None:
+        if selected_slot is None:
             return state
+
+        return self.preview_replacement_for_slot(
+            state,
+            candidate,
+            selected_slot.slot_id,
+        )
+
+    def preview_replacement_for_slot(self, state, candidate, target_slot_id):
+        board = state.current_board
+        selected_slot = self._slot_by_id(board, target_slot_id)
+        selected = selected_slot.player if selected_slot is not None else None
+        if board is None or selected is None:
+            return self._error(state, "Choose an occupied slot first.")
 
         preview = WorkspaceReplacementPreview(
             formation_name=board.formation_name,
@@ -148,23 +168,138 @@ class WorkspaceService:
             current_score=round(candidate.score - candidate.score_difference, 2),
             replacement_score=round(candidate.score, 2),
             score_difference=candidate.score_difference,
+            revision=state.revision,
         )
         return replace(
             state,
             replacement_preview=preview,
+            swap_preview=None,
+            last_error="",
         )
 
     def cancel_replacement(self, state):
         return replace(
             state,
             replacement_preview=None,
+            swap_preview=None,
+            last_error="",
         )
+
+    def candidate_for_player(self, state, roster_players, player_id, target_slot_id):
+        board = state.current_board
+        target_slot = self._slot_by_id(board, target_slot_id)
+        target = target_slot.player if target_slot is not None else None
+        if board is None or target is None:
+            return None
+
+        ranking = self._rank_players(
+            roster_players,
+            target.position,
+            target.side,
+        )
+        target_score = self._score_for(ranking, target.player_name)
+        current_lineup_names = {
+            slot.player.player_name
+            for slot in board.slots
+            if slot.player is not None
+        }
+
+        for player_score in ranking:
+            player = player_score.player
+            candidate_id = self._player_id(player.name)
+            if candidate_id != player_id:
+                continue
+            if player.name in current_lineup_names:
+                return None
+            difference = round(float(player_score.score) - target_score, 2)
+            return WorkspaceReplacementCandidate(
+                player_id=candidate_id,
+                player_name=player.name,
+                score=float(player_score.score),
+                score_difference=difference,
+                reason=self._candidate_reason(difference),
+            )
+
+        return None
+
+    def can_drop(self, state, payload, target_slot_id):
+        return self.validate_swap(state, payload, target_slot_id)[0]
+
+    def validate_swap(self, state, payload, target_slot_id):
+        board = state.current_board
+        if board is None:
+            return False, "No formation is selected."
+        try:
+            payload_revision = int(payload.get("revision", -1))
+        except (TypeError, ValueError):
+            payload_revision = -1
+        if payload_revision != state.revision:
+            return False, "The lineup changed. Try the drag again."
+        if payload.get("formation_name") != board.formation_name:
+            return False, "Switch back to the source formation first."
+        target_slot = self._slot_by_id(board, target_slot_id)
+        if target_slot is None or target_slot.player is None:
+            return False, "Drop onto an occupied lineup slot."
+        if payload.get("source_type") == "lineup":
+            source_slot_id = payload.get("source_slot_id", "")
+            source_slot = self._slot_by_id(board, source_slot_id)
+            if source_slot is None or source_slot.player is None:
+                return False, "The dragged player is no longer in this lineup."
+            if source_slot_id == target_slot_id:
+                return False, "Drop onto a different slot to swap players."
+            return True, ""
+        if payload.get("source_type") == "candidate":
+            if not payload.get("player_id"):
+                return False, "The replacement candidate is unavailable."
+            return True, ""
+        return False, "This item cannot be dropped on the lineup."
+
+    def preview_swap(self, state, source_slot_id, target_slot_id):
+        board = state.current_board
+        source_slot = self._slot_by_id(board, source_slot_id)
+        target_slot = self._slot_by_id(board, target_slot_id)
+        source = source_slot.player if source_slot is not None else None
+        target = target_slot.player if target_slot is not None else None
+        if source is None or target is None:
+            return self._error(state, "Both lineup slots must be occupied.")
+        if source_slot_id == target_slot_id:
+            return self._error(state, "Choose a different slot to swap players.")
+
+        return replace(
+            state,
+            replacement_preview=None,
+            swap_preview=WorkspaceSwapPreview(
+                formation_name=board.formation_name,
+                source_slot_id=source_slot_id,
+                target_slot_id=target_slot_id,
+                source_player_id=source.player_id,
+                source_player_name=source.player_name,
+                target_player_id=target.player_id,
+                target_player_name=target.player_name,
+                source_role=self._role_label(source),
+                target_role=self._role_label(target),
+                revision=state.revision,
+            ),
+            last_error="",
+        )
+
+    def apply_preview(self, state, roster_players):
+        if state.replacement_preview is not None:
+            return self.apply_replacement(state, roster_players)
+        if state.swap_preview is not None:
+            return self.apply_swap(state)
+        return state
 
     def apply_replacement(self, state, roster_players):
         preview = state.replacement_preview
         board = state.current_board
         if preview is None or board is None:
             return state
+        if preview.revision != state.revision:
+            return self._error(
+                self.cancel_replacement(state),
+                "The preview is out of date. Try the change again.",
+            )
 
         replacement_player = self._find_player(
             roster_players,
@@ -215,9 +350,73 @@ class WorkspaceService:
             workspace_boards=boards,
             selected_player_id=preview.replacement_player_id,
             replacement_preview=None,
+            swap_preview=None,
             history=state.history + (modification,),
             redo_stack=(),
             evaluation_state="pending",
+            revision=state.revision + 1,
+            last_error="",
+        )
+
+    def apply_swap(self, state):
+        preview = state.swap_preview
+        board = state.current_board
+        if preview is None or board is None:
+            return state
+        if preview.revision != state.revision:
+            return self._error(
+                self.cancel_replacement(state),
+                "The preview is out of date. Try the swap again.",
+            )
+
+        source_slot = self._slot_by_id(board, preview.source_slot_id)
+        target_slot = self._slot_by_id(board, preview.target_slot_id)
+        source = source_slot.player if source_slot is not None else None
+        target = target_slot.player if target_slot is not None else None
+        if source is None or target is None:
+            return self._error(state, "The swap cannot be applied safely.")
+
+        source_for_target = self._assign_player_to_slot(source, target, selected=True)
+        target_for_source = self._assign_player_to_slot(target, source, selected=False)
+        updated_slots = []
+        for slot in board.slots:
+            if slot.slot_id == preview.source_slot_id:
+                updated_slots.append(replace(slot, player=target_for_source))
+            elif slot.slot_id == preview.target_slot_id:
+                updated_slots.append(replace(slot, player=source_for_target))
+            else:
+                updated_slots.append(slot)
+
+        updated_board = replace(
+            board,
+            slots=tuple(updated_slots),
+            selected_player_id=source.player_id,
+        )
+        boards = dict(state.workspace_boards)
+        boards[updated_board.formation_name] = updated_board
+        modification = WorkspaceModification(
+            formation_name=preview.formation_name,
+            slot_id=preview.target_slot_id,
+            role=preview.target_role,
+            original_player_name=preview.target_player_name,
+            replacement_player_name=preview.source_player_name,
+            score_difference=0.0,
+            kind="swap",
+            source_slot_id=preview.source_slot_id,
+            target_slot_id=preview.target_slot_id,
+        )
+
+        return replace(
+            state,
+            workspace_boards=boards,
+            selected_player_id=source.player_id,
+            replacement_preview=None,
+            swap_preview=None,
+            history=state.history + (modification,),
+            redo_stack=(),
+            evaluation_state="pending",
+            revision=state.revision + 1,
+            last_error="",
         )
 
     def reset(self, state):
@@ -229,6 +428,7 @@ class WorkspaceService:
             original_boards=state.original_boards,
             workspace_boards=boards,
             current_formation_name=state.current_formation_name,
+            revision=state.revision + 1,
         )
 
     def with_evaluated_boards(self, state, boards):
@@ -252,7 +452,10 @@ class WorkspaceService:
             state,
             workspace_boards=workspace_boards,
             replacement_preview=None,
+            swap_preview=None,
             evaluation_state="evaluated",
+            revision=state.revision + 1,
+            last_error="",
         )
 
     def select_board_player(self, board, player_id):
@@ -386,6 +589,15 @@ class WorkspaceService:
         return None
 
     @staticmethod
+    def _slot_by_id(board, slot_id):
+        if board is None:
+            return None
+        for slot in board.slots:
+            if slot.slot_id == slot_id:
+                return slot
+        return None
+
+    @staticmethod
     def _find_player(players, player_name):
         for player in players or []:
             if player.name == player_name:
@@ -426,3 +638,28 @@ class WorkspaceService:
     @staticmethod
     def _player_id(name):
         return str(name or "").strip().replace(" ", "_").lower()
+
+    @staticmethod
+    def _assign_player_to_slot(player, slot_template, selected=False):
+        return replace(
+            player,
+            position=slot_template.position,
+            position_label=slot_template.position_label,
+            position_abbreviation=slot_template.position_abbreviation,
+            side=slot_template.side,
+            side_label=slot_template.side_label,
+            individual_order=slot_template.individual_order,
+            order_label=slot_template.order_label,
+            order_side=slot_template.order_side,
+            order_side_label=slot_template.order_side_label,
+            is_selected=selected,
+            is_modified=True,
+            is_replacement_preview=False,
+        )
+
+    @staticmethod
+    def _error(state, message):
+        return replace(
+            state,
+            last_error=message,
+        )

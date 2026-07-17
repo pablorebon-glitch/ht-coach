@@ -18,6 +18,9 @@
   current Workspace Lineup without rerunning lineup optimization or replacing applied
   player changes.
 - Added Evaluated Workspace status after successful fixed-lineup recalculation.
+- Added Alpha 0.4.4 Drag & Drop Lineup Editing for the Formation Board, including
+  starting-player slot swaps, dragged replacement candidates, Apply/Cancel previews,
+  Escape-to-cancel and stale drag revision protection.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -96,8 +99,8 @@
 - Formation Board selection now shows Player Intelligence when roster data is available
   and preserves a clean unavailable state for restored results without roster details.
 - Formation Board now distinguishes Original Recommendation, Replacement Preview,
-  Modified Workspace - Pending Recalculation and Evaluated Workspace states without
-  automatically recalculating match results.
+  Swap Preview, Modified Workspace - Pending Recalculation and Evaluated Workspace
+  states without automatically recalculating match results.
 
 ### Notes
 
