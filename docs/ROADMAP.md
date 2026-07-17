@@ -274,6 +274,8 @@ Acceptance criteria:
   goal/corner geometry.
 - Alpha 0.4.4 Drag and Drop: pitch-slot swaps and dragged replacement candidates with
   Apply/Cancel previews and no automatic recalculation.
+- Alpha 0.4.4.1 Integrated Bench Panel: dedicated roster-minus-lineup Bench beside the
+  pitch, Bench exchange previews, starter-to-Bench exchange and keyboard fallback.
 - Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against
   the optimized recommendation.
 - Match scenario history.

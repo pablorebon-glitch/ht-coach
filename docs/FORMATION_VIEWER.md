@@ -173,6 +173,13 @@ click would create. Apply Change commits the preview; Cancel Change or Escape cl
 The board stores stable slot IDs and workspace revisions in drag payloads, so stale
 gestures are rejected safely.
 
+Alpha 0.4.4.1 adds an integrated Bench panel beside the pitch. Bench is derived from the
+loaded roster minus the currently displayed Workspace Lineup. Bench players can be
+dragged onto occupied lineup slots, and starters can be dragged onto Bench player cards;
+both directions normalize to the same replacement exchange preview. The Bench has its
+own internal scroll area, while Player Intelligence remains focused on explanations and
+closest alternatives.
+
 ## Design Tokens
 
 Formation Viewer starts a small visual token set for:
@@ -207,6 +214,6 @@ Later Alpha milestones can continue evolving the board into a broader editing wo
 - calculate lineup delta;
 - reset to optimized recommendation.
 
-Alpha 0.4.4 implements player-to-player swaps and replacement-candidate drops. It does
-not implement roster-panel drag, order editing, automatic recalculation or what-if
-Decision Delta.
+Alpha 0.4.4.1 implements pitch-slot swaps and Bench exchanges. It does not implement
+order editing, automatic recalculation, substitutes/match plans or what-if Decision
+Delta.

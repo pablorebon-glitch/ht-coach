@@ -21,6 +21,9 @@
 - Added Alpha 0.4.4 Drag & Drop Lineup Editing for the Formation Board, including
   starting-player slot swaps, dragged replacement candidates, Apply/Cancel previews,
   Escape-to-cancel and stale drag revision protection.
+- Added Alpha 0.4.4.1 Integrated Bench Panel beside the Formation Board, with roster
+  minus Workspace lineup derivation, bench-to-lineup and starter-to-bench exchange
+  previews, keyboard replacement fallback and compact internally scrolling bench cards.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -101,6 +104,8 @@
 - Formation Board now distinguishes Original Recommendation, Replacement Preview,
   Swap Preview, Modified Workspace - Pending Recalculation and Evaluated Workspace
   states without automatically recalculating match results.
+- Player Intelligence now focuses on explanation; primary replacement controls moved to
+  the dedicated Bench panel while closest alternatives remain informational.
 
 ### Notes
 

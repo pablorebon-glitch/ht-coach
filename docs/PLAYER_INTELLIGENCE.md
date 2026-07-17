@@ -15,8 +15,9 @@ Player Intelligence answers:
 - why those alternatives were not selected.
 
 It explains the selected player and, inside the Interactive Workspace, can provide the
-context for a replacement preview. It does not rerun optimization or calculate what-if
-match deltas.
+context for a replacement preview. Primary replacement controls live in the Bench panel,
+not inside Player Intelligence. It does not rerun optimization or calculate what-if match
+deltas.
 
 ## Architecture
 
@@ -109,9 +110,9 @@ Score deltas are explicitly player-score differences, not win-probability deltas
 
 ## Workspace Replacement Context
 
-Alpha 0.4.3 adds a separate Workspace replacement flow beside Player Intelligence. The
-workspace layer reuses existing same-role player ranking to show up to five compatible
-replacement candidates, excluding the current player and players already in the editable
+Alpha 0.4.4.1 keeps the Workspace replacement flow beside Player Intelligence. The
+workspace layer reuses existing same-role player ranking to annotate Bench compatibility
+and preview exchanges, excluding the current player and players already in the editable
 lineup.
 
 When a replacement is previewed, the inspector shows:
@@ -122,8 +123,11 @@ When a replacement is previewed, the inspector shows:
 - player score difference.
 
 The preview does not change probabilities, xG, Decision Lab, tactic, order or any engine
-calculation. Apply Replacement modifies only the Workspace Lineup. Recalculate Analysis
-must be triggered explicitly.
+calculation. Apply Change modifies only the Workspace Lineup. Recalculate Analysis must
+be triggered explicitly.
+
+Closest Alternatives remains informational. The accessible non-drag replacement route is:
+select a lineup slot, focus a Bench card, press Enter or Space, then Apply or Cancel.
 
 ## Effective-Tie Thresholds
 

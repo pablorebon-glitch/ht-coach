@@ -23,6 +23,7 @@ def formation_board_stylesheet():
     return f"""
         QFrame#formationBoardPanel,
         QFrame#playerInspectorPanel,
+        QFrame#benchPanel,
         QFrame#formationFooter {{
             background: #ffffff;
             border: 1px solid #e4e7ec;
@@ -30,6 +31,11 @@ def formation_board_stylesheet():
         }}
 
         QScrollArea#playerInspectorScroll {{
+            background: transparent;
+            border: 0;
+        }}
+
+        QScrollArea#benchScroll {{
             background: transparent;
             border: 0;
         }}
@@ -157,6 +163,32 @@ def formation_board_stylesheet():
         QPushButton#replacementCandidate[selected="true"] {{
             background: #eef6ff;
             border: 2px solid {CARD_MODIFIED_BORDER};
+        }}
+
+        QPushButton#benchPlayerCard {{
+            background: #ffffff;
+            border: 1px solid #d0d5dd;
+            border-radius: 7px;
+            color: {TEXT_PRIMARY};
+            font-size: 10px;
+            font-weight: 600;
+            padding: 5px 6px;
+            text-align: left;
+        }}
+
+        QPushButton#benchPlayerCard:hover {{
+            background: #f8fafc;
+        }}
+
+        QPushButton#benchPlayerCard[selected="true"] {{
+            background: {CARD_SELECTED};
+            border: 2px solid {CARD_SELECTED_BORDER};
+        }}
+
+        QPushButton#benchPlayerCard[preview="true"],
+        QPushButton#benchPlayerCard[dropTarget="true"] {{
+            background: #ecfdf3;
+            border: 2px solid {POSITIVE};
         }}
 
         QPushButton#workspaceAction {{

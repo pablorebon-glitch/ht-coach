@@ -174,18 +174,21 @@ UI-independent and does not import Qt.
 
 Modules:
 
-- `workspace_models.py`: workspace state, replacement/swap previews, replacement
-  candidates, revision tracking and modification history view models.
+- `workspace_models.py`: workspace state, derived Bench player view models,
+  replacement/swap previews, replacement candidates, revision tracking and modification
+  history view models.
 - `workspace_service.py`: creates editable board copies, ranks compatible replacements
-  with existing player analyzers, previews click and drag replacement, previews slot
-  swaps, applies/cancels previews, resets state, reconciles evaluated fixed-lineup
-  results and prepares undo/redo history shape.
+  with existing player analyzers, derives Bench from roster minus Workspace lineup,
+  previews Bench exchanges and slot swaps, applies/cancels previews, resets state,
+  reconciles evaluated fixed-lineup results and prepares undo/redo history shape.
 
 Workspace rules:
 
 - the original recommendation is immutable;
 - slots own tactical position, side, order and pitch coordinates; players move between
   slots without carrying the old slot's tactical assignment;
+- Bench is derived from loaded roster players minus the displayed Workspace Lineup and
+  is never an independent source of truth;
 - apply changes only the Workspace Lineup;
 - reset restores the original recommendation;
 - recalculation is explicit and routed back through `MatchController`;
