@@ -430,11 +430,212 @@ class WorkspaceServiceTest(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("lineup changed", message)
 
+    def test_bench_derives_from_roster_minus_current_lineup(self):
+        state = self.service.create([self.board], "3-5-2")
+        bench = self.service.derive_bench(state, self.roster)
+        bench_names = [player.player_name for player in bench]
+
+        self.assertIn("A Replacement", bench_names)
+        self.assertNotIn("Rushton", bench_names)
+        self.assertEqual(len(bench_names), len(set(bench_names)))
+
+    def test_bench_ordering_is_deterministic(self):
+        state = self.service.create([self.board], "3-5-2")
+
+        first = self.service.derive_bench(state, self.roster)
+        second = self.service.derive_bench(state, list(reversed(self.roster)))
+
+        self.assertEqual(first, second)
+
+    def test_bench_exchange_apply_updates_lineup_and_derived_bench(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+
+        state = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+        self.assertIsNotNone(state.replacement_preview)
+        self.assertEqual(
+            state.replacement_preview.replacement_player_name,
+            "A Replacement",
+        )
+        applied = self.service.apply_preview(state, self.roster)
+        lineup_names = [
+            slot.player.player_name
+            for slot in applied.current_board.slots
+            if slot.player is not None
+        ]
+        bench_names = [
+            player.player_name
+            for player in self.service.derive_bench(applied, self.roster)
+        ]
+
+        self.assertIn("A Replacement", lineup_names)
+        self.assertIn("Rushton", bench_names)
+        self.assertNotIn("A Replacement", bench_names)
+        self.assertEqual(len(lineup_names), 11)
+        self.assertEqual(len(lineup_names), len(set(lineup_names)))
+        self.assertEqual(
+            state.original_boards["3-5-2"].selected_player.player_name,
+            "Rushton",
+        )
+
+    def test_both_bench_exchange_directions_create_equivalent_preview(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+
+        bench_to_lineup = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+        starter_to_bench = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+
+        self.assertEqual(
+            bench_to_lineup.replacement_preview,
+            starter_to_bench.replacement_preview,
+        )
+
+    def test_reset_restores_original_lineup_and_bench(self):
+        state = self.service.create([self.board], "3-5-2")
+        original_bench_names = {
+            player.player_name
+            for player in self.service.derive_bench(state, self.roster)
+        }
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        state = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+        state = self.service.apply_preview(state, self.roster)
+
+        reset = self.service.reset(state)
+
+        self.assertEqual(
+            {
+                player.player_name
+                for player in self.service.derive_bench(reset, self.roster)
+            },
+            original_bench_names,
+        )
+        self.assertEqual(reset.current_board.selected_player_id, "")
+
+    def test_structured_replacement_history_includes_lineup_snapshots(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        state = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+        applied = self.service.apply_preview(state, self.roster)
+        modification = applied.history[-1]
+
+        self.assertEqual(modification.kind, "replacement")
+        self.assertEqual(modification.target_slot_id, target_slot.slot_id)
+        self.assertEqual(modification.incoming_player_id, "a_replacement")
+        self.assertEqual(
+            modification.outgoing_player_id,
+            target_slot.player.player_id,
+        )
+        self.assertEqual(len(modification.before_lineup_ids), 11)
+        self.assertEqual(len(modification.after_lineup_ids), 11)
+        self.assertEqual(
+            modification.revision_after,
+            modification.revision_before + 1,
+        )
+
+    def test_missing_roster_player_rejects_bench_preview_apply(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        state = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+
+        applied = self.service.apply_preview(
+            state,
+            [player for player in self.roster if player.name != "A Replacement"],
+        )
+
+        self.assertIn("no longer available", applied.last_error)
+        self.assertFalse(applied.dirty)
+
+    def test_changed_target_occupant_rejects_stale_apply(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        previewed = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "a_replacement",
+        )
+        changed = self.service.preview_bench_exchange(
+            state,
+            self.roster,
+            target_slot.slot_id,
+            "b_replacement",
+        )
+        changed = self.service.apply_preview(changed, self.roster)
+        changed = changed.__class__(
+            **{
+                **changed.__dict__,
+                "replacement_preview": previewed.replacement_preview,
+                "revision": previewed.revision,
+            }
+        )
+
+        applied = self.service.apply_preview(changed, self.roster)
+
+        self.assertIn("target player changed", applied.last_error)
+
 
 try:
     from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
     from ht_coach_app.views.match_page import MatchPage
+    from ht_coach_app.widgets.formation_board.bench_panel import (
+        BenchPanel,
+        BenchPlayerCard,
+    )
     from ht_coach_app.widgets.formation_board.formation_board import (
         FormationBoard,
     )
@@ -445,6 +646,8 @@ except ModuleNotFoundError as exc:
     QApplication = None
     FormationBoard = None
     MatchPage = None
+    BenchPanel = None
+    BenchPlayerCard = None
     QLabel = None
     QPushButton = None
 
@@ -475,10 +678,8 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             if slot.player.player_name == "Rushton"
         )
         board_widget.select_player(player_id)
-        candidate = board_widget.findChild(QPushButton, "replacementCandidate")
-        self.assertIsNotNone(candidate)
 
-        candidate.click()
+        board_widget.preview_bench_player_for_selected_slot("a_replacement")
         self.assertEqual(recalculate_calls, [])
         self.assertEqual(
             board_widget.workspace_status_label.text(),
@@ -534,7 +735,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             if slot.player.player_name == "Rushton"
         )
         board.select_player(player_id)
-        board.findChild(QPushButton, "replacementCandidate").click()
+        board.preview_bench_player_for_selected_slot("a_replacement")
         board.apply_replacement_button.click()
 
         self.assertEqual(calls, [])
@@ -602,6 +803,131 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             "Replacement Preview",
         )
 
+    def test_bench_panel_appears_beside_board_with_internal_scroll(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+
+        bench = board_widget.findChild(BenchPanel)
+
+        self.assertIsNotNone(bench)
+        self.assertTrue(bench.scroll.widgetResizable())
+        self.assertGreaterEqual(bench.minimumWidth(), 160)
+        self.assertGreater(
+            board_widget.pitch.minimumWidth(),
+            bench.minimumWidth(),
+        )
+
+    def test_bench_cards_are_clickable_focusable_and_keyboard_previewable(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        player_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+        board_widget.select_player(player_id)
+        card = next(
+            item for item in board_widget.findChildren(BenchPlayerCard)
+            if item.player.player_name == "A Replacement"
+        )
+
+        card.click()
+        self.assertEqual(
+            board_widget._selected_bench_player_id,
+            "a_replacement",
+        )
+        self.assertNotEqual(card.focusPolicy(), 0)
+
+        from PySide6.QtCore import QCoreApplication, QEvent, Qt
+        from PySide6.QtGui import QKeyEvent
+
+        event = QKeyEvent(QEvent.KeyPress, Qt.Key_Return, Qt.NoModifier)
+        QCoreApplication.sendEvent(card, event)
+
+        self.assertIsNotNone(
+            board_widget.workspace_state().replacement_preview
+        )
+
+    def test_board_routes_starter_drop_on_bench_card_to_exchange_preview(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        source_slot = next(
+            slot for slot in board_widget.current_board().slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        payload = {
+            "source_type": "lineup",
+            "player_id": source_slot.player.player_id,
+            "source_slot_id": source_slot.slot_id,
+            "formation_name": board_widget.current_board().formation_name,
+            "revision": board_widget.workspace_state().revision,
+        }
+
+        board_widget._handle_starter_dropped_on_bench(
+            payload,
+            "a_replacement",
+        )
+
+        self.assertIsNotNone(
+            board_widget.workspace_state().replacement_preview
+        )
+        self.assertEqual(
+            board_widget.workspace_state().replacement_preview.slot_id,
+            source_slot.slot_id,
+        )
+
+    def test_bench_background_has_no_drop_operation(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+
+        self.assertFalse(board_widget.bench_panel.acceptDrops())
+        self.assertIsNone(board_widget.workspace_state().replacement_preview)
+
+    def test_player_intelligence_replacement_controls_are_removed(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        player_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+        board_widget.select_player(player_id)
+
+        self.assertIsNone(
+            board_widget.inspector.findChild(QPushButton, "replacementCandidate")
+        )
+
     def test_escape_cancels_preview_without_resetting_workspace(self):
         board_widget = FormationBoard()
         board_widget.set_boards(
@@ -617,7 +943,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             if slot.player.player_name == "Rushton"
         )
         board_widget.select_player(player_id)
-        board_widget.findChild(QPushButton, "replacementCandidate").click()
+        board_widget.preview_bench_player_for_selected_slot("a_replacement")
 
         from PySide6.QtCore import QCoreApplication, QEvent, Qt
         from PySide6.QtGui import QKeyEvent

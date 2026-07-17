@@ -3,8 +3,11 @@ from dataclasses import replace
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
 from ht_coach_app.core.position_formatting import format_position
+from ht_coach_app.core.position_formatting import format_position_abbreviation
+from ht_coach_app.core.position_formatting import normalize_position_key
 from ht_coach_app.core.side_formatting import format_side
 from ht_coach_app.workspace.workspace_models import (
+    WorkspaceBenchPlayer,
     WorkspaceModification,
     WorkspaceReplacementCandidate,
     WorkspaceReplacementPreview,
@@ -138,6 +141,82 @@ class WorkspaceService:
 
         return tuple(candidates)
 
+    def derive_bench(self, state, roster_players, selected_bench_player_id=""):
+        board = state.current_board
+        if board is None or not roster_players:
+            return ()
+
+        lineup_ids = self._lineup_roster_ids(board)
+        selected_slot = self._selected_slot(board)
+        selected_position = (
+            selected_slot.player.position
+            if selected_slot is not None and selected_slot.player is not None
+            else ""
+        )
+        selected_side = (
+            selected_slot.player.side
+            if selected_slot is not None and selected_slot.player is not None
+            else ""
+        )
+        selected_ranking = (
+            self._rank_players(roster_players, selected_position, selected_side)
+            if selected_position
+            else ()
+        )
+        bench = []
+
+        for player in roster_players:
+            player_id = self._player_id(player.name)
+            if player_id in lineup_ids:
+                continue
+
+            best_position, best_score = self._analyzer.best_position(player)
+            best_key = normalize_position_key(best_position)
+            compatibility = ""
+            score = float(best_score)
+            if selected_position:
+                selected_score = self._score_for(selected_ranking, player.name)
+                score = selected_score
+                compatibility = self._compatibility_label(
+                    selected_score,
+                    self._score_for(
+                        selected_ranking,
+                        selected_slot.player.player_name,
+                    ),
+                )
+
+            bench.append(
+                WorkspaceBenchPlayer(
+                    player_id=player_id,
+                    player_name=player.name,
+                    best_position=best_key,
+                    best_position_label=format_position(best_key),
+                    best_position_abbreviation=format_position_abbreviation(
+                        best_key
+                    ),
+                    score=round(score, 2),
+                    compatibility_label=compatibility,
+                    is_selected=player_id == selected_bench_player_id,
+                    is_incoming_preview=(
+                        state.replacement_preview is not None
+                        and state.replacement_preview.replacement_player_id
+                        == player_id
+                    ),
+                )
+            )
+
+        return tuple(
+            sorted(
+                bench,
+                key=lambda item: (
+                    self._bench_position_rank(item.best_position),
+                    -float(item.score),
+                    item.player_name,
+                    item.player_id,
+                ),
+            )
+        )
+
     def preview_replacement(self, state, candidate):
         board = state.current_board
         selected_slot = self._selected_slot(board)
@@ -222,6 +301,49 @@ class WorkspaceService:
 
         return None
 
+    def preview_bench_exchange(self, state, roster_players, target_slot_id, bench_player_id):
+        valid, message = self.validate_bench_exchange(
+            state,
+            roster_players,
+            target_slot_id,
+            bench_player_id,
+        )
+        if not valid:
+            return self._error(state, message)
+
+        candidate = self.candidate_for_player(
+            state,
+            roster_players,
+            bench_player_id,
+            target_slot_id,
+        )
+        if candidate is None:
+            return self._error(
+                state,
+                "This bench player cannot replace that slot.",
+            )
+
+        return self.preview_replacement_for_slot(
+            state,
+            candidate,
+            target_slot_id,
+        )
+
+    def validate_bench_exchange(self, state, roster_players, target_slot_id, bench_player_id):
+        board = state.current_board
+        if board is None:
+            return False, "No formation is selected."
+        target_slot = self._slot_by_id(board, target_slot_id)
+        if target_slot is None or target_slot.player is None:
+            return False, "Drop onto an occupied lineup slot."
+        bench_ids = {
+            item.player_id
+            for item in self.derive_bench(state, roster_players)
+        }
+        if bench_player_id not in bench_ids:
+            return False, "This player is not available on the bench."
+        return True, ""
+
     def can_drop(self, state, payload, target_slot_id):
         return self.validate_swap(state, payload, target_slot_id)[0]
 
@@ -248,7 +370,7 @@ class WorkspaceService:
             if source_slot_id == target_slot_id:
                 return False, "Drop onto a different slot to swap players."
             return True, ""
-        if payload.get("source_type") == "candidate":
+        if payload.get("source_type") in ("candidate", "bench"):
             if not payload.get("player_id"):
                 return False, "The replacement candidate is unavailable."
             return True, ""
@@ -300,11 +422,35 @@ class WorkspaceService:
                 self.cancel_replacement(state),
                 "The preview is out of date. Try the change again.",
             )
+        current_slot = self._slot_by_id(board, preview.slot_id)
+        if current_slot is None or current_slot.player is None:
+            return self._error(
+                self.cancel_replacement(state),
+                "The target slot changed. Try the change again.",
+            )
+        if current_slot.player.player_id != preview.current_player_id:
+            return self._error(
+                self.cancel_replacement(state),
+                "The target player changed. Try the change again.",
+            )
+        if self._lineup_contains_roster_id(
+            board,
+            preview.replacement_player_id,
+        ):
+            return self._error(
+                self.cancel_replacement(state),
+                "The incoming player is already in the lineup.",
+            )
 
         replacement_player = self._find_player(
             roster_players,
             preview.replacement_player_name,
         )
+        if replacement_player is None:
+            return self._error(
+                self.cancel_replacement(state),
+                "The incoming player is no longer available in the roster.",
+            )
         updated_slots = []
 
         for slot in board.slots:
@@ -336,6 +482,8 @@ class WorkspaceService:
         )
         boards = dict(state.workspace_boards)
         boards[updated_board.formation_name] = updated_board
+        before_ids = self._lineup_ids(board)
+        after_ids = self._lineup_ids(updated_board)
         modification = WorkspaceModification(
             formation_name=preview.formation_name,
             slot_id=preview.slot_id,
@@ -343,6 +491,14 @@ class WorkspaceService:
             original_player_name=preview.current_player_name,
             replacement_player_name=preview.replacement_player_name,
             score_difference=preview.score_difference,
+            kind="replacement",
+            target_slot_id=preview.slot_id,
+            incoming_player_id=preview.replacement_player_id,
+            outgoing_player_id=preview.current_player_id,
+            before_lineup_ids=before_ids,
+            after_lineup_ids=after_ids,
+            revision_before=state.revision,
+            revision_after=state.revision + 1,
         )
 
         return replace(
@@ -394,6 +550,8 @@ class WorkspaceService:
         )
         boards = dict(state.workspace_boards)
         boards[updated_board.formation_name] = updated_board
+        before_ids = self._lineup_ids(board)
+        after_ids = self._lineup_ids(updated_board)
         modification = WorkspaceModification(
             formation_name=preview.formation_name,
             slot_id=preview.target_slot_id,
@@ -404,6 +562,12 @@ class WorkspaceService:
             kind="swap",
             source_slot_id=preview.source_slot_id,
             target_slot_id=preview.target_slot_id,
+            incoming_player_id=preview.source_player_id,
+            outgoing_player_id=preview.target_player_id,
+            before_lineup_ids=before_ids,
+            after_lineup_ids=after_ids,
+            revision_before=state.revision,
+            revision_after=state.revision + 1,
         )
 
         return replace(
@@ -577,6 +741,28 @@ class WorkspaceService:
         return 0.0
 
     @staticmethod
+    def _lineup_ids(board):
+        if board is None:
+            return ()
+        return tuple(
+            slot.player.player_id
+            for slot in board.slots
+            if slot.player is not None
+        )
+
+    def _lineup_roster_ids(self, board):
+        if board is None:
+            return set()
+        return {
+            self._player_id(slot.player.player_name)
+            for slot in board.slots
+            if slot.player is not None
+        }
+
+    def _lineup_contains_roster_id(self, board, roster_player_id):
+        return roster_player_id in self._lineup_roster_ids(board)
+
+    @staticmethod
     def _selected_slot(board):
         if board is None:
             return None
@@ -627,6 +813,27 @@ class WorkspaceService:
         if difference > 0:
             return "Higher role score than the current player."
         return "Lower role score than the current player."
+
+    @staticmethod
+    def _compatibility_label(candidate_score, selected_score):
+        difference = float(candidate_score) - float(selected_score)
+        if difference >= 0.5:
+            return "Strong fit"
+        if difference >= -0.5:
+            return "Compatible"
+        return "Valid but suboptimal"
+
+    @staticmethod
+    def _bench_position_rank(position):
+        order = {
+            "goalkeeper": 0,
+            "central_defender": 1,
+            "wing_back": 1,
+            "inner_midfielder": 2,
+            "winger": 3,
+            "forward": 4,
+        }
+        return order.get(normalize_position_key(position), 5)
 
     @staticmethod
     def _display_name(player_name):

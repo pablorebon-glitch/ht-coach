@@ -11,6 +11,19 @@ class WorkspaceReplacementCandidate:
 
 
 @dataclass(frozen=True)
+class WorkspaceBenchPlayer:
+    player_id: str
+    player_name: str
+    best_position: str
+    best_position_label: str
+    best_position_abbreviation: str
+    score: float
+    compatibility_label: str = ""
+    is_selected: bool = False
+    is_incoming_preview: bool = False
+
+
+@dataclass(frozen=True)
 class WorkspaceReplacementPreview:
     formation_name: str
     slot_id: str
@@ -50,6 +63,12 @@ class WorkspaceModification:
     kind: str = "replacement"
     source_slot_id: str = ""
     target_slot_id: str = ""
+    incoming_player_id: str = ""
+    outgoing_player_id: str = ""
+    before_lineup_ids: tuple[str, ...] = ()
+    after_lineup_ids: tuple[str, ...] = ()
+    revision_before: int = 0
+    revision_after: int = 0
 
 
 @dataclass(frozen=True)

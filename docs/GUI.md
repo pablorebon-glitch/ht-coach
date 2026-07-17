@@ -137,13 +137,16 @@ Content:
 - Analysis inputs that collapse after success and reopen without rerunning analysis.
 - Persistent collapsible Analysis Setup with a visible toggle. Showing or hiding setup
   preserves selected values, current results and Workspace state.
-- Formation Board tab with a vertical pitch, compact player cards, formation switching
-  across analyzed alternatives, click-to-inspect behavior, workspace replacement actions,
-  and original HT Coach styling.
+- Formation Board tab with a vertical pitch, compact player cards, integrated Bench,
+  formation switching across analyzed alternatives, click-to-inspect behavior, workspace
+  replacement actions, and original HT Coach styling.
 - Interactive Workspace controls for Apply/Cancel previews, Reset Workspace and
-  Recalculate Analysis. Click replacement, dragged replacement candidates and
+  Recalculate Analysis. Bench-to-lineup exchange, starter-to-Bench exchange and
   starting-player swaps change only the Workspace Lineup after Apply; recalculation
   always requires the explicit Recalculate Analysis action.
+- Bench panel with compact focusable cards, deterministic roster-minus-lineup derivation
+  and internal scrolling. Clicking selects a Bench player for inspection; Enter or Space
+  previews replacement for the selected lineup slot.
 - Player Intelligence inspector with profile label, coach's note, why-selected points,
   contribution bars, strengths, limitations, alternatives, collapsed technical details
   and internal overflow scrolling.
