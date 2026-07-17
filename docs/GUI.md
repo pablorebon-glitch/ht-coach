@@ -136,7 +136,11 @@ Content:
 - Compact recommended-result summary and analysis metadata row.
 - Analysis inputs that collapse after success and reopen without rerunning analysis.
 - Formation Board tab with a vertical pitch, compact player cards, formation switching
-  across analyzed alternatives, click-to-inspect behavior, and original HT Coach styling.
+  across analyzed alternatives, click-to-inspect behavior, workspace replacement actions,
+  and original HT Coach styling.
+- Interactive Workspace controls for Apply Replacement, Cancel Replacement, Reset
+  Workspace and Recalculate Analysis. Replacement apply changes only the Workspace
+  Lineup; recalculation always requires the explicit Recalculate Analysis action.
 - Player Intelligence inspector with profile label, coach's note, why-selected points,
   contribution bars, strengths, limitations, alternatives, collapsed technical details
   and internal overflow scrolling.
@@ -285,7 +289,11 @@ Responsibilities:
   and forwards at the top.
 - Preserve left, center and right semantics.
 - Render compact player cards with user-facing position, side and order labels.
-- Support read-only player selection and Player Intelligence updates.
+- Support player selection, Player Intelligence updates and workspace replacement
+  previews.
+- Distinguish immutable Recommended Lineup state from editable Workspace Lineup state.
+- Show Original Recommendation, Unsaved Changes and Modified Workspace status.
+- Emit explicit recalculation intent without calling the engine directly.
 - Own full-pitch scaling, card containment and the compact formation/tactic footer.
 - Keep reusable pitch and inspector layout behavior outside `MatchPage`.
 - Avoid engine, optimizer and persistence dependencies.

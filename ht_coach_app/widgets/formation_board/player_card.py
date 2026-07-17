@@ -27,6 +27,14 @@ class PlayerCard(QPushButton):
             "recommended",
             "true" if self.player.is_recommended else "false"
         )
+        self.setProperty(
+            "modified",
+            "true" if self.player.is_modified else "false"
+        )
+        self.setProperty(
+            "preview",
+            "true" if self.player.is_replacement_preview else "false"
+        )
         self.style().unpolish(self)
         self.style().polish(self)
         self._update_text()
@@ -50,7 +58,7 @@ class PlayerCard(QPushButton):
         self.setText(
             "\n".join(
                 [
-                    display_name,
+                    self._name_line(display_name),
                     self.player.position_abbreviation,
                     order or "Normal",
                 ]
@@ -70,6 +78,14 @@ class PlayerCard(QPushButton):
                 f"Order side: {self.player.order_side_label}"
             )
 
+        if self.player.is_modified:
+            parts.append("Workspace replacement")
+
         return " | ".join(
             part for part in parts if part
         )
+
+    def _name_line(self, display_name):
+        if self.player.is_modified:
+            return f"* {display_name}"
+        return display_name

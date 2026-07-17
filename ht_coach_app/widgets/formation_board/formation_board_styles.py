@@ -6,6 +6,8 @@ CARD_BORDER = "#d0d5dd"
 CARD_SELECTED = "#fef3c7"
 CARD_SELECTED_BORDER = "#d97706"
 CARD_RECOMMENDED_BORDER = "#2563eb"
+CARD_MODIFIED = "#eff6ff"
+CARD_MODIFIED_BORDER = "#1d4ed8"
 TEXT_PRIMARY = "#111827"
 TEXT_SECONDARY = "#667085"
 WARNING = "#b42318"
@@ -60,6 +62,31 @@ def formation_board_stylesheet():
             padding: 3px 6px;
         }}
 
+        QLabel#workspaceStatusBadge {{
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 650;
+            padding: 3px 7px;
+        }}
+
+        QLabel#workspaceStatusBadge[state="clean"] {{
+            background: #f2f4f7;
+            border: 1px solid #d0d5dd;
+            color: {NEUTRAL};
+        }}
+
+        QLabel#workspaceStatusBadge[state="pending"] {{
+            background: #fffaeb;
+            border: 1px solid #fedf89;
+            color: #b54708;
+        }}
+
+        QLabel#workspaceStatusBadge[state="dirty"] {{
+            background: #eef6ff;
+            border: 1px solid #bfdbfe;
+            color: {CARD_MODIFIED_BORDER};
+        }}
+
         QLabel#coachNote {{
             background: #f8fafc;
             border: 1px solid #e4e7ec;
@@ -96,9 +123,40 @@ def formation_board_stylesheet():
             border: 2px solid {CARD_RECOMMENDED_BORDER};
         }}
 
+        QPushButton#playerCard[modified="true"] {{
+            background: {CARD_MODIFIED};
+            border: 2px solid {CARD_MODIFIED_BORDER};
+        }}
+
         QPushButton#playerCard[selected="true"] {{
             background: {CARD_SELECTED};
             border: 2px solid {CARD_SELECTED_BORDER};
+        }}
+
+        QPushButton#replacementCandidate {{
+            background: #ffffff;
+            border: 1px solid #d0d5dd;
+            border-radius: 7px;
+            color: {TEXT_PRIMARY};
+            padding: 5px 7px;
+            text-align: left;
+        }}
+
+        QPushButton#replacementCandidate[selected="true"] {{
+            background: #eef6ff;
+            border: 2px solid {CARD_MODIFIED_BORDER};
+        }}
+
+        QPushButton#workspaceAction {{
+            border: 1px solid #d0d5dd;
+            border-radius: 7px;
+            padding: 5px 8px;
+        }}
+
+        QPushButton#workspaceAction[primary="true"] {{
+            background: {CARD_MODIFIED_BORDER};
+            border: 1px solid {CARD_MODIFIED_BORDER};
+            color: #ffffff;
         }}
 
         QPushButton#playerCard:hover {{

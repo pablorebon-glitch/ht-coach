@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QSplitter,
@@ -29,15 +30,19 @@ from ht_coach_app.widgets.formation_board.layout_metrics import (
     SPLITTER_INSPECTOR_RATIO,
 )
 from ht_coach_app.widgets.formation_board.pitch_widget import PitchWidget
+from ht_coach_app.workspace.workspace_service import WorkspaceService
 
 
 class FormationBoard(QWidget):
     formation_changed = Signal(str)
+    recalculate_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._mapper = FormationBoardMapper()
         self._intelligence_service = PlayerIntelligenceService()
+        self._workspace_service = WorkspaceService()
+        self._workspace_state = None
         self._boards = {}
         self._details_by_name = {}
         self._roster_players = []
@@ -68,7 +73,42 @@ class FormationBoard(QWidget):
         self.meta_label = QLabel("")
         self.meta_label.setObjectName("formationBoardMeta")
         header_layout.addWidget(self.meta_label)
+
+        self.workspace_status_label = QLabel("Original Recommendation")
+        self.workspace_status_label.setObjectName("workspaceStatusBadge")
+        self.workspace_status_label.setProperty("state", "clean")
+        header_layout.addWidget(self.workspace_status_label)
+
         header_layout.addStretch(1)
+
+        self.apply_replacement_button = QPushButton("Apply Replacement")
+        self.apply_replacement_button.setObjectName("workspaceAction")
+        self.apply_replacement_button.setProperty("primary", "true")
+        self.apply_replacement_button.clicked.connect(
+            self.apply_replacement
+        )
+        header_layout.addWidget(self.apply_replacement_button)
+
+        self.cancel_replacement_button = QPushButton("Cancel Replacement")
+        self.cancel_replacement_button.setObjectName("workspaceAction")
+        self.cancel_replacement_button.clicked.connect(
+            self.cancel_replacement
+        )
+        header_layout.addWidget(self.cancel_replacement_button)
+
+        self.reset_workspace_button = QPushButton("Reset Workspace")
+        self.reset_workspace_button.setObjectName("workspaceAction")
+        self.reset_workspace_button.clicked.connect(
+            self.reset_workspace
+        )
+        header_layout.addWidget(self.reset_workspace_button)
+
+        self.recalculate_button = QPushButton("Recalculate Analysis")
+        self.recalculate_button.setObjectName("workspaceAction")
+        self.recalculate_button.clicked.connect(
+            self.recalculate_requested
+        )
+        header_layout.addWidget(self.recalculate_button)
         layout.addWidget(header)
 
         self.splitter = QSplitter(Qt.Horizontal)
@@ -139,7 +179,11 @@ class FormationBoard(QWidget):
     ):
         self._details_by_name = player_details_by_name or {}
         self._roster_players = list(roster_players or [])
-        self._boards = {board.formation_name: board for board in boards}
+        self._workspace_state = self._workspace_service.create(
+            list(boards),
+            selected_formation_name,
+        )
+        self._sync_boards_cache()
         self.formation_combo.blockSignals(True)
         self.formation_combo.clear()
 
@@ -156,18 +200,29 @@ class FormationBoard(QWidget):
         self.formation_combo.setCurrentIndex(index if index >= 0 else 0)
         self.formation_combo.blockSignals(False)
         self._current_name = self.formation_combo.currentData() or ""
+        if self._workspace_state is not None:
+            self._workspace_state = self._workspace_service.set_formation(
+                self._workspace_state,
+                self._current_name,
+            )
+            self._sync_boards_cache()
         self._render_current_board()
 
     def current_board(self):
-        return self._boards.get(self._current_name)
+        if self._workspace_state is None:
+            return None
+        return self._workspace_state.current_board
 
     def select_player(self, player_id):
         board = self.current_board()
         if board is None:
             return
 
-        updated = self._mapper.select_player(board, player_id)
-        self._boards[updated.formation_name] = updated
+        self._workspace_state = self._workspace_service.select_player(
+            self._workspace_state,
+            player_id,
+        )
+        self._sync_boards_cache()
         self._render_current_board()
 
     def clear_selection(self):
@@ -175,16 +230,62 @@ class FormationBoard(QWidget):
         if board is None:
             return
 
-        updated = self._mapper.clear_selection(board)
-        self._boards[updated.formation_name] = updated
+        self._workspace_state = self._workspace_service.clear_selection(
+            self._workspace_state
+        )
+        self._sync_boards_cache()
+        self._render_current_board()
+
+    def preview_replacement(self, candidate):
+        if self._workspace_state is None:
+            return
+
+        self._workspace_state = self._workspace_service.preview_replacement(
+            self._workspace_state,
+            candidate,
+        )
+        self._sync_boards_cache()
+        self._render_current_board()
+
+    def apply_replacement(self):
+        if self._workspace_state is None:
+            return
+
+        self._workspace_state = self._workspace_service.apply_replacement(
+            self._workspace_state,
+            self._roster_players,
+        )
+        self._sync_boards_cache()
+        self._render_current_board()
+
+    def cancel_replacement(self):
+        if self._workspace_state is None:
+            return
+
+        self._workspace_state = self._workspace_service.cancel_replacement(
+            self._workspace_state
+        )
+        self._sync_boards_cache()
+        self._render_current_board()
+
+    def reset_workspace(self):
+        if self._workspace_state is None:
+            return
+
+        self._workspace_state = self._workspace_service.reset(
+            self._workspace_state
+        )
+        self._sync_boards_cache()
         self._render_current_board()
 
     def _on_formation_changed(self):
         self._current_name = self.formation_combo.currentData() or ""
-        board = self.current_board()
-
-        if board is not None and board.selected_player_id:
-            self._boards[board.formation_name] = self._mapper.clear_selection(board)
+        if self._workspace_state is not None:
+            self._workspace_state = self._workspace_service.set_formation(
+                self._workspace_state,
+                self._current_name,
+            )
+            self._sync_boards_cache()
 
         self.formation_changed.emit(self._current_name)
         self._render_current_board()
@@ -192,6 +293,7 @@ class FormationBoard(QWidget):
     def _render_current_board(self):
         board = self.current_board()
         self.pitch.set_board(board)
+        self._update_workspace_toolbar()
 
         if board is None:
             self.meta_label.setText("")
@@ -254,6 +356,14 @@ class FormationBoard(QWidget):
         header_layout.addWidget(subtitle, 1, 0, 1, 2)
         self.inspector_layout.addWidget(header)
 
+        if (
+            self._workspace_state is not None
+            and self._workspace_state.replacement_preview is not None
+        ):
+            self._add_preview_panel(
+                self._workspace_state.replacement_preview
+            )
+
         note = QLabel(intelligence.headline)
         note.setObjectName("coachNote")
         note.setWordWrap(True)
@@ -294,6 +404,8 @@ class FormationBoard(QWidget):
 
         if intelligence.alternatives:
             self._add_alternatives(intelligence.alternatives)
+
+        self._add_replacements()
 
         if intelligence.technical_attributes:
             self._add_technical_details(intelligence.technical_attributes)
@@ -338,6 +450,66 @@ class FormationBoard(QWidget):
             )
             label.setWordWrap(True)
             self.inspector_layout.addWidget(label)
+
+    def _add_replacements(self):
+        if self._workspace_state is None:
+            return
+
+        candidates = self._workspace_service.replacement_candidates(
+            self._workspace_state,
+            self._roster_players,
+        )
+        if not candidates:
+            return
+
+        self.inspector_layout.addWidget(self._section_label("Replace Player"))
+        preview = self._workspace_state.replacement_preview
+
+        for candidate in candidates:
+            button = QPushButton(
+                f"{candidate.player_name}  |  "
+                f"Score {candidate.score:.2f}  "
+                f"({candidate.score_difference:+.2f})"
+            )
+            button.setObjectName("replacementCandidate")
+            button.setProperty(
+                "selected",
+                "true"
+                if (
+                    preview is not None
+                    and preview.replacement_player_id == candidate.player_id
+                )
+                else "false",
+            )
+            button.setToolTip(candidate.reason)
+            button.clicked.connect(
+                lambda checked=False, item=candidate: (
+                    self.preview_replacement(item)
+                )
+            )
+            self.inspector_layout.addWidget(button)
+
+    def _add_preview_panel(self, preview):
+        panel = QFrame()
+        panel.setObjectName("coachNote")
+        layout = QGridLayout(panel)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setHorizontalSpacing(8)
+        layout.setVerticalSpacing(3)
+
+        rows = [
+            ("Preview Replacement", preview.role),
+            ("Current Player", preview.current_player_name),
+            ("Replacement Player", preview.replacement_player_name),
+            ("Player score difference", f"{preview.score_difference:+.2f}"),
+        ]
+        for row, (label, value) in enumerate(rows):
+            key = QLabel(label)
+            key.setObjectName("playerInspectorMeta")
+            layout.addWidget(key, row, 0)
+            layout.addWidget(QLabel(value), row, 1)
+
+        self.inspector_layout.addWidget(panel)
 
     def _add_technical_details(self, attributes):
         toggle = QToolButton()
@@ -384,6 +556,39 @@ class FormationBoard(QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
+
+    def _sync_boards_cache(self):
+        if self._workspace_state is None:
+            self._boards = {}
+            return
+
+        self._boards = dict(self._workspace_state.workspace_boards)
+
+    def _update_workspace_toolbar(self):
+        state = self._workspace_state
+        if state is None:
+            status = "Original Recommendation"
+            status_state = "clean"
+            has_preview = False
+            is_dirty = False
+        else:
+            status = state.status_label
+            status_state = state.status_state
+            has_preview = state.replacement_preview is not None
+            is_dirty = state.dirty
+
+        self.workspace_status_label.setText(status)
+        self.workspace_status_label.setProperty("state", status_state)
+        self.workspace_status_label.style().unpolish(
+            self.workspace_status_label
+        )
+        self.workspace_status_label.style().polish(
+            self.workspace_status_label
+        )
+        self.apply_replacement_button.setEnabled(has_preview)
+        self.cancel_replacement_button.setEnabled(has_preview)
+        self.reset_workspace_button.setEnabled(has_preview or is_dirty)
+        self.recalculate_button.setEnabled(is_dirty)
 
     @staticmethod
     def _section_label(text):

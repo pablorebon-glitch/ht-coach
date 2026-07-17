@@ -442,6 +442,9 @@ class MatchPage(BasePage):
                 ),
                 roster_players=self._roster_players,
             )
+            board.recalculate_requested.connect(
+                self.analyze_requested
+            )
             return board
         except Exception as exc:
             panel = QFrame()
