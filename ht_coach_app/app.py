@@ -70,6 +70,7 @@ def _application_stylesheet():
         QFrame#workspacePanel,
         QFrame#resultCard,
         QFrame#metadataPanel,
+        QFrame#compactDecisionLab,
         QFrame#statePanel {
             background: #ffffff;
             border: 1px solid #e4e7ec;
@@ -97,26 +98,24 @@ def _application_stylesheet():
             font-weight: 650;
         }
 
-        QFrame#metricTile {
-            background: #ffffff;
-            border: 1px solid #d8dde6;
-            border-radius: 6px;
-        }
-
-        QLabel#metricLabel {
-            color: #667085;
-            font-size: 11px;
-        }
-
-        QLabel#metricValue {
-            color: #111827;
-            font-size: 16px;
-            font-weight: 650;
-        }
-
         QLabel#metadataValue {
             color: #111827;
             font-weight: 650;
+        }
+
+        QLabel#compactMetric {
+            color: #344054;
+            font-size: 11px;
+            font-weight: 650;
+        }
+
+        QLabel#compactDecisionText {
+            color: #667085;
+            font-size: 10px;
+        }
+
+        QPushButton#editAnalysisButton {
+            padding: 4px 10px;
         }
 
         QPushButton#primaryAction {

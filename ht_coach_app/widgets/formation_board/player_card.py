@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QPushButton
 
 
@@ -18,19 +19,6 @@ class PlayerCard(QPushButton):
         self.refresh()
 
     def refresh(self):
-        order = self.player.order_label
-        if self.player.order_side_label:
-            order = f"{order} {self.player.order_side_label}"
-
-        self.setText(
-            "\n".join(
-                [
-                    self.player.display_name,
-                    self.player.position_abbreviation,
-                    order or "Normal",
-                ]
-            )
-        )
         self.setProperty(
             "selected",
             "true" if self.player.is_selected else "false"
@@ -41,6 +29,33 @@ class PlayerCard(QPushButton):
         )
         self.style().unpolish(self)
         self.style().polish(self)
+        self._update_text()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_text()
+
+    def _update_text(self):
+        order = self.player.order_label
+        if self.player.order_side_label:
+            order = f"{order} {self.player.order_side_label}"
+
+        available_width = max(1, self.width() - 10)
+        metrics = QFontMetrics(self.font())
+        display_name = metrics.elidedText(
+            self.player.player_name,
+            Qt.ElideRight,
+            available_width,
+        )
+        self.setText(
+            "\n".join(
+                [
+                    display_name,
+                    self.player.position_abbreviation,
+                    order or "Normal",
+                ]
+            )
+        )
 
     def _tooltip_text(self):
         parts = [

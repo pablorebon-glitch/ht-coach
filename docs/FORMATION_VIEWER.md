@@ -63,6 +63,12 @@ Supported formations:
 The slot layouts are derived from the centralized formation catalog in
 `models.formations`; formation definitions are not duplicated in the UI.
 
+Alpha 0.4.2.1 compacts the normalized tactical lines while preserving their thirds and
+left/center/right meaning. The pitch fits a centered 68:105 field rectangle into the
+available board area, including both goals, both penalty and goal areas, halfway line,
+center markings and corner arcs. Resize handlers consume centralized geometry; they do
+not define formation-specific coordinates.
+
 ## Player Cards
 
 Cards are compact and show:
@@ -74,6 +80,10 @@ Cards are compact and show:
 
 Cards support normal, hover, selected, recommended and empty-slot fallback states. Long
 names are truncated on the card and preserved in the tooltip.
+
+Card width is bounded by the closest pair of slots on the current tactical line as well
+as global readable minimum/maximum sizes. Height scales with width. Cards remain inside
+the pitch and do not alter formation geometry during selection or resizing.
 
 ## Player Intelligence
 
@@ -132,6 +142,19 @@ analyzed result data and does not rerun optimization.
 
 If board rendering fails, the Match page keeps the comparison and Detailed XI tabs
 available and shows a recoverable board error message.
+
+## Compact Tactical Workspace
+
+Alpha 0.4.2.1 places the pitch and Player Intelligence in a horizontal splitter with an
+initial 65/35 proportion and usable minimum pane widths. The pitch never scrolls. Player
+Intelligence uses an internal vertical scroll area, and Technical Details starts
+collapsed, so long explanations cannot force the pitch smaller.
+
+Successful and restored analyses collapse the large input form into compact analysis,
+recommendation and Decision Lab rows. `Edit analysis` restores the previous controls and
+selections without clearing the visible result or starting optimization. The supported
+desktop target is 1280x720 and above, with explicit checks at 1366x768, 1600x900 and
+1920x1080.
 
 ## Design Tokens
 

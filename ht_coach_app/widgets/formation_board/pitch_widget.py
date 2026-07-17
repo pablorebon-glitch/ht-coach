@@ -1,11 +1,21 @@
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from ht_coach_app.widgets.formation_board.formation_board_styles import (
     PITCH_BACKGROUND,
     PITCH_BACKGROUND_ALT,
     PITCH_LINES,
+)
+from ht_coach_app.widgets.formation_board.layout_metrics import (
+    PITCH_ASPECT_RATIO,
+    PITCH_GOAL_DEPTH,
+    PITCH_OUTER_MARGIN,
+    PLAYER_CARD_LINE_GAP_RATIO,
+    PLAYER_CARD_MAX_HEIGHT,
+    PLAYER_CARD_MAX_WIDTH,
+    PLAYER_CARD_MIN_HEIGHT,
+    PLAYER_CARD_MIN_WIDTH,
 )
 from ht_coach_app.widgets.formation_board.player_card import PlayerCard
 
@@ -18,8 +28,12 @@ class PitchWidget(QWidget):
         super().__init__(parent)
         self._board = None
         self._slot_widgets = []
-        self.setMinimumSize(420, 620)
+        self.setMinimumSize(260, 300)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setFocusPolicy(Qt.StrongFocus)
+
+    def sizeHint(self):
+        return QSize(420, 600)
 
     def set_board(self, board):
         self._board = board
@@ -39,17 +53,48 @@ class PitchWidget(QWidget):
                 )
             else:
                 widget = PlayerCard(slot.player, self)
-                widget.selected.connect(
-                    self.player_selected
-                )
+                widget.selected.connect(self.player_selected)
 
             widget.show()
-            self._slot_widgets.append(
-                (slot, widget)
-            )
+            self._slot_widgets.append((slot, widget))
 
         self._position_slot_widgets()
         self.update()
+
+    def pitch_rect(self):
+        available = QRectF(
+            PITCH_OUTER_MARGIN + PITCH_GOAL_DEPTH,
+            PITCH_OUTER_MARGIN + PITCH_GOAL_DEPTH,
+            max(1, self.width() - 2 * (PITCH_OUTER_MARGIN + PITCH_GOAL_DEPTH)),
+            max(1, self.height() - 2 * (PITCH_OUTER_MARGIN + PITCH_GOAL_DEPTH)),
+        )
+        available_ratio = available.width() / max(1.0, available.height())
+
+        if available_ratio > PITCH_ASPECT_RATIO:
+            height = available.height()
+            width = height * PITCH_ASPECT_RATIO
+        else:
+            width = available.width()
+            height = width / PITCH_ASPECT_RATIO
+
+        return QRectF(
+            available.center().x() - width / 2,
+            available.center().y() - height / 2,
+            width,
+            height,
+        )
+
+    def goal_rects(self):
+        rect = self.pitch_rect()
+        goal_width = rect.width() * 0.26
+        left = rect.center().x() - goal_width / 2
+        return (
+            QRectF(left, rect.top() - PITCH_GOAL_DEPTH, goal_width, PITCH_GOAL_DEPTH),
+            QRectF(left, rect.bottom(), goal_width, PITCH_GOAL_DEPTH),
+        )
+
+    def card_geometries(self):
+        return tuple(widget.geometry() for _, widget in self._slot_widgets)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -75,89 +120,122 @@ class PitchWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        rect = self._pitch_rect()
+        rect = self.pitch_rect()
         painter.fillRect(rect, QColor(PITCH_BACKGROUND))
 
         stripe_height = rect.height() / 8
-        painter.fillRect(
-            QRectF(rect.left(), rect.top(), rect.width(), stripe_height),
-            QColor(PITCH_BACKGROUND_ALT),
-        )
-        painter.fillRect(
-            QRectF(
-                rect.left(),
-                rect.top() + stripe_height * 4,
-                rect.width(),
-                stripe_height,
-            ),
-            QColor(PITCH_BACKGROUND_ALT),
-        )
+        for stripe in range(0, 8, 2):
+            painter.fillRect(
+                QRectF(
+                    rect.left(),
+                    rect.top() + stripe_height * stripe,
+                    rect.width(),
+                    stripe_height,
+                ),
+                QColor(PITCH_BACKGROUND_ALT),
+            )
 
-        pen = QPen(QColor(PITCH_LINES), 2)
-        painter.setPen(pen)
+        line_width = max(1.0, min(2.0, rect.width() / 260))
+        painter.setPen(QPen(QColor(PITCH_LINES), line_width))
         painter.drawRect(rect)
 
-        halfway_y = rect.top() + rect.height() * 0.50
-        painter.drawLine(
-            rect.left(),
-            halfway_y,
-            rect.right(),
-            halfway_y,
-        )
-        painter.drawEllipse(
-            rect.center(),
-            rect.width() * 0.12,
-            rect.width() * 0.12,
-        )
+        halfway_y = rect.center().y()
+        painter.drawLine(rect.left(), halfway_y, rect.right(), halfway_y)
+        circle_radius = rect.width() * 0.12
+        painter.drawEllipse(rect.center(), circle_radius, circle_radius)
+        painter.setBrush(QColor(PITCH_LINES))
+        painter.drawEllipse(rect.center(), line_width * 1.5, line_width * 1.5)
+        painter.setBrush(Qt.NoBrush)
 
-        self._draw_penalty_area(painter, rect, top=True)
-        self._draw_penalty_area(painter, rect, top=False)
+        self._draw_end_markings(painter, rect, top=True)
+        self._draw_end_markings(painter, rect, top=False)
+        self._draw_corner_arcs(painter, rect)
 
-    def _draw_penalty_area(self, painter, rect, top):
-        area_width = rect.width() * 0.56
-        area_height = rect.height() * 0.16
-        goal_width = rect.width() * 0.28
-        goal_height = rect.height() * 0.06
-        left = rect.center().x() - area_width / 2
-        goal_left = rect.center().x() - goal_width / 2
+    def _draw_end_markings(self, painter, rect, top):
+        penalty_width = rect.width() * 0.62
+        penalty_height = rect.height() * 0.16
+        goal_area_width = rect.width() * 0.30
+        goal_area_height = rect.height() * 0.065
+        penalty_left = rect.center().x() - penalty_width / 2
+        goal_area_left = rect.center().x() - goal_area_width / 2
 
         if top:
-            area_top = rect.top()
-            goal_top = rect.top()
+            penalty_top = rect.top()
+            goal_area_top = rect.top()
+            spot_y = rect.top() + rect.height() * 0.105
         else:
-            area_top = rect.bottom() - area_height
-            goal_top = rect.bottom() - goal_height
+            penalty_top = rect.bottom() - penalty_height
+            goal_area_top = rect.bottom() - goal_area_height
+            spot_y = rect.bottom() - rect.height() * 0.105
 
+        painter.drawRect(QRectF(penalty_left, penalty_top, penalty_width, penalty_height))
         painter.drawRect(
-            QRectF(left, area_top, area_width, area_height)
+            QRectF(goal_area_left, goal_area_top, goal_area_width, goal_area_height)
         )
-        painter.drawRect(
-            QRectF(goal_left, goal_top, goal_width, goal_height)
-        )
+        painter.setBrush(QColor(PITCH_LINES))
+        painter.drawEllipse(QPointF(rect.center().x(), spot_y), 1.5, 1.5)
+        painter.setBrush(Qt.NoBrush)
 
-    def _pitch_rect(self):
-        margin = 12
-        return QRectF(
-            margin,
-            margin,
-            max(1, self.width() - margin * 2),
-            max(1, self.height() - margin * 2),
+        goal = self.goal_rects()[0 if top else 1]
+        painter.drawRect(goal)
+
+    def _draw_corner_arcs(self, painter, rect):
+        diameter = max(8.0, rect.width() * 0.04)
+        corners = (
+            (rect.left(), rect.top(), 0),
+            (rect.right() - diameter, rect.top(), 90 * 16),
+            (rect.left(), rect.bottom() - diameter, 270 * 16),
+            (rect.right() - diameter, rect.bottom() - diameter, 180 * 16),
         )
+        for left, top, start_angle in corners:
+            painter.drawArc(
+                QRectF(left, top, diameter, diameter),
+                start_angle,
+                90 * 16,
+            )
 
     def _position_slot_widgets(self):
-        rect = self._pitch_rect()
-        card_width = min(132, max(92, int(rect.width() * 0.23)))
-        card_height = 64
+        rect = self.pitch_rect()
+        card_width, card_height = self._card_size(rect)
 
         for slot, widget in self._slot_widgets:
             x = rect.left() + rect.width() * slot.normalized_x
             y = rect.top() + rect.height() * slot.normalized_y
-            widget.setGeometry(
-                int(x - card_width / 2),
-                int(y - card_height / 2),
-                card_width,
-                card_height,
+            left = max(rect.left(), min(x - card_width / 2, rect.right() - card_width))
+            top = max(rect.top(), min(y - card_height / 2, rect.bottom() - card_height))
+            widget.setGeometry(int(left), int(top), card_width, card_height)
+
+    def _card_size(self, rect):
+        minimum_gap = self._minimum_line_gap(rect)
+        width_from_pitch = int(rect.width() * 0.22)
+        width_from_gap = int(minimum_gap * PLAYER_CARD_LINE_GAP_RATIO)
+        card_width = max(
+            PLAYER_CARD_MIN_WIDTH,
+            min(PLAYER_CARD_MAX_WIDTH, width_from_pitch, width_from_gap),
+        )
+        card_height = max(
+            PLAYER_CARD_MIN_HEIGHT,
+            min(PLAYER_CARD_MAX_HEIGHT, int(card_width * 0.72)),
+        )
+        return card_width, card_height
+
+    def _minimum_line_gap(self, rect):
+        if self._board is None:
+            return rect.width()
+
+        gaps = []
+        lines = {}
+        for slot in self._board.slots:
+            lines.setdefault(slot.line, []).append(slot.normalized_x)
+
+        for positions in lines.values():
+            positions.sort()
+            gaps.extend(
+                rect.width() * (right - left)
+                for left, right in zip(positions, positions[1:])
             )
+
+        return min(gaps) if gaps else rect.width() * 0.5
 
     def _clear_slot_widgets(self):
         for _, widget in self._slot_widgets:

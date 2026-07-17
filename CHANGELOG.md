@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.4.2.1 Compact Match Workspace with a responsive full-pitch view,
+  horizontal board/inspector splitter, compact formation footer and internal Player
+  Intelligence scrolling.
+- Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
+  formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
 - Added roster CSV browsing, loading, reload, last-path persistence, and export of
   visible Squad rows.
@@ -46,6 +51,13 @@
 
 ### Changed
 
+- Match analysis inputs now collapse after a successful or restored analysis and can be
+  reopened without rerunning optimization or clearing the current result.
+- Match recommendation, metadata and Decision Lab presentation now use compact rows so
+  the tactical workspace receives most of the available height.
+- Formation player cards now elide long names according to their rendered width while
+  preserving full names in tooltips; technical details are collapsed by default.
+- The supported minimum desktop workspace is now 1280x720.
 - Fixed Squad player table sorting so numeric columns such as TSI, salary, skills,
   selected position score and selected position rank sort numerically instead of
   lexically.

@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -6,17 +6,27 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QScrollArea,
+    QSizePolicy,
     QSplitter,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from ht_coach_app.player_intelligence.service import (
-    PlayerIntelligenceService,
-)
+from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.widgets.formation_board.formation_board_styles import (
     formation_board_stylesheet,
+)
+from ht_coach_app.widgets.formation_board.layout_metrics import (
+    BOARD_MINIMUM_WIDTH,
+    COMPACT_PANEL_PADDING,
+    COMPACT_SECTION_SPACING,
+    INSPECTOR_MINIMUM_WIDTH,
+    SPLITTER_BOARD_RATIO,
+    SPLITTER_HANDLE_WIDTH,
+    SPLITTER_INSPECTOR_RATIO,
 )
 from ht_coach_app.widgets.formation_board.pitch_widget import PitchWidget
 
@@ -38,22 +48,21 @@ class FormationBoard(QWidget):
     def _build(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(COMPACT_SECTION_SPACING)
 
         header = QFrame()
         header.setObjectName("formationBoardPanel")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(12, 10, 12, 10)
-        header_layout.setSpacing(10)
+        header_layout.setContentsMargins(10, 6, 10, 6)
+        header_layout.setSpacing(8)
 
         title = QLabel("Formation Board")
         title.setObjectName("formationBoardTitle")
         header_layout.addWidget(title)
 
         self.formation_combo = QComboBox()
-        self.formation_combo.currentTextChanged.connect(
-            self._on_formation_changed
-        )
+        self.formation_combo.setMinimumWidth(150)
+        self.formation_combo.currentTextChanged.connect(self._on_formation_changed)
         header_layout.addWidget(self.formation_combo)
 
         self.meta_label = QLabel("")
@@ -62,26 +71,64 @@ class FormationBoard(QWidget):
         header_layout.addStretch(1)
         layout.addWidget(header)
 
-        splitter = QSplitter()
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.setObjectName("formationWorkspaceSplitter")
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(SPLITTER_HANDLE_WIDTH)
+
+        pitch_panel = QWidget()
+        pitch_panel.setObjectName("pitchPanel")
+        pitch_layout = QVBoxLayout(pitch_panel)
+        pitch_layout.setContentsMargins(0, 0, 0, 0)
+        pitch_layout.setSpacing(6)
+        pitch_panel.setMinimumWidth(BOARD_MINIMUM_WIDTH)
 
         self.pitch = PitchWidget()
-        self.pitch.player_selected.connect(
-            self.select_player
-        )
-        self.pitch.empty_area_clicked.connect(
-            self.clear_selection
-        )
-        splitter.addWidget(self.pitch)
+        self.pitch.player_selected.connect(self.select_player)
+        self.pitch.empty_area_clicked.connect(self.clear_selection)
+        pitch_layout.addWidget(self.pitch, 1)
+
+        footer = QFrame()
+        footer.setObjectName("formationFooter")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(10, 5, 10, 5)
+        self.footer_label = QLabel("")
+        self.footer_label.setObjectName("formationBoardMeta")
+        footer_layout.addWidget(self.footer_label)
+        footer_layout.addStretch(1)
+        pitch_layout.addWidget(footer)
+        self.splitter.addWidget(pitch_panel)
+
+        self.inspector_scroll = QScrollArea()
+        self.inspector_scroll.setObjectName("playerInspectorScroll")
+        self.inspector_scroll.setWidgetResizable(True)
+        self.inspector_scroll.setFrameShape(QFrame.NoFrame)
+        self.inspector_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.inspector_scroll.setMinimumWidth(INSPECTOR_MINIMUM_WIDTH)
+        self.inspector_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.inspector = QFrame()
         self.inspector.setObjectName("playerInspectorPanel")
         self.inspector_layout = QVBoxLayout(self.inspector)
-        self.inspector_layout.setContentsMargins(14, 14, 14, 14)
-        self.inspector_layout.setSpacing(8)
-        splitter.addWidget(self.inspector)
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 1)
-        layout.addWidget(splitter, 1)
+        self.inspector_layout.setContentsMargins(
+            COMPACT_PANEL_PADDING,
+            COMPACT_PANEL_PADDING,
+            COMPACT_PANEL_PADDING,
+            COMPACT_PANEL_PADDING,
+        )
+        self.inspector_layout.setSpacing(6)
+        self.inspector_scroll.setWidget(self.inspector)
+        self.splitter.addWidget(self.inspector_scroll)
+
+        self.splitter.setStretchFactor(0, 2)
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setSizes(
+            [
+                int(1000 * SPLITTER_BOARD_RATIO),
+                int(1000 * SPLITTER_INSPECTOR_RATIO),
+            ]
+        )
+        layout.addWidget(self.splitter, 1)
 
     def set_boards(
         self,
@@ -92,10 +139,7 @@ class FormationBoard(QWidget):
     ):
         self._details_by_name = player_details_by_name or {}
         self._roster_players = list(roster_players or [])
-        self._boards = {
-            board.formation_name: board
-            for board in boards
-        }
+        self._boards = {board.formation_name: board for board in boards}
         self.formation_combo.blockSignals(True)
         self.formation_combo.clear()
 
@@ -106,9 +150,7 @@ class FormationBoard(QWidget):
             self.formation_combo.addItem(label, board.formation_name)
 
         target = selected_formation_name or (
-            boards[0].formation_name
-            if boards
-            else ""
+            boards[0].formation_name if boards else ""
         )
         index = self.formation_combo.findData(target)
         self.formation_combo.setCurrentIndex(index if index >= 0 else 0)
@@ -121,20 +163,15 @@ class FormationBoard(QWidget):
 
     def select_player(self, player_id):
         board = self.current_board()
-
         if board is None:
             return
 
-        updated = self._mapper.select_player(
-            board,
-            player_id
-        )
+        updated = self._mapper.select_player(board, player_id)
         self._boards[updated.formation_name] = updated
         self._render_current_board()
 
     def clear_selection(self):
         board = self.current_board()
-
         if board is None:
             return
 
@@ -147,9 +184,7 @@ class FormationBoard(QWidget):
         board = self.current_board()
 
         if board is not None and board.selected_player_id:
-            self._boards[board.formation_name] = self._mapper.clear_selection(
-                board
-            )
+            self._boards[board.formation_name] = self._mapper.clear_selection(board)
 
         self.formation_changed.emit(self._current_name)
         self._render_current_board()
@@ -160,36 +195,54 @@ class FormationBoard(QWidget):
 
         if board is None:
             self.meta_label.setText("")
+            self.footer_label.setText("")
             self._render_inspector_message(
                 "Run a match analysis to view the recommended formation."
             )
             return
 
-        self.meta_label.setText(
-            f"{board.tactic_name} | Tactic level {board.tactic_level:.2f}"
-        )
+        self.meta_label.setText(board.recommendation_label)
+        self._update_footer(board)
         intelligence = self._intelligence_service.analyze(
             board.selected_player,
             self._roster_players,
         )
         self._render_intelligence(intelligence)
 
+    def _update_footer(self, board):
+        parts = [
+            f"Formation {board.formation_name}",
+            f"Tactic {board.tactic_name}",
+            f"Level {board.tactic_level:.2f}",
+        ]
+        if board.selected_player is not None:
+            player = board.selected_player
+            order = player.order_label or "Normal"
+            if player.order_side_label:
+                order = f"{order} {player.order_side_label}"
+            parts.append(f"Selected order {order}")
+        self.footer_label.setText("  |  ".join(parts))
+
     def _render_intelligence(self, intelligence):
         self._clear_inspector()
 
         if intelligence.availability_state != "available":
-            self._render_inspector_message(
-                intelligence.headline
-            )
+            self._render_inspector_message(intelligence.headline)
             return
+
+        header = QWidget()
+        header_layout = QGridLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setHorizontalSpacing(8)
+        header_layout.setVerticalSpacing(2)
 
         title = QLabel(intelligence.player_name)
         title.setObjectName("formationBoardTitle")
-        self.inspector_layout.addWidget(title)
+        header_layout.addWidget(title, 0, 0)
 
         badge = QLabel(intelligence.profile_label)
         badge.setObjectName("playerProfileBadge")
-        self.inspector_layout.addWidget(badge)
+        header_layout.addWidget(badge, 0, 1, alignment=Qt.AlignRight)
 
         subtitle = QLabel(
             f"{intelligence.current_position_label} | "
@@ -198,57 +251,69 @@ class FormationBoard(QWidget):
         )
         subtitle.setObjectName("playerInspectorMeta")
         subtitle.setWordWrap(True)
-        self.inspector_layout.addWidget(subtitle)
+        header_layout.addWidget(subtitle, 1, 0, 1, 2)
+        self.inspector_layout.addWidget(header)
 
         note = QLabel(intelligence.headline)
         note.setObjectName("coachNote")
         note.setWordWrap(True)
         self.inspector_layout.addWidget(note)
 
+        overview = QWidget()
+        overview_layout = QGridLayout(overview)
+        overview_layout.setContentsMargins(0, 0, 0, 0)
+        overview_layout.setHorizontalSpacing(10)
+        overview_layout.setVerticalSpacing(6)
+
         if intelligence.why_selected:
-            self._add_points(
-                "Why selected",
-                intelligence.why_selected,
+            overview_layout.addWidget(
+                self._points_group("Why selected", intelligence.why_selected),
+                0,
+                0,
             )
+
+        strengths_and_limits = QWidget()
+        strengths_layout = QVBoxLayout(strengths_and_limits)
+        strengths_layout.setContentsMargins(0, 0, 0, 0)
+        strengths_layout.setSpacing(6)
+        if intelligence.strengths:
+            strengths_layout.addWidget(
+                self._points_group("Strengths", intelligence.strengths)
+            )
+        if intelligence.limitations:
+            strengths_layout.addWidget(
+                self._points_group("Limitations", intelligence.limitations)
+            )
+        overview_layout.addWidget(strengths_and_limits, 0, 1)
+        overview_layout.setColumnStretch(0, 1)
+        overview_layout.setColumnStretch(1, 1)
+        self.inspector_layout.addWidget(overview)
 
         if intelligence.tactical_contributions:
-            self._add_contributions(
-                intelligence.tactical_contributions
-            )
-
-        if intelligence.strengths:
-            self._add_points("Strengths", intelligence.strengths)
-
-        if intelligence.limitations:
-            self._add_points("Limitations", intelligence.limitations)
+            self._add_contributions(intelligence.tactical_contributions)
 
         if intelligence.alternatives:
             self._add_alternatives(intelligence.alternatives)
 
         if intelligence.technical_attributes:
-            self._add_technical_details(
-                intelligence.technical_attributes
-            )
+            self._add_technical_details(intelligence.technical_attributes)
 
         self.inspector_layout.addStretch(1)
 
-    def _add_points(self, title, points):
-        self.inspector_layout.addWidget(
-            self._section_label(title)
-        )
-
+    def _points_group(self, title, points):
+        group = QWidget()
+        layout = QVBoxLayout(group)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(3)
+        layout.addWidget(self._section_label(title))
         for point in points:
-            label = QLabel(
-                f"{point.title}: {point.detail}"
-            )
+            label = QLabel(f"{point.title}: {point.detail}")
             label.setWordWrap(True)
-            self.inspector_layout.addWidget(label)
+            layout.addWidget(label)
+        return group
 
     def _add_contributions(self, contributions):
-        self.inspector_layout.addWidget(
-            self._section_label("Tactical profile")
-        )
-
+        self.inspector_layout.addWidget(self._section_label("Tactical profile"))
         for contribution in contributions:
             label = QLabel(
                 f"{contribution.label}: {contribution.display_value} "
@@ -258,18 +323,13 @@ class FormationBoard(QWidget):
             bar = QProgressBar()
             bar.setObjectName("contributionBar")
             bar.setRange(0, 100)
-            bar.setValue(
-                int(contribution.normalized_value * 100)
-            )
+            bar.setValue(int(contribution.normalized_value * 100))
             bar.setTextVisible(False)
             self.inspector_layout.addWidget(label)
             self.inspector_layout.addWidget(bar)
 
     def _add_alternatives(self, alternatives):
-        self.inspector_layout.addWidget(
-            self._section_label("Closest alternatives")
-        )
-
+        self.inspector_layout.addWidget(self._section_label("Closest alternatives"))
         for alternative in alternatives:
             label = QLabel(
                 f"{alternative.player_name}: {alternative.score:.2f} "
@@ -280,23 +340,35 @@ class FormationBoard(QWidget):
             self.inspector_layout.addWidget(label)
 
     def _add_technical_details(self, attributes):
-        self.inspector_layout.addWidget(
-            self._section_label("Technical details")
-        )
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(5)
+        toggle = QToolButton()
+        toggle.setObjectName("technicalDetailsToggle")
+        toggle.setText("Technical details")
+        toggle.setCheckable(True)
+        toggle.setChecked(False)
+        toggle.setArrowType(Qt.RightArrow)
+        toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.inspector_layout.addWidget(toggle)
 
+        details = QWidget()
+        details.setObjectName("technicalDetailsContent")
+        grid = QGridLayout(details)
+        grid.setContentsMargins(14, 2, 0, 0)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(3)
         for row, (label, value) in enumerate(attributes):
             label_widget = QLabel(label)
             label_widget.setObjectName("playerInspectorMeta")
-            value_widget = QLabel(str(value))
             grid.addWidget(label_widget, row, 0)
-            grid.addWidget(value_widget, row, 1)
+            grid.addWidget(QLabel(str(value)), row, 1)
 
-        grid_host = QWidget()
-        grid_host.setLayout(grid)
-        self.inspector_layout.addWidget(grid_host)
+        details.setVisible(False)
+        toggle.toggled.connect(details.setVisible)
+        toggle.toggled.connect(
+            lambda checked: toggle.setArrowType(
+                Qt.DownArrow if checked else Qt.RightArrow
+            )
+        )
+        self.inspector_layout.addWidget(details)
 
     def _render_inspector_message(self, message):
         self._clear_inspector()
@@ -310,25 +382,11 @@ class FormationBoard(QWidget):
         while self.inspector_layout.count():
             item = self.inspector_layout.takeAt(0)
             widget = item.widget()
-
             if widget is not None:
                 widget.setParent(None)
 
-    def _section_label(self, text):
+    @staticmethod
+    def _section_label(text):
         label = QLabel(text)
         label.setObjectName("formationBoardTitle")
         return label
-
-    @staticmethod
-    def _format_optional_float(value):
-        if value is None:
-            return "-"
-
-        return f"{value:.2f}"
-
-    @staticmethod
-    def _format_optional_int(value):
-        if value is None:
-            return "-"
-
-        return str(value)

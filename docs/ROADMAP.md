@@ -263,6 +263,8 @@ Acceptance criteria:
 - Alpha 0.4.1 Formation Viewer: read-only pitch board for match recommendations.
 - Alpha 0.4.2 Player Intelligence: deterministic selected-player profile,
   why-selected explanation, tactical contributions and same-role alternatives.
+- Alpha 0.4.2.1 Compact Match Workspace: responsive full-pitch scaling, collapsible
+  analysis inputs and a horizontal board/inspector workspace before lineup editing.
 - Alpha 0.4.3 Editable Lineup Board: prepare lineup edits without recalculation.
 - Alpha 0.4.4 Drag and Drop: roster-to-pitch and pitch-slot movement.
 - Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against

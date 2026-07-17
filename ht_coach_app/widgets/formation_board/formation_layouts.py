@@ -23,10 +23,10 @@ class SlotLayout:
 
 
 _LINE_Y = {
-    "forward": 0.13,
+    "forward": 0.18,
     "midfield": 0.43,
-    "defense": 0.70,
-    "goalkeeper": 0.90,
+    "defense": 0.67,
+    "goalkeeper": 0.87,
 }
 
 
@@ -88,7 +88,7 @@ def _defense_slots(formation_name, positions):
                 "defense",
                 Position.WING_BACK,
                 [Side.LEFT, Side.RIGHT],
-                [0.14, 0.86],
+                [0.10, 0.90],
             )
         )
 
@@ -122,7 +122,7 @@ def _midfield_slots(formation_name, positions):
                 "midfield",
                 Position.WINGER,
                 [Side.LEFT, Side.RIGHT],
-                [0.12, 0.88],
+                [0.10, 0.90],
             )
         )
 
@@ -163,7 +163,7 @@ def _line_distribution(count):
     if count == 2:
         return [Side.LEFT, Side.RIGHT], [0.38, 0.62]
 
-    return [Side.LEFT, Side.CENTER, Side.RIGHT], [0.28, 0.50, 0.72]
+    return [Side.LEFT, Side.CENTER, Side.RIGHT], [0.30, 0.50, 0.70]
 
 
 def _slots(formation_name, line, position, sides, xs):

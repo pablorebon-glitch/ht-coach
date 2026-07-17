@@ -20,10 +20,22 @@ BAR_FILL = "#2563eb"
 def formation_board_stylesheet():
     return f"""
         QFrame#formationBoardPanel,
-        QFrame#playerInspectorPanel {{
+        QFrame#playerInspectorPanel,
+        QFrame#formationFooter {{
             background: #ffffff;
             border: 1px solid #e4e7ec;
             border-radius: {BORDER_RADIUS}px;
+        }}
+
+        QScrollArea#playerInspectorScroll {{
+            background: transparent;
+            border: 0;
+        }}
+
+        QSplitter#formationWorkspaceSplitter::handle {{
+            background: #e4e7ec;
+            border-radius: 3px;
+            margin: 2px;
         }}
 
         QLabel#formationBoardTitle {{
@@ -53,7 +65,7 @@ def formation_board_stylesheet():
             border: 1px solid #e4e7ec;
             border-radius: 7px;
             color: {TEXT_PRIMARY};
-            padding: 8px;
+            padding: 6px;
         }}
 
         QProgressBar#contributionBar {{
@@ -74,9 +86,9 @@ def formation_board_stylesheet():
             border: 1px solid {CARD_BORDER};
             border-radius: 7px;
             color: {TEXT_PRIMARY};
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 600;
-            padding: 4px;
+            padding: 2px;
             text-align: center;
         }}
 
@@ -98,7 +110,15 @@ def formation_board_stylesheet():
             border: 1px dashed rgba(255, 255, 255, 0.75);
             border-radius: 7px;
             color: #ffffff;
-            font-size: 10px;
-            padding: 4px;
+            font-size: 9px;
+            padding: 2px;
+        }}
+
+        QToolButton#technicalDetailsToggle {{
+            border: 0;
+            color: {TEXT_PRIMARY};
+            font-weight: 650;
+            padding: 3px 0;
+            text-align: left;
         }}
     """

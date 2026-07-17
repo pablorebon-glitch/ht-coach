@@ -133,13 +133,16 @@ Content:
 - Compact warning when many formations are selected.
 - Analyze Match action.
 - Progress indicator.
-- Prominent recommended-result summary.
+- Compact recommended-result summary and analysis metadata row.
+- Analysis inputs that collapse after success and reopen without rerunning analysis.
 - Formation Board tab with a vertical pitch, compact player cards, formation switching
   across analyzed alternatives, click-to-inspect behavior, and original HT Coach styling.
 - Player Intelligence inspector with profile label, coach's note, why-selected points,
-  contribution bars, strengths, limitations, alternatives and technical details.
-- Decision Lab section with recommendation, confidence badge, reasons, risks, tactical
-  observations, sector matchup notes, and optimization gain breakdown.
+  contribution bars, strengths, limitations, alternatives, collapsed technical details
+  and internal overflow scrolling.
+- Compact Decision Lab row with recommendation confidence and play-to-win, secure-draw
+  and avoid-defeat perspectives derived from existing result data. Full copy output
+  remains available.
 - Formation comparison table with deltas versus the recommendation.
 - Detailed XI table for inspection and accessibility.
 - Probabilities, xG, possession, and tactic.
@@ -160,6 +163,12 @@ Expected controls:
 - Result table and recommended XI table inside the page.
 - Formation Board, Comparison and Detailed XI result tabs.
 - Empty, loading, success, and error states.
+
+After analysis, the Match view prioritizes a growing horizontal tactical workspace.
+Formation Board starts at approximately 65% width and Player Intelligence at 35%; the
+user can resize both panes. The pitch maintains its 68:105 field ratio and never scrolls
+internally. The practical minimum supported application size is 1280x720. Below this
+size, cards continue to scale and elide text without changing tactical geometry.
 
 ### Reports View
 
@@ -277,6 +286,8 @@ Responsibilities:
 - Preserve left, center and right semantics.
 - Render compact player cards with user-facing position, side and order labels.
 - Support read-only player selection and Player Intelligence updates.
+- Own full-pitch scaling, card containment and the compact formation/tactic footer.
+- Keep reusable pitch and inspector layout behavior outside `MatchPage`.
 - Avoid engine, optimizer and persistence dependencies.
 
 ### PlayerIntelligencePanel

@@ -124,6 +124,15 @@ Persisted or restored match results may not have roster details available. In th
 - no exception is raised;
 - the panel avoids partial or misleading explanations.
 
+## Compact Inspector Layout
+
+Alpha 0.4.2.1 keeps the coach note, why-selected rationale, strengths, limitations,
+tactical contributions and alternatives in a denser inspector beside the pitch.
+Technical Details starts collapsed. The inspector owns its vertical scroll area, so
+overflow does not create a Match-page scrollbar or reduce the full-pitch view. These are
+presentation changes only; profile rules, explanations, contribution values and
+alternative rankings are unchanged.
+
 ## Performance Constraints
 
 Player selection must remain lightweight. Player Intelligence uses loaded roster data,

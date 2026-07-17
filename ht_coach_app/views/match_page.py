@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QScrollArea,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -21,9 +20,6 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
-from ht_coach_app.reasoning.explanation_formatter import (
-    optimization_gain_lines,
-)
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 
@@ -49,13 +45,16 @@ class MatchPage(BasePage):
         self._formation_board_mapper = FormationBoardMapper()
         self._roster_players = []
         self._state = "empty"
+        self._analysis_inputs_collapsed = False
+        self.body_layout.setContentsMargins(16, 12, 16, 12)
+        self.body_layout.setSpacing(8)
         self._build_inputs()
         self._build_results()
 
     def _build_inputs(self):
-        controls = QFrame()
-        controls.setObjectName("workspacePanel")
-        layout = QGridLayout(controls)
+        self.analysis_inputs_panel = QFrame()
+        self.analysis_inputs_panel.setObjectName("workspacePanel")
+        layout = QGridLayout(self.analysis_inputs_panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(12)
@@ -154,29 +153,17 @@ class MatchPage(BasePage):
         layout.addWidget(self.analyze_button, 6, 3)
         layout.setColumnStretch(1, 1)
 
-        self.body_layout.addWidget(controls, 0)
+        self.body_layout.addWidget(self.analysis_inputs_panel, 0)
 
     def _build_results(self):
-        self.results_scroll = QScrollArea()
-        self.results_scroll.setWidgetResizable(True)
-        self.results_scroll.setFrameShape(QFrame.NoFrame)
-
         self.results_host = QWidget()
         self.results_layout = QVBoxLayout(
             self.results_host
         )
         self.results_layout.setContentsMargins(0, 0, 0, 0)
-        self.results_layout.setSpacing(12)
-        self.results_scroll.setWidget(
-            self.results_host
-        )
-
+        self.results_layout.setSpacing(6)
         self._show_empty_results()
-
-        self.body_layout.addWidget(
-            self.results_scroll,
-            1
-        )
+        self.body_layout.addWidget(self.results_host, 1)
 
     def set_opponents(self, opponent_names, selected_name=None):
         current = (
@@ -336,6 +323,7 @@ class MatchPage(BasePage):
 
     def show_error(self, message):
         self._state = "error"
+        self.expand_analysis_inputs()
         self.status_label.setProperty(
             "state",
             "error"
@@ -369,38 +357,14 @@ class MatchPage(BasePage):
     def show_results(self, result, restored=False):
         self._state = "success"
         self._clear_results_widgets()
-
-        header = QHBoxLayout()
-        title = QLabel(
-            "Last analysis" if restored else "Analysis results"
-        )
-        title.setObjectName("sectionTitle")
-        header.addWidget(title)
-        header.addStretch(1)
-
-        copy_summary = QPushButton("Copy Summary")
-        copy_summary.clicked.connect(
-            self.copy_summary_requested
-        )
-        header.addWidget(copy_summary)
-
-        copy_decision_lab = QPushButton("Copy Decision Lab")
-        copy_decision_lab.clicked.connect(
-            self.copy_decision_lab_requested
-        )
-        header.addWidget(copy_decision_lab)
-
-        copy_lineup = QPushButton("Copy Lineup")
-        copy_lineup.clicked.connect(
-            self.copy_lineup_requested
-        )
-        header.addWidget(copy_lineup)
-
-        header_widget = QWidget()
-        header_widget.setLayout(header)
-        self.results_layout.addWidget(header_widget)
+        self.collapse_analysis_inputs()
 
         recommended = result.recommended_formation
+
+        self.results_layout.addWidget(
+            self._build_analysis_context(result),
+            0,
+        )
 
         if recommended is not None:
             self.results_layout.addWidget(
@@ -412,23 +376,33 @@ class MatchPage(BasePage):
         if result.decision_lab is not None:
             self.results_layout.addWidget(
                 self._build_decision_lab_panel(
-                    result.decision_lab
+                    result.decision_lab,
+                    recommended,
                 )
             )
 
         self.results_layout.addWidget(
-            self._build_metadata_panel(result)
+            self._build_result_tabs(result, restored=restored),
+            1,
         )
 
-        self.results_layout.addWidget(
-            self._build_result_tabs(result, restored=restored)
-        )
+    def collapse_analysis_inputs(self):
+        self._analysis_inputs_collapsed = True
+        self.analysis_inputs_panel.setVisible(False)
+        self.set_compact_header(True)
 
-        self.results_layout.addStretch(1)
+    def expand_analysis_inputs(self):
+        self._analysis_inputs_collapsed = False
+        self.analysis_inputs_panel.setVisible(True)
+        self.set_compact_header(False)
+
+    def analysis_inputs_expanded(self):
+        return not self._analysis_inputs_collapsed
 
     def _build_result_tabs(self, result, restored=False):
         tabs = QTabWidget()
         tabs.setObjectName("matchResultTabs")
+        tabs.setDocumentMode(True)
 
         tabs.addTab(
             self._build_formation_board_tab(result, restored),
@@ -491,9 +465,9 @@ class MatchPage(BasePage):
         card = QFrame()
         card.setObjectName("recommendedCard")
         layout = QGridLayout(card)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setHorizontalSpacing(14)
-        layout.setVerticalSpacing(8)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setHorizontalSpacing(10)
+        layout.setVerticalSpacing(4)
 
         badge = QLabel("Recommended")
         badge.setObjectName("recommendedBadge")
@@ -502,8 +476,8 @@ class MatchPage(BasePage):
         title = QLabel(
             f"{formation.formation_name} - {formation.recommended_tactic}"
         )
-        title.setObjectName("resultHeadline")
-        layout.addWidget(title, 0, 1, 1, 4)
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title, 0, 1)
 
         values = [
             ("Tactic level", f"{formation.tactic_level:.2f}"),
@@ -516,18 +490,21 @@ class MatchPage(BasePage):
         ]
 
         for index, (label, value) in enumerate(values):
-            metric = self._build_metric(label, value)
-            layout.addWidget(metric, 1 + index // 4, index % 4)
+            metric = QLabel(f"{label}  {value}")
+            metric.setObjectName("compactMetric")
+            layout.addWidget(metric, 0, index + 2)
+
+        layout.setColumnStretch(1, 1)
 
         return card
 
-    def _build_decision_lab_panel(self, decision_lab):
+    def _build_decision_lab_panel(self, decision_lab, recommended):
         card = QFrame()
-        card.setObjectName("resultCard")
+        card.setObjectName("compactDecisionLab")
         layout = QGridLayout(card)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setHorizontalSpacing(16)
-        layout.setVerticalSpacing(10)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(3)
 
         title = QLabel("Decision Lab")
         title.setObjectName("sectionTitle")
@@ -539,151 +516,95 @@ class MatchPage(BasePage):
         confidence.setObjectName("recommendedBadge")
         layout.addWidget(confidence, 0, 3)
 
-        headline = QLabel(decision_lab.headline)
-        headline.setObjectName("resultHeadline")
-        headline.setWordWrap(True)
-        layout.addWidget(headline, 1, 0, 1, 4)
+        if recommended is None:
+            headline = QLabel(decision_lab.headline)
+            headline.setWordWrap(True)
+            layout.addWidget(headline, 1, 0, 1, 4)
+            return card
 
-        summary = QLabel(decision_lab.summary)
-        summary.setWordWrap(True)
-        layout.addWidget(summary, 2, 0, 1, 4)
-
-        reasons = self._build_text_list(
-            "Why this formation?",
-            [
-                f"{reason.title}: {reason.description}"
-                for reason in decision_lab.reasons[:5]
-            ]
+        reason = (
+            decision_lab.reasons[0].description
+            if decision_lab.reasons
+            else decision_lab.headline
         )
-        layout.addWidget(reasons, 3, 0, 1, 2)
-
-        risks = self._build_text_list(
-            "Main risks",
-            [
-                f"{risk.title}: {risk.description}"
-                for risk in decision_lab.risks[:3]
-            ] or ["No major risk flagged by the configured rules."]
+        risk = (
+            decision_lab.risks[0].description
+            if decision_lab.risks
+            else decision_lab.summary
         )
-        layout.addWidget(risks, 3, 2, 1, 2)
-
-        observations = self._build_text_list(
-            "Tactical observations",
-            [
-                f"{item.title}: {item.description}"
-                for item in decision_lab.tactical_observations[:3]
-            ]
-        )
-        layout.addWidget(observations, 4, 0, 1, 4)
-
-        gains = self._build_text_list(
-            "Optimization impact",
-            [
-                line.removeprefix("- ")
-                for line in optimization_gain_lines(decision_lab)
-            ]
-        )
-        layout.addWidget(gains, 5, 0, 1, 2)
-
-        sector = self._build_text_list(
-            "Sector matchup",
-            self._sector_lines(decision_lab)
-        )
-        layout.addWidget(sector, 5, 2, 1, 2)
+        scenarios = [
+            (
+                "Play to win",
+                self._format_percent(recommended.win_probability),
+                reason,
+            ),
+            (
+                "Secure the draw",
+                self._format_percent(recommended.draw_probability),
+                decision_lab.confidence.explanation,
+            ),
+            (
+                "Avoid defeat",
+                self._format_percent(
+                    recommended.win_probability + recommended.draw_probability
+                ),
+                risk,
+            ),
+        ]
+        for column, (label, probability, explanation) in enumerate(scenarios):
+            section = QWidget()
+            section_layout = QVBoxLayout(section)
+            section_layout.setContentsMargins(0, 0, 0, 0)
+            section_layout.setSpacing(1)
+            heading = QLabel(f"{label}  {probability}")
+            heading.setObjectName("metadataValue")
+            detail = QLabel(self._short_text(explanation))
+            detail.setObjectName("compactDecisionText")
+            detail.setWordWrap(True)
+            section_layout.addWidget(heading)
+            section_layout.addWidget(detail)
+            layout.addWidget(section, 1, column)
+            layout.setColumnStretch(column, 1)
 
         return card
 
-    def _sector_lines(self, decision_lab):
-        favorable = [
-            item for item in decision_lab.opponent_weaknesses
-            if item.classification in {
-                "Slight advantage",
-                "Strong advantage",
-            }
-        ]
-        vulnerabilities = [
-            item for item in decision_lab.our_vulnerabilities
-            if "disadvantage" in item.classification.lower()
-        ]
-
-        lines = []
-
-        if favorable:
-            best = max(
-                favorable,
-                key=lambda item: item.relative_difference
-            )
-            lines.append(
-                f"Best attacking channel: {best.sector} "
-                f"({best.classification})."
-            )
-        elif all(
-            item.classification == "Balanced"
-            for item in decision_lab.opponent_weaknesses
-        ):
-            lines.append("No clear attacking channel advantage.")
-        else:
-            least_bad = max(
-                decision_lab.opponent_weaknesses,
-                key=lambda item: item.relative_difference
-            )
-            lines.append(
-                "No attacking advantage detected. Least unfavorable "
-                f"channel: {least_bad.sector}."
-            )
-
-        if vulnerabilities:
-            concern = min(
-                vulnerabilities,
-                key=lambda item: item.relative_difference
-            )
-            lines.append(
-                f"Main defensive concern: {concern.sector} "
-                f"({concern.classification})."
-            )
-        else:
-            lines.append("No clear defensive vulnerability detected.")
-
-        return lines
-
-    def _build_text_list(self, title, lines):
-        frame = QFrame()
-        frame.setObjectName("metadataPanel")
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(4)
-
-        title_label = QLabel(title)
-        title_label.setObjectName("metadataValue")
-        layout.addWidget(title_label)
-
-        for line in lines:
-            label = QLabel(f"- {line}")
-            label.setWordWrap(True)
-            layout.addWidget(label)
-
-        return frame
-
-    def _build_metadata_panel(self, result):
+    def _build_analysis_context(self, result):
         panel = QFrame()
         panel.setObjectName("metadataPanel")
-        layout = QGridLayout(panel)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setHorizontalSpacing(18)
-        layout.setVerticalSpacing(6)
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(12)
 
         items = [
             ("Opponent", result.opponent_name),
             ("CSV", result.players_csv_filename),
             ("Players", str(result.player_count)),
-            ("Formations", ", ".join(result.analyzed_formations)),
+            ("Formations", str(len(result.analyzed_formations))),
             ("Completed", result.completed_at),
         ]
 
-        for index, (label, value) in enumerate(items):
-            layout.addWidget(QLabel(label), 0, index)
-            value_label = QLabel(value)
+        for label, value in items:
+            value_label = QLabel(f"{label}  {value}")
             value_label.setObjectName("metadataValue")
-            layout.addWidget(value_label, 1, index)
+            layout.addWidget(value_label)
+
+        layout.addStretch(1)
+        copy_summary = QPushButton("Copy summary")
+        copy_summary.clicked.connect(self.copy_summary_requested)
+        layout.addWidget(copy_summary)
+
+        copy_decision_lab = QPushButton("Copy Decision Lab")
+        copy_decision_lab.clicked.connect(self.copy_decision_lab_requested)
+        layout.addWidget(copy_decision_lab)
+
+        copy_lineup = QPushButton("Copy lineup")
+        copy_lineup.clicked.connect(self.copy_lineup_requested)
+        layout.addWidget(copy_lineup)
+
+        edit_button = QPushButton("Edit analysis")
+        edit_button.setObjectName("editAnalysisButton")
+        edit_button.clicked.connect(self.expand_analysis_inputs)
+        layout.addWidget(edit_button)
 
         return panel
 
@@ -799,22 +720,6 @@ class MatchPage(BasePage):
 
         layout.addWidget(table)
         return card
-
-    def _build_metric(self, label, value):
-        frame = QFrame()
-        frame.setObjectName("metricTile")
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(2)
-
-        label_widget = QLabel(label)
-        label_widget.setObjectName("metricLabel")
-        value_widget = QLabel(value)
-        value_widget.setObjectName("metricValue")
-
-        layout.addWidget(label_widget)
-        layout.addWidget(value_widget)
-        return frame
 
     def _configure_table(self, table):
         table.setEditTriggers(
@@ -937,6 +842,14 @@ class MatchPage(BasePage):
     @staticmethod
     def _format_percent(value):
         return f"{value * 100:.1f}%"
+
+    @staticmethod
+    def _short_text(value, limit=110):
+        text = " ".join(str(value or "").split())
+        if len(text) <= limit:
+            return text
+
+        return f"{text[:limit - 3].rstrip()}..."
 
     def _emit_workspace_changed(self):
         self._update_formation_warning()
