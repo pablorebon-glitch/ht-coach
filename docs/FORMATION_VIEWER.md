@@ -166,6 +166,13 @@ Alpha 0.4.3 makes the board editable through Workspace replacements. Applied
 replacements are visually marked and can be evaluated through fixed-lineup Workspace
 recalculation without replacing the editable lineup with a newly optimized XI.
 
+Alpha 0.4.4 adds drag-and-drop lineup editing to the same Workspace model. Starting
+players can be dragged onto other occupied slots to preview a swap, and replacement
+candidates can be dragged onto an occupied slot to preview the same replacement that a
+click would create. Apply Change commits the preview; Cancel Change or Escape clears it.
+The board stores stable slot IDs and workspace revisions in drag payloads, so stale
+gestures are rejected safely.
+
 ## Design Tokens
 
 Formation Viewer starts a small visual token set for:
@@ -188,18 +195,18 @@ future board-related widgets.
 
 ## Future Hattrick-inspired lineup editing workflow
 
-Later Alpha 0.4 milestones can evolve the read-only board into an editing workspace:
+Later Alpha milestones can continue evolving the board into a broader editing workspace:
 
 - roster panel on the left;
 - pitch in the center;
 - inspector and impact panel on the right;
 - drag from roster to slot;
-- swap players;
 - move a player between valid slots;
 - remove a player from the pitch;
 - change order using card controls;
 - calculate lineup delta;
 - reset to optimized recommendation.
 
-This milestone only prepares stable slot IDs and player IDs. It does not implement drag
-and drop, disabled fake drag behavior, or what-if recalculation.
+Alpha 0.4.4 implements player-to-player swaps and replacement-candidate drops. It does
+not implement roster-panel drag, order editing, automatic recalculation or what-if
+Decision Delta.

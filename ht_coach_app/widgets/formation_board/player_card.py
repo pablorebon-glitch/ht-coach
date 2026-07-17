@@ -1,6 +1,11 @@
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFontMetrics
-from PySide6.QtWidgets import QPushButton
+import json
+
+from PySide6.QtCore import QMimeData, Qt, Signal
+from PySide6.QtGui import QDrag, QFontMetrics
+from PySide6.QtWidgets import QApplication, QPushButton
+
+
+WORKSPACE_DRAG_MIME = "application/x-ht-coach-workspace-player"
 
 
 class PlayerCard(QPushButton):
@@ -9,6 +14,8 @@ class PlayerCard(QPushButton):
     def __init__(self, player, parent=None):
         super().__init__(parent)
         self.player = player
+        self._drag_start_position = None
+        self._drag_context = {}
         self.setObjectName("playerCard")
         self.setFocusPolicy(Qt.StrongFocus)
         self.setCursor(Qt.PointingHandCursor)
@@ -17,6 +24,15 @@ class PlayerCard(QPushButton):
             lambda: self.selected.emit(self.player.player_id)
         )
         self.refresh()
+
+    def set_drag_context(self, formation_name, slot_id, revision):
+        self._drag_context = {
+            "source_type": "lineup",
+            "player_id": self.player.player_id,
+            "source_slot_id": slot_id,
+            "formation_name": formation_name,
+            "revision": revision,
+        }
 
     def refresh(self):
         self.setProperty(
@@ -42,6 +58,40 @@ class PlayerCard(QPushButton):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_text()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_position = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if not (event.buttons() & Qt.LeftButton):
+            super().mouseMoveEvent(event)
+            return
+        if self._drag_start_position is None:
+            super().mouseMoveEvent(event)
+            return
+        distance = (
+            event.position().toPoint() - self._drag_start_position
+        ).manhattanLength()
+        if distance < QApplication.startDragDistance():
+            super().mouseMoveEvent(event)
+            return
+
+        self._start_drag()
+
+    def _start_drag(self):
+        if not self._drag_context:
+            return
+
+        mime = QMimeData()
+        mime.setData(
+            WORKSPACE_DRAG_MIME,
+            json.dumps(self._drag_context).encode("utf-8"),
+        )
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.exec(Qt.MoveAction)
 
     def _update_text(self):
         order = self.player.order_label

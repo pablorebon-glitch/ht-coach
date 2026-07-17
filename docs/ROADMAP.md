@@ -272,7 +272,8 @@ Acceptance criteria:
   Workspace Lineup as fixed input, add evaluated Workspace state, simplify the Match
   summary, keep Analysis Setup collapsible, add page-level scrolling and correct pitch
   goal/corner geometry.
-- Alpha 0.4.4 Drag and Drop: roster-to-pitch and pitch-slot movement.
+- Alpha 0.4.4 Drag and Drop: pitch-slot swaps and dragged replacement candidates with
+  Apply/Cancel previews and no automatic recalculation.
 - Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against
   the optimized recommendation.
 - Match scenario history.

@@ -140,9 +140,10 @@ Content:
 - Formation Board tab with a vertical pitch, compact player cards, formation switching
   across analyzed alternatives, click-to-inspect behavior, workspace replacement actions,
   and original HT Coach styling.
-- Interactive Workspace controls for Apply Replacement, Cancel Replacement, Reset
-  Workspace and Recalculate Analysis. Replacement apply changes only the Workspace
-  Lineup; recalculation always requires the explicit Recalculate Analysis action.
+- Interactive Workspace controls for Apply/Cancel previews, Reset Workspace and
+  Recalculate Analysis. Click replacement, dragged replacement candidates and
+  starting-player swaps change only the Workspace Lineup after Apply; recalculation
+  always requires the explicit Recalculate Analysis action.
 - Player Intelligence inspector with profile label, coach's note, why-selected points,
   contribution bars, strengths, limitations, alternatives, collapsed technical details
   and internal overflow scrolling.

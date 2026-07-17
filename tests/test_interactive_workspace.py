@@ -287,6 +287,149 @@ class WorkspaceServiceTest(unittest.TestCase):
             "A Replacement",
         )
 
+    def test_swap_preview_does_not_mutate_until_apply(self):
+        state = self.service.create([self.board], "3-5-2")
+        slots = [
+            slot for slot in state.current_board.slots if slot.player is not None
+        ]
+        source = slots[0]
+        target = slots[1]
+
+        previewed = self.service.preview_swap(
+            state,
+            source.slot_id,
+            target.slot_id,
+        )
+
+        self.assertIsNotNone(previewed.swap_preview)
+        self.assertEqual(previewed.status_label, "Swap Preview")
+        self.assertEqual(
+            previewed.current_board.slots[0].player.player_name,
+            source.player.player_name,
+        )
+        self.assertEqual(
+            previewed.current_board.slots[1].player.player_name,
+            target.player.player_name,
+        )
+
+    def test_apply_swap_keeps_slot_tactics_attached_to_slots(self):
+        state = self.service.create([self.board], "3-5-2")
+        slots = [
+            slot for slot in state.current_board.slots if slot.player is not None
+        ]
+        source = slots[0]
+        target = slots[1]
+
+        state = self.service.preview_swap(
+            state,
+            source.slot_id,
+            target.slot_id,
+        )
+        applied = self.service.apply_preview(state, self.roster)
+        updated_source_slot = next(
+            slot for slot in applied.current_board.slots
+            if slot.slot_id == source.slot_id
+        )
+        updated_target_slot = next(
+            slot for slot in applied.current_board.slots
+            if slot.slot_id == target.slot_id
+        )
+
+        self.assertEqual(
+            updated_source_slot.player.player_name,
+            target.player.player_name,
+        )
+        self.assertEqual(
+            updated_source_slot.player.position,
+            source.player.position,
+        )
+        self.assertEqual(
+            updated_target_slot.player.player_name,
+            source.player.player_name,
+        )
+        self.assertEqual(
+            updated_target_slot.player.position,
+            target.player.position,
+        )
+        self.assertEqual(applied.revision, state.revision + 1)
+        self.assertEqual(len(applied.history), 1)
+        self.assertEqual(applied.history[0].kind, "swap")
+
+    def test_stale_replacement_preview_is_rejected_safely(self):
+        state = self.service.create([self.board], "3-5-2")
+        candidate = self.service.replacement_candidates(
+            state,
+            self.roster,
+        )[0]
+        previewed = self.service.preview_replacement(state, candidate)
+        stale = self.service.reset(previewed)
+        stale = stale.__class__(
+            **{
+                **stale.__dict__,
+                "replacement_preview": previewed.replacement_preview,
+            }
+        )
+
+        applied = self.service.apply_preview(stale, self.roster)
+
+        self.assertIn("out of date", applied.last_error)
+        self.assertFalse(applied.dirty)
+        self.assertEqual(
+            applied.current_board.slots[0].player.player_name,
+            state.current_board.slots[0].player.player_name,
+        )
+
+    def test_drag_replacement_preview_matches_click_replacement_preview(self):
+        state = self.service.create([self.board], "3-5-2")
+        selected_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        candidate = self.service.replacement_candidates(
+            state,
+            self.roster,
+        )[0]
+
+        click_state = self.service.preview_replacement(state, candidate)
+        drag_candidate = self.service.candidate_for_player(
+            state,
+            self.roster,
+            candidate.player_id,
+            selected_slot.slot_id,
+        )
+        drag_state = self.service.preview_replacement_for_slot(
+            state,
+            drag_candidate,
+            selected_slot.slot_id,
+        )
+
+        self.assertEqual(
+            click_state.replacement_preview,
+            drag_state.replacement_preview,
+        )
+
+    def test_invalid_drag_revision_is_rejected_without_crashing(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+        )
+
+        valid, message = self.service.validate_swap(
+            state,
+            {
+                "source_type": "lineup",
+                "source_slot_id": target_slot.slot_id,
+                "formation_name": "3-5-2",
+                "revision": "not-a-number",
+            },
+            target_slot.slot_id,
+        )
+
+        self.assertFalse(valid)
+        self.assertIn("lineup changed", message)
+
 
 try:
     from PySide6.QtWidgets import QApplication, QLabel, QPushButton
@@ -398,6 +541,92 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         board.recalculate_button.click()
         self.assertEqual(calls, [])
         self.assertEqual(len(workspace_calls), 1)
+
+    def test_board_routes_lineup_drop_to_swap_preview(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        slots = [
+            slot for slot in board_widget.current_board().slots
+            if slot.player is not None
+        ]
+        payload = {
+            "source_type": "lineup",
+            "player_id": slots[0].player.player_id,
+            "source_slot_id": slots[0].slot_id,
+            "formation_name": board_widget.current_board().formation_name,
+            "revision": board_widget.workspace_state().revision,
+        }
+
+        board_widget._handle_player_dropped(payload, slots[1].slot_id)
+
+        self.assertIsNotNone(board_widget.workspace_state().swap_preview)
+        self.assertEqual(
+            board_widget.workspace_status_label.text(),
+            "Swap Preview",
+        )
+
+    def test_board_routes_candidate_drop_to_replacement_preview(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        target_slot = next(
+            slot for slot in board_widget.current_board().slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        payload = {
+            "source_type": "candidate",
+            "player_id": "a_replacement",
+            "formation_name": board_widget.current_board().formation_name,
+            "revision": board_widget.workspace_state().revision,
+        }
+
+        board_widget._handle_player_dropped(payload, target_slot.slot_id)
+
+        self.assertIsNotNone(
+            board_widget.workspace_state().replacement_preview
+        )
+        self.assertEqual(
+            board_widget.workspace_status_label.text(),
+            "Replacement Preview",
+        )
+
+    def test_escape_cancels_preview_without_resetting_workspace(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        player_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+        board_widget.select_player(player_id)
+        board_widget.findChild(QPushButton, "replacementCandidate").click()
+
+        from PySide6.QtCore import QCoreApplication, QEvent, Qt
+        from PySide6.QtGui import QKeyEvent
+
+        event = QKeyEvent(QEvent.KeyPress, Qt.Key_Escape, Qt.NoModifier)
+        QCoreApplication.sendEvent(board_widget, event)
+
+        self.assertIsNone(board_widget.workspace_state().replacement_preview)
+        self.assertFalse(board_widget.workspace_state().dirty)
 
     def test_recalculated_workspace_result_preserves_applied_replacement(self):
         result = formation_result()
