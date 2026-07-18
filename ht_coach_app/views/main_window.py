@@ -19,7 +19,16 @@ from ht_coach_app.core.constants import (
     WINDOW_MINIMUM_WIDTH,
     WINDOW_TITLE,
 )
+from ht_coach_app.core.localization import (
+    configure_localization,
+    localization_service,
+    t,
+)
 from ht_coach_app.core.paths import application_icon_path
+from ht_coach_app.persistence.app_settings_repository import (
+    AppSettings,
+    AppSettingsRepository,
+)
 from ht_coach_app.persistence.opponent_repository import OpponentRepository
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceRepository,
@@ -41,12 +50,12 @@ from ht_coach_app.widgets.navigation_sidebar import NavigationSidebar
 
 class MainWindow(QMainWindow):
     PAGES = [
-        {"key": "dashboard", "label": "Dashboard", "factory": DashboardPage},
-        {"key": "squad", "label": "Squad", "factory": SquadPage},
-        {"key": "opponents", "label": "Opponents", "factory": OpponentsPage},
-        {"key": "match", "label": "Match", "factory": MatchPage},
-        {"key": "reports", "label": "Reports", "factory": ReportsPage},
-        {"key": "settings", "label": "Settings", "factory": SettingsPage},
+        {"key": "dashboard", "label": lambda: t("nav.dashboard"), "factory": DashboardPage},
+        {"key": "squad", "label": lambda: t("nav.squad"), "factory": SquadPage},
+        {"key": "opponents", "label": lambda: t("nav.opponents"), "factory": OpponentsPage},
+        {"key": "match", "label": lambda: t("nav.match"), "factory": MatchPage},
+        {"key": "reports", "label": lambda: t("nav.reports"), "factory": ReportsPage},
+        {"key": "settings", "label": lambda: t("nav.settings"), "factory": SettingsPage},
     ]
 
     def __init__(self, parent=None):
@@ -56,6 +65,9 @@ class MainWindow(QMainWindow):
             WINDOW_MINIMUM_WIDTH,
             WINDOW_MINIMUM_HEIGHT
         )
+        self._settings_repository = AppSettingsRepository()
+        self._settings = self._settings_repository.load()
+        configure_localization(self._settings.language)
         self._apply_application_icon()
         self._controllers = []
         self._app_events = AppEvents(self)
@@ -71,22 +83,26 @@ class MainWindow(QMainWindow):
             )
 
     def _build_toolbar(self):
-        toolbar = QToolBar("Main Toolbar")
+        self.toolbar = QToolBar("Main Toolbar")
+        toolbar = self.toolbar
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
         toolbar.setToolButtonStyle(
             Qt.ToolButtonTextBesideIcon
         )
 
-        refresh_action = QAction("Refresh", self)
-        refresh_action.setStatusTip("Refresh the current workspace view")
-        refresh_action.triggered.connect(
+        self.refresh_action = QAction(t("app.refresh"), self)
+        self.refresh_action.setStatusTip(t("app.refresh_tip"))
+        self.refresh_action.triggered.connect(
             self._show_not_implemented_status
         )
 
-        toolbar.addAction(refresh_action)
+        toolbar.addAction(self.refresh_action)
         toolbar.addSeparator()
-        toolbar.addAction("Help", self._show_not_implemented_status)
+        self.help_action = toolbar.addAction(
+            t("app.help"),
+            self._show_not_implemented_status,
+        )
 
         self.addToolBar(
             Qt.TopToolBarArea,
@@ -94,7 +110,7 @@ class MainWindow(QMainWindow):
         )
 
     def _build_status_bar(self):
-        self.statusBar().showMessage("Ready")
+        self.statusBar().showMessage(t("app.ready"))
 
     def _build_shell(self):
         root = QWidget()
@@ -140,7 +156,7 @@ class MainWindow(QMainWindow):
 
     def _show_not_implemented_status(self):
         self.statusBar().showMessage(
-            "This shell action will be implemented in a later epic.",
+            t("app.not_implemented"),
             5000
         )
 
@@ -187,4 +203,29 @@ class MainWindow(QMainWindow):
                 )
             )
 
+        if page["key"] == "settings":
+            widget.set_language(self._settings.language)
+            widget.language_changed.connect(
+                self._change_language
+            )
+
         return widget
+
+    def _change_language(self, language):
+        self._settings = self._settings_repository.save(
+            AppSettings(language=language)
+        )
+        localization_service().set_language(language)
+        self._app_events.language_changed.emit(language)
+        self._retranslate_ui()
+        self.statusBar().showMessage(t("settings.saved"), 5000)
+
+    def _retranslate_ui(self):
+        self.refresh_action.setText(t("app.refresh"))
+        self.refresh_action.setStatusTip(t("app.refresh_tip"))
+        self.help_action.setText(t("app.help"))
+        self.sidebar.retranslate_ui()
+        for index in range(self.stacked_pages.count()):
+            widget = self.stacked_pages.widget(index)
+            if hasattr(widget, "retranslate_ui"):
+                widget.retranslate_ui()

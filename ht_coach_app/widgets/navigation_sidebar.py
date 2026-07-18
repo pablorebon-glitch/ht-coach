@@ -20,8 +20,9 @@ class NavigationSidebar(QListWidget):
             QSizePolicy.Expanding
         )
 
-        for page in pages:
-            item = QListWidgetItem(page["label"])
+        self._pages = list(pages)
+        for page in self._pages:
+            item = QListWidgetItem(page["label"]())
             item.setData(Qt.UserRole, page["key"])
             self.addItem(item)
 
@@ -32,6 +33,12 @@ class NavigationSidebar(QListWidget):
     def select_first_page(self):
         if self.count():
             self.setCurrentRow(0)
+
+    def retranslate_ui(self):
+        for index, page in enumerate(self._pages):
+            item = self.item(index)
+            if item is not None:
+                item.setText(page["label"]())
 
     def _handle_current_item_changed(
         self,

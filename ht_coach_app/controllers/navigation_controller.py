@@ -1,5 +1,7 @@
 from PySide6.QtCore import QObject, Signal
 
+from ht_coach_app.core.localization import t
+
 
 class NavigationController(QObject):
     page_changed = Signal(str)
@@ -35,7 +37,6 @@ class NavigationController(QObject):
             self._page_indexes[key]
         )
         self._status_bar.showMessage(
-            f"{key.title()} ready"
+            t("nav.ready", page=t(f"nav.{key}"))
         )
         self.page_changed.emit(key)
-

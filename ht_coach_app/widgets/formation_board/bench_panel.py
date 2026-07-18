@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ht_coach_app.core.localization import t
 from ht_coach_app.widgets.formation_board.player_card import WORKSPACE_DRAG_MIME
 
 
@@ -51,7 +52,8 @@ class BenchPlayerCard(QPushButton):
         score = f"{self.player.score:.2f}"
         lines = [
             self.player.player_name,
-            f"{self.player.best_position_abbreviation}  Score {score}",
+            f"{self.player.best_position_abbreviation}  "
+            f"{t('bench.score', score=score)}",
         ]
         if self.player.compatibility_label:
             lines.append(self.player.compatibility_label)
@@ -124,7 +126,7 @@ class BenchPlayerCard(QPushButton):
         parts = [
             self.player.player_name,
             self.player.best_position_label,
-            f"Score {self.player.score:.2f}",
+            t("bench.score", score=f"{self.player.score:.2f}"),
             self.player.compatibility_label,
         ]
         return " | ".join(part for part in parts if part)
@@ -156,7 +158,7 @@ class BenchPanel(QFrame):
         header = QWidget()
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
-        self.title_label = QLabel("Bench")
+        self.title_label = QLabel(t("bench.title"))
         self.title_label.setObjectName("formationBoardTitle")
         self.count_label = QLabel("")
         self.count_label.setObjectName("formationBoardMeta")
@@ -188,9 +190,9 @@ class BenchPanel(QFrame):
             self.content_layout.addStretch(1)
             return
 
-        self.count_label.setText(f"{len(players)} players")
+        self.count_label.setText(t("bench.players", count=len(players)))
         if not players:
-            message = QLabel("No bench players available.")
+            message = QLabel(t("bench.empty"))
             message.setWordWrap(True)
             message.setObjectName("playerInspectorMeta")
             self.content_layout.addWidget(message)

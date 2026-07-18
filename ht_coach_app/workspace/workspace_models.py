@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from ht_coach_app.core.localization import t
+
 
 @dataclass(frozen=True)
 class WorkspaceReplacementCandidate:
@@ -99,18 +101,18 @@ class WorkspaceState:
     @property
     def status_label(self):
         if self.evaluation_state == "updating":
-            return "Updating analysis..."
+            return t("workspace.updating")
         if self.evaluation_state == "failed":
-            return "Analysis failed"
+            return t("workspace.failed")
         if self.swap_preview is not None:
-            return "Swap Preview"
+            return t("workspace.swap_preview")
         if self.replacement_preview is not None:
-            return "Replacement Preview"
+            return t("workspace.replacement_preview")
         if self.evaluation_state == "evaluated":
-            return "Evaluated Workspace"
+            return t("workspace.evaluated")
         if self.dirty or self.evaluation_state == "pending":
-            return "Modified Workspace - Pending Recalculation"
-        return "Original Recommendation"
+            return t("workspace.pending")
+        return t("workspace.original")
 
     @property
     def status_state(self):

@@ -1,5 +1,8 @@
 from PySide6.QtCore import QObject, QThread, QTimer
 
+from dataclasses import replace
+
+from ht_coach_app.change_analysis.service import ChangeAnalysisService
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
@@ -28,6 +31,7 @@ class MatchController(QObject):
         self._service = service
         self._settings_repository = settings_repository
         self._app_events = app_events
+        self._change_analysis_service = ChangeAnalysisService()
         self._thread = None
         self._worker = None
         self._roster_players = []
@@ -320,6 +324,18 @@ class MatchController(QObject):
             else:
                 self._view.set_processing(False)
             return
+
+        if finished_workspace_state is not None:
+            previous_result = self._settings_repository.load_last_result()
+            change_analysis = self._change_analysis_service.analyze(
+                previous_result,
+                result,
+                finished_workspace_state,
+            )
+            result = replace(
+                result,
+                change_analysis=change_analysis,
+            )
 
         if finished_workspace_state is not None and hasattr(
             self._view,

@@ -52,6 +52,10 @@ class BasePage(QWidget):
         self.body_layout = body_layout
         layout.addWidget(body, 1)
 
+    def set_page_text(self, title, subtitle):
+        self.page_title_label.setText(title)
+        self.page_subtitle_label.setText(subtitle)
+
     def set_compact_header(self, compact):
         self.page_subtitle_label.setVisible(not compact)
         if compact:

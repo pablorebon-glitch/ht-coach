@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ht_coach_app.core.localization import t
 from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.widgets.formation_board.bench_panel import BenchPanel
@@ -71,7 +72,8 @@ class FormationBoard(QWidget):
         header_layout.setContentsMargins(10, 6, 10, 6)
         header_layout.setSpacing(8)
 
-        title = QLabel("Formation Board")
+        title = QLabel(t("workspace.formation_board"))
+        self.title_label = title
         title.setObjectName("formationBoardTitle")
         header_layout.addWidget(title)
 
@@ -84,17 +86,17 @@ class FormationBoard(QWidget):
         self.meta_label.setObjectName("formationBoardMeta")
         header_layout.addWidget(self.meta_label)
 
-        self.workspace_status_label = QLabel("Original Recommendation")
+        self.workspace_status_label = QLabel(t("workspace.original"))
         self.workspace_status_label.setObjectName("workspaceStatusBadge")
         self.workspace_status_label.setProperty("state", "clean")
         header_layout.addWidget(self.workspace_status_label)
 
         header_layout.addStretch(1)
 
-        self.reset_workspace_button = QPushButton("Reset Workspace")
+        self.reset_workspace_button = QPushButton(t("workspace.reset"))
         self.reset_workspace_button.setObjectName("workspaceAction")
         self.reset_workspace_button.setToolTip(
-            "Restore the original recommended lineup."
+            t("workspace.reset_tip")
         )
         self.reset_workspace_button.clicked.connect(
             self.reset_workspace
@@ -584,28 +586,30 @@ class FormationBoard(QWidget):
         panel = QFrame()
         panel.setObjectName("coachNote")
         panel.setToolTip(
-            "Difference between each player's calculated contribution score "
-            "for this specific tactical slot."
+            t("workspace.slot_score_tip")
         )
         layout = QGridLayout(panel)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setHorizontalSpacing(8)
         layout.setVerticalSpacing(3)
         rows = [
-            ("Position fit comparison", modification.role),
+            (t("workspace.position_fit_comparison"), modification.role),
             (
-                "Previous player",
+                t("workspace.previous_player"),
                 f"{modification.original_player_name}: "
                 f"{modification.previous_slot_score:.2f}",
             ),
             (
-                "Current player",
+                t("workspace.current_player"),
                 f"{modification.replacement_player_name}: "
                 f"{modification.current_slot_score:.2f}",
             ),
             (
-                "Difference",
-                f"{modification.score_difference:+.2f} in this slot",
+                t("workspace.difference"),
+                t(
+                    "workspace.in_this_slot",
+                    value=f"{modification.score_difference:+.2f}",
+                ),
             ),
         ]
         for row, (label, value) in enumerate(rows):
@@ -649,7 +653,7 @@ class FormationBoard(QWidget):
     def _add_technical_details(self, attributes):
         toggle = QToolButton()
         toggle.setObjectName("technicalDetailsToggle")
-        toggle.setText("Technical details")
+        toggle.setText(t("workspace.technical_details"))
         toggle.setCheckable(True)
         toggle.setChecked(False)
         toggle.setArrowType(Qt.RightArrow)
@@ -924,8 +928,8 @@ class FormationBoard(QWidget):
     @staticmethod
     def _why_heading(selected_player):
         if selected_player is not None and selected_player.is_modified:
-            return "Workspace Impact"
-        return "Why Recommended"
+            return t("workspace.workspace_impact")
+        return t("workspace.why_recommended")
 
     def _modification_for_player(self, selected_player):
         if selected_player is None or self._workspace_state is None:

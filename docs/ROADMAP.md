@@ -280,8 +280,11 @@ Acceptance criteria:
   automatic fixed-lineup recalculation is debounced, stale results are ignored, Reset
   Workspace remains the only global edit action, and Player Intelligence distinguishes
   `Why Recommended` from `Workspace Impact`.
-- Alpha 0.4.6 What-if Evaluation and Decision Delta: evaluate manual changes against
-  the optimized recommendation.
+- Alpha 0.4.6 Change Analysis and Internationalization: explain the latest Workspace
+  change with calculated before/after values, add English and Spanish translation
+  catalogs, and persist the selected language.
+- Alpha 0.4.7 Undo / Redo: add reversible Workspace editing history on top of the
+  existing modification model.
 - Match scenario history.
 - Exportable reports.
 - Advanced opponent scouting notes.
