@@ -70,7 +70,7 @@ whether the current assignment is the player's strongest evaluated position.
 The panel limits each list to the most useful points. Neutral players do not receive
 forced criticism.
 
-## Why Selected
+## Why Recommended
 
 When roster data is available, the service ranks candidates for the same current
 position and side using existing `PlayerAnalyzer.rank_players`.
@@ -108,26 +108,33 @@ Each alternative displays:
 
 Score deltas are explicitly player-score differences, not win-probability deltas.
 
-## Workspace Replacement Context
+## Workspace Impact
 
-Alpha 0.4.4.1 keeps the Workspace replacement flow beside Player Intelligence. The
+Alpha 0.4.5 keeps the Workspace replacement flow beside Player Intelligence. The
 workspace layer reuses existing same-role player ranking to annotate Bench compatibility
-and preview exchanges, excluding the current player and players already in the editable
+and commit exchanges, excluding the current player and players already in the editable
 lineup.
 
-When a replacement is previewed, the inspector shows:
+When the selected player is part of the optimizer recommendation, the inspector labels
+the rationale as `Why Recommended`. When the selected player was manually inserted into
+the Workspace Lineup, the same area is labeled `Workspace Impact` so the user can
+distinguish optimizer-selected players from manual experiments.
+
+For manually inserted players, the inspector also shows a slot-specific score
+comparison:
 
 - current player;
 - replacement player;
 - role;
-- player score difference.
+- player score difference in this slot.
 
-The preview does not change probabilities, xG, Decision Lab, tactic, order or any engine
-calculation. Apply Change modifies only the Workspace Lineup. Recalculate Analysis must
-be triggered explicitly.
+The comparison is a player-fit difference for the tactical slot. It is not a
+win-probability delta and does not invent new match metrics.
 
-Closest Alternatives remains informational. The accessible non-drag replacement route is:
-select a lineup slot, focus a Bench card, press Enter or Space, then Apply or Cancel.
+Closest Alternatives remains informational. The accessible non-drag replacement routes
+are: select a lineup slot and activate a Bench card, or select a Bench player and then
+activate a starter. Both routes commit immediately and schedule automatic fixed-lineup
+recalculation.
 
 ## Effective-Tie Thresholds
 
@@ -167,6 +174,9 @@ call:
 - `OrderOptimizer`;
 - `TacticOptimizer`;
 - full match analysis.
+
+Workspace recalculation is triggered by the Match controller after a committed edit, not
+by Player Intelligence.
 
 ## Explicit Non-Mechanics
 

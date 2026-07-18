@@ -69,6 +69,9 @@ class WorkspaceModification:
     after_lineup_ids: tuple[str, ...] = ()
     revision_before: int = 0
     revision_after: int = 0
+    interaction_source: str = ""
+    previous_slot_score: float | None = None
+    current_slot_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,10 @@ class WorkspaceState:
 
     @property
     def status_label(self):
+        if self.evaluation_state == "updating":
+            return "Updating analysis..."
+        if self.evaluation_state == "failed":
+            return "Analysis failed"
         if self.swap_preview is not None:
             return "Swap Preview"
         if self.replacement_preview is not None:
@@ -107,6 +114,10 @@ class WorkspaceState:
 
     @property
     def status_state(self):
+        if self.evaluation_state == "updating":
+            return "updating"
+        if self.evaluation_state == "failed":
+            return "failed"
         if self.replacement_preview is not None or self.swap_preview is not None:
             return "preview"
         if self.evaluation_state == "evaluated":

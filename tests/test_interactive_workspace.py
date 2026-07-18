@@ -627,6 +627,108 @@ class WorkspaceServiceTest(unittest.TestCase):
 
         self.assertIn("target player changed", applied.last_error)
 
+    def test_immediate_replacement_commits_without_preview_and_tracks_source(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+
+        applied = self.service.replace_slot_immediately(
+            state,
+            self.roster,
+            "3-5-2",
+            target_slot.slot_id,
+            "a_replacement",
+            state.revision,
+            interaction_source="CLICK",
+        )
+
+        self.assertIsNone(applied.replacement_preview)
+        self.assertEqual(applied.revision, state.revision + 1)
+        self.assertEqual(applied.history[-1].interaction_source, "CLICK")
+        self.assertEqual(applied.history[-1].replacement_player_name, "A Replacement")
+
+    def test_click_and_drag_immediate_replacements_are_equivalent_except_source(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+
+        click = self.service.replace_slot_immediately(
+            state,
+            self.roster,
+            "3-5-2",
+            target_slot.slot_id,
+            "a_replacement",
+            state.revision,
+            interaction_source="CLICK",
+        )
+        drag = self.service.replace_slot_immediately(
+            state,
+            self.roster,
+            "3-5-2",
+            target_slot.slot_id,
+            "a_replacement",
+            state.revision,
+            interaction_source="DRAG",
+        )
+
+        click_names = [
+            slot.player.player_name
+            for slot in click.current_board.slots
+            if slot.player is not None
+        ]
+        drag_names = [
+            slot.player.player_name
+            for slot in drag.current_board.slots
+            if slot.player is not None
+        ]
+
+        self.assertEqual(click_names, drag_names)
+        self.assertEqual(
+            {
+                player.player_name
+                for player in self.service.derive_bench(click, self.roster)
+            },
+            {
+                player.player_name
+                for player in self.service.derive_bench(drag, self.roster)
+            },
+        )
+        self.assertEqual(
+            click.history[-1].target_slot_id,
+            drag.history[-1].target_slot_id,
+        )
+        self.assertNotEqual(
+            click.history[-1].interaction_source,
+            drag.history[-1].interaction_source,
+        )
+
+    def test_stale_immediate_replacement_is_rejected(self):
+        state = self.service.create([self.board], "3-5-2")
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+
+        rejected = self.service.replace_slot_immediately(
+            state,
+            self.roster,
+            "3-5-2",
+            target_slot.slot_id,
+            "a_replacement",
+            state.revision + 1,
+            interaction_source="CLICK",
+        )
+
+        self.assertIn("lineup changed", rejected.last_error)
+        self.assertFalse(rejected.dirty)
+
 
 try:
     from PySide6.QtWidgets import QApplication, QLabel, QPushButton
@@ -658,7 +760,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_board_ui_state_transitions_do_not_recalculate_until_requested(self):
+    def test_board_ui_replacement_commits_and_requests_recalculation_immediately(self):
         board_widget = FormationBoard()
         board_widget.set_boards(
             [self._board_model()],
@@ -667,9 +769,9 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
                 make_player("A Replacement", scoring=11, passing=7),
             ],
         )
-        recalculate_calls = []
-        board_widget.recalculate_requested.connect(
-            lambda state: recalculate_calls.append(state)
+        modification_calls = []
+        board_widget.workspace_modified.connect(
+            lambda state: modification_calls.append(state)
         )
 
         player_id = next(
@@ -680,27 +782,19 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         board_widget.select_player(player_id)
 
         board_widget.preview_bench_player_for_selected_slot("a_replacement")
-        self.assertEqual(recalculate_calls, [])
+        self.assertEqual(len(modification_calls), 1)
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Replacement Preview",
-        )
-
-        board_widget.apply_replacement_button.click()
-        self.assertEqual(recalculate_calls, [])
-        self.assertIn(
-            "Pending Recalculation",
-            board_widget.workspace_status_label.text(),
+            "Updating analysis...",
         )
         self.assertEqual(
-            board_widget.current_board().selected_player.player_name,
-            "A Replacement",
-        )
-
-        board_widget.recalculate_button.click()
-        self.assertEqual(len(recalculate_calls), 1)
-        self.assertEqual(
-            recalculate_calls[0].current_board.selected_player.player_name,
+            next(
+                slot.player.player_name
+                for slot in board_widget.current_board().slots
+                if slot.player is not None
+                and slot.slot_id
+                == modification_calls[0].history[-1].target_slot_id
+            ),
             "A Replacement",
         )
 
@@ -736,10 +830,8 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         )
         board.select_player(player_id)
         board.preview_bench_player_for_selected_slot("a_replacement")
-        board.apply_replacement_button.click()
 
         self.assertEqual(calls, [])
-        board.recalculate_button.click()
         self.assertEqual(calls, [])
         self.assertEqual(len(workspace_calls), 1)
 
@@ -766,10 +858,11 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
 
         board_widget._handle_player_dropped(payload, slots[1].slot_id)
 
-        self.assertIsNotNone(board_widget.workspace_state().swap_preview)
+        self.assertIsNone(board_widget.workspace_state().swap_preview)
+        self.assertTrue(board_widget.workspace_state().dirty)
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Swap Preview",
+            "Updating analysis...",
         )
 
     def test_board_routes_candidate_drop_to_replacement_preview(self):
@@ -795,12 +888,13 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
 
         board_widget._handle_player_dropped(payload, target_slot.slot_id)
 
-        self.assertIsNotNone(
+        self.assertIsNone(
             board_widget.workspace_state().replacement_preview
         )
+        self.assertTrue(board_widget.workspace_state().dirty)
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Replacement Preview",
+            "Updating analysis...",
         )
 
     def test_bench_panel_appears_beside_board_with_internal_scroll(self):
@@ -844,10 +938,8 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         )
 
         card.click()
-        self.assertEqual(
-            board_widget._selected_bench_player_id,
-            "a_replacement",
-        )
+        self.assertEqual(board_widget._selected_bench_player_id, "")
+        self.assertTrue(board_widget.workspace_state().dirty)
         self.assertNotEqual(card.focusPolicy(), 0)
 
         from PySide6.QtCore import QCoreApplication, QEvent, Qt
@@ -856,9 +948,62 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         event = QKeyEvent(QEvent.KeyPress, Qt.Key_Return, Qt.NoModifier)
         QCoreApplication.sendEvent(card, event)
 
-        self.assertIsNotNone(
-            board_widget.workspace_state().replacement_preview
+        self.assertIsNone(board_widget.workspace_state().replacement_preview)
+
+    def test_click_bench_then_starter_replaces_immediately(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
         )
+        card = next(
+            item for item in board_widget.findChildren(BenchPlayerCard)
+            if item.player.player_name == "A Replacement"
+        )
+        starter_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+
+        card.click()
+        self.assertEqual(board_widget._selected_bench_player_id, "a_replacement")
+        board_widget.select_player(starter_id)
+
+        self.assertTrue(board_widget.workspace_state().dirty)
+        self.assertEqual(board_widget._selected_bench_player_id, "")
+        self.assertIn(
+            "A Replacement",
+            [
+                slot.player.player_name
+                for slot in board_widget.current_board().slots
+                if slot.player is not None
+            ],
+        )
+
+    def test_clicking_selected_starter_again_deselects_it(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        starter_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+
+        board_widget.select_player(starter_id)
+        self.assertEqual(board_widget.current_board().selected_player_id, starter_id)
+        board_widget.select_player(starter_id)
+
+        self.assertEqual(board_widget.current_board().selected_player_id, "")
 
     def test_board_routes_starter_drop_on_bench_card_to_exchange_preview(self):
         board_widget = FormationBoard()
@@ -887,11 +1032,12 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             "a_replacement",
         )
 
-        self.assertIsNotNone(
+        self.assertIsNone(
             board_widget.workspace_state().replacement_preview
         )
+        self.assertTrue(board_widget.workspace_state().dirty)
         self.assertEqual(
-            board_widget.workspace_state().replacement_preview.slot_id,
+            board_widget.workspace_state().history[-1].target_slot_id,
             source_slot.slot_id,
         )
 
@@ -928,6 +1074,63 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             board_widget.inspector.findChild(QPushButton, "replacementCandidate")
         )
 
+    def test_confirmation_and_manual_recalculate_buttons_are_removed(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+
+        texts = [
+            button.text()
+            for button in board_widget.findChildren(QPushButton)
+        ]
+
+        self.assertNotIn("Apply Replacement", texts)
+        self.assertNotIn("Cancel Replacement", texts)
+        self.assertNotIn("Recalculate Analysis", texts)
+        self.assertIn("Reset Workspace", texts)
+        self.assertFalse(board_widget.reset_workspace_button.isEnabled())
+
+    def test_player_intelligence_uses_workspace_impact_for_inserted_player(self):
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=[
+                make_player("Rushton", scoring=8, passing=6),
+                make_player("A Replacement", scoring=11, passing=7),
+            ],
+        )
+        player_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+        board_widget.select_player(player_id)
+        board_widget.preview_bench_player_for_selected_slot("a_replacement")
+        inserted_id = next(
+            slot.player.player_id
+            for slot in board_widget.current_board().slots
+            if slot.player is not None
+            and slot.player.player_name == "A Replacement"
+        )
+        board_widget.select_player(inserted_id)
+
+        labels = [
+            label.text()
+            for label in board_widget.inspector.findChildren(QLabel)
+        ]
+
+        self.assertIn("Workspace Impact", labels)
+        self.assertIn("Position fit comparison", labels)
+        self.assertIn("Difference", labels)
+        self.assertTrue(
+            any("in this slot" in label for label in labels)
+        )
+
     def test_escape_cancels_preview_without_resetting_workspace(self):
         board_widget = FormationBoard()
         board_widget.set_boards(
@@ -952,7 +1155,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         QCoreApplication.sendEvent(board_widget, event)
 
         self.assertIsNone(board_widget.workspace_state().replacement_preview)
-        self.assertFalse(board_widget.workspace_state().dirty)
+        self.assertTrue(board_widget.workspace_state().dirty)
 
     def test_recalculated_workspace_result_preserves_applied_replacement(self):
         result = formation_result()

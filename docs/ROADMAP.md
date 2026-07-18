@@ -276,7 +276,11 @@ Acceptance criteria:
   Apply/Cancel previews and no automatic recalculation.
 - Alpha 0.4.4.1 Integrated Bench Panel: dedicated roster-minus-lineup Bench beside the
   pitch, Bench exchange previews, starter-to-Bench exchange and keyboard fallback.
-- Alpha 0.4.5 What-if Evaluation and Decision Delta: evaluate manual changes against
+- Alpha 0.4.5 One-Click Workspace: valid click and drag edits commit immediately,
+  automatic fixed-lineup recalculation is debounced, stale results are ignored, Reset
+  Workspace remains the only global edit action, and Player Intelligence distinguishes
+  `Why Recommended` from `Workspace Impact`.
+- Alpha 0.4.6 What-if Evaluation and Decision Delta: evaluate manual changes against
   the optimized recommendation.
 - Match scenario history.
 - Exportable reports.

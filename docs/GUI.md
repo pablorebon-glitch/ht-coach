@@ -138,15 +138,14 @@ Content:
 - Persistent collapsible Analysis Setup with a visible toggle. Showing or hiding setup
   preserves selected values, current results and Workspace state.
 - Formation Board tab with a vertical pitch, compact player cards, integrated Bench,
-  formation switching across analyzed alternatives, click-to-inspect behavior, workspace
-  replacement actions, and original HT Coach styling.
-- Interactive Workspace controls for Apply/Cancel previews, Reset Workspace and
-  Recalculate Analysis. Bench-to-lineup exchange, starter-to-Bench exchange and
-  starting-player swaps change only the Workspace Lineup after Apply; recalculation
-  always requires the explicit Recalculate Analysis action.
+  formation switching across analyzed alternatives, click-to-inspect behavior,
+  one-click workspace replacement actions, and original HT Coach styling.
+- Interactive Workspace editing where valid click and drag actions commit immediately
+  to the Workspace Lineup and schedule automatic fixed-lineup recalculation. Reset
+  Workspace remains the only global edit action.
 - Bench panel with compact focusable cards, deterministic roster-minus-lineup derivation
-  and internal scrolling. Clicking selects a Bench player for inspection; Enter or Space
-  previews replacement for the selected lineup slot.
+  and internal scrolling. Clicking a Bench player and then a starter, or selecting a
+  starter and clicking a Bench player, performs the same immediate exchange.
 - Player Intelligence inspector with profile label, coach's note, why-selected points,
   contribution bars, strengths, limitations, alternatives, collapsed technical details
   and internal overflow scrolling.
@@ -298,11 +297,13 @@ Responsibilities:
   and forwards at the top.
 - Preserve left, center and right semantics.
 - Render compact player cards with user-facing position, side and order labels.
-- Support player selection, Player Intelligence updates and workspace replacement
-  previews.
+- Support player selection, Player Intelligence updates and immediate workspace
+  replacements.
 - Distinguish immutable Recommended Lineup state from editable Workspace Lineup state.
-- Show Original Recommendation, Unsaved Changes and Modified Workspace status.
-- Emit explicit recalculation intent without calling the engine directly.
+- Show Original Recommendation, Updating Analysis, Evaluated Workspace and failed
+  analysis states.
+- Emit workspace-modified intent for the controller to debounce and recalculate without
+  calling the engine directly.
 - Own full-pitch scaling, card containment and the compact formation/tactic footer.
 - Keep reusable pitch and inspector layout behavior outside `MatchPage`.
 - Avoid engine, optimizer and persistence dependencies.

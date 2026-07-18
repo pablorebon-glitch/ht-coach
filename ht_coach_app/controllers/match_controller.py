@@ -1,4 +1,4 @@
-from PySide6.QtCore import QObject, QThread
+from PySide6.QtCore import QObject, QThread, QTimer
 
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
@@ -32,6 +32,14 @@ class MatchController(QObject):
         self._worker = None
         self._roster_players = []
         self._pending_workspace_state = None
+        self._queued_workspace_state = None
+        self._latest_workspace_revision = None
+        self._workspace_recalc_timer = QTimer(self)
+        self._workspace_recalc_timer.setSingleShot(True)
+        self._workspace_recalc_timer.setInterval(300)
+        self._workspace_recalc_timer.timeout.connect(
+            self._start_queued_workspace_recalculation
+        )
 
         self._connect_view()
         self._connect_app_events()
@@ -222,6 +230,19 @@ class MatchController(QObject):
         self._thread.start()
 
     def _recalculate_workspace(self, workspace_state):
+        self._queued_workspace_state = workspace_state
+        self._latest_workspace_revision = workspace_state.revision
+        if hasattr(self._view, "show_workspace_updating"):
+            self._view.show_workspace_updating()
+        self._workspace_recalc_timer.start()
+
+    def _start_queued_workspace_recalculation(self):
+        workspace_state = self._queued_workspace_state
+        if workspace_state is None:
+            return
+        if self._thread is not None:
+            return
+        self._queued_workspace_state = None
         try:
             self._service.validate_inputs(
                 self._view.players_csv_path(),
@@ -236,11 +257,12 @@ class MatchController(QObject):
 
         self._save_current_settings()
         self._pending_workspace_state = workspace_state
-        self._view.set_processing(
-            True
-        )
+        if hasattr(self._view, "set_workspace_processing"):
+            self._view.set_workspace_processing(True)
+        else:
+            self._view.set_processing(True)
         self._view.show_status(
-            "Evaluating current Workspace lineup..."
+            "Updating Workspace analysis..."
         )
 
         self._thread = QThread(self)
@@ -286,9 +308,26 @@ class MatchController(QObject):
         self._thread.start()
 
     def _analysis_finished(self, result):
-        self._view.set_processing(
-            False
-        )
+        finished_workspace_state = self._pending_workspace_state
+        if (
+            finished_workspace_state is not None
+            and self._latest_workspace_revision is not None
+            and finished_workspace_state.revision != self._latest_workspace_revision
+        ):
+            self._pending_workspace_state = None
+            if hasattr(self._view, "set_workspace_processing"):
+                self._view.set_workspace_processing(False)
+            else:
+                self._view.set_processing(False)
+            return
+
+        if finished_workspace_state is not None and hasattr(
+            self._view,
+            "set_workspace_processing",
+        ):
+            self._view.set_workspace_processing(False)
+        else:
+            self._view.set_processing(False)
         self._settings_repository.save_last_result(
             result
         )
@@ -303,10 +342,19 @@ class MatchController(QObject):
         )
 
     def _analysis_failed(self, message):
-        self._view.set_processing(
-            False
-        )
+        if self._pending_workspace_state is not None and hasattr(
+            self._view,
+            "set_workspace_processing",
+        ):
+            self._view.set_workspace_processing(False)
+        else:
+            self._view.set_processing(False)
+        failed_state = self._pending_workspace_state
         self._pending_workspace_state = None
+        if failed_state is not None:
+            if hasattr(self._view, "show_workspace_analysis_failed"):
+                self._view.show_workspace_analysis_failed(message)
+            return
         self._view.show_error(
             message
         )
@@ -362,6 +410,8 @@ class MatchController(QObject):
     def _clear_worker_refs(self):
         self._thread = None
         self._worker = None
+        if self._queued_workspace_state is not None:
+            self._workspace_recalc_timer.start()
 
     def _save_current_settings(self):
         self._settings_repository.save(

@@ -55,13 +55,13 @@ class PitchWidget(QWidget):
         self._board = None
         self._slot_widgets = []
         self._revision = 0
-        self.setMinimumSize(360, 560)
+        self.setMinimumSize(320, 500)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setAcceptDrops(True)
 
     def sizeHint(self):
-        return QSize(480, 700)
+        return QSize(430, 620)
 
     def set_board(self, board, revision=0):
         self._board = board

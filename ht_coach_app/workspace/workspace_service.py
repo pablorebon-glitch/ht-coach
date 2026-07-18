@@ -329,6 +329,71 @@ class WorkspaceService:
             target_slot_id,
         )
 
+    def replace_slot_immediately(
+        self,
+        state,
+        roster_players,
+        formation_name,
+        target_slot_id,
+        incoming_player_id,
+        expected_revision,
+        interaction_source="",
+    ):
+        valid, message = self._validate_immediate_intent(
+            state,
+            formation_name,
+            expected_revision,
+        )
+        if not valid:
+            return self._error(state, message)
+
+        previewed = self.preview_bench_exchange(
+            state,
+            roster_players,
+            target_slot_id,
+            incoming_player_id,
+        )
+        if previewed.replacement_preview is None:
+            return previewed
+
+        applied = self.apply_replacement(
+            previewed,
+            roster_players,
+            interaction_source=interaction_source,
+        )
+        return self._mark_pending(applied)
+
+    def swap_slots_immediately(
+        self,
+        state,
+        formation_name,
+        source_slot_id,
+        target_slot_id,
+        expected_revision,
+        interaction_source="",
+    ):
+        valid, message = self._validate_immediate_intent(
+            state,
+            formation_name,
+            expected_revision,
+        )
+        if not valid:
+            return self._error(state, message)
+
+        previewed = self.preview_swap(
+            state,
+            source_slot_id,
+            target_slot_id,
+        )
+        if previewed.swap_preview is None:
+            return previewed
+
+        applied = self.apply_swap(
+            previewed,
+            interaction_source=interaction_source,
+        )
+        return self._mark_pending(applied)
+
     def validate_bench_exchange(self, state, roster_players, target_slot_id, bench_player_id):
         board = state.current_board
         if board is None:
@@ -412,7 +477,7 @@ class WorkspaceService:
             return self.apply_swap(state)
         return state
 
-    def apply_replacement(self, state, roster_players):
+    def apply_replacement(self, state, roster_players, interaction_source=""):
         preview = state.replacement_preview
         board = state.current_board
         if preview is None or board is None:
@@ -499,6 +564,9 @@ class WorkspaceService:
             after_lineup_ids=after_ids,
             revision_before=state.revision,
             revision_after=state.revision + 1,
+            interaction_source=interaction_source,
+            previous_slot_score=preview.current_score,
+            current_slot_score=preview.replacement_score,
         )
 
         return replace(
@@ -514,7 +582,7 @@ class WorkspaceService:
             last_error="",
         )
 
-    def apply_swap(self, state):
+    def apply_swap(self, state, interaction_source=""):
         preview = state.swap_preview
         board = state.current_board
         if preview is None or board is None:
@@ -568,6 +636,7 @@ class WorkspaceService:
             after_lineup_ids=after_ids,
             revision_before=state.revision,
             revision_after=state.revision + 1,
+            interaction_source=interaction_source,
         )
 
         return replace(
@@ -620,6 +689,24 @@ class WorkspaceService:
             evaluation_state="evaluated",
             revision=state.revision + 1,
             last_error="",
+        )
+
+    def mark_updating(self, state):
+        return replace(
+            state,
+            replacement_preview=None,
+            swap_preview=None,
+            evaluation_state="updating",
+            last_error="",
+        )
+
+    def mark_failed(self, state, message):
+        return replace(
+            state,
+            replacement_preview=None,
+            swap_preview=None,
+            evaluation_state="failed",
+            last_error=message,
         )
 
     def select_board_player(self, board, player_id):
@@ -761,6 +848,31 @@ class WorkspaceService:
 
     def _lineup_contains_roster_id(self, board, roster_player_id):
         return roster_player_id in self._lineup_roster_ids(board)
+
+    @staticmethod
+    def _validate_immediate_intent(state, formation_name, expected_revision):
+        board = state.current_board
+        if board is None:
+            return False, "No formation is selected."
+        if formation_name != board.formation_name:
+            return False, "Switch back to the source formation first."
+        try:
+            revision = int(expected_revision)
+        except (TypeError, ValueError):
+            revision = -1
+        if revision != state.revision:
+            return False, "The lineup changed. Try the action again."
+        return True, ""
+
+    @staticmethod
+    def _mark_pending(state):
+        return replace(
+            state,
+            replacement_preview=None,
+            swap_preview=None,
+            evaluation_state="pending",
+            last_error="",
+        )
 
     @staticmethod
     def _selected_slot(board):

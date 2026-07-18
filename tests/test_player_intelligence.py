@@ -360,7 +360,7 @@ class PlayerIntelligenceFormationBoardTest(unittest.TestCase):
             label.text()
             for label in board_widget.findChildren(QLabel)
         ]
-        self.assertIn("Why selected", labels)
+        self.assertIn("Why Recommended", labels)
         self.assertTrue(
             any("Primary Finisher" in label for label in labels)
         )

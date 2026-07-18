@@ -357,6 +357,14 @@ class MatchPage(BasePage):
         if is_processing:
             self.show_loading()
 
+    def set_workspace_processing(self, is_processing):
+        self.analyze_button.setEnabled(
+            not is_processing
+        )
+        self.analyze_button.setText(
+            "Updating..." if is_processing else "Analyze Match"
+        )
+
     def show_status(self, message):
         self.status_label.setProperty(
             "state",
@@ -404,6 +412,7 @@ class MatchPage(BasePage):
         )
 
     def show_results(self, result, restored=False, workspace_state=None):
+        scroll_value = self.scroll_area.verticalScrollBar().value()
         self._state = "success"
         self._clear_results_widgets()
         self.collapse_analysis_inputs()
@@ -438,6 +447,13 @@ class MatchPage(BasePage):
             ),
             1,
         )
+        self.scroll_area.verticalScrollBar().setValue(scroll_value)
+
+    def show_workspace_updating(self):
+        self.show_status("Updating Workspace analysis...")
+
+    def show_workspace_analysis_failed(self, message):
+        self.show_status(f"Analysis failed: {message}")
 
     def collapse_analysis_inputs(self):
         self._analysis_inputs_collapsed = True
@@ -515,6 +531,9 @@ class MatchPage(BasePage):
                 workspace_state=workspace_state,
             )
             board.recalculate_requested.connect(
+                self.workspace_recalculate_requested.emit
+            )
+            board.workspace_modified.connect(
                 self.workspace_recalculate_requested.emit
             )
             return board
