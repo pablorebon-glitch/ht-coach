@@ -1,4 +1,17 @@
 class RecommendationRanker:
+    TYPE_PRIORITY = {
+        "action": 0,
+        "warning": 1,
+        "observation": 2,
+    }
+    CATEGORY_PRIORITY = {
+        "lineup": 0,
+        "formation": 1,
+        "weakness": 2,
+        "balance": 3,
+        "strength": 4,
+    }
+
     def rank(self, recommendations, limit=5):
         unique = {}
         for recommendation in recommendations:
@@ -9,12 +22,22 @@ class RecommendationRanker:
             ):
                 unique[recommendation.code] = recommendation
 
-        return sorted(
+        sorted_items = sorted(
             unique.values(),
             key=lambda item: (
-                item.impact_score,
-                item.estimated_win_delta,
+                self.TYPE_PRIORITY.get(item.card_type.value, 9),
+                self.CATEGORY_PRIORITY.get(item.category.value, 9),
+                -item.estimated_win_delta,
+                -item.impact_score,
                 item.code,
             ),
-            reverse=True,
-        )[:limit]
+        )
+        actions = [
+            item for item in sorted_items
+            if item.card_type.value == "action"
+        ][:3]
+        observations = [
+            item for item in sorted_items
+            if item.card_type.value in {"observation", "warning"}
+        ][:2]
+        return (actions + observations)[:limit]

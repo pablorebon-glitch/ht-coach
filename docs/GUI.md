@@ -340,10 +340,15 @@ Responsibilities:
 
 Responsibilities:
 
-- Show ranked recommendations from the deterministic advisor engine.
-- Display title, category, confidence and estimated impact.
+- Show ranked Action, Observation and Warning cards from the deterministic advisor
+  engine.
+- Display title, category and confidence for every card.
+- Display estimated win-probability impact only for actionable recommendations with a
+  measurable evaluated before/after delta.
 - Hide explanations in Simple mode and show them in Detailed mode.
 - Never auto-apply changes.
+- Avoid presenting weak sectors, low possession or attack imbalance as commands unless
+  an evaluated formation or Workspace change improves the result.
 - Use localized strings for all labels and recommendation copy.
 
 ## Controllers
