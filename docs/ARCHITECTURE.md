@@ -17,6 +17,9 @@ Desktop application code may call the engine, adapt input and output data, persi
 workspaces, and present recommendations. It must not duplicate rating formulas,
 optimization logic, tactic math, probability calculations, or formation scoring.
 
+The Tactical Advisor lives under `engine/advisor`, but it is an expert-system layer over
+already evaluated result data. It does not alter engine formulas or optimizer behavior.
+
 ## Target Layers
 
 ```text
@@ -37,6 +40,7 @@ ht_coach_app/
   workers/
 
 engine/
+  advisor/
 models/
 importers/
 database/
@@ -148,6 +152,8 @@ Suggested services:
   - Formats copy-ready match summaries and recommended lineup text from view models.
   - Runs Decision Lab reasoning after optimization finishes, using only serializable
     analysis view-model data and existing engine outputs.
+  - Runs Tactical Advisor recommendations over already evaluated results and persists
+    serializable recommendation view models.
 
 ### Reasoning
 
@@ -193,6 +199,36 @@ Rules:
 - persist only serializable view-model data;
 - never alter rating, probability, xG, optimizer, Decision Lab or Player Intelligence
   formulas.
+
+### Tactical Advisor
+
+`engine/advisor/`
+
+The Tactical Advisor answers "what should I improve next?" using deterministic rules
+over the current evaluated match context.
+
+Modules:
+
+- `recommendation.py`: immutable recommendation payload with title/explanation keys,
+  category, confidence, impact score and estimated win delta.
+- `recommendation_types.py`: category and confidence enums.
+- `recommendation_rule.py`: independent rule interface.
+- `recommendation_engine.py`: context wrapper and initial expert-system rules.
+- `recommendation_ranker.py`: duplicate removal and impact-based ranking.
+
+Initial rules:
+
+- Lineup: uses the latest Change Analysis to recommend keeping a beneficial Workspace
+  replacement.
+- Formation: recommends another evaluated formation only when win improvement exceeds
+  the threshold.
+- Strength: highlights the strongest calculated sector as an observation.
+- Weakness: highlights the sector most exposed against opponent ratings.
+- Balance: detects low possession or heavily unbalanced attack/defense.
+
+Rules use existing calculated values only. They do not call `TeamRater`,
+`LineupOptimizer`, `FormationOptimizer`, probability, xG, Decision Lab or Player
+Intelligence formulas.
 
 ### Workspace
 
@@ -334,13 +370,14 @@ Suggested repositories:
   - Stores UI preferences and last-used paths.
 
 - `AppSettingsRepository`
-  - Stores app-level preferences such as selected language.
+  - Stores app-level preferences such as selected language and Advisor verbosity.
   - Falls back to English for missing or unsupported values.
 
 - `MatchWorkspaceRepository`
   - Stores the last selected players CSV path, opponent, and formations.
   - Stores the last successful analysis result as serializable view-model JSON.
   - Persists Change Analysis view-model data when present.
+  - Persists Tactical Advisor recommendation view-model data when present.
   - Restores results for any supported formation from the centralized catalog.
   - Uses JSON under the application data directory.
   - Keeps workspace persistence separate from widgets and engine code.
@@ -427,6 +464,7 @@ views/widgets -> controllers -> services -> engine/models/importers/persistence
 controllers -> state / application events
 services -> state view models
 services -> reasoning -> existing analysis view models
+services -> engine/advisor -> existing evaluated analysis view models
 widgets -> player_intelligence -> existing roster data / player analyzers
 widgets -> workspace -> existing roster data / player analyzers
 views/widgets -> localization -> resources/i18n
@@ -475,6 +513,8 @@ User clicks Analyze Match
      player assignments in the refreshed board
   -> ChangeAnalysisService compares previous and current evaluated Workspace results
   -> MatchPage renders Change Analysis above the local result tabs
+  -> RecommendationEngine ranks Tactical Advisor recommendations
+  -> MatchPage renders Tactical Advisor as an informational panel
 ```
 
 The engine remains unaware of the desktop application.
@@ -498,6 +538,7 @@ Examples:
 - `PlayerAlternativeViewModel`
 - `PlayerContributionViewModel`
 - `DecisionLabResult`
+- `Recommendation`
 - `FormationComparison`
 - `SectorComparison`
 

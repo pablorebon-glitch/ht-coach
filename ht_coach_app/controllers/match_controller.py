@@ -11,6 +11,7 @@ from ht_coach_app.services.match_workspace_service import (
     format_decision_lab,
     format_match_summary,
     format_recommended_lineup,
+    with_tactical_advisor,
 )
 from ht_coach_app.workers.match_analysis_worker import (
     MatchAnalysisWorker,
@@ -336,6 +337,7 @@ class MatchController(QObject):
                 result,
                 change_analysis=change_analysis,
             )
+            result = with_tactical_advisor(result)
 
         if finished_workspace_state is not None and hasattr(
             self._view,

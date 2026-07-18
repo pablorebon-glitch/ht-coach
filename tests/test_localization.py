@@ -21,6 +21,18 @@ class LocalizationServiceTest(unittest.TestCase):
 
             self.assertEqual(repository.load().language, "es")
 
+    def test_advisor_verbosity_persistence_round_trip(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repository = AppSettingsRepository(
+                Path(temp_dir) / "app_settings.json"
+            )
+
+            repository.save(
+                AppSettings(language="en", advisor_verbosity="simple")
+            )
+
+            self.assertEqual(repository.load().advisor_verbosity, "simple")
+
     def test_fallback_to_english_for_missing_translation(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             resources = Path(temp_dir)

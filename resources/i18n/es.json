@@ -22,7 +22,12 @@
     "language_help": "El idioma se aplica inmediatamente donde sea práctico.",
     "english": "English",
     "spanish": "Español",
-    "saved": "Preferencia de idioma guardada."
+    "saved": "Preferencia de idioma guardada.",
+    "advisor_verbosity": "Detalle del asesor",
+    "advisor_verbosity_help": "Simple muestra título e impacto. Detallado también muestra la explicación.",
+    "verbosity_simple": "Simple",
+    "verbosity_detailed": "Detallado",
+    "advisor_saved": "Preferencia del asesor guardada."
   },
   "dashboard": {
     "title": "Panel",
@@ -144,5 +149,66 @@
     "risky_text": "El cambio ayuda en un área, pero el costo calculado es relevante.",
     "negative_text": "Las probabilidades generales del equipo empeoraron.",
     "not_available": "El Análisis del cambio aparecerá después de recalcular el Workspace."
+  },
+  "advisor": {
+    "title": "Asesor táctico",
+    "empty": "El Asesor táctico aparecerá después del análisis.",
+    "estimated_win": "Estimado {value} victoria",
+    "impact": {
+      "high": "Alto impacto",
+      "medium": "Impacto medio",
+      "observation": "Observación"
+    },
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "category": {
+      "lineup": "Alineación",
+      "formation": "Formación",
+      "strength": "Fortaleza",
+      "weakness": "Debilidad",
+      "balance": "Balance"
+    },
+    "sector": {
+      "left_defense": "defensa izquierda",
+      "central_defense": "defensa central",
+      "right_defense": "defensa derecha",
+      "midfield": "mediocampo",
+      "left_attack": "ataque izquierdo",
+      "central_attack": "ataque central",
+      "right_attack": "ataque derecho"
+    },
+    "rule": {
+      "consider_formation": {
+        "title": "Considera {formation}",
+        "explanation": "Esta formación evaluada mejora la probabilidad de victoria en {win_delta} sin ser más débil que la recomendación actual."
+      },
+      "strongest_sector": {
+        "title": "{sector} es tu zona más fuerte",
+        "explanation": "Tu rating calculado de {sector} es actualmente {value}. No hace falta actuar ahí antes de atender zonas más riesgosas."
+      },
+      "exposed_sector": {
+        "title": "Refuerza {sector}",
+        "explanation": "Tu {sector} calculado está {gap} puntos por detrás del rival. Mejorarlo debería ser el próximo foco táctico."
+      },
+      "low_possession": {
+        "title": "Mejora la posesión",
+        "explanation": "La posesión actual es {possession}. Sumar mediocampo probablemente sea la mejora táctica más práctica."
+      },
+      "unbalanced_attack": {
+        "title": "Equilibra el ataque",
+        "explanation": "Tus ratings de ataque están concentrados en un canal. Un ataque más balanceado puede hacer el plan menos frágil."
+      },
+      "unbalanced_defense": {
+        "title": "Equilibra la defensa",
+        "explanation": "Tus ratings defensivos están desparejos. El lado más débil puede ser la ruta más fácil para el rival."
+      },
+      "keep_lineup_change": {
+        "title": "Mantén a {incoming} en {slot}",
+        "explanation": "Reemplazar a {outgoing} por {incoming} mejoró este puesto y suma aproximadamente {win_delta} de probabilidad de victoria."
+      }
+    }
   }
 }

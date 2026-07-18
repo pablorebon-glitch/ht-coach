@@ -52,6 +52,7 @@ class MatchPage(BasePage):
         self._last_result = None
         self._last_restored = False
         self._last_workspace_state = None
+        self._advisor_verbosity = "detailed"
         self._analysis_inputs_collapsed = False
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
@@ -459,6 +460,13 @@ class MatchPage(BasePage):
             self.results_layout.addWidget(
                 self._build_change_analysis_panel(
                     result.change_analysis
+                )
+            )
+
+        if result.tactical_advisor:
+            self.results_layout.addWidget(
+                self._build_tactical_advisor_panel(
+                    result.tactical_advisor
                 )
             )
 
@@ -891,6 +899,76 @@ class MatchPage(BasePage):
 
         return card
 
+    def _build_tactical_advisor_panel(self, recommendations):
+        card = QFrame()
+        card.setObjectName("compactDecisionLab")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setSpacing(6)
+
+        title = QLabel(t("advisor.title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title)
+
+        for recommendation in recommendations[:5]:
+            item = QFrame()
+            item.setObjectName("metadataPanel")
+            item_layout = QGridLayout(item)
+            item_layout.setContentsMargins(8, 6, 8, 6)
+            item_layout.setHorizontalSpacing(10)
+            item_layout.setVerticalSpacing(3)
+
+            impact = QLabel(self._advisor_impact_label(recommendation))
+            impact.setObjectName("recommendedBadge")
+            item_layout.addWidget(impact, 0, 0)
+
+            heading = QLabel(
+                t(
+                    recommendation.title_key,
+                    **self._localized_params(recommendation.params),
+                )
+            )
+            heading.setObjectName("metadataValue")
+            item_layout.addWidget(heading, 0, 1)
+
+            estimate = QLabel(
+                t(
+                    "advisor.estimated_win",
+                    value=self._format_delta_percent(
+                        recommendation.estimated_win_delta
+                    ),
+                )
+            )
+            estimate.setObjectName("compactMetric")
+            item_layout.addWidget(estimate, 0, 2)
+
+            meta = QLabel(
+                "  |  ".join(
+                    [
+                        t(recommendation.category_key),
+                        t(recommendation.confidence_key),
+                    ]
+                )
+            )
+            meta.setObjectName("compactDecisionText")
+            item_layout.addWidget(meta, 1, 0)
+
+            if self._advisor_verbosity == "detailed":
+                explanation = QLabel(
+                    t(
+                        recommendation.explanation_key,
+                        **self._localized_params(recommendation.params),
+                    )
+                )
+                explanation.setWordWrap(True)
+                explanation.setObjectName("compactDecisionText")
+                item_layout.addWidget(explanation, 1, 1, 1, 2)
+
+            item_layout.setColumnStretch(1, 1)
+            layout.addWidget(item)
+
+        return card
+
     def _build_lineup_table(self, formation):
         card = QFrame()
         card.setObjectName("resultCard")
@@ -1010,6 +1088,17 @@ class MatchPage(BasePage):
                 workspace_state=self._last_workspace_state,
             )
 
+    def set_advisor_verbosity(self, verbosity):
+        self._advisor_verbosity = (
+            verbosity if verbosity in {"simple", "detailed"} else "detailed"
+        )
+        if self._last_result is not None and self._state == "success":
+            self.show_results(
+                self._last_result,
+                restored=self._last_restored,
+                workspace_state=self._last_workspace_state,
+            )
+
     def copy_text_to_clipboard(self, text):
         QApplication.clipboard().setText(text)
 
@@ -1093,6 +1182,23 @@ class MatchPage(BasePage):
         if change.value_type == "percent":
             return self._format_delta_percent(change.difference)
         return self._format_delta_number(change.difference)
+
+    def _advisor_impact_label(self, recommendation):
+        if recommendation.impact_score >= 1.5:
+            return t("advisor.impact.high")
+        if recommendation.impact_score >= 0.5:
+            return t("advisor.impact.medium")
+        return t("advisor.impact.observation")
+
+    def _localized_params(self, params):
+        localized = {}
+        for key, value in dict(params or {}).items():
+            text = str(value)
+            if text.startswith("{") and text.endswith("}"):
+                localized[key] = t(text[1:-1])
+            else:
+                localized[key] = value
+        return localized
 
     @staticmethod
     def _mini_heading(text):

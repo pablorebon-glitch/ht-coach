@@ -202,23 +202,49 @@ class MainWindow(QMainWindow):
                     self
                 )
             )
+            widget.set_advisor_verbosity(
+                self._settings.advisor_verbosity
+            )
 
         if page["key"] == "settings":
             widget.set_language(self._settings.language)
+            widget.set_advisor_verbosity(
+                self._settings.advisor_verbosity
+            )
             widget.language_changed.connect(
                 self._change_language
+            )
+            widget.advisor_verbosity_changed.connect(
+                self._change_advisor_verbosity
             )
 
         return widget
 
     def _change_language(self, language):
         self._settings = self._settings_repository.save(
-            AppSettings(language=language)
+            AppSettings(
+                language=language,
+                advisor_verbosity=self._settings.advisor_verbosity,
+            )
         )
         localization_service().set_language(language)
         self._app_events.language_changed.emit(language)
         self._retranslate_ui()
         self.statusBar().showMessage(t("settings.saved"), 5000)
+
+    def _change_advisor_verbosity(self, verbosity):
+        self._settings = self._settings_repository.save(
+            AppSettings(
+                language=self._settings.language,
+                advisor_verbosity=verbosity,
+            )
+        )
+        self._app_events.advisor_verbosity_changed.emit(verbosity)
+        for index in range(self.stacked_pages.count()):
+            widget = self.stacked_pages.widget(index)
+            if hasattr(widget, "set_advisor_verbosity"):
+                widget.set_advisor_verbosity(verbosity)
+        self.statusBar().showMessage(t("settings.advisor_saved"), 5000)
 
     def _retranslate_ui(self):
         self.refresh_action.setText(t("app.refresh"))

@@ -283,8 +283,10 @@ Acceptance criteria:
 - Alpha 0.4.6 Change Analysis and Internationalization: explain the latest Workspace
   change with calculated before/after values, add English and Spanish translation
   catalogs, and persist the selected language.
-- Alpha 0.4.7 Undo / Redo: add reversible Workspace editing history on top of the
-  existing modification model.
+- Alpha 0.4.7 Tactical Advisor: rank deterministic recommendations for what to improve
+  next using evaluated match results, localized advisor copy and persisted verbosity.
+- Alpha 0.4.8 Opponent Tactical Analysis: deepen opponent-specific tactical
+  interpretation beyond the current sector comparison.
 - Match scenario history.
 - Exportable reports.
 - Advanced opponent scouting notes.

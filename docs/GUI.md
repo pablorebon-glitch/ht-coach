@@ -155,6 +155,8 @@ Content:
 - Change Analysis panel after Workspace recalculation, comparing the previous evaluated
   Workspace to the current evaluated Workspace with last change, position fit, team
   impact, changed sectors only and a deterministic summary.
+- Tactical Advisor panel with three to five ranked, informational recommendations
+  derived from the current evaluated Workspace.
 - Formation comparison table with deltas versus the recommendation.
 - Detailed XI table for inspection and accessibility.
 - Probabilities, xG, possession, and tactic.
@@ -212,6 +214,7 @@ Purpose:
 Content:
 
 - Language selector with English and Spanish.
+- Advisor verbosity selector with Simple and Detailed modes.
 - Default data folder.
 - Last CSV behavior.
 - Theme preference.
@@ -333,6 +336,16 @@ Responsibilities:
 - Use deterministic interpretation thresholds.
 - Avoid calling engine code or duplicating Decision Lab reasoning.
 
+### TacticalAdvisorPanel
+
+Responsibilities:
+
+- Show ranked recommendations from the deterministic advisor engine.
+- Display title, category, confidence and estimated impact.
+- Hide explanations in Simple mode and show them in Detailed mode.
+- Never auto-apply changes.
+- Use localized strings for all labels and recommendation copy.
+
 ## Controllers
 
 Controllers connect views to application behavior.
@@ -364,6 +377,7 @@ Suggested services:
 - `MatchWorkspaceService`
 - `ChangeAnalysisService`
 - `LocalizationService`
+- `RecommendationEngine`
 - `ReportService`
 - `SettingsService`
 

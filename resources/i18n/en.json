@@ -22,7 +22,12 @@
     "language_help": "Language changes apply immediately where practical.",
     "english": "English",
     "spanish": "Español",
-    "saved": "Language preference saved."
+    "saved": "Language preference saved.",
+    "advisor_verbosity": "Advisor verbosity",
+    "advisor_verbosity_help": "Simple shows title and impact. Detailed also shows the explanation.",
+    "verbosity_simple": "Simple",
+    "verbosity_detailed": "Detailed",
+    "advisor_saved": "Advisor preference saved."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -144,5 +149,66 @@
     "risky_text": "The change helps one area, but the calculated downside is noticeable.",
     "negative_text": "Overall team probabilities became worse.",
     "not_available": "Change Analysis will appear after a Workspace recalculation."
+  },
+  "advisor": {
+    "title": "Tactical Advisor",
+    "empty": "Tactical Advisor will appear after analysis.",
+    "estimated_win": "Estimated {value} Win",
+    "impact": {
+      "high": "High Impact",
+      "medium": "Medium Impact",
+      "observation": "Observation"
+    },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "category": {
+      "lineup": "Lineup",
+      "formation": "Formation",
+      "strength": "Strength",
+      "weakness": "Weakness",
+      "balance": "Balance"
+    },
+    "sector": {
+      "left_defense": "left defense",
+      "central_defense": "central defense",
+      "right_defense": "right defense",
+      "midfield": "midfield",
+      "left_attack": "left attack",
+      "central_attack": "central attack",
+      "right_attack": "right attack"
+    },
+    "rule": {
+      "consider_formation": {
+        "title": "Consider {formation}",
+        "explanation": "This evaluated formation improves win probability by {win_delta} without being weaker than the current recommendation."
+      },
+      "strongest_sector": {
+        "title": "{sector} is your strongest area",
+        "explanation": "Your calculated {sector} rating is currently {value}. No action is required there before addressing higher-risk areas."
+      },
+      "exposed_sector": {
+        "title": "Strengthen {sector}",
+        "explanation": "Your calculated {sector} is behind the opponent by {gap} rating points. Improving it should be the next tactical focus."
+      },
+      "low_possession": {
+        "title": "Improve possession",
+        "explanation": "Current possession is {possession}. Adding midfield strength is likely the most practical next tactical improvement."
+      },
+      "unbalanced_attack": {
+        "title": "Balance the attack",
+        "explanation": "Your attacking ratings are concentrated on one channel. A more balanced attack can make the plan less fragile."
+      },
+      "unbalanced_defense": {
+        "title": "Balance the defense",
+        "explanation": "Your defensive ratings are uneven. The weakest side can become the opponent's easiest route."
+      },
+      "keep_lineup_change": {
+        "title": "Keep {incoming} in {slot}",
+        "explanation": "Replacing {outgoing} with {incoming} improved this slot and adds an estimated {win_delta} win probability."
+      }
+    }
   }
 }

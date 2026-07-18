@@ -39,6 +39,10 @@
   substitution.
 - Added `AppSettingsRepository` and a Settings language selector that persists the
   selected language.
+- Added Alpha 0.4.7 Tactical Advisor with deterministic recommendation rules, impact
+  scoring, confidence labels, localization and persisted verbosity.
+- Added `engine/advisor` with independent lineup, formation, strength, weakness and
+  balance rules plus impact-based ranking and duplicate removal.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -129,6 +133,9 @@
   across selection, Workspace edits and automatic result refreshes.
 - Match, shell, Workspace, Bench, Formation Board, Dashboard, Reports and Settings now
   retrieve migrated user-facing strings through the localization layer.
+- Match results now show a Tactical Advisor panel that updates with normal analysis and
+  automatic Workspace recalculation.
+- Settings now persists Advisor verbosity as Simple or Detailed.
 
 ### Notes
 
@@ -141,3 +148,5 @@
 - Change Analysis uses only already calculated Match result view models and does not
   change engine, optimizer, probability, xG, rating, Decision Lab or Player Intelligence
   formulas.
+- Tactical Advisor is informational only and never applies lineup, formation or tactical
+  changes automatically.

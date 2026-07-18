@@ -7,6 +7,7 @@ from ht_coach_app.core.paths import user_data_dir
 @dataclass(frozen=True)
 class AppSettings:
     language: str = "en"
+    advisor_verbosity: str = "detailed"
 
 
 class AppSettingsRepository:
@@ -33,7 +34,16 @@ class AppSettingsRepository:
         if language not in {"en", "es"}:
             language = "en"
 
-        return AppSettings(language=language)
+        advisor_verbosity = str(
+            data.get("advisor_verbosity", "detailed")
+        ).strip()
+        if advisor_verbosity not in {"simple", "detailed"}:
+            advisor_verbosity = "detailed"
+
+        return AppSettings(
+            language=language,
+            advisor_verbosity=advisor_verbosity,
+        )
 
     def save(self, settings):
         self.storage_path.parent.mkdir(
