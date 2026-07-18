@@ -3,6 +3,12 @@ from datetime import datetime
 from types import SimpleNamespace
 from pathlib import Path
 
+from engine.advisor.recommendation import Recommendation
+from engine.advisor.recommendation_engine import RecommendationEngine
+from engine.advisor.recommendation_types import (
+    RecommendationCategory,
+    RecommendationConfidence,
+)
 from engine.analyzers.team_rater import TeamRater
 from engine.optimizers.formation_optimizer import FormationOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
@@ -113,6 +119,7 @@ class MatchAnalysisResult:
     completed_at: str = ""
     decision_lab: DecisionLabResult | None = None
     change_analysis: ChangeAnalysisResult | None = None
+    tactical_advisor: list[Recommendation] = field(default_factory=list)
 
     @property
     def recommended_formation(self):
@@ -570,7 +577,7 @@ class MatchWorkspaceService:
         except Exception:
             decision_lab = None
 
-        return MatchAnalysisResult(
+        enriched = MatchAnalysisResult(
             player_count=result.player_count,
             opponent_name=result.opponent_name,
             formations=result.formations,
@@ -579,7 +586,9 @@ class MatchWorkspaceService:
             completed_at=result.completed_at,
             decision_lab=decision_lab,
             change_analysis=result.change_analysis,
+            tactical_advisor=result.tactical_advisor,
         )
+        return with_tactical_advisor(enriched)
 
     @staticmethod
     def _map_team_ratings(ratings):
@@ -653,6 +662,10 @@ def match_analysis_result_to_dict(result):
     data["change_analysis"] = change_analysis_result_to_dict(
         result.change_analysis
     )
+    data["tactical_advisor"] = [
+        _recommendation_to_dict(recommendation)
+        for recommendation in result.tactical_advisor
+    ]
     return data
 
 
@@ -732,6 +745,15 @@ def match_analysis_result_from_dict(data):
         change_analysis=change_analysis_result_from_dict(
             data.get("change_analysis")
         ),
+        tactical_advisor=[
+            recommendation
+            for recommendation in (
+                _recommendation_from_dict(item)
+                for item in data.get("tactical_advisor", [])
+                if isinstance(item, dict)
+            )
+            if recommendation is not None
+        ],
     )
 
     if result.decision_lab is None and result.formations:
@@ -750,9 +772,29 @@ def match_analysis_result_from_dict(data):
                 completed_at=result.completed_at,
                 decision_lab=decision_lab,
                 change_analysis=result.change_analysis,
+                tactical_advisor=result.tactical_advisor,
             )
 
     return result
+
+
+def with_tactical_advisor(result):
+    try:
+        recommendations = RecommendationEngine().recommend(result)
+    except Exception:
+        recommendations = []
+
+    return MatchAnalysisResult(
+        player_count=result.player_count,
+        opponent_name=result.opponent_name,
+        formations=result.formations,
+        players_csv_filename=result.players_csv_filename,
+        analyzed_formations=result.analyzed_formations,
+        completed_at=result.completed_at,
+        decision_lab=result.decision_lab,
+        change_analysis=result.change_analysis,
+        tactical_advisor=list(recommendations),
+    )
 
 
 def _team_ratings_from_dict(data):
@@ -899,6 +941,39 @@ def _decision_lab_from_dict(data):
             tactic_gain=float(data.get("tactic_gain", 0.0)),
             total_gain=float(data.get("total_gain", 0.0)),
             schema_version=int(data.get("schema_version", 1))
+        )
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _recommendation_to_dict(recommendation):
+    return {
+        "code": recommendation.code,
+        "title_key": recommendation.title_key,
+        "explanation_key": recommendation.explanation_key,
+        "category": recommendation.category.value,
+        "impact_score": recommendation.impact_score,
+        "confidence": recommendation.confidence.value,
+        "estimated_win_delta": recommendation.estimated_win_delta,
+        "params": dict(recommendation.params),
+    }
+
+
+def _recommendation_from_dict(data):
+    try:
+        return Recommendation(
+            code=data.get("code", ""),
+            title_key=data.get("title_key", ""),
+            explanation_key=data.get("explanation_key", ""),
+            category=RecommendationCategory(
+                data.get("category", RecommendationCategory.BALANCE.value)
+            ),
+            impact_score=float(data.get("impact_score", 0.0)),
+            confidence=RecommendationConfidence(
+                data.get("confidence", RecommendationConfidence.LOW.value)
+            ),
+            estimated_win_delta=float(data.get("estimated_win_delta", 0.0)),
+            params=dict(data.get("params", {})),
         )
     except (TypeError, ValueError, AttributeError):
         return None
