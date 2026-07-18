@@ -43,6 +43,7 @@ from ht_coach_app.workspace.workspace_service import WorkspaceService
 class FormationBoard(QWidget):
     formation_changed = Signal(str)
     recalculate_requested = Signal(object)
+    workspace_modified = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -90,34 +91,15 @@ class FormationBoard(QWidget):
 
         header_layout.addStretch(1)
 
-        self.apply_replacement_button = QPushButton("Apply Replacement")
-        self.apply_replacement_button.setObjectName("workspaceAction")
-        self.apply_replacement_button.setProperty("primary", "true")
-        self.apply_replacement_button.clicked.connect(
-            self.apply_replacement
-        )
-        header_layout.addWidget(self.apply_replacement_button)
-
-        self.cancel_replacement_button = QPushButton("Cancel Replacement")
-        self.cancel_replacement_button.setObjectName("workspaceAction")
-        self.cancel_replacement_button.clicked.connect(
-            self.cancel_replacement
-        )
-        header_layout.addWidget(self.cancel_replacement_button)
-
         self.reset_workspace_button = QPushButton("Reset Workspace")
         self.reset_workspace_button.setObjectName("workspaceAction")
+        self.reset_workspace_button.setToolTip(
+            "Restore the original recommended lineup."
+        )
         self.reset_workspace_button.clicked.connect(
             self.reset_workspace
         )
         header_layout.addWidget(self.reset_workspace_button)
-
-        self.recalculate_button = QPushButton("Recalculate Analysis")
-        self.recalculate_button.setObjectName("workspaceAction")
-        self.recalculate_button.clicked.connect(
-            self._emit_recalculate_requested
-        )
-        header_layout.addWidget(self.recalculate_button)
         layout.addWidget(header)
 
         self.splitter = QSplitter(Qt.Horizontal)
@@ -261,6 +243,25 @@ class FormationBoard(QWidget):
         board = self.current_board()
         if board is None:
             return
+        if self._selected_bench_player_id:
+            target_slot = next(
+                (
+                    slot for slot in board.slots
+                    if slot.player is not None
+                    and slot.player.player_id == player_id
+                ),
+                None,
+            )
+            if target_slot is not None:
+                self._commit_bench_exchange(
+                    target_slot.slot_id,
+                    self._selected_bench_player_id,
+                    "CLICK",
+                )
+                return
+        if board.selected_player_id == player_id:
+            self.clear_selection()
+            return
 
         self._workspace_state = self._workspace_service.select_player(
             self._workspace_state,
@@ -284,6 +285,27 @@ class FormationBoard(QWidget):
 
     def select_bench_player(self, player_id):
         if self._workspace_state is None:
+            return
+        board = self.current_board()
+        if board is not None and board.selected_player is not None:
+            selected_slot = next(
+                (
+                    slot for slot in board.slots
+                    if slot.player is not None
+                    and slot.player.player_id == board.selected_player_id
+                ),
+                None,
+            )
+            if selected_slot is not None:
+                self._commit_bench_exchange(
+                    selected_slot.slot_id,
+                    player_id,
+                    "CLICK",
+                )
+                return
+        if self._selected_bench_player_id == player_id:
+            self._selected_bench_player_id = ""
+            self._render_current_board()
             return
         self._selected_bench_player_id = player_id
         self._workspace_state = replace(
@@ -314,15 +336,11 @@ class FormationBoard(QWidget):
         )
         if selected_slot is None:
             return
-        self._selected_bench_player_id = player_id
-        self._workspace_state = self._workspace_service.preview_bench_exchange(
-            self._workspace_state,
-            self._roster_players,
+        self._commit_bench_exchange(
             selected_slot.slot_id,
             player_id,
+            "CLICK",
         )
-        self._sync_boards_cache()
-        self._render_current_board()
 
     def preview_replacement(self, candidate):
         if self._workspace_state is None:
@@ -360,12 +378,19 @@ class FormationBoard(QWidget):
         if self._workspace_state is None:
             return
 
+        was_dirty = self._workspace_state.dirty
         self._workspace_state = self._workspace_service.reset(
             self._workspace_state
         )
         self._selected_bench_player_id = ""
+        if was_dirty:
+            self._workspace_state = self._workspace_service.mark_updating(
+                self._workspace_state
+            )
         self._sync_boards_cache()
         self._render_current_board()
+        if was_dirty:
+            self.workspace_modified.emit(self._workspace_state)
 
     def _on_formation_changed(self):
         self._current_name = self.formation_combo.currentData() or ""
@@ -405,7 +430,7 @@ class FormationBoard(QWidget):
             self._intelligence_player(board),
             self._roster_players,
         )
-        self._render_intelligence(intelligence)
+        self._render_intelligence(intelligence, board)
 
     def _update_footer(self, board):
         parts = [
@@ -421,7 +446,7 @@ class FormationBoard(QWidget):
             parts.append(f"Selected order {order}")
         self.footer_label.setText("  |  ".join(parts))
 
-    def _render_intelligence(self, intelligence):
+    def _render_intelligence(self, intelligence, board=None):
         self._clear_inspector()
 
         if intelligence.availability_state != "available":
@@ -454,12 +479,6 @@ class FormationBoard(QWidget):
 
         if (
             self._workspace_state is not None
-            and self._workspace_state.has_preview
-        ):
-            self._add_preview_panel(self._workspace_state)
-
-        if (
-            self._workspace_state is not None
             and self._workspace_state.last_error
         ):
             note = QLabel(self._workspace_state.last_error)
@@ -480,7 +499,10 @@ class FormationBoard(QWidget):
 
         if intelligence.why_selected:
             overview_layout.addWidget(
-                self._points_group("Why selected", intelligence.why_selected),
+                self._points_group(
+                    self._why_heading(board.selected_player),
+                    intelligence.why_selected,
+                ),
                 0,
                 0,
             )
@@ -507,6 +529,8 @@ class FormationBoard(QWidget):
 
         if intelligence.alternatives:
             self._add_alternatives(intelligence.alternatives)
+
+        self._add_slot_score_comparison(board.selected_player)
 
         if intelligence.technical_attributes:
             self._add_technical_details(intelligence.technical_attributes)
@@ -551,6 +575,45 @@ class FormationBoard(QWidget):
             )
             label.setWordWrap(True)
             self.inspector_layout.addWidget(label)
+
+    def _add_slot_score_comparison(self, selected_player):
+        modification = self._modification_for_player(selected_player)
+        if modification is None:
+            return
+
+        panel = QFrame()
+        panel.setObjectName("coachNote")
+        panel.setToolTip(
+            "Difference between each player's calculated contribution score "
+            "for this specific tactical slot."
+        )
+        layout = QGridLayout(panel)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setHorizontalSpacing(8)
+        layout.setVerticalSpacing(3)
+        rows = [
+            ("Position fit comparison", modification.role),
+            (
+                "Previous player",
+                f"{modification.original_player_name}: "
+                f"{modification.previous_slot_score:.2f}",
+            ),
+            (
+                "Current player",
+                f"{modification.replacement_player_name}: "
+                f"{modification.current_slot_score:.2f}",
+            ),
+            (
+                "Difference",
+                f"{modification.score_difference:+.2f} in this slot",
+            ),
+        ]
+        for row, (label, value) in enumerate(rows):
+            key = QLabel(label)
+            key.setObjectName("playerInspectorMeta")
+            layout.addWidget(key, row, 0)
+            layout.addWidget(QLabel(value), row, 1)
+        self.inspector_layout.addWidget(panel)
 
     def _add_preview_panel(self, state):
         panel = QFrame()
@@ -698,12 +761,10 @@ class FormationBoard(QWidget):
         if state is None:
             status = "Original Recommendation"
             status_state = "clean"
-            has_preview = False
             is_dirty = False
         else:
             status = state.status_label
             status_state = state.status_state
-            has_preview = state.has_preview
             is_dirty = state.dirty
 
         self.workspace_status_label.setText(status)
@@ -714,16 +775,7 @@ class FormationBoard(QWidget):
         self.workspace_status_label.style().polish(
             self.workspace_status_label
         )
-        self.apply_replacement_button.setEnabled(has_preview)
-        self.cancel_replacement_button.setEnabled(has_preview)
-        self.reset_workspace_button.setEnabled(has_preview or is_dirty)
-        self.recalculate_button.setEnabled(is_dirty)
-        self.apply_replacement_button.setText(
-            "Apply Change" if has_preview else "Apply Replacement"
-        )
-        self.cancel_replacement_button.setText(
-            "Cancel Change" if has_preview else "Cancel Replacement"
-        )
+        self.reset_workspace_button.setEnabled(is_dirty)
 
     def _emit_recalculate_requested(self):
         if self._workspace_state is not None:
@@ -740,11 +792,24 @@ class FormationBoard(QWidget):
                 target_slot_id,
             )
             if valid:
-                self._workspace_state = self._workspace_service.preview_swap(
+                self._workspace_state = self._workspace_service.swap_slots_immediately(
                     self._workspace_state,
+                    self._current_name,
                     payload.get("source_slot_id", ""),
                     target_slot_id,
+                    payload.get("revision", -1),
+                    interaction_source="DRAG",
                 )
+                self._selected_bench_player_id = ""
+                if not self._workspace_state.last_error:
+                    self._workspace_state = self._workspace_service.mark_updating(
+                        self._workspace_state
+                    )
+                self._sync_boards_cache()
+                self._render_current_board()
+                if not self._workspace_state.last_error:
+                    self.workspace_modified.emit(self._workspace_state)
+                return
             else:
                 self._workspace_state = replace(
                     self._workspace_state,
@@ -775,14 +840,12 @@ class FormationBoard(QWidget):
                     ),
                 )
             else:
-                self._workspace_state = (
-                    self._workspace_service.preview_bench_exchange(
-                        self._workspace_state,
-                        self._roster_players,
-                        target_slot_id,
-                        candidate.player_id,
-                    )
+                self._commit_bench_exchange(
+                    target_slot_id,
+                    candidate.player_id,
+                    "DRAG",
                 )
+                return
 
         self._sync_boards_cache()
         self._render_current_board()
@@ -807,30 +870,74 @@ class FormationBoard(QWidget):
                 last_error="The lineup changed. Try the drag again.",
             )
         else:
-            self._selected_bench_player_id = bench_player_id
-            self._workspace_state = self._workspace_service.preview_bench_exchange(
-                self._workspace_state,
-                self._roster_players,
+            self._commit_bench_exchange(
                 payload.get("source_slot_id", ""),
                 bench_player_id,
+                "DRAG",
             )
+            return
         self._sync_boards_cache()
         self._render_current_board()
 
     def keyPressEvent(self, event):
-        if (
-            event.key() == Qt.Key_Escape
-            and self._workspace_state is not None
-            and self._workspace_state.has_preview
-        ):
-            self.cancel_replacement()
+        if event.key() == Qt.Key_Escape:
+            self.clear_selection()
             event.accept()
             return
 
         super().keyPressEvent(event)
+
+    def _commit_bench_exchange(self, target_slot_id, bench_player_id, source):
+        if self._workspace_state is None:
+            return
+        board = self.current_board()
+        if board is None:
+            return
+        self._workspace_state = self._workspace_service.replace_slot_immediately(
+            self._workspace_state,
+            self._roster_players,
+            board.formation_name,
+            target_slot_id,
+            bench_player_id,
+            self._workspace_state.revision,
+            interaction_source=source,
+        )
+        self._selected_bench_player_id = ""
+        if not self._workspace_state.last_error:
+            self._workspace_state = self._workspace_service.clear_selection(
+                self._workspace_state
+            )
+            self._workspace_state = self._workspace_service.mark_updating(
+                self._workspace_state
+            )
+        self._sync_boards_cache()
+        self._render_current_board()
+        if not self._workspace_state.last_error:
+            self.workspace_modified.emit(self._workspace_state)
 
     @staticmethod
     def _section_label(text):
         label = QLabel(text)
         label.setObjectName("formationBoardTitle")
         return label
+
+    @staticmethod
+    def _why_heading(selected_player):
+        if selected_player is not None and selected_player.is_modified:
+            return "Workspace Impact"
+        return "Why Recommended"
+
+    def _modification_for_player(self, selected_player):
+        if selected_player is None or self._workspace_state is None:
+            return None
+        if not selected_player.is_modified:
+            return None
+        for modification in reversed(self._workspace_state.history):
+            if (
+                modification.replacement_player_name
+                == selected_player.player_name
+                and modification.previous_slot_score is not None
+                and modification.current_slot_score is not None
+            ):
+                return modification
+        return None

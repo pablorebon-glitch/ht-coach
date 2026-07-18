@@ -167,18 +167,25 @@ replacements are visually marked and can be evaluated through fixed-lineup Works
 recalculation without replacing the editable lineup with a newly optimized XI.
 
 Alpha 0.4.4 adds drag-and-drop lineup editing to the same Workspace model. Starting
-players can be dragged onto other occupied slots to preview a swap, and replacement
-candidates can be dragged onto an occupied slot to preview the same replacement that a
-click would create. Apply Change commits the preview; Cancel Change or Escape clears it.
+players can be dragged onto other occupied slots to swap assignments, and replacement
+candidates can be dragged onto an occupied slot to perform the same replacement that a
+click would create. Alpha 0.4.5 commits valid edits immediately and schedules automatic
+fixed-lineup recalculation, so there are no Apply, Cancel or manual Recalculate buttons.
 The board stores stable slot IDs and workspace revisions in drag payloads, so stale
 gestures are rejected safely.
 
 Alpha 0.4.4.1 adds an integrated Bench panel beside the pitch. Bench is derived from the
 loaded roster minus the currently displayed Workspace Lineup. Bench players can be
 dragged onto occupied lineup slots, and starters can be dragged onto Bench player cards;
-both directions normalize to the same replacement exchange preview. The Bench has its
+both directions normalize to the same immediate replacement exchange. The Bench has its
 own internal scroll area, while Player Intelligence remains focused on explanations and
 closest alternatives.
+
+Alpha 0.4.5 reduces the pitch footprint, preserves Match-page scroll position across
+selection and automatic result refreshes, and keeps Formation Board as the default local
+result tab. Automatic workspace recalculation uses fixed-lineup evaluation and stale
+result protection by Workspace revision; it never reruns lineup optimization after a
+manual edit.
 
 ## Design Tokens
 
@@ -214,6 +221,6 @@ Later Alpha milestones can continue evolving the board into a broader editing wo
 - calculate lineup delta;
 - reset to optimized recommendation.
 
-Alpha 0.4.4.1 implements pitch-slot swaps and Bench exchanges. It does not implement
-order editing, automatic recalculation, substitutes/match plans or what-if Decision
-Delta.
+Alpha 0.4.5 implements immediate pitch-slot swaps, Bench exchanges and automatic
+fixed-lineup recalculation. It does not implement order editing, substitutes/match plans
+or a full Decision Delta system.

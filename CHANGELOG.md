@@ -8,22 +8,28 @@
   horizontal board/inspector splitter, compact formation footer and internal Player
   Intelligence scrolling.
 - Added Alpha 0.4.3 Interactive Workspace with an editable Workspace Lineup, immutable
-  Recommended Lineup, replacement preview, apply/cancel/reset actions and explicit
-  Recalculate Analysis action.
+  Recommended Lineup, replacement workflow and Reset Workspace baseline.
 - Added `ht_coach_app/workspace` as a UI-independent workspace state and service layer
   for lineup edits, dirty state, replacement ranking and future undo/redo support.
 - Added `docs/WORKSPACE.md` covering recommended versus workspace lineups, editing
   lifecycle, reset, recalculation and future Decision Delta/drag-and-drop milestones.
-- Added fixed-lineup Workspace recalculation so Recalculate Analysis evaluates the
-  current Workspace Lineup without rerunning lineup optimization or replacing applied
-  player changes.
+- Added fixed-lineup Workspace recalculation so the current Workspace Lineup can be
+  evaluated without rerunning lineup optimization or replacing committed player changes.
 - Added Evaluated Workspace status after successful fixed-lineup recalculation.
 - Added Alpha 0.4.4 Drag & Drop Lineup Editing for the Formation Board, including
-  starting-player slot swaps, dragged replacement candidates, Apply/Cancel previews,
-  Escape-to-cancel and stale drag revision protection.
+  starting-player slot swaps, dragged replacement candidates, Escape selection clearing
+  and stale drag revision protection.
 - Added Alpha 0.4.4.1 Integrated Bench Panel beside the Formation Board, with roster
   minus Workspace lineup derivation, bench-to-lineup and starter-to-bench exchange
   previews, keyboard replacement fallback and compact internally scrolling bench cards.
+- Added Alpha 0.4.5 One-Click Workspace editing so valid click and drag lineup changes
+  commit immediately, schedule automatic fixed-lineup recalculation, and keep Reset
+  Workspace as the only global edit action.
+- Added debounced Workspace recalculation with stale-result protection by Workspace
+  revision.
+- Added Player Intelligence contextual labels: `Why Recommended` for optimizer-selected
+  players and `Workspace Impact` for manually inserted Workspace players.
+- Added slot-specific Workspace score comparison wording with `in this slot` deltas.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -101,17 +107,23 @@
   forwards from left to right.
 - Formation Board selection now shows Player Intelligence when roster data is available
   and preserves a clean unavailable state for restored results without roster details.
-- Formation Board now distinguishes Original Recommendation, Replacement Preview,
-  Swap Preview, Modified Workspace - Pending Recalculation and Evaluated Workspace
-  states without automatically recalculating match results.
+- Formation Board now distinguishes Original Recommendation, Updating Analysis,
+  Evaluated Workspace and failed analysis states while preserving the editable Workspace
+  Lineup.
 - Player Intelligence now focuses on explanation; primary replacement controls moved to
   the dedicated Bench panel while closest alternatives remain informational.
+- Formation Board no longer exposes Apply, Cancel or manual Recalculate controls for
+  Workspace edits.
+- Workspace click and drag interactions now use the same service commit path and trigger
+  fixed-lineup recalculation automatically.
+- Reduced the Formation Board pitch footprint and preserved Match-page scroll position
+  across selection, Workspace edits and automatic result refreshes.
 
 ### Notes
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
-- Workspace edits are local view-model changes until Recalculate Analysis explicitly
-  evaluates the fixed Workspace Lineup through existing calculation paths.
+- Workspace edits are immediate view-model changes that are automatically evaluated as a
+  fixed Workspace Lineup through existing calculation paths.
 - Decision Lab explanations are deterministic and rule-based; no AI service, LLM,
   network dependency, or external API is used.

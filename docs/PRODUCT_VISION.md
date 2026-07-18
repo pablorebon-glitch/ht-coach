@@ -41,8 +41,9 @@ optimized recommendation as the baseline.
 - 0.4.2 Player Intelligence
 - 0.4.3 Editable Lineup Board
 - 0.4.4 Drag and Drop
-- 0.4.5 What-if Evaluation and Decision Delta
+- 0.4.5 One-Click Workspace
+- 0.4.6 What-if Evaluation and Decision Delta
 
 Alpha 0.4 starts with a read-only Formation Viewer and deterministic Player
-Intelligence. Later milestones can add editing and what-if evaluation without changing
-the stable optimization engine.
+Intelligence, then adds immediate workspace editing before broader what-if evaluation.
+These milestones preserve the stable optimization engine.

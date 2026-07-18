@@ -179,8 +179,8 @@ Modules:
   history view models.
 - `workspace_service.py`: creates editable board copies, ranks compatible replacements
   with existing player analyzers, derives Bench from roster minus Workspace lineup,
-  previews Bench exchanges and slot swaps, applies/cancels previews, resets state,
-  reconciles evaluated fixed-lineup results and prepares undo/redo history shape.
+  commits immediate Bench exchanges and slot swaps, resets state, reconciles evaluated
+  fixed-lineup results and prepares undo/redo history shape.
 
 Workspace rules:
 
@@ -189,11 +189,12 @@ Workspace rules:
   slots without carrying the old slot's tactical assignment;
 - Bench is derived from loaded roster players minus the displayed Workspace Lineup and
   is never an independent source of truth;
-- apply changes only the Workspace Lineup;
+- valid click and drag edits commit immediately to the Workspace Lineup;
 - reset restores the original recommendation;
-- recalculation is explicit and routed back through `MatchController`;
+- recalculation is automatic, debounced and routed back through `MatchController`;
 - Workspace recalculation evaluates the current fixed lineup through application-layer
   orchestration around existing `TeamRater` and `TacticOptimizer` calculations;
+- stale recalculation results are discarded when the Workspace revision has changed;
 - no engine formulas, probability calculations, Decision Lab rules or optimizer behavior
   are changed.
 
@@ -431,10 +432,11 @@ User clicks Analyze Match
   -> MatchWorkspaceRepository persists the last successful result
   -> MatchPage renders Decision Lab, recommended summary, Formation Board,
      comparison table and detailed XI
-  -> FormationBoard creates an editable Workspace Lineup copy for manual replacement
-     previews without changing the persisted recommendation
-  -> Recalculate Analysis evaluates the Workspace Lineup as fixed input and preserves
-     its player assignments in the refreshed board
+  -> FormationBoard creates an editable Workspace Lineup copy for one-click
+     replacements without changing the persisted recommendation
+  -> Valid Workspace edits emit workspace-modified intent
+  -> MatchController debounces fixed-lineup recalculation and preserves committed
+     player assignments in the refreshed board
 ```
 
 The engine remains unaware of the desktop application.
