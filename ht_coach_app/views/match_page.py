@@ -22,6 +22,10 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from engine.advisor.recommendation_engine import (
+    format_win_delta,
+    impact_band,
+)
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
@@ -918,7 +922,7 @@ class MatchPage(BasePage):
             item_layout.setHorizontalSpacing(10)
             item_layout.setVerticalSpacing(3)
 
-            impact = QLabel(self._advisor_impact_label(recommendation))
+            impact = QLabel(self._advisor_badge_label(recommendation))
             impact.setObjectName("recommendedBadge")
             item_layout.addWidget(impact, 0, 0)
 
@@ -931,16 +935,17 @@ class MatchPage(BasePage):
             heading.setObjectName("metadataValue")
             item_layout.addWidget(heading, 0, 1)
 
-            estimate = QLabel(
-                t(
-                    "advisor.estimated_win",
-                    value=self._format_delta_percent(
-                        recommendation.estimated_win_delta
-                    ),
+            if recommendation.is_action:
+                estimate = QLabel(
+                    t(
+                        "advisor.estimated_win",
+                        value=format_win_delta(
+                            recommendation.estimated_win_delta
+                        ),
+                    )
                 )
-            )
-            estimate.setObjectName("compactMetric")
-            item_layout.addWidget(estimate, 0, 2)
+                estimate.setObjectName("compactMetric")
+                item_layout.addWidget(estimate, 0, 2)
 
             meta = QLabel(
                 "  |  ".join(
@@ -1183,12 +1188,10 @@ class MatchPage(BasePage):
             return self._format_delta_percent(change.difference)
         return self._format_delta_number(change.difference)
 
-    def _advisor_impact_label(self, recommendation):
-        if recommendation.impact_score >= 1.5:
-            return t("advisor.impact.high")
-        if recommendation.impact_score >= 0.5:
-            return t("advisor.impact.medium")
-        return t("advisor.impact.observation")
+    def _advisor_badge_label(self, recommendation):
+        if not recommendation.is_action:
+            return t(recommendation.card_type_key)
+        return t(f"advisor.impact.{impact_band(recommendation)}")
 
     def _localized_params(self, params):
         localized = {}

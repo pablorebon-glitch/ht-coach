@@ -154,9 +154,15 @@
     "title": "Tactical Advisor",
     "empty": "Tactical Advisor will appear after analysis.",
     "estimated_win": "Estimated {value} Win",
+    "card": {
+      "action": "Action",
+      "observation": "Observation",
+      "warning": "Warning"
+    },
     "impact": {
       "high": "High Impact",
       "medium": "Medium Impact",
+      "low": "Low Impact",
       "observation": "Observation"
     },
     "confidence": {
@@ -181,33 +187,53 @@
       "right_attack": "right attack"
     },
     "rule": {
-      "consider_formation": {
-        "title": "Consider {formation}",
-        "explanation": "This evaluated formation improves win probability by {win_delta} without being weaker than the current recommendation."
+      "use_formation": {
+        "title": "Use {formation} instead of {current_formation}",
+        "explanation": "This evaluated formation improves win probability by {win_delta}. Sector changes: {sector_summary}."
       },
       "strongest_sector": {
         "title": "{sector} is your strongest area",
         "explanation": "Your calculated {sector} rating is currently {value}. No action is required there before addressing higher-risk areas."
       },
-      "exposed_sector": {
-        "title": "Strengthen {sector}",
-        "explanation": "Your calculated {sector} is behind the opponent by {gap} rating points. Improving it should be the next tactical focus."
+      "defensive_exposure": {
+        "title": "{sector} is exposed",
+        "explanation": "The opponent's {opponent_sector} is {gap} rating points above your matching {sector}. This is a warning until an evaluated lineup or formation change improves it."
+      },
+      "defensive_observation": {
+        "title": "{sector} matchup needs attention",
+        "explanation": "The opponent's {opponent_sector} is ahead of your matching {sector} by {gap} rating points. Treat this as matchup context, not an unevaluated instruction."
+      },
+      "inefficient_flank": {
+        "title": "{sector} is an inefficient route",
+        "explanation": "Your {sector} is {gap} rating points below the opponent's matching {opponent_sector}. Do not treat this as a recommendation to strengthen it unless an evaluated change improves the result."
+      },
+      "best_attack_matchup": {
+        "title": "{sector} is your best attacking route",
+        "explanation": "Your {sector} is the closest matchup against the opponent's {opponent_sector}, with a calculated margin of {gap} rating points."
       },
       "low_possession": {
-        "title": "Improve possession",
-        "explanation": "Current possession is {possession}. Adding midfield strength is likely the most practical next tactical improvement."
+        "title": "Possession is low",
+        "explanation": "Current possession is {possession}. This is tactical context unless an evaluated formation or lineup change increases the match result."
       },
-      "unbalanced_attack": {
-        "title": "Balance the attack",
-        "explanation": "Your attacking ratings are concentrated on one channel. A more balanced attack can make the plan less fragile."
+      "favorable_concentration": {
+        "title": "Attack concentration matches their weakness",
+        "explanation": "Your strongest attacking channel, {sector}, targets the opponent's weakest matching defense, {opponent_sector}."
       },
-      "unbalanced_defense": {
-        "title": "Balance the defense",
-        "explanation": "Your defensive ratings are uneven. The weakest side can become the opponent's easiest route."
+      "unfavorable_concentration": {
+        "title": "Attack concentration targets a stronger defense",
+        "explanation": "Your strongest attacking channel, {sector}, targets {opponent_sector}, which is not the opponent's weakest defensive sector."
       },
       "keep_lineup_change": {
         "title": "Keep {incoming} in {slot}",
         "explanation": "Replacing {outgoing} with {incoming} improved this slot and adds an estimated {win_delta} win probability."
+      },
+      "revert_lineup_change": {
+        "title": "Revert {incoming} in {slot}",
+        "explanation": "Replacing {outgoing} with {incoming} reduced win probability by {win_delta}. Revert this Workspace change."
+      },
+      "neutral_lineup_change": {
+        "title": "{incoming} in {slot} is neutral",
+        "explanation": "Replacing {outgoing} with {incoming} did not create a measurable win-probability improvement. Treat it as a preference, not a recommendation."
       }
     }
   }

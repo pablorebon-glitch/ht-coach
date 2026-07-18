@@ -43,6 +43,10 @@
   scoring, confidence labels, localization and persisted verbosity.
 - Added `engine/advisor` with independent lineup, formation, strength, weakness and
   balance rules plus impact-based ranking and duplicate removal.
+- Added Alpha 0.4.7.1 Actionable Tactical Advisor card types: Action, Observation and
+  Warning.
+- Added centralized tactical matchup mapping for own attack versus opponent defense and
+  opponent attack versus own defense.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -136,6 +140,15 @@
 - Match results now show a Tactical Advisor panel that updates with normal analysis and
   automatic Workspace recalculation.
 - Settings now persists Advisor verbosity as Simple or Detailed.
+- Tactical Advisor now reserves actionable recommendations and impact badges for
+  evaluated formation or Workspace lineup changes with measurable win-probability
+  deltas.
+- Tactical Advisor now presents weak sectors, low possession, attack concentration and
+  defensive exposure as observations or warnings unless an evaluated change improves the
+  result.
+- Tactical Advisor ranking now prioritizes actions, caps them at three, keeps at most
+  two context cards, and prevents generic strength notes from displacing actionable
+  recommendations.
 
 ### Notes
 
@@ -150,3 +163,6 @@
   formulas.
 - Tactical Advisor is informational only and never applies lineup, formation or tactical
   changes automatically.
+- Actionable Tactical Advisor changes do not modify optimization formulas, player
+  ratings, xG, probabilities, tactic behavior, Decision Lab, Player Intelligence or
+  position weights.

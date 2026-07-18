@@ -6,6 +6,7 @@ from pathlib import Path
 from engine.advisor.recommendation import Recommendation
 from engine.advisor.recommendation_engine import RecommendationEngine
 from engine.advisor.recommendation_types import (
+    RecommendationCardType,
     RecommendationCategory,
     RecommendationConfidence,
 )
@@ -952,10 +953,12 @@ def _recommendation_to_dict(recommendation):
         "title_key": recommendation.title_key,
         "explanation_key": recommendation.explanation_key,
         "category": recommendation.category.value,
+        "card_type": recommendation.card_type.value,
         "impact_score": recommendation.impact_score,
         "confidence": recommendation.confidence.value,
         "estimated_win_delta": recommendation.estimated_win_delta,
         "params": dict(recommendation.params),
+        "sector_deltas": list(recommendation.sector_deltas),
     }
 
 
@@ -968,12 +971,16 @@ def _recommendation_from_dict(data):
             category=RecommendationCategory(
                 data.get("category", RecommendationCategory.BALANCE.value)
             ),
+            card_type=RecommendationCardType(
+                data.get("card_type", RecommendationCardType.OBSERVATION.value)
+            ),
             impact_score=float(data.get("impact_score", 0.0)),
             confidence=RecommendationConfidence(
                 data.get("confidence", RecommendationConfidence.LOW.value)
             ),
             estimated_win_delta=float(data.get("estimated_win_delta", 0.0)),
             params=dict(data.get("params", {})),
+            sector_deltas=tuple(data.get("sector_deltas", ())),
         )
     except (TypeError, ValueError, AttributeError):
         return None

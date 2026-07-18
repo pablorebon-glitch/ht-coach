@@ -209,26 +209,45 @@ over the current evaluated match context.
 
 Modules:
 
+- `matchups.py`: centralized sector matchup mapping for own attack versus opponent
+  defense and opponent attack versus own defense.
 - `recommendation.py`: immutable recommendation payload with title/explanation keys,
-  category, confidence, impact score and estimated win delta.
-- `recommendation_types.py`: category and confidence enums.
+  category, card type, confidence, impact score, estimated win delta and evaluated
+  sector deltas.
+- `recommendation_types.py`: category, card type and confidence enums.
 - `recommendation_rule.py`: independent rule interface.
 - `recommendation_engine.py`: context wrapper and initial expert-system rules.
-- `recommendation_ranker.py`: duplicate removal and impact-based ranking.
+- `recommendation_ranker.py`: duplicate removal and ranking by actionable value, then
+  warnings and observations.
 
 Initial rules:
 
 - Lineup: uses the latest Change Analysis to recommend keeping a beneficial Workspace
-  replacement.
-- Formation: recommends another evaluated formation only when win improvement exceeds
-  the threshold.
+  replacement, reverting a harmful one, or marking a neutral change as observation.
+- Formation: recommends another evaluated formation only when the before/after result
+  has a measurable win-probability improvement.
 - Strength: highlights the strongest calculated sector as an observation.
 - Weakness: highlights the sector most exposed against opponent ratings.
-- Balance: detects low possession or heavily unbalanced attack/defense.
+- Attack matchup: identifies efficient or inefficient attacking routes by comparing
+  each own attack against the correct opposing defensive sector.
+- Balance: detects low possession and whether concentrated attack targets the
+  opponent's weakest defensive sector.
 
 Rules use existing calculated values only. They do not call `TeamRater`,
 `LineupOptimizer`, `FormationOptimizer`, probability, xG, Decision Lab or Player
 Intelligence formulas.
+
+Advisor card types are intentionally strict:
+
+- `ACTION`: a concrete evaluated formation or Workspace lineup change with before/after
+  state and measured win-probability impact.
+- `WARNING`: risk or unfavorable matchup context without an evaluated fix.
+- `OBSERVATION`: strengths, weaknesses, efficient routes or neutral changes that help
+  the coach reason without pretending to be measured improvements.
+
+Impact badges are shown only for actions. High impact starts at `+1.5 pp` win
+probability, medium at `+0.5 pp`, and low above the minimum actionable threshold.
+Confidence remains independent from impact size.
 
 ### Workspace
 

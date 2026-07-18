@@ -285,6 +285,10 @@ Acceptance criteria:
   catalogs, and persist the selected language.
 - Alpha 0.4.7 Tactical Advisor: rank deterministic recommendations for what to improve
   next using evaluated match results, localized advisor copy and persisted verbosity.
+- Alpha 0.4.7.1 Actionable Tactical Advisor: split Advisor output into Action,
+  Observation and Warning cards, reserve impact badges for measured evaluated changes,
+  centralize sector matchup mapping, and prevent unevaluated tactical context from
+  appearing as actionable advice.
 - Alpha 0.4.8 Opponent Tactical Analysis: deepen opponent-specific tactical
   interpretation beyond the current sector comparison.
 - Match scenario history.
