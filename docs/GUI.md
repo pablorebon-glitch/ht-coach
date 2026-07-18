@@ -152,6 +152,9 @@ Content:
 - Compact Decision Lab row with recommendation confidence and play-to-win, secure-draw
   and avoid-defeat perspectives derived from existing result data. Full copy output
   remains available.
+- Change Analysis panel after Workspace recalculation, comparing the previous evaluated
+  Workspace to the current evaluated Workspace with last change, position fit, team
+  impact, changed sectors only and a deterministic summary.
 - Formation comparison table with deltas versus the recommendation.
 - Detailed XI table for inspection and accessibility.
 - Probabilities, xG, possession, and tactic.
@@ -208,6 +211,7 @@ Purpose:
 
 Content:
 
+- Language selector with English and Spanish.
 - Default data folder.
 - Last CSV behavior.
 - Theme preference.
@@ -319,6 +323,16 @@ Responsibilities:
 - Avoid chemistry, hidden relationships or unsupported game mechanics.
 - Preserve clean unavailable states for restored results without roster data.
 
+### ChangeAnalysisPanel
+
+Responsibilities:
+
+- Display the latest Workspace change after automatic recalculation.
+- Compare old and new calculated win, draw and loss values.
+- Show only sectors whose calculated ratings changed.
+- Use deterministic interpretation thresholds.
+- Avoid calling engine code or duplicating Decision Lab reasoning.
+
 ## Controllers
 
 Controllers connect views to application behavior.
@@ -348,6 +362,8 @@ Suggested services:
 - `RosterService`
 - `OpponentService`
 - `MatchWorkspaceService`
+- `ChangeAnalysisService`
+- `LocalizationService`
 - `ReportService`
 - `SettingsService`
 
@@ -357,6 +373,7 @@ Service rules:
 - Map engine outputs to app view models.
 - Normalize errors.
 - Avoid direct widget imports.
+- Return user-facing text through the localization layer where practical.
 
 ## State Management
 
@@ -385,6 +402,7 @@ Recommended files:
 - `opponents.json`
 - `match_workspace.json`
 - `match_last_result.json`
+- `app_settings.json`
 - `settings.json`
 - `recent_files.json`
 

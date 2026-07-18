@@ -144,6 +144,25 @@ Workspace revision still matches the latest requested revision.
 After recalculation, the Workspace Lineup keeps its committed player assignments and the
 original recommendation remains available as the Reset Workspace baseline.
 
+## Change Analysis
+
+Alpha 0.4.6 adds a Change Analysis panel after Workspace recalculation. The panel
+compares only calculated values from:
+
+```text
+previous evaluated Workspace -> current evaluated Workspace
+```
+
+It uses the last Workspace modification to show the incoming player, outgoing player and
+slot, then displays the slot fit score difference with explicit `in this slot` wording.
+Team impact compares win, draw and loss values before and after recalculation. Sector
+Changes lists only rating sectors whose calculated values changed.
+
+The summary is deterministic. It uses simple thresholds over calculated probability and
+sector differences to classify the latest change as an excellent trade-off, balanced
+improvement, risky change or net negative. It does not call an LLM and does not change
+Decision Lab rules, xG, probability or rating calculations.
+
 ## Match Layout
 
 Alpha 0.4.3.1 keeps Analysis Setup as a persistent collapsible section. It is expanded
@@ -165,8 +184,7 @@ The workspace model reserves history and redo state so later milestones can add:
 
 - Undo;
 - Redo;
-- Decision Delta;
 - what-if comparison against the original recommendation.
 
-Alpha 0.4.5 deliberately does not include a full Decision Delta system or animated
-interactions.
+Alpha 0.4.6 deliberately does not include a long history timeline, Undo/Redo or
+animated interactions.

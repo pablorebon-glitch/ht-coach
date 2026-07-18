@@ -30,6 +30,15 @@
 - Added Player Intelligence contextual labels: `Why Recommended` for optimizer-selected
   players and `Workspace Impact` for manually inserted Workspace players.
 - Added slot-specific Workspace score comparison wording with `in this slot` deltas.
+- Added Alpha 0.4.6 Change Analysis, comparing the previous evaluated Workspace to the
+  current evaluated Workspace after automatic recalculation.
+- Added deterministic Change Analysis summaries for excellent trade-off, balanced
+  improvement, risky change and net negative outcomes.
+- Added English and Spanish localization catalogs under `resources/i18n`.
+- Added `LocalizationService` with English fallback, missing-key safety and parameter
+  substitution.
+- Added `AppSettingsRepository` and a Settings language selector that persists the
+  selected language.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -118,6 +127,8 @@
   fixed-lineup recalculation automatically.
 - Reduced the Formation Board pitch footprint and preserved Match-page scroll position
   across selection, Workspace edits and automatic result refreshes.
+- Match, shell, Workspace, Bench, Formation Board, Dashboard, Reports and Settings now
+  retrieve migrated user-facing strings through the localization layer.
 
 ### Notes
 
@@ -127,3 +138,6 @@
   fixed Workspace Lineup through existing calculation paths.
 - Decision Lab explanations are deterministic and rule-based; no AI service, LLM,
   network dependency, or external API is used.
+- Change Analysis uses only already calculated Match result view models and does not
+  change engine, optimizer, probability, xG, rating, Decision Lab or Player Intelligence
+  formulas.

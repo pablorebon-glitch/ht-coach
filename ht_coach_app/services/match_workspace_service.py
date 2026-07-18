@@ -9,6 +9,11 @@ from engine.optimizers.tactic_optimizer import TacticOptimizer
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import normalize_position_key
 from ht_coach_app.core.side_formatting import normalize_side_value
+from ht_coach_app.change_analysis.models import ChangeAnalysisResult
+from ht_coach_app.change_analysis.service import (
+    change_analysis_result_from_dict,
+    change_analysis_result_to_dict,
+)
 from ht_coach_app.reasoning.decision_lab import DecisionLab
 from ht_coach_app.reasoning.explanation_formatter import (
     decision_lab_result_to_dict,
@@ -107,6 +112,7 @@ class MatchAnalysisResult:
     )
     completed_at: str = ""
     decision_lab: DecisionLabResult | None = None
+    change_analysis: ChangeAnalysisResult | None = None
 
     @property
     def recommended_formation(self):
@@ -571,7 +577,8 @@ class MatchWorkspaceService:
             players_csv_filename=result.players_csv_filename,
             analyzed_formations=result.analyzed_formations,
             completed_at=result.completed_at,
-            decision_lab=decision_lab
+            decision_lab=decision_lab,
+            change_analysis=result.change_analysis,
         )
 
     @staticmethod
@@ -642,6 +649,9 @@ def match_analysis_result_to_dict(result):
     data = asdict(result)
     data["decision_lab"] = decision_lab_result_to_dict(
         result.decision_lab
+    )
+    data["change_analysis"] = change_analysis_result_to_dict(
+        result.change_analysis
     )
     return data
 
@@ -718,7 +728,10 @@ def match_analysis_result_from_dict(data):
         ],
         decision_lab=_decision_lab_from_dict(
             data.get("decision_lab")
-        )
+        ),
+        change_analysis=change_analysis_result_from_dict(
+            data.get("change_analysis")
+        ),
     )
 
     if result.decision_lab is None and result.formations:
@@ -735,7 +748,8 @@ def match_analysis_result_from_dict(data):
                 players_csv_filename=result.players_csv_filename,
                 analyzed_formations=result.analyzed_formations,
                 completed_at=result.completed_at,
-                decision_lab=decision_lab
+                decision_lab=decision_lab,
+                change_analysis=result.change_analysis,
             )
 
     return result

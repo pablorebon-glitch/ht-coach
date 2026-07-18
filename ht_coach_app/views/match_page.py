@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ht_coach_app.core.localization import t
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
@@ -38,8 +39,8 @@ class MatchPage(BasePage):
 
     def __init__(self, parent=None):
         super().__init__(
-            "Match",
-            "Analyze a match against a saved opponent.",
+            t("match.title"),
+            t("match.subtitle"),
             parent
         )
         self._applying_settings = False
@@ -48,6 +49,9 @@ class MatchPage(BasePage):
         self._formation_board_mapper = FormationBoardMapper()
         self._roster_players = []
         self._state = "empty"
+        self._last_result = None
+        self._last_restored = False
+        self._last_workspace_state = None
         self._analysis_inputs_collapsed = False
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
@@ -85,7 +89,8 @@ class MatchPage(BasePage):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         header.setSpacing(8)
-        title = QLabel("Analysis Setup")
+        title = QLabel(t("match.analysis_setup"))
+        self.analysis_setup_title = title
         title.setObjectName("sectionTitle")
         header.addWidget(title)
         header.addStretch(1)
@@ -106,51 +111,59 @@ class MatchPage(BasePage):
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(12)
 
-        csv_label = QLabel("Players CSV")
+        csv_label = QLabel(t("match.players_csv"))
+        self.csv_label = csv_label
         self.players_path_edit = QLineEdit()
         self.players_path_edit.setPlaceholderText(
-            "Select players.csv"
+            t("match.select_players_csv")
         )
         self.players_path_edit.textChanged.connect(
             self._emit_workspace_changed
         )
 
-        browse_button = QPushButton("Browse")
+        browse_button = QPushButton(t("match.browse"))
+        self.browse_button = browse_button
         browse_button.clicked.connect(
             self.browse_players_requested
         )
 
-        load_button = QPushButton("Load Players")
+        load_button = QPushButton(t("match.load_players"))
+        self.load_button = load_button
         load_button.clicked.connect(
             self.load_players_requested
         )
 
-        self.players_loaded_label = QLabel("No players loaded")
+        self.players_loaded_label = QLabel(t("match.no_players_loaded"))
 
-        opponent_label = QLabel("Opponent")
+        opponent_label = QLabel(t("match.opponent"))
+        self.opponent_label = opponent_label
         self.opponent_combo = QComboBox()
         self.opponent_combo.currentTextChanged.connect(
             self._emit_workspace_changed
         )
 
-        formation_label = QLabel("Formations")
+        formation_label = QLabel(t("match.formations"))
+        self.formation_label = formation_label
         formation_actions = QHBoxLayout()
         formation_actions.setContentsMargins(0, 0, 0, 0)
         formation_actions.setSpacing(8)
 
-        select_all_button = QPushButton("Select All")
+        select_all_button = QPushButton(t("match.select_all"))
+        self.select_all_button = select_all_button
         select_all_button.clicked.connect(
             self.select_all_formations
         )
         formation_actions.addWidget(select_all_button)
 
-        clear_all_button = QPushButton("Clear All")
+        clear_all_button = QPushButton(t("match.clear_all"))
+        self.clear_all_button = clear_all_button
         clear_all_button.clicked.connect(
             self.clear_all_formations
         )
         formation_actions.addWidget(clear_all_button)
 
-        favorites_button = QPushButton("Favorites")
+        favorites_button = QPushButton(t("match.favorites"))
+        self.favorites_button = favorites_button
         favorites_button.clicked.connect(
             self.select_favorite_formations
         )
@@ -176,10 +189,10 @@ class MatchPage(BasePage):
             "warning"
         )
 
-        self.status_label = QLabel("Ready")
+        self.status_label = QLabel(t("match.ready"))
         self.status_label.setWordWrap(True)
 
-        self.analyze_button = QPushButton("Analyze Match")
+        self.analyze_button = QPushButton(t("match.analyze"))
         self.analyze_button.setObjectName("primaryAction")
         self.analyze_button.clicked.connect(
             self.analyze_requested
@@ -332,7 +345,7 @@ class MatchPage(BasePage):
     def choose_players_file(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select players.csv",
+            t("match.select_players_csv"),
             self.players_csv_path(),
             "CSV files (*.csv);;All files (*.*)"
         )
@@ -340,7 +353,7 @@ class MatchPage(BasePage):
 
     def set_players_loaded_count(self, count):
         self.players_loaded_label.setText(
-            f"{count} players loaded"
+            t("match.players_loaded", count=count)
         )
 
     def set_roster_players(self, players):
@@ -351,7 +364,7 @@ class MatchPage(BasePage):
             not is_processing
         )
         self.analyze_button.setText(
-            "Analyzing..." if is_processing else "Analyze Match"
+            t("match.analyzing") if is_processing else t("match.analyze")
         )
 
         if is_processing:
@@ -362,7 +375,7 @@ class MatchPage(BasePage):
             not is_processing
         )
         self.analyze_button.setText(
-            "Updating..." if is_processing else "Analyze Match"
+            t("match.updating") if is_processing else t("match.analyze")
         )
 
     def show_status(self, message):
@@ -395,7 +408,7 @@ class MatchPage(BasePage):
         self.set_processing(False)
         self._clear_results_widgets()
         self._show_state_message(
-            "Analysis could not complete",
+            t("match.analysis_error_title"),
             message
         )
 
@@ -407,13 +420,16 @@ class MatchPage(BasePage):
         self._state = "loading"
         self._clear_results_widgets()
         self._show_state_message(
-            "Analyzing match",
-            "Optimizing formations, lineup, individual orders and tactic."
+            t("match.loading_title"),
+            t("match.loading_message")
         )
 
     def show_results(self, result, restored=False, workspace_state=None):
         scroll_value = self.scroll_area.verticalScrollBar().value()
         self._state = "success"
+        self._last_result = result
+        self._last_restored = restored
+        self._last_workspace_state = workspace_state
         self._clear_results_widgets()
         self.collapse_analysis_inputs()
 
@@ -439,6 +455,13 @@ class MatchPage(BasePage):
                 )
             )
 
+        if result.change_analysis is not None:
+            self.results_layout.addWidget(
+                self._build_change_analysis_panel(
+                    result.change_analysis
+                )
+            )
+
         self.results_layout.addWidget(
             self._build_result_tabs(
                 result,
@@ -450,10 +473,10 @@ class MatchPage(BasePage):
         self.scroll_area.verticalScrollBar().setValue(scroll_value)
 
     def show_workspace_updating(self):
-        self.show_status("Updating Workspace analysis...")
+        self.show_status(t("match.updating_workspace"))
 
     def show_workspace_analysis_failed(self, message):
-        self.show_status(f"Analysis failed: {message}")
+        self.show_status(t("match.analysis_failed", message=message))
 
     def collapse_analysis_inputs(self):
         self._analysis_inputs_collapsed = True
@@ -488,18 +511,18 @@ class MatchPage(BasePage):
                 restored,
                 workspace_state=workspace_state,
             ),
-            "Formation Board",
+            t("match.formation_board"),
         )
         tabs.addTab(
             self._build_comparison_table(result),
-            "Comparison",
+            t("match.comparison"),
         )
 
         recommended = result.recommended_formation
         if recommended is not None:
             tabs.addTab(
                 self._build_lineup_table(recommended),
-                "Detailed XI",
+                t("match.detailed_xi"),
             )
 
         return tabs
@@ -544,11 +567,10 @@ class MatchPage(BasePage):
             layout.setContentsMargins(18, 18, 18, 18)
             layout.setSpacing(6)
 
-            title = QLabel("Formation board could not render")
+            title = QLabel(t("match.board_error_title"))
             title.setObjectName("sectionTitle")
             message = QLabel(
-                "The comparison and Detailed XI tabs are still available. "
-                f"Board error: {exc}"
+                t("match.board_error_message", error=exc)
             )
             message.setWordWrap(True)
             layout.addWidget(title)
@@ -563,7 +585,7 @@ class MatchPage(BasePage):
         layout.setHorizontalSpacing(10)
         layout.setVerticalSpacing(4)
 
-        badge = QLabel("Recommended")
+        badge = QLabel(t("match.recommended"))
         badge.setObjectName("recommendedBadge")
         layout.addWidget(badge, 0, 0)
 
@@ -574,13 +596,13 @@ class MatchPage(BasePage):
         layout.addWidget(title, 0, 1)
 
         values = [
-            ("Tactic level", f"{formation.tactic_level:.2f}"),
-            ("Win", self._format_percent(formation.win_probability)),
-            ("Draw", self._format_percent(formation.draw_probability)),
-            ("Loss", self._format_percent(formation.loss_probability)),
-            ("Possession", self._format_percent(formation.possession)),
-            ("xG", f"{formation.expected_goals:.2f}"),
-            ("Opp xG", f"{formation.opponent_expected_goals:.2f}"),
+            (t("match.tactic_level"), f"{formation.tactic_level:.2f}"),
+            (t("match.win"), self._format_percent(formation.win_probability)),
+            (t("match.draw"), self._format_percent(formation.draw_probability)),
+            (t("match.loss"), self._format_percent(formation.loss_probability)),
+            (t("match.possession"), self._format_percent(formation.possession)),
+            (t("match.xg"), f"{formation.expected_goals:.2f}"),
+            (t("match.opp_xg"), f"{formation.opponent_expected_goals:.2f}"),
         ]
 
         for index, (label, value) in enumerate(values):
@@ -600,12 +622,15 @@ class MatchPage(BasePage):
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(3)
 
-        title = QLabel("Decision Lab")
+        title = QLabel(t("match.decision_lab"))
         title.setObjectName("sectionTitle")
         layout.addWidget(title, 0, 0, 1, 3)
 
         confidence = QLabel(
-            f"Recommendation confidence: {decision_lab.confidence.level}"
+            t(
+                "match.recommendation_confidence",
+                level=decision_lab.confidence.level,
+            )
         )
         confidence.setObjectName("recommendedBadge")
         layout.addWidget(confidence, 0, 3)
@@ -628,17 +653,17 @@ class MatchPage(BasePage):
         )
         scenarios = [
             (
-                "Play to win",
+                t("match.play_to_win"),
                 self._format_percent(recommended.win_probability),
                 reason,
             ),
             (
-                "Secure the draw",
+                t("match.secure_draw"),
                 self._format_percent(recommended.draw_probability),
                 decision_lab.confidence.explanation,
             ),
             (
-                "Avoid defeat",
+                t("match.avoid_defeat"),
                 self._format_percent(
                     recommended.win_probability + recommended.draw_probability
                 ),
@@ -670,8 +695,8 @@ class MatchPage(BasePage):
         layout.setSpacing(12)
 
         items = [
-            ("Opponent", result.opponent_name),
-            ("Formations", str(len(result.analyzed_formations))),
+            (t("match.opponent"), result.opponent_name),
+            (t("match.formations"), str(len(result.analyzed_formations))),
         ]
 
         for label, value in items:
@@ -689,7 +714,7 @@ class MatchPage(BasePage):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        title = QLabel("Formation comparison")
+        title = QLabel(t("match.formation_comparison"))
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
@@ -701,14 +726,14 @@ class MatchPage(BasePage):
         table.setHorizontalHeaderLabels(
             [
                 "",
-                "Formation",
-                "Tactic",
-                "Win / Draw / Loss",
-                "Possession",
-                "xG",
-                "Opp xG",
-                "Win diff",
-                "xG diff",
+                t("match.formations"),
+                t("match.tactic"),
+                t("match.win_draw_loss"),
+                t("match.possession"),
+                t("match.xg"),
+                t("match.opp_xg"),
+                t("match.win_diff"),
+                t("match.xg_diff"),
             ]
         )
         self._configure_table(table)
@@ -747,6 +772,125 @@ class MatchPage(BasePage):
         layout.addWidget(table)
         return card
 
+    def _build_change_analysis_panel(self, analysis):
+        card = QFrame()
+        card.setObjectName("compactDecisionLab")
+        layout = QGridLayout(card)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setHorizontalSpacing(14)
+        layout.setVerticalSpacing(6)
+
+        title = QLabel(t("change.title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title, 0, 0, 1, 4)
+
+        last_change = QWidget()
+        last_layout = QVBoxLayout(last_change)
+        last_layout.setContentsMargins(0, 0, 0, 0)
+        last_layout.setSpacing(2)
+        last_layout.addWidget(self._mini_heading(t("change.last_change")))
+        last_layout.addWidget(
+            QLabel(
+                f"{t('change.incoming_player')}: "
+                f"{analysis.last_change.incoming_player}"
+            )
+        )
+        last_layout.addWidget(
+            QLabel(
+                f"{t('change.outgoing_player')}: "
+                f"{analysis.last_change.outgoing_player}"
+            )
+        )
+        last_layout.addWidget(
+            QLabel(
+                f"{t('change.slot')}: {analysis.last_change.slot}"
+            )
+        )
+        layout.addWidget(last_change, 1, 0)
+
+        fit = QWidget()
+        fit_layout = QVBoxLayout(fit)
+        fit_layout.setContentsMargins(0, 0, 0, 0)
+        fit_layout.setSpacing(2)
+        fit_layout.addWidget(self._mini_heading(t("change.position_fit")))
+        fit_layout.addWidget(
+            QLabel(
+                f"{t('change.previous_score')}: "
+                f"{analysis.position_fit.previous_player_score:.2f}"
+            )
+        )
+        fit_layout.addWidget(
+            QLabel(
+                f"{t('change.current_score')}: "
+                f"{analysis.position_fit.current_player_score:.2f}"
+            )
+        )
+        fit_layout.addWidget(
+            QLabel(
+                t(
+                    "workspace.in_this_slot",
+                    value=self._format_delta_number(
+                        analysis.position_fit.difference
+                    ),
+                )
+            )
+        )
+        layout.addWidget(fit, 1, 1)
+
+        impact = QWidget()
+        impact_layout = QVBoxLayout(impact)
+        impact_layout.setContentsMargins(0, 0, 0, 0)
+        impact_layout.setSpacing(2)
+        impact_layout.addWidget(self._mini_heading(t("change.team_impact")))
+        for change in analysis.team_impact:
+            impact_layout.addWidget(
+                QLabel(
+                    f"{change.label}: "
+                    f"{self._format_change_value(change.old_value, change.value_type)} "
+                    f"-> {self._format_change_value(change.new_value, change.value_type)} "
+                    f"({self._format_change_delta(change)})"
+                )
+            )
+        layout.addWidget(impact, 1, 2)
+
+        summary = QWidget()
+        summary_layout = QVBoxLayout(summary)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary_layout.setSpacing(2)
+        summary_layout.addWidget(self._mini_heading(t("change.summary")))
+        if analysis.summary is not None:
+            headline = QLabel(t(analysis.summary.title_key))
+            headline.setObjectName("metadataValue")
+            summary_layout.addWidget(headline)
+            detail = QLabel(t(analysis.summary.description_key))
+            detail.setWordWrap(True)
+            detail.setObjectName("compactDecisionText")
+            summary_layout.addWidget(detail)
+        layout.addWidget(summary, 1, 3)
+
+        if analysis.sector_changes:
+            sector_panel = QWidget()
+            sector_layout = QVBoxLayout(sector_panel)
+            sector_layout.setContentsMargins(0, 0, 0, 0)
+            sector_layout.setSpacing(2)
+            sector_layout.addWidget(
+                self._mini_heading(t("change.sector_changes"))
+            )
+            for change in analysis.sector_changes:
+                sector_layout.addWidget(
+                    QLabel(
+                        f"{change.label}: {change.old_value:.0f} -> "
+                        f"{change.new_value:.0f} "
+                        f"({self._format_delta_number(change.difference)})"
+                    )
+                )
+            layout.addWidget(sector_panel, 2, 0, 1, 4)
+
+        for column in range(4):
+            layout.setColumnStretch(column, 1)
+
+        return card
+
     def _build_lineup_table(self, formation):
         card = QFrame()
         card.setObjectName("resultCard")
@@ -754,7 +898,7 @@ class MatchPage(BasePage):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        title = QLabel("Recommended XI")
+        title = QLabel(t("match.recommended_xi"))
         title.setObjectName("sectionTitle")
         layout.addWidget(title)
 
@@ -764,12 +908,12 @@ class MatchPage(BasePage):
         )
         table.setHorizontalHeaderLabels(
             [
-                "No.",
-                "Side",
-                "Position",
-                "Player",
-                "Order",
-                "Order Side",
+                t("match.number"),
+                t("match.side"),
+                t("match.position"),
+                t("match.player"),
+                t("match.order"),
+                t("match.order_side"),
             ]
         )
         self._configure_table(table)
@@ -818,8 +962,8 @@ class MatchPage(BasePage):
     def _show_empty_results(self):
         self._state = "empty"
         self._show_state_message(
-            "No analysis yet",
-            "Run a match analysis to view the recommended formation."
+            t("match.empty_title"),
+            t("match.empty_message")
         )
 
     def _show_state_message(self, title, message):
@@ -838,6 +982,33 @@ class MatchPage(BasePage):
         layout.addWidget(message_label)
         self.results_layout.addWidget(panel)
         self.results_layout.addStretch(1)
+
+    def retranslate_ui(self):
+        self.set_page_text(
+            t("match.title"),
+            t("match.subtitle"),
+        )
+        self.analysis_setup_title.setText(t("match.analysis_setup"))
+        self.csv_label.setText(t("match.players_csv"))
+        self.players_path_edit.setPlaceholderText(t("match.select_players_csv"))
+        self.browse_button.setText(t("match.browse"))
+        self.load_button.setText(t("match.load_players"))
+        self.opponent_label.setText(t("match.opponent"))
+        self.formation_label.setText(t("match.formations"))
+        self.select_all_button.setText(t("match.select_all"))
+        self.clear_all_button.setText(t("match.clear_all"))
+        self.favorites_button.setText(t("match.favorites"))
+        self.analyze_button.setText(t("match.analyze"))
+        self._sync_analysis_setup_toggle()
+        self._update_formation_warning()
+        if self._state == "empty":
+            self.clear_results()
+        elif self._last_result is not None:
+            self.show_results(
+                self._last_result,
+                restored=self._last_restored,
+                workspace_state=self._last_workspace_state,
+            )
 
     def copy_text_to_clipboard(self, text):
         QApplication.clipboard().setText(text)
@@ -913,6 +1084,22 @@ class MatchPage(BasePage):
 
         return f"{value:+.2f}"
 
+    def _format_change_value(self, value, value_type):
+        if value_type == "percent":
+            return self._format_percent(value)
+        return f"{value:.0f}"
+
+    def _format_change_delta(self, change):
+        if change.value_type == "percent":
+            return self._format_delta_percent(change.difference)
+        return self._format_delta_number(change.difference)
+
+    @staticmethod
+    def _mini_heading(text):
+        label = QLabel(text)
+        label.setObjectName("metadataValue")
+        return label
+
     @staticmethod
     def _format_percent(value):
         return f"{value * 100:.1f}%"
@@ -939,7 +1126,7 @@ class MatchPage(BasePage):
 
         if selected_count > 4:
             self.formation_warning_label.setText(
-                "Many formations selected. Analysis can take longer."
+                t("match.many_formations")
             )
         else:
             self.formation_warning_label.setText("")
@@ -949,8 +1136,8 @@ class MatchPage(BasePage):
             return
 
         if self.analysis_inputs_expanded():
-            self.analysis_setup_toggle.setText("Hide analysis setup")
+            self.analysis_setup_toggle.setText(t("match.hide_setup"))
             self.analysis_setup_toggle.setArrowType(Qt.DownArrow)
         else:
-            self.analysis_setup_toggle.setText("Show analysis setup")
+            self.analysis_setup_toggle.setText(t("match.show_setup"))
             self.analysis_setup_toggle.setArrowType(Qt.RightArrow)

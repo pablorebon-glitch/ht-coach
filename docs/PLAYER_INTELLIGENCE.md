@@ -178,6 +178,13 @@ call:
 Workspace recalculation is triggered by the Match controller after a committed edit, not
 by Player Intelligence.
 
+## Change Analysis Boundary
+
+Alpha 0.4.6 keeps Player Intelligence focused on the selected player. It does not
+duplicate the Change Analysis panel and does not summarize team-level probability or
+sector movement. Team-level before/after comparison belongs to Change Analysis, which
+uses only previous and current evaluated Match result values.
+
 ## Explicit Non-Mechanics
 
 HT Coach does not implement player chemistry, hidden player relationships, invented

@@ -27,6 +27,7 @@ ht_coach_app/
   controllers/
   services/
   reasoning/
+  change_analysis/
   player_intelligence/
   workspace/
   state/
@@ -81,6 +82,8 @@ Expected modules:
 - `events.py`: defines application-level event names or signal contracts.
 - `errors.py`: defines desktop-facing exceptions and user-safe error messages.
 - `constants.py`: contains UI constants that are not business rules.
+- `localization.py`: loads UI translation catalogs, returns localized strings, applies
+  English fallback and parameter substitution.
 
 ### Controllers
 
@@ -110,7 +113,9 @@ Initial controllers:
   apply filters, export visible rows, and publish roster path changes.
 - `OpponentController`: create, update, duplicate, delete, and select opponents.
 - `MatchController`: persist match workspace inputs and run matchup optimization against
-  the selected opponent through a background worker.
+  the selected opponent through a background worker. It also attaches Change Analysis
+  after Workspace recalculation by comparing the previous persisted evaluated result to
+  the current evaluated result.
 - `ReportsController`: prepare recommendation summaries and exports.
 - `SettingsController`: manage user preferences and app-level configuration.
 
@@ -164,6 +169,30 @@ Modules:
   - Converts serializable match analysis results into immutable board view models.
   - Reuses centralized position, side and order formatting.
   - Does not call optimizers, persistence, or engine calculators.
+
+### Change Analysis
+
+`ht_coach_app/change_analysis/`
+
+The Change Analysis layer compares two already evaluated match result view models. It
+does not call the engine, optimizers, Decision Lab or Player Intelligence.
+
+Modules:
+
+- `models.py`: serializable view models for last change, position fit, team impact,
+  sector changes and deterministic summary.
+- `service.py`: compares previous evaluated Workspace values against current evaluated
+  Workspace values, filters unchanged sectors, and classifies the change with fixed
+  thresholds.
+
+Rules:
+
+- compare only calculated result values;
+- use the last Workspace modification for incoming/outgoing player and slot context;
+- show `in this slot` wording for position fit scores;
+- persist only serializable view-model data;
+- never alter rating, probability, xG, optimizer, Decision Lab or Player Intelligence
+  formulas.
 
 ### Workspace
 
@@ -288,6 +317,7 @@ Initial persistence can be JSON files under a local application data folder:
 ```text
 user_data/
   opponents.json
+  app_settings.json
   settings.json
   recent_files.json
 ```
@@ -303,9 +333,14 @@ Suggested repositories:
 - `SettingsRepository`
   - Stores UI preferences and last-used paths.
 
+- `AppSettingsRepository`
+  - Stores app-level preferences such as selected language.
+  - Falls back to English for missing or unsupported values.
+
 - `MatchWorkspaceRepository`
   - Stores the last selected players CSV path, opponent, and formations.
   - Stores the last successful analysis result as serializable view-model JSON.
+  - Persists Change Analysis view-model data when present.
   - Restores results for any supported formation from the centralized catalog.
   - Uses JSON under the application data directory.
   - Keeps workspace persistence separate from widgets and engine code.
@@ -394,6 +429,7 @@ services -> state view models
 services -> reasoning -> existing analysis view models
 widgets -> player_intelligence -> existing roster data / player analyzers
 widgets -> workspace -> existing roster data / player analyzers
+views/widgets -> localization -> resources/i18n
 persistence -> models or persistence DTOs
 ```
 
@@ -437,6 +473,8 @@ User clicks Analyze Match
   -> Valid Workspace edits emit workspace-modified intent
   -> MatchController debounces fixed-lineup recalculation and preserves committed
      player assignments in the refreshed board
+  -> ChangeAnalysisService compares previous and current evaluated Workspace results
+  -> MatchPage renders Change Analysis above the local result tabs
 ```
 
 The engine remains unaware of the desktop application.
