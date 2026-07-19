@@ -121,7 +121,8 @@ Initial controllers:
 
 - `NavigationController`: switches central pages without opening new windows.
 - `SquadController`: load players, refresh squad state, handle CSV import errors,
-  apply filters, export visible rows, and publish roster path changes.
+  apply filters, build the Squad Builder Ideal XI view, export visible rows, and publish
+  roster path changes.
 - `OpponentController`: create, update, duplicate, delete, and select opponents.
 - `MatchController`: persist match workspace inputs and run matchup optimization against
   the selected opponent through a background worker. It also attaches Change Analysis
@@ -144,6 +145,15 @@ Suggested services:
   - Normalizes import errors for the UI.
   - Exposes roster summaries, sortable/filterable row view models, player details,
     position rankings through existing analyzers, and CSV export formatting.
+
+- `SquadBuilderService`
+  - Builds the Squad Ideal XI experience from loaded roster data.
+  - Calls existing `FormationOptimizer.optimize`, which in turn uses `LineupOptimizer`,
+    `TeamRater`, and `FormationAnalyzer.overall_score`.
+  - Evaluates every formation from `models.formations` for Auto mode.
+  - Maps results into serializable UI-facing formation, ranking, team profile and board
+    view models.
+  - Does not duplicate optimizer behavior or introduce rating formulas.
 
 - `OpponentService`
   - Manages saved opponents.

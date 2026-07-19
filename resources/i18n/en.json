@@ -39,6 +39,55 @@
     "subtitle": "Review and export future recommendations and match summaries.",
     "placeholder": "Reports will be implemented in a later epic."
   },
+  "squad_builder": {
+    "ideal_xi": "Ideal XI",
+    "players": "Players",
+    "formation": "Formation",
+    "empty_title": "No Ideal XI yet",
+    "empty_message": "Load a roster to build the Ideal XI.",
+    "empty_profile": "Team profile will appear after loading a roster.",
+    "best_formation_value": "Best Formation: {formation}",
+    "overall_score_value": "Overall Score: {score}",
+    "confidence_value": "Confidence: {confidence}",
+    "best_formations": "Best Formations",
+    "rank": "#",
+    "score": "Score",
+    "delta": "Delta",
+    "midfield": "Midfield",
+    "profile": "Profile",
+    "team_profile": "Team Profile",
+    "strengths_value": "Strengths: {strengths}",
+    "weaknesses_value": "Weaknesses: {weaknesses}",
+    "style_value": "Preferred style: {style}",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "close": "Close",
+      "low": "Low",
+      "alternative": "Alternative"
+    },
+    "style": {
+      "midfield_control": "Midfield control",
+      "attacking": "Attacking",
+      "defensive_stability": "Defensive stability",
+      "balanced": "Balanced"
+    },
+    "sector": {
+      "left_defense": "Left defense",
+      "central_defense": "Central defense",
+      "right_defense": "Right defense",
+      "midfield": "Midfield",
+      "left_attack": "Left attack",
+      "central_attack": "Central attack",
+      "right_attack": "Right attack"
+    },
+    "reason": {
+      "empty": "Load a roster to build an Ideal XI.",
+      "best": "{formation} has the strongest roster fit among the supported formations.",
+      "manual": "{formation} is selected for manual review and is {delta} behind the best roster fit.",
+      "formation_fit": "{formation} fits this roster with an overall formation score of {score}."
+    }
+  },
   "match": {
     "title": "Match",
     "subtitle": "Analyze a match against a saved opponent.",

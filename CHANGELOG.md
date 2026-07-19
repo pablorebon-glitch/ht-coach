@@ -54,6 +54,9 @@
   matchup matrix.
 - Added `engine/match_intelligence` as a serializable interpretation layer over already
   evaluated Match Workspace results.
+- Added Alpha 0.5.0 Squad Builder with an Ideal XI tab, Auto formation evaluation
+  across the full catalog, Best Formations ranking, team profile, reused Formation
+  Board and integrated Player Intelligence.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.

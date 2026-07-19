@@ -68,12 +68,24 @@ No marketing hero or decorative layout is needed. This is an operational tool.
 Purpose:
 
 - Import and inspect the player roster.
+- Build an opponent-independent Ideal XI for roster review before match preparation.
 
 Content:
 
 - CSV path selector.
 - Load and reload buttons.
 - Export visible rows button.
+- Two tabs: Ideal XI and Players.
+- Ideal XI tab with a top formation selector containing Auto and every supported
+  formation from the centralized catalog.
+- Auto mode evaluates every supported formation and displays the best roster fit.
+- Formation Board reused from the Match workspace for the Ideal XI pitch; no second
+  pitch widget is introduced.
+- Best Formations side panel with sorted scores and deltas versus the best result.
+- Summary with best formation, overall score, confidence and reason.
+- Team profile with strengths, weaknesses and preferred formation style.
+- Player Intelligence inspector inside the Formation Board for selected Ideal XI
+  players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,
   salary and specialty.
 - Search by player name.
@@ -94,6 +106,8 @@ Expected controls:
 - Position ranking selector.
 - Export visible table action.
 - Clear error display for invalid CSV.
+- Auto/manual formation selector for Ideal XI.
+- Best Formations ranking table.
 
 ### Opponents View
 

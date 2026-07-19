@@ -1,6 +1,10 @@
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
+from ht_coach_app.services.squad_builder_service import (
+    AUTO_FORMATION,
+    SquadBuilderService,
+)
 from ht_coach_app.services.squad_service import SquadValidationError
 
 
@@ -10,14 +14,17 @@ class SquadController:
         view,
         service,
         settings_repository,
-        app_events=None
+        app_events=None,
+        builder_service=None
     ):
         self._view = view
         self._service = service
+        self._builder_service = builder_service or SquadBuilderService()
         self._settings_repository = settings_repository
         self._app_events = app_events
         self._roster = None
         self._visible_rows = []
+        self._ideal_selection = AUTO_FORMATION
 
         self._connect_view()
         self.refresh()
@@ -41,11 +48,19 @@ class SquadController:
         self._view.player_selected.connect(
             self._show_player_detail
         )
+        if hasattr(self._view, "ideal_formation_changed"):
+            self._view.ideal_formation_changed.connect(
+                self._show_ideal_xi
+            )
 
     def refresh(self):
         self._view.set_supported_positions(
             self._service.supported_positions()
         )
+        if hasattr(self._view, "set_ideal_formation_options"):
+            self._view.set_ideal_formation_options(
+                self._builder_service.selection_options()
+            )
         settings = self._settings_repository.load()
         self._view.set_csv_path(
             settings.players_csv_path
@@ -82,6 +97,9 @@ class SquadController:
         self._view.show_status(
             f"Loaded {self._roster.player_count} players."
         )
+        self._show_ideal_xi(
+            self._ideal_selection
+        )
 
         if self._app_events is not None:
             self._app_events.roster_changed.emit(
@@ -110,6 +128,33 @@ class SquadController:
         )
         self._view.set_players(
             self._visible_rows
+        )
+
+    def _show_ideal_xi(self, formation_name=AUTO_FORMATION):
+        self._ideal_selection = formation_name or AUTO_FORMATION
+
+        if not hasattr(self._view, "show_ideal_xi"):
+            return
+
+        if self._roster is None:
+            self._view.show_ideal_empty()
+            return
+
+        result = self._builder_service.build(
+            self._roster.players,
+            self._ideal_selection,
+        )
+        details_by_name = {
+            row.name: self._service.player_detail(
+                self._roster.players,
+                row.name,
+            )
+            for row in self._roster.rows
+        }
+        self._view.show_ideal_xi(
+            result,
+            player_details_by_name=details_by_name,
+            roster_players=self._roster.players,
         )
 
     def _show_player_detail(self, player_name):

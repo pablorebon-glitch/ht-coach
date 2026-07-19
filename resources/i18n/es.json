@@ -39,6 +39,55 @@
     "subtitle": "Revisa y exporta futuras recomendaciones y resúmenes de partido.",
     "placeholder": "Los reportes se implementarán en un próximo epic."
   },
+  "squad_builder": {
+    "ideal_xi": "XI ideal",
+    "players": "Jugadores",
+    "formation": "Formacion",
+    "empty_title": "Todavia no hay XI ideal",
+    "empty_message": "Carga un plantel para construir el XI ideal.",
+    "empty_profile": "El perfil del equipo aparecera despues de cargar un plantel.",
+    "best_formation_value": "Mejor formacion: {formation}",
+    "overall_score_value": "Score general: {score}",
+    "confidence_value": "Confianza: {confidence}",
+    "best_formations": "Mejores formaciones",
+    "rank": "#",
+    "score": "Score",
+    "delta": "Diferencia",
+    "midfield": "Mediocampo",
+    "profile": "Perfil",
+    "team_profile": "Perfil del equipo",
+    "strengths_value": "Fortalezas: {strengths}",
+    "weaknesses_value": "Debilidades: {weaknesses}",
+    "style_value": "Estilo preferido: {style}",
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "close": "Cerrada",
+      "low": "Baja",
+      "alternative": "Alternativa"
+    },
+    "style": {
+      "midfield_control": "Control del mediocampo",
+      "attacking": "Ofensivo",
+      "defensive_stability": "Estabilidad defensiva",
+      "balanced": "Equilibrado"
+    },
+    "sector": {
+      "left_defense": "Defensa izquierda",
+      "central_defense": "Defensa central",
+      "right_defense": "Defensa derecha",
+      "midfield": "Mediocampo",
+      "left_attack": "Ataque izquierdo",
+      "central_attack": "Ataque central",
+      "right_attack": "Ataque derecho"
+    },
+    "reason": {
+      "empty": "Carga un plantel para construir el XI ideal.",
+      "best": "{formation} tiene el mejor encaje de plantel entre las formaciones soportadas.",
+      "manual": "{formation} esta seleccionada para revision manual y queda {delta} por detras del mejor encaje.",
+      "formation_fit": "{formation} encaja con este plantel con un score general de formacion de {score}."
+    }
+  },
   "match": {
     "title": "Partido",
     "subtitle": "Analiza un partido contra un rival guardado.",
