@@ -45,7 +45,6 @@
     "formation": "Formacion",
     "empty_title": "Todavia no hay XI ideal",
     "empty_message": "Carga un plantel para construir el XI ideal.",
-    "empty_profile": "El perfil del equipo aparecera despues de cargar un plantel.",
     "best_formation_value": "Mejor formacion: {formation}",
     "overall_score_value": "Score general: {score}",
     "confidence_value": "Confianza: {confidence}",
@@ -55,22 +54,12 @@
     "delta": "Diferencia",
     "midfield": "Mediocampo",
     "profile": "Perfil",
-    "team_profile": "Perfil del equipo",
-    "strengths_value": "Fortalezas: {strengths}",
-    "weaknesses_value": "Debilidades: {weaknesses}",
-    "style_value": "Estilo preferido: {style}",
     "confidence": {
       "high": "Alta",
       "medium": "Media",
       "close": "Cerrada",
       "low": "Baja",
       "alternative": "Alternativa"
-    },
-    "style": {
-      "midfield_control": "Control del mediocampo",
-      "attacking": "Ofensivo",
-      "defensive_stability": "Estabilidad defensiva",
-      "balanced": "Equilibrado"
     },
     "sector": {
       "left_defense": "Defensa izquierda",
@@ -86,6 +75,52 @@
       "best": "{formation} tiene el mejor encaje de plantel entre las formaciones soportadas.",
       "manual": "{formation} esta seleccionada para revision manual y queda {delta} por detras del mejor encaje.",
       "formation_fit": "{formation} encaja con este plantel con un score general de formacion de {score}."
+    }
+  },
+  "squad_identity": {
+    "title": "Identidad del plantel",
+    "empty_title": "Todavia no hay identidad del plantel",
+    "empty_message": "Carga un plantel para describir su identidad.",
+    "strengths": "Fortalezas",
+    "weaknesses": "Debilidades",
+    "tactical_readiness": "Preparacion tactica",
+    "formation_affinity": "Afinidad de formaciones",
+    "tactic": "Tactica",
+    "readiness_label": "Preparacion",
+    "affinity": "Afinidad",
+    "select_tactic": "Selecciona una tactica para ver detalles de preparacion.",
+    "contributors_value": "Principales contribuyentes: {players}",
+    "detail_strengths": "Fortalezas: {values}",
+    "detail_limitations": "Limitaciones: {values}",
+    "compatible_formations_value": "Formaciones compatibles: {formations}",
+    "identity": {
+      "midfield_dominant": "Plantel dominante en mediocampo",
+      "wing_oriented": "Plantel orientado a bandas",
+      "balanced": "Plantel equilibrado",
+      "defensive": "Plantel defensivo",
+      "central_attack": "Plantel de ataque central",
+      "counter_oriented": "Plantel orientado a contraataque"
+    },
+    "explanation": {
+      "midfield_dominant": "Tu plantel rinde naturalmente mejor controlando el mediocampo y sosteniendo la posesion.",
+      "wing_oriented": "Tu plantel rinde naturalmente mejor abriendo la cancha y creando chances por bandas.",
+      "balanced": "Tu plantel tiene un perfil equilibrado sin una identidad tactica dominante.",
+      "defensive": "Tu plantel rinde naturalmente mejor con estabilidad defensiva y cobertura confiable.",
+      "central_attack": "Tu plantel rinde naturalmente mejor creando chances por el centro.",
+      "counter_oriented": "Tu plantel tiene rasgos que apoyan resistir presion y salir rapido."
+    },
+    "level": {
+      "excellent": "Excelente",
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "very_low": "Muy baja"
+    },
+    "readiness": {
+      "why": "La preparacion para {tactic} es {level} segun atributos del plantel, encaje de formacion y perfil general.",
+      "strength": "El plantel tiene atributos relevantes para {tactic}.",
+      "limitation_context": "{tactic} sigue dependiendo del contexto del partido y la forma del rival.",
+      "limitation_gap": "{tactic} esta menos respaldada que las capacidades mas fuertes del plantel."
     }
   },
   "match": {

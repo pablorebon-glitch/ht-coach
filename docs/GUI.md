@@ -83,7 +83,15 @@ Content:
   pitch widget is introduced.
 - Best Formations side panel with sorted scores and deltas versus the best result.
 - Summary with best formation, overall score, confidence and reason.
-- Team profile with strengths, weaknesses and preferred formation style.
+- Squad Identity panel that separates Identity, Strengths, Weaknesses, Tactical
+  Readiness and Formation Affinity.
+- Identity explanation that describes what the squad naturally does well without
+  recommending match tactics.
+- Tactical Readiness entries for Normal, Attack in the Middle, Attack on Wings, Play
+  Creatively, Pressing, Counter-Attacks and Long Shots, with why suitable, strengths,
+  limitations, main contributors and compatible formations.
+- Formation Affinity for every supported formation, reusing existing Squad Builder
+  formation optimization results.
 - Player Intelligence inspector inside the Formation Board for selected Ideal XI
   players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,
@@ -108,6 +116,8 @@ Expected controls:
 - Clear error display for invalid CSV.
 - Auto/manual formation selector for Ideal XI.
 - Best Formations ranking table.
+- Tactical Readiness selector and detail display.
+- Formation Affinity table.
 
 ### Opponents View
 

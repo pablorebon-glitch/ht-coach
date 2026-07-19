@@ -46,6 +46,7 @@ class RatingStub:
 
 class SquadBuilderServiceTest(unittest.TestCase):
     def setUp(self):
+        configure_localization("en")
         self.players = [
             make_player(index)
             for index in range(1, 24)
@@ -154,12 +155,77 @@ class SquadBuilderServiceTest(unittest.TestCase):
     def test_squad_builder_localization_keys_exist(self):
         configure_localization("en")
         self.assertEqual(t("squad_builder.ideal_xi"), "Ideal XI")
+        self.assertEqual(
+            t("squad_identity.identity.midfield_dominant"),
+            "Midfield Dominant Squad",
+        )
 
         configure_localization("es")
         self.assertNotEqual(
             t("squad_builder.ideal_xi"),
             "Translation unavailable",
         )
+        self.assertNotEqual(
+            t("squad_identity.title"),
+            "Translation unavailable",
+        )
+
+    def test_identity_classification_uses_squad_profile(self):
+        service = SquadBuilderService(
+            optimizer=self._optimizer
+        )
+
+        result = service.build(self.players)
+
+        self.assertEqual(
+            result.squad_identity.identity,
+            "Central Attack Squad",
+        )
+        self.assertIn(
+            "central",
+            result.squad_identity.explanation.lower(),
+        )
+        self.assertTrue(result.squad_identity.contributors)
+
+    def test_tactical_readiness_covers_supported_tactics(self):
+        service = SquadBuilderService(
+            optimizer=self._optimizer
+        )
+
+        result = service.build(self.players)
+        readiness = result.squad_identity.tactical_readiness
+
+        self.assertEqual(len(readiness), 7)
+        self.assertEqual(readiness[0].level, "Excellent")
+        self.assertTrue(readiness[0].why_suitable)
+        self.assertTrue(readiness[0].contributors)
+        self.assertTrue(readiness[0].compatible_formations)
+
+    def test_formation_affinity_maps_every_supported_formation(self):
+        service = SquadBuilderService(
+            optimizer=self._optimizer
+        )
+
+        result = service.build(self.players)
+        affinity = result.squad_identity.formation_affinity
+
+        self.assertEqual(len(affinity), len(FORMATION_BY_NAME))
+        self.assertEqual(affinity[0].formation_name, "2-5-3")
+        self.assertEqual(affinity[0].level, "Excellent")
+        self.assertEqual(affinity[0].score_delta, 0.0)
+        self.assertTrue(affinity[0].is_best)
+
+    def test_player_contribution_mapping_is_deterministic(self):
+        service = SquadBuilderService(
+            optimizer=self._optimizer
+        )
+
+        first = service.build(self.players).squad_identity.contributors
+        second = service.build(self.players).squad_identity.contributors
+
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 3)
+        self.assertTrue(first[0].player_name)
 
 
 if __name__ == "__main__":

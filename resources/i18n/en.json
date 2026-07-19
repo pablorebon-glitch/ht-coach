@@ -45,7 +45,6 @@
     "formation": "Formation",
     "empty_title": "No Ideal XI yet",
     "empty_message": "Load a roster to build the Ideal XI.",
-    "empty_profile": "Team profile will appear after loading a roster.",
     "best_formation_value": "Best Formation: {formation}",
     "overall_score_value": "Overall Score: {score}",
     "confidence_value": "Confidence: {confidence}",
@@ -55,22 +54,12 @@
     "delta": "Delta",
     "midfield": "Midfield",
     "profile": "Profile",
-    "team_profile": "Team Profile",
-    "strengths_value": "Strengths: {strengths}",
-    "weaknesses_value": "Weaknesses: {weaknesses}",
-    "style_value": "Preferred style: {style}",
     "confidence": {
       "high": "High",
       "medium": "Medium",
       "close": "Close",
       "low": "Low",
       "alternative": "Alternative"
-    },
-    "style": {
-      "midfield_control": "Midfield control",
-      "attacking": "Attacking",
-      "defensive_stability": "Defensive stability",
-      "balanced": "Balanced"
     },
     "sector": {
       "left_defense": "Left defense",
@@ -86,6 +75,52 @@
       "best": "{formation} has the strongest roster fit among the supported formations.",
       "manual": "{formation} is selected for manual review and is {delta} behind the best roster fit.",
       "formation_fit": "{formation} fits this roster with an overall formation score of {score}."
+    }
+  },
+  "squad_identity": {
+    "title": "Squad Identity",
+    "empty_title": "No squad identity yet",
+    "empty_message": "Load a roster to describe the squad identity.",
+    "strengths": "Strengths",
+    "weaknesses": "Weaknesses",
+    "tactical_readiness": "Tactical Readiness",
+    "formation_affinity": "Formation Affinity",
+    "tactic": "Tactic",
+    "readiness_label": "Readiness",
+    "affinity": "Affinity",
+    "select_tactic": "Select a tactic to inspect readiness details.",
+    "contributors_value": "Main contributors: {players}",
+    "detail_strengths": "Strengths: {values}",
+    "detail_limitations": "Limitations: {values}",
+    "compatible_formations_value": "Compatible formations: {formations}",
+    "identity": {
+      "midfield_dominant": "Midfield Dominant Squad",
+      "wing_oriented": "Wing Oriented Squad",
+      "balanced": "Balanced Squad",
+      "defensive": "Defensive Squad",
+      "central_attack": "Central Attack Squad",
+      "counter_oriented": "Counter-oriented Squad"
+    },
+    "explanation": {
+      "midfield_dominant": "Your squad naturally performs best when controlling midfield and supporting possession.",
+      "wing_oriented": "Your squad naturally performs best when stretching play and creating chances from wide areas.",
+      "balanced": "Your squad has a balanced profile without one dominant tactical identity.",
+      "defensive": "Your squad naturally performs best through defensive stability and reliable coverage.",
+      "central_attack": "Your squad naturally performs best when creating central chances.",
+      "counter_oriented": "Your squad has traits that support absorbing pressure and breaking forward."
+    },
+    "level": {
+      "excellent": "Excellent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "very_low": "Very Low"
+    },
+    "readiness": {
+      "why": "{tactic} readiness is {level} based on roster attributes, formation fit and squad profile.",
+      "strength": "The squad has relevant attributes for {tactic}.",
+      "limitation_context": "{tactic} still depends on match context and opponent shape.",
+      "limitation_gap": "{tactic} is less supported than the squad's strongest capabilities."
     }
   },
   "match": {

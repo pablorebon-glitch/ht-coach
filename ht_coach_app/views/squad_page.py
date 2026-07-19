@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -65,6 +66,7 @@ class SquadPage(BasePage):
         )
         self._state = "empty"
         self._formation_board_mapper = FormationBoardMapper()
+        self._readiness_rows = []
         self._build_controls()
         self._build_content()
 
@@ -188,11 +190,78 @@ class SquadPage(BasePage):
         self.ideal_board.reset_workspace_button.setVisible(False)
         splitter.addWidget(self.ideal_board)
 
+        side_scroll = QScrollArea()
+        side_scroll.setWidgetResizable(True)
+        side_scroll.setFrameShape(QFrame.NoFrame)
         side_panel = QFrame()
         side_panel.setObjectName("workspacePanel")
         side_layout = QVBoxLayout(side_panel)
         side_layout.setContentsMargins(12, 12, 12, 12)
         side_layout.setSpacing(8)
+
+        identity_title = QLabel(t("squad_identity.title"))
+        identity_title.setObjectName("sectionTitle")
+        self.identity_label = QLabel(t("squad_identity.empty_title"))
+        self.identity_label.setObjectName("sectionTitle")
+        self.identity_explanation_label = QLabel(t("squad_identity.empty_message"))
+        self.identity_explanation_label.setWordWrap(True)
+        self.identity_contributors_label = QLabel("")
+        self.identity_contributors_label.setWordWrap(True)
+
+        strengths_title = QLabel(t("squad_identity.strengths"))
+        strengths_title.setObjectName("sectionTitle")
+        self.identity_strengths_label = QLabel("-")
+        self.identity_strengths_label.setWordWrap(True)
+
+        weaknesses_title = QLabel(t("squad_identity.weaknesses"))
+        weaknesses_title.setObjectName("sectionTitle")
+        self.identity_weaknesses_label = QLabel("-")
+        self.identity_weaknesses_label.setWordWrap(True)
+
+        readiness_title = QLabel(t("squad_identity.tactical_readiness"))
+        readiness_title.setObjectName("sectionTitle")
+        self.readiness_table = QTableWidget(0, 2)
+        self.readiness_table.setHorizontalHeaderLabels(
+            [
+                t("squad_identity.tactic"),
+                t("squad_identity.readiness_label"),
+            ]
+        )
+        self.readiness_table.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        self.readiness_table.setSelectionBehavior(
+            QAbstractItemView.SelectRows
+        )
+        self.readiness_table.setSelectionMode(
+            QAbstractItemView.SingleSelection
+        )
+        self.readiness_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        self.readiness_table.itemSelectionChanged.connect(
+            self._show_selected_tactic_detail
+        )
+        self.readiness_detail_label = QLabel(t("squad_identity.select_tactic"))
+        self.readiness_detail_label.setWordWrap(True)
+
+        affinity_title = QLabel(t("squad_identity.formation_affinity"))
+        affinity_title.setObjectName("sectionTitle")
+        self.formation_affinity_table = QTableWidget(0, 4)
+        self.formation_affinity_table.setHorizontalHeaderLabels(
+            [
+                t("squad_builder.formation"),
+                t("squad_identity.affinity"),
+                t("squad_builder.score"),
+                t("squad_builder.delta"),
+            ]
+        )
+        self.formation_affinity_table.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        self.formation_affinity_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
 
         ranking_title = QLabel(t("squad_builder.best_formations"))
         ranking_title.setObjectName("sectionTitle")
@@ -217,16 +286,24 @@ class SquadPage(BasePage):
             QHeaderView.Stretch
         )
 
-        profile_title = QLabel(t("squad_builder.team_profile"))
-        profile_title.setObjectName("sectionTitle")
-        self.ideal_profile_label = QLabel(t("squad_builder.empty_profile"))
-        self.ideal_profile_label.setWordWrap(True)
-
+        side_layout.addWidget(identity_title)
+        side_layout.addWidget(self.identity_label)
+        side_layout.addWidget(self.identity_explanation_label)
+        side_layout.addWidget(self.identity_contributors_label)
+        side_layout.addWidget(strengths_title)
+        side_layout.addWidget(self.identity_strengths_label)
+        side_layout.addWidget(weaknesses_title)
+        side_layout.addWidget(self.identity_weaknesses_label)
+        side_layout.addWidget(readiness_title)
+        side_layout.addWidget(self.readiness_table)
+        side_layout.addWidget(self.readiness_detail_label)
+        side_layout.addWidget(affinity_title)
+        side_layout.addWidget(self.formation_affinity_table)
         side_layout.addWidget(ranking_title)
-        side_layout.addWidget(self.ideal_ranking_table, 1)
-        side_layout.addWidget(profile_title)
-        side_layout.addWidget(self.ideal_profile_label)
-        splitter.addWidget(side_panel)
+        side_layout.addWidget(self.ideal_ranking_table)
+        side_layout.addStretch(1)
+        side_scroll.setWidget(side_panel)
+        splitter.addWidget(side_scroll)
         splitter.setSizes([820, 320])
         layout.addWidget(splitter, 1)
 
@@ -439,7 +516,7 @@ class SquadPage(BasePage):
         self.ideal_confidence_label.setText("")
         self.ideal_reason_label.setText(t("squad_builder.empty_message"))
         self.ideal_ranking_table.setRowCount(0)
-        self.ideal_profile_label.setText(t("squad_builder.empty_profile"))
+        self._set_squad_identity(None)
 
     def show_ideal_xi(
         self,
@@ -473,7 +550,7 @@ class SquadPage(BasePage):
         )
         self.ideal_reason_label.setText(result.reason)
         self._set_ideal_rankings(result.rankings)
-        self._set_team_profile(result.team_profile)
+        self._set_squad_identity(result.squad_identity)
 
         boards = [
             self._formation_board_mapper.to_board(
@@ -523,17 +600,141 @@ class SquadPage(BasePage):
                     item.setBackground(Qt.GlobalColor.lightGray)
                 self.ideal_ranking_table.setItem(row, column, item)
 
-    def _set_team_profile(self, profile):
-        strengths = ", ".join(profile.strengths) or "-"
-        weaknesses = ", ".join(profile.weaknesses) or "-"
-        self.ideal_profile_label.setText(
+    def _set_squad_identity(self, identity):
+        if identity is None:
+            self._readiness_rows = []
+            self.identity_label.setText(t("squad_identity.empty_title"))
+            self.identity_explanation_label.setText(
+                t("squad_identity.empty_message")
+            )
+            self.identity_contributors_label.setText("")
+            self.identity_strengths_label.setText("-")
+            self.identity_weaknesses_label.setText("-")
+            self.readiness_table.setRowCount(0)
+            self.readiness_detail_label.setText(
+                t("squad_identity.select_tactic")
+            )
+            self.formation_affinity_table.setRowCount(0)
+            return
+
+        self.identity_label.setText(identity.identity)
+        self.identity_explanation_label.setText(identity.explanation)
+        self.identity_contributors_label.setText(
+            self._contributors_text(identity.contributors)
+        )
+        self.identity_strengths_label.setText(
+            ", ".join(identity.strengths) or "-"
+        )
+        self.identity_weaknesses_label.setText(
+            ", ".join(identity.weaknesses) or "-"
+        )
+        self._set_tactical_readiness(identity.tactical_readiness)
+        self._set_formation_affinity(identity.formation_affinity)
+
+    def _set_tactical_readiness(self, readiness_rows):
+        self._readiness_rows = list(readiness_rows or [])
+        self.readiness_table.setRowCount(len(self._readiness_rows))
+
+        for row, readiness in enumerate(self._readiness_rows):
+            values = [
+                readiness.tactic_name,
+                readiness.level,
+            ]
+            for column, value in enumerate(values):
+                self.readiness_table.setItem(
+                    row,
+                    column,
+                    SortableTableItem(
+                        value,
+                        str(value).casefold(),
+                    ),
+                )
+
+        if self._readiness_rows:
+            self.readiness_table.selectRow(0)
+            self._render_tactic_detail(self._readiness_rows[0])
+        else:
+            self.readiness_detail_label.setText(
+                t("squad_identity.select_tactic")
+            )
+
+    def _set_formation_affinity(self, affinity_rows):
+        self.formation_affinity_table.setRowCount(len(affinity_rows or []))
+
+        for row, affinity in enumerate(affinity_rows or []):
+            values = [
+                (
+                    f"{affinity.formation_name} *"
+                    if affinity.is_best
+                    else affinity.formation_name
+                ),
+                affinity.level,
+                f"{affinity.overall_score:.2f}",
+                f"{affinity.score_delta:.2f}",
+            ]
+            sort_values = [
+                affinity.formation_name.casefold(),
+                affinity.level.casefold(),
+                affinity.overall_score,
+                affinity.score_delta,
+            ]
+
+            for column, value in enumerate(values):
+                self.formation_affinity_table.setItem(
+                    row,
+                    column,
+                    SortableTableItem(
+                        value,
+                        sort_values[column],
+                    ),
+                )
+
+    def _show_selected_tactic_detail(self):
+        selected = self.readiness_table.selectedItems()
+
+        if not selected:
+            return
+
+        row = selected[0].row()
+        if row < 0 or row >= len(getattr(self, "_readiness_rows", [])):
+            return
+
+        self._render_tactic_detail(self._readiness_rows[row])
+
+    def _render_tactic_detail(self, readiness):
+        self.readiness_detail_label.setText(
             "\n".join(
                 [
-                    t("squad_builder.strengths_value", strengths=strengths),
-                    t("squad_builder.weaknesses_value", weaknesses=weaknesses),
-                    t("squad_builder.style_value", style=profile.preferred_style),
+                    readiness.why_suitable,
+                    t(
+                        "squad_identity.detail_strengths",
+                        values=", ".join(readiness.strengths) or "-",
+                    ),
+                    t(
+                        "squad_identity.detail_limitations",
+                        values=", ".join(readiness.limitations) or "-",
+                    ),
+                    self._contributors_text(readiness.contributors),
+                    t(
+                        "squad_identity.compatible_formations_value",
+                        formations=", ".join(readiness.compatible_formations) or "-",
+                    ),
                 ]
             )
+        )
+
+    def _contributors_text(self, contributors):
+        names = [
+            (
+                f"{contributor.player_name} ({contributor.value_label})"
+                if contributor.value_label
+                else contributor.player_name
+            )
+            for contributor in contributors or []
+        ]
+        return t(
+            "squad_identity.contributors_value",
+            players=", ".join(names) or "-",
         )
 
     def set_loaded_count(self, count):

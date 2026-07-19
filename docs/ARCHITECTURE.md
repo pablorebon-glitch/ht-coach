@@ -151,8 +151,10 @@ Suggested services:
   - Calls existing `FormationOptimizer.optimize`, which in turn uses `LineupOptimizer`,
     `TeamRater`, and `FormationAnalyzer.overall_score`.
   - Evaluates every formation from `models.formations` for Auto mode.
-  - Maps results into serializable UI-facing formation, ranking, team profile and board
-    view models.
+  - Maps results into serializable UI-facing formation, ranking, squad identity,
+    tactical readiness, formation affinity, contributor and board view models.
+  - Describes long-term squad capability only; it does not consider opponents and does
+    not recommend match tactics.
   - Does not duplicate optimizer behavior or introduce rating formulas.
 
 - `OpponentService`

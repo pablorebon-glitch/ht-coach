@@ -120,8 +120,11 @@ Deliverables:
 - Export visible rows to CSV
 - Squad-to-Match roster path synchronization through app events
 - Squad Builder Ideal XI tab with Auto formation evaluation across the full formation
-  catalog, Best Formations ranking, team profile, reused Formation Board and integrated
-  Player Intelligence.
+  catalog, Best Formations ranking, Squad Identity, reused Formation Board and
+  integrated Player Intelligence.
+- Squad Identity and Tactical Readiness panel replacing Preferred Style wording with
+  descriptive identity, strengths, weaknesses, tactic capability readiness, formation
+  affinity and main player contributors.
 
 Acceptance criteria:
 
@@ -129,6 +132,8 @@ Acceptance criteria:
 - Player table supports sorting.
 - Users can review the strongest roster-fit XI without selecting an opponent.
 - Switching formation rebuilds the Ideal XI summary, pitch and player explanation.
+- Squad Identity describes long-term roster capability without opponent context or
+  match-tactic recommendations.
 - Import errors do not crash the app.
 - Match receives roster path changes without restarting the app.
 - No engine formulas or optimizer calculations are changed.
