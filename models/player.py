@@ -25,3 +25,6 @@ class Player:
 
     tsi: int
     salary: int
+
+    injury: float | None = None
+    injury_raw: str = ""

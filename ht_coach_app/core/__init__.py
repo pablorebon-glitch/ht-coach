@@ -1,0 +1,2 @@
+"""Core desktop application infrastructure."""
+

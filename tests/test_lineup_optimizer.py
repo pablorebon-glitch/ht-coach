@@ -11,7 +11,8 @@ from models.team_ratings import TeamRatings
 from models.tactic import Tactic
 
 from models.formations import (
-    FORMATION_352
+    FORMATION_352,
+    FORMATIONS,
 )
 
 
@@ -197,6 +198,28 @@ def test_optimizer_returns_complete_lineup(
 
     assert len(
         result.lineup.players
+    ) == 11
+
+
+@pytest.mark.parametrize(
+    "formation",
+    FORMATIONS
+)
+def test_lineup_optimizer_supports_every_formation(
+    players,
+    formation
+):
+    lineup = LineupOptimizer.optimize(
+        players,
+        formation
+    )
+
+    assert len(lineup.players) == 11
+    assert len(
+        {
+            id(lineup_player.player)
+            for lineup_player in lineup.players
+        }
     ) == 11
 
 

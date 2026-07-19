@@ -1,0 +1,505 @@
+{
+  "app": {
+    "ready": "Ready",
+    "refresh": "Refresh",
+    "refresh_tip": "Refresh the current workspace view",
+    "help": "Help",
+    "not_implemented": "This shell action will be implemented in a later epic."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "squad": "Squad",
+    "opponents": "Opponents",
+    "match": "Match",
+    "reports": "Reports",
+    "settings": "Settings",
+    "ready": "{page} ready"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Configure desktop preferences and local application paths.",
+    "language": "Language",
+    "language_help": "Language changes apply immediately where practical.",
+    "english": "English",
+    "spanish": "Español",
+    "saved": "Language preference saved.",
+    "advisor_verbosity": "Advisor verbosity",
+    "advisor_verbosity_help": "Simple shows title and impact. Detailed also shows the explanation.",
+    "verbosity_simple": "Simple",
+    "verbosity_detailed": "Detailed",
+    "advisor_saved": "Advisor preference saved."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Workspace overview for roster, opponent, and latest recommendation.",
+    "placeholder": "Dashboard content will be implemented in a later epic."
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Review and export future recommendations and match summaries.",
+    "placeholder": "Reports will be implemented in a later epic."
+  },
+  "squad_builder": {
+    "ideal_xi": "Ideal XI",
+    "players": "Players",
+    "formation": "Formation",
+    "empty_title": "No Ideal XI yet",
+    "empty_message": "Load a roster to build the Ideal XI.",
+    "best_formation_value": "Best Formation: {formation}",
+    "overall_score_value": "Overall Score: {score}",
+    "confidence_value": "Confidence: {confidence}",
+    "best_formations": "Best Formations",
+    "rank": "#",
+    "score": "Score",
+    "delta": "Delta",
+    "midfield": "Midfield",
+    "profile": "Profile",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "close": "Close",
+      "low": "Low",
+      "alternative": "Alternative"
+    },
+    "sector": {
+      "left_defense": "Left defense",
+      "central_defense": "Central defense",
+      "right_defense": "Right defense",
+      "midfield": "Midfield",
+      "left_attack": "Left attack",
+      "central_attack": "Central attack",
+      "right_attack": "Right attack"
+    },
+    "reason": {
+      "empty": "Load a roster to build an Ideal XI.",
+      "best": "{formation} has the strongest roster fit among the supported formations.",
+      "manual": "{formation} is selected for manual review and is {delta} behind the best roster fit.",
+      "formation_fit": "{formation} fits this roster with an overall formation score of {score}."
+    }
+  },
+  "squad_identity": {
+    "title": "Squad Identity",
+    "empty_title": "No squad identity yet",
+    "empty_message": "Load a roster to describe the squad identity.",
+    "strengths": "Strengths",
+    "weaknesses": "Weaknesses",
+    "tactical_readiness": "Tactical Readiness",
+    "formation_affinity": "Formation Affinity",
+    "tactic": "Tactic",
+    "readiness_label": "Readiness",
+    "affinity": "Affinity",
+    "select_tactic": "Select a tactic to inspect readiness details.",
+    "contributors_value": "Main contributors: {players}",
+    "detail_strengths": "Strengths: {values}",
+    "detail_limitations": "Limitations: {values}",
+    "compatible_formations_value": "Compatible formations: {formations}",
+    "identity": {
+      "midfield_dominant": "Midfield Dominant Squad",
+      "wing_oriented": "Wing Oriented Squad",
+      "balanced": "Balanced Squad",
+      "defensive": "Defensive Squad",
+      "central_attack": "Central Attack Squad",
+      "counter_oriented": "Counter-oriented Squad"
+    },
+    "explanation": {
+      "midfield_dominant": "Your squad naturally performs best when controlling midfield and supporting possession.",
+      "wing_oriented": "Your squad naturally performs best when stretching play and creating chances from wide areas.",
+      "balanced": "Your squad has a balanced profile without one dominant tactical identity.",
+      "defensive": "Your squad naturally performs best through defensive stability and reliable coverage.",
+      "central_attack": "Your squad naturally performs best when creating central chances.",
+      "counter_oriented": "Your squad has traits that support absorbing pressure and breaking forward."
+    },
+    "level": {
+      "excellent": "Excellent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "very_low": "Very Low"
+    },
+    "readiness": {
+      "why": "{tactic} readiness is {level} based on roster attributes, formation fit and squad profile.",
+      "strength": "The squad has relevant attributes for {tactic}.",
+      "limitation_context": "{tactic} still depends on match context and opponent shape.",
+      "limitation_gap": "{tactic} is less supported than the squad's strongest capabilities."
+    }
+  },
+  "availability": {
+    "mode_label": "Squad availability",
+    "mode": {
+      "current": "Current Available Squad",
+      "full_strength": "Full Strength Squad"
+    },
+    "full_strength_warning": "Full Strength is a theoretical squad and may include unavailable players.",
+    "health_title": "Squad Health",
+    "health_empty": "Squad health appears after loading a roster.",
+    "unavailable_players": "Unavailable players",
+    "impact_title": "Availability impact",
+    "impact_empty": "Availability impact appears after comparing current and full-strength squads.",
+    "coverage_title": "Positional coverage",
+    "player_name": "Name",
+    "status": "Status",
+    "injury_value": "Injury",
+    "expected_role": "Expected role",
+    "role": "Role",
+    "coverage": "Coverage",
+    "depth": "Depth",
+    "summary_count": "{available} of {total} players available",
+    "unavailable_starters_value": "Unavailable starters: {count}",
+    "affected_areas_value": "Affected areas: {areas}",
+    "severity_value": "Severity: {severity}",
+    "score_difference_value": "Overall score: {value}",
+    "most_affected_area_value": "Most affected area: {area}",
+    "replacement_value": "Replacement: {replacement}",
+    "formation_impact_value": "Formation impact: {impact}",
+    "filter": {
+      "all": "All",
+      "available": "Available",
+      "unavailable": "Unavailable",
+      "injured": "Injured",
+      "unknown": "Unknown"
+    },
+    "reason": {
+      "available": "Available",
+      "injured": "Not selected because the player is currently injured.",
+      "unknown": "Availability status is unknown from the imported data.",
+      "not_enough_players": "There are not enough eligible players to build an Ideal XI."
+    },
+    "status_message": {
+      "updating_ideal_xi": "Updating Ideal XI...",
+      "recalculating_formation": "Recalculating formation...",
+      "evaluating_formations": "Evaluating available formations...",
+      "updating_availability": "Updating squad availability...",
+      "updating_readiness": "Updating tactical readiness..."
+    }
+  },
+  "match": {
+    "title": "Match",
+    "subtitle": "Analyze a match against a saved opponent.",
+    "analysis_setup": "Analysis Setup",
+    "players_csv": "Players CSV",
+    "select_players_csv": "Select players.csv",
+    "browse": "Browse",
+    "load_players": "Load Players",
+    "no_players_loaded": "No players loaded",
+    "players_loaded": "{count} players loaded",
+    "opponent": "Opponent",
+    "formations": "Formations",
+    "select_all": "Select All",
+    "clear_all": "Clear All",
+    "favorites": "Favorites",
+    "ready": "Ready",
+    "analyze": "Analyze Match",
+    "analyzing": "Analyzing...",
+    "updating": "Updating...",
+    "updating_workspace": "Updating Workspace analysis...",
+    "analysis_failed": "Analysis failed: {message}",
+    "analysis_error_title": "Analysis could not complete",
+    "loading_title": "Analyzing match",
+    "loading_message": "Optimizing formations, lineup, individual orders and tactic.",
+    "empty_title": "No analysis yet",
+    "empty_message": "Run a match analysis to view the recommended formation.",
+    "hide_setup": "Hide analysis setup",
+    "show_setup": "Show analysis setup",
+    "many_formations": "Many formations selected. Analysis can take longer.",
+    "formation_board": "Formation Board",
+    "comparison": "Comparison",
+    "detailed_xi": "Detailed XI",
+    "recommended": "Recommended",
+    "tactic_level": "Tactic level",
+    "win": "Win",
+    "draw": "Draw",
+    "loss": "Loss",
+    "possession": "Possession",
+    "xg": "xG",
+    "opp_xg": "Opp xG",
+    "decision_lab": "Decision Lab",
+    "recommendation_confidence": "Recommendation confidence: {level}",
+    "play_to_win": "Play to win",
+    "secure_draw": "Secure the draw",
+    "avoid_defeat": "Avoid defeat",
+    "formation_comparison": "Formation comparison",
+    "tactic": "Tactic",
+    "win_draw_loss": "Win / Draw / Loss",
+    "win_diff": "Win diff",
+    "xg_diff": "xG diff",
+    "recommended_xi": "Recommended XI",
+    "number": "No.",
+    "side": "Side",
+    "position": "Position",
+    "player": "Player",
+    "order": "Order",
+    "order_side": "Order Side",
+    "board_error_title": "Formation board could not render",
+    "board_error_message": "The comparison and Detailed XI tabs are still available. Board error: {error}"
+  },
+  "workspace": {
+    "formation_board": "Formation Board",
+    "reset": "Reset Workspace",
+    "reset_tip": "Restore the original recommended lineup.",
+    "original": "Original Recommendation",
+    "updating": "Updating analysis...",
+    "evaluated": "Evaluated Workspace",
+    "failed": "Analysis failed",
+    "pending": "Modified Workspace - Pending Recalculation",
+    "swap_preview": "Swap Preview",
+    "replacement_preview": "Replacement Preview",
+    "why_recommended": "Why Recommended",
+    "workspace_impact": "Workspace Impact",
+    "position_fit_comparison": "Position fit comparison",
+    "previous_player": "Previous player",
+    "current_player": "Current player",
+    "difference": "Difference",
+    "in_this_slot": "{value} in this slot",
+    "slot_score_tip": "Difference between each player's calculated contribution score for this specific tactical slot.",
+    "technical_details": "Technical details"
+  },
+  "bench": {
+    "title": "Bench",
+    "players": "{count} players",
+    "empty": "No bench players available.",
+    "score": "Score {score}"
+  },
+  "change": {
+    "title": "Change Analysis",
+    "last_change": "Last Change",
+    "incoming_player": "Incoming player",
+    "outgoing_player": "Outgoing player",
+    "slot": "Slot",
+    "position_fit": "Position Fit",
+    "previous_score": "Previous player score",
+    "current_score": "Current player score",
+    "team_impact": "Team Impact",
+    "sector_changes": "Sector Changes",
+    "summary": "Summary",
+    "old": "Old",
+    "new": "New",
+    "excellent_tradeoff": "Excellent trade-off",
+    "balanced_improvement": "Balanced improvement",
+    "risky_change": "Risky change",
+    "net_negative": "Net negative",
+    "excellent_text": "Improved win chances while reducing loss risk with no major sector sacrifice.",
+    "balanced_text": "Improved the team while keeping the tactical trade-off controlled.",
+    "risky_text": "The change helps one area, but the calculated downside is noticeable.",
+    "negative_text": "Overall team probabilities became worse.",
+    "not_available": "Change Analysis will appear after a Workspace recalculation."
+  },
+  "match_intelligence": {
+    "title": "Match Intelligence",
+    "highlights": "Key Signals",
+    "sector": {
+      "left_defense": "left defense",
+      "central_defense": "central defense",
+      "right_defense": "right defense",
+      "midfield": "midfield",
+      "left_attack": "left attack",
+      "central_attack": "central attack",
+      "right_attack": "right attack"
+    },
+    "classification": {
+      "excellent": "Excellent",
+      "favorable": "Favorable",
+      "balanced": "Balanced",
+      "unfavorable": "Unfavorable",
+      "critical": "Critical"
+    },
+    "profile": {
+      "title": "Team Profile",
+      "ours": "Us: strongest {strongest}; weakest {weakest}.",
+      "opponent": "Opponent: strongest {strongest}; weakest {weakest}."
+    },
+    "focus": {
+      "title": "Tactical Focus",
+      "attack_best_route": {
+        "title": "Attack through {attack_sector}",
+        "description": "{attack_sector} faces {defense_sector} with a {difference} rating margin."
+      },
+      "protect_exposed_defense": {
+        "title": "Protect {defense_sector}",
+        "description": "Their {attack_sector} attacks your {defense_sector} with a {difference} rating margin."
+      },
+      "midfield_battle": {
+        "title": "Treat midfield as the key battle",
+        "description": "Possession and chance volume depend on how well {sector} holds."
+      }
+    },
+    "opportunity": {
+      "attack_route": {
+        "title": "{attack_sector} is a usable route",
+        "description": "{attack_sector} versus {defense_sector} has a {difference} rating margin."
+      },
+      "midfield": {
+        "title": "Midfield can support possession",
+        "description": "Projected possession is {possession}, which should support chance volume."
+      }
+    },
+    "risk": {
+      "dangerous_route": {
+        "title": "Their {attack_sector} is dangerous",
+        "description": "Their {attack_sector} versus your {defense_sector} has a {difference} rating margin."
+      },
+      "midfield_deficit": {
+        "title": "Midfield deficit can limit the plan",
+        "description": "Projected possession is only {possession}."
+      }
+    },
+    "summary": {
+      "defensive_risk": "This match is likely to be shaped by their {attack_sector} against your {defense_sector}.",
+      "midfield_control": "This match is likely to be decided in midfield; projected possession is {possession}.",
+      "balanced": "This match looks balanced across the main tactical sectors. Small lineup choices may decide it."
+    },
+    "matrix": {
+      "side": "Side",
+      "attack": "Attack",
+      "defense": "Defense",
+      "diff": "Diff",
+      "classification": "Class",
+      "our_attack": "Our attack",
+      "opponent_attack": "Opponent attack"
+    },
+    "interpretation": {
+      "our_attack": {
+        "excellent": "This is a strong attacking route.",
+        "favorable": "This attacking route is favorable.",
+        "balanced": "This attacking route is balanced.",
+        "unfavorable": "This attacking route is difficult.",
+        "critical": "This attacking route is inefficient."
+      },
+      "opponent_attack": {
+        "excellent": "This is a major defensive risk.",
+        "favorable": "This is a defensive risk.",
+        "balanced": "This matchup is balanced.",
+        "unfavorable": "This defensive matchup is favorable for us.",
+        "critical": "This defensive matchup strongly favors us."
+      }
+    }
+  },
+  "advisor": {
+    "title": "Tactical Advisor",
+    "empty": "Tactical Advisor will appear after analysis.",
+    "estimated_win": "Estimated {value} Win",
+    "card": {
+      "action": "Action",
+      "observation": "Observation",
+      "warning": "Warning"
+    },
+    "impact": {
+      "high": "High Impact",
+      "medium": "Medium Impact",
+      "low": "Low Impact",
+      "observation": "Observation"
+    },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "category": {
+      "lineup": "Lineup",
+      "formation": "Formation",
+      "strength": "Strength",
+      "weakness": "Weakness",
+      "balance": "Balance"
+    },
+    "sector": {
+      "left_defense": "left defense",
+      "central_defense": "central defense",
+      "right_defense": "right defense",
+      "midfield": "midfield",
+      "left_attack": "left attack",
+      "central_attack": "central attack",
+      "right_attack": "right attack"
+    },
+    "sector_article": {
+      "left_defense": "Left defense",
+      "central_defense": "Central defense",
+      "right_defense": "Right defense",
+      "midfield": "Midfield",
+      "left_attack": "Left attack",
+      "central_attack": "Central attack",
+      "right_attack": "Right attack"
+    },
+    "sector_exposed": {
+      "left_defense": "Left defense is exposed",
+      "central_defense": "Central defense is exposed",
+      "right_defense": "Right defense is exposed",
+      "midfield": "Midfield is exposed",
+      "left_attack": "Left attack is exposed",
+      "central_attack": "Central attack is exposed",
+      "right_attack": "Right attack is exposed"
+    },
+    "rule": {
+      "consider_formation": {
+        "title": "Use {formation} instead of {current_formation}",
+        "explanation": "This evaluated formation improves win probability by {win_delta}. Sector changes: {sector_summary}."
+      },
+      "use_formation": {
+        "title": "Use {formation} instead of {current_formation}",
+        "explanation": "This evaluated formation improves win probability by {win_delta}. Sector changes: {sector_summary}."
+      },
+      "strongest_sector": {
+        "title": "{sector_with_article} is your strongest area",
+        "explanation": "Your calculated {sector} rating is currently {value}. No action is required there before addressing higher-risk areas."
+      },
+      "exposed_sector": {
+        "title": "{sector_exposed}",
+        "explanation": "The opponent is ahead of your matching {sector} by {gap} rating points. Treat this as matchup context unless an evaluated change improves it."
+      },
+      "defensive_exposure": {
+        "title": "{sector_exposed}",
+        "explanation": "The opponent's {opponent_sector} is {gap} rating points above your matching {sector}. This is a warning until an evaluated lineup or formation change improves it."
+      },
+      "defensive_observation": {
+        "title": "{sector_with_article} matchup needs attention",
+        "explanation": "The opponent's {opponent_sector} is ahead of your matching {sector} by {gap} rating points. Treat this as matchup context, not an unevaluated instruction."
+      },
+      "inefficient_flank": {
+        "title": "{sector_with_article} is an inefficient route",
+        "explanation": "Your {sector} is {gap} rating points below the opponent's matching {opponent_sector}. Do not treat this as a recommendation to strengthen it unless an evaluated change improves the result."
+      },
+      "best_attack_matchup": {
+        "title": "{sector_with_article} is your best attacking route",
+        "explanation": "Your {sector} is the closest matchup against the opponent's {opponent_sector}, with a calculated margin of {gap} rating points."
+      },
+      "low_possession": {
+        "title": "Possession is low",
+        "explanation": "Current possession is {possession}. This is tactical context unless an evaluated formation or lineup change increases the match result."
+      },
+      "unbalanced_attack": {
+        "title": "Attack is concentrated in an unfavorable matchup",
+        "explanation": "Your attack is concentrated in one channel. Treat this as tactical context unless an evaluated alternative improves the result."
+      },
+      "unbalanced_defense": {
+        "title": "Defense is uneven",
+        "explanation": "Your defensive ratings are uneven. Treat this as risk context unless an evaluated change improves the result."
+      },
+      "favorable_concentration": {
+        "title": "Attack concentration matches their weakness",
+        "explanation": "Your strongest attacking channel, {sector}, targets the opponent's weakest matching defense, {opponent_sector}."
+      },
+      "favorable_attack_concentration": {
+        "title": "Attack concentration matches their weakness",
+        "explanation": "Your strongest attacking channel, {sector}, targets the opponent's weakest matching defense, {opponent_sector}."
+      },
+      "unfavorable_concentration": {
+        "title": "Attack concentration targets a stronger defense",
+        "explanation": "Your strongest attacking channel, {sector}, targets {opponent_sector}, which is not the opponent's weakest defensive sector."
+      },
+      "unfavorable_attack_concentration": {
+        "title": "Attack concentration targets a stronger defense",
+        "explanation": "Your strongest attacking channel, {sector}, targets {opponent_sector}, which is not the opponent's weakest defensive sector."
+      },
+      "keep_lineup_change": {
+        "title": "Keep {incoming} in {slot}",
+        "explanation": "Replacing {outgoing} with {incoming} improved this slot and adds an estimated {win_delta} win probability."
+      },
+      "revert_lineup_change": {
+        "title": "Revert {incoming} in {slot}",
+        "explanation": "Replacing {outgoing} with {incoming} reduced win probability by {win_delta}. Revert this Workspace change."
+      },
+      "neutral_lineup_change": {
+        "title": "{incoming} in {slot} is neutral",
+        "explanation": "Replacing {outgoing} with {incoming} did not create a measurable win-probability improvement. Treat it as a preference, not a recommendation."
+      }
+    }
+  }
+}

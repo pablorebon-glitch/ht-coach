@@ -1,0 +1,505 @@
+{
+  "app": {
+    "ready": "Listo",
+    "refresh": "Actualizar",
+    "refresh_tip": "Actualizar la vista actual",
+    "help": "Ayuda",
+    "not_implemented": "Esta acción se implementará en un próximo epic."
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "squad": "Plantel",
+    "opponents": "Rivales",
+    "match": "Partido",
+    "reports": "Reportes",
+    "settings": "Configuración",
+    "ready": "{page} listo"
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Configura preferencias de escritorio y rutas locales.",
+    "language": "Idioma",
+    "language_help": "El idioma se aplica inmediatamente donde sea práctico.",
+    "english": "English",
+    "spanish": "Español",
+    "saved": "Preferencia de idioma guardada.",
+    "advisor_verbosity": "Detalle del asesor",
+    "advisor_verbosity_help": "Simple muestra título e impacto. Detallado también muestra la explicación.",
+    "verbosity_simple": "Simple",
+    "verbosity_detailed": "Detallado",
+    "advisor_saved": "Preferencia del asesor guardada."
+  },
+  "dashboard": {
+    "title": "Panel",
+    "subtitle": "Resumen del Workspace con plantel, rival y última recomendación.",
+    "placeholder": "El contenido del panel se implementará en un próximo epic."
+  },
+  "reports": {
+    "title": "Reportes",
+    "subtitle": "Revisa y exporta futuras recomendaciones y resúmenes de partido.",
+    "placeholder": "Los reportes se implementarán en un próximo epic."
+  },
+  "squad_builder": {
+    "ideal_xi": "XI ideal",
+    "players": "Jugadores",
+    "formation": "Formacion",
+    "empty_title": "Todavia no hay XI ideal",
+    "empty_message": "Carga un plantel para construir el XI ideal.",
+    "best_formation_value": "Mejor formacion: {formation}",
+    "overall_score_value": "Score general: {score}",
+    "confidence_value": "Confianza: {confidence}",
+    "best_formations": "Mejores formaciones",
+    "rank": "#",
+    "score": "Score",
+    "delta": "Diferencia",
+    "midfield": "Mediocampo",
+    "profile": "Perfil",
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "close": "Cerrada",
+      "low": "Baja",
+      "alternative": "Alternativa"
+    },
+    "sector": {
+      "left_defense": "Defensa izquierda",
+      "central_defense": "Defensa central",
+      "right_defense": "Defensa derecha",
+      "midfield": "Mediocampo",
+      "left_attack": "Ataque izquierdo",
+      "central_attack": "Ataque central",
+      "right_attack": "Ataque derecho"
+    },
+    "reason": {
+      "empty": "Carga un plantel para construir el XI ideal.",
+      "best": "{formation} tiene el mejor encaje de plantel entre las formaciones soportadas.",
+      "manual": "{formation} esta seleccionada para revision manual y queda {delta} por detras del mejor encaje.",
+      "formation_fit": "{formation} encaja con este plantel con un score general de formacion de {score}."
+    }
+  },
+  "squad_identity": {
+    "title": "Identidad del plantel",
+    "empty_title": "Todavia no hay identidad del plantel",
+    "empty_message": "Carga un plantel para describir su identidad.",
+    "strengths": "Fortalezas",
+    "weaknesses": "Debilidades",
+    "tactical_readiness": "Preparacion tactica",
+    "formation_affinity": "Afinidad de formaciones",
+    "tactic": "Tactica",
+    "readiness_label": "Preparacion",
+    "affinity": "Afinidad",
+    "select_tactic": "Selecciona una tactica para ver detalles de preparacion.",
+    "contributors_value": "Principales contribuyentes: {players}",
+    "detail_strengths": "Fortalezas: {values}",
+    "detail_limitations": "Limitaciones: {values}",
+    "compatible_formations_value": "Formaciones compatibles: {formations}",
+    "identity": {
+      "midfield_dominant": "Plantel dominante en mediocampo",
+      "wing_oriented": "Plantel orientado a bandas",
+      "balanced": "Plantel equilibrado",
+      "defensive": "Plantel defensivo",
+      "central_attack": "Plantel de ataque central",
+      "counter_oriented": "Plantel orientado a contraataque"
+    },
+    "explanation": {
+      "midfield_dominant": "Tu plantel rinde naturalmente mejor controlando el mediocampo y sosteniendo la posesion.",
+      "wing_oriented": "Tu plantel rinde naturalmente mejor abriendo la cancha y creando chances por bandas.",
+      "balanced": "Tu plantel tiene un perfil equilibrado sin una identidad tactica dominante.",
+      "defensive": "Tu plantel rinde naturalmente mejor con estabilidad defensiva y cobertura confiable.",
+      "central_attack": "Tu plantel rinde naturalmente mejor creando chances por el centro.",
+      "counter_oriented": "Tu plantel tiene rasgos que apoyan resistir presion y salir rapido."
+    },
+    "level": {
+      "excellent": "Excelente",
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "very_low": "Muy baja"
+    },
+    "readiness": {
+      "why": "La preparacion para {tactic} es {level} segun atributos del plantel, encaje de formacion y perfil general.",
+      "strength": "El plantel tiene atributos relevantes para {tactic}.",
+      "limitation_context": "{tactic} sigue dependiendo del contexto del partido y la forma del rival.",
+      "limitation_gap": "{tactic} esta menos respaldada que las capacidades mas fuertes del plantel."
+    }
+  },
+  "availability": {
+    "mode_label": "Disponibilidad del plantel",
+    "mode": {
+      "current": "Plantel disponible actualmente",
+      "full_strength": "Plantel completo"
+    },
+    "full_strength_warning": "Plantel completo es una simulacion teorica y puede incluir jugadores no disponibles.",
+    "health_title": "Salud del plantel",
+    "health_empty": "La salud del plantel aparece despues de cargar un roster.",
+    "unavailable_players": "Jugadores no disponibles",
+    "impact_title": "Impacto de disponibilidad",
+    "impact_empty": "El impacto aparece al comparar plantel actual y plantel completo.",
+    "coverage_title": "Cobertura posicional",
+    "player_name": "Nombre",
+    "status": "Estado",
+    "injury_value": "Lesion",
+    "expected_role": "Rol esperado",
+    "role": "Rol",
+    "coverage": "Cobertura",
+    "depth": "Profundidad",
+    "summary_count": "{available} de {total} jugadores disponibles",
+    "unavailable_starters_value": "Titulares no disponibles: {count}",
+    "affected_areas_value": "Areas afectadas: {areas}",
+    "severity_value": "Severidad: {severity}",
+    "score_difference_value": "Score general: {value}",
+    "most_affected_area_value": "Area mas afectada: {area}",
+    "replacement_value": "Reemplazo: {replacement}",
+    "formation_impact_value": "Impacto de formacion: {impact}",
+    "filter": {
+      "all": "Todos",
+      "available": "Disponible",
+      "unavailable": "No disponible",
+      "injured": "Lesionado",
+      "unknown": "Desconocido"
+    },
+    "reason": {
+      "available": "Disponible",
+      "injured": "No seleccionado porque el jugador esta lesionado actualmente.",
+      "unknown": "El estado de disponibilidad es desconocido en los datos importados.",
+      "not_enough_players": "No hay suficientes jugadores elegibles para construir un XI ideal."
+    },
+    "status_message": {
+      "updating_ideal_xi": "Actualizando XI ideal...",
+      "recalculating_formation": "Recalculando formacion...",
+      "evaluating_formations": "Evaluando formaciones disponibles...",
+      "updating_availability": "Actualizando disponibilidad del plantel...",
+      "updating_readiness": "Actualizando preparacion tactica..."
+    }
+  },
+  "match": {
+    "title": "Partido",
+    "subtitle": "Analiza un partido contra un rival guardado.",
+    "analysis_setup": "Preparación del análisis",
+    "players_csv": "CSV de jugadores",
+    "select_players_csv": "Seleccionar players.csv",
+    "browse": "Buscar",
+    "load_players": "Cargar jugadores",
+    "no_players_loaded": "No hay jugadores cargados",
+    "players_loaded": "{count} jugadores cargados",
+    "opponent": "Rival",
+    "formations": "Formaciones",
+    "select_all": "Seleccionar todo",
+    "clear_all": "Limpiar todo",
+    "favorites": "Favoritas",
+    "ready": "Listo",
+    "analyze": "Analizar partido",
+    "analyzing": "Analizando...",
+    "updating": "Actualizando...",
+    "updating_workspace": "Actualizando análisis del Workspace...",
+    "analysis_failed": "El análisis falló: {message}",
+    "analysis_error_title": "El análisis no pudo completarse",
+    "loading_title": "Analizando partido",
+    "loading_message": "Optimizando formaciones, alineación, órdenes individuales y táctica.",
+    "empty_title": "Todavía no hay análisis",
+    "empty_message": "Ejecuta un análisis de partido para ver la formación recomendada.",
+    "hide_setup": "Ocultar preparación",
+    "show_setup": "Mostrar preparación",
+    "many_formations": "Hay muchas formaciones seleccionadas. El análisis puede tardar más.",
+    "formation_board": "Cancha",
+    "comparison": "Comparación",
+    "detailed_xi": "XI detallado",
+    "recommended": "Recomendado",
+    "tactic_level": "Nivel táctico",
+    "win": "Victoria",
+    "draw": "Empate",
+    "loss": "Derrota",
+    "possession": "Posesión",
+    "xg": "xG",
+    "opp_xg": "xG rival",
+    "decision_lab": "Decision Lab",
+    "recommendation_confidence": "Confianza de la recomendación: {level}",
+    "play_to_win": "Jugar a ganar",
+    "secure_draw": "Asegurar empate",
+    "avoid_defeat": "Evitar derrota",
+    "formation_comparison": "Comparación de formaciones",
+    "tactic": "Táctica",
+    "win_draw_loss": "Victoria / Empate / Derrota",
+    "win_diff": "Dif. victoria",
+    "xg_diff": "Dif. xG",
+    "recommended_xi": "XI recomendado",
+    "number": "Nro.",
+    "side": "Lado",
+    "position": "Posición",
+    "player": "Jugador",
+    "order": "Orden",
+    "order_side": "Lado orden",
+    "board_error_title": "La cancha no pudo renderizarse",
+    "board_error_message": "La comparación y el XI detallado siguen disponibles. Error de cancha: {error}"
+  },
+  "workspace": {
+    "formation_board": "Cancha",
+    "reset": "Restaurar Workspace",
+    "reset_tip": "Restaurar la alineación recomendada original.",
+    "original": "Recomendación original",
+    "updating": "Actualizando análisis...",
+    "evaluated": "Workspace evaluado",
+    "failed": "El análisis falló",
+    "pending": "Workspace modificado - recálculo pendiente",
+    "swap_preview": "Vista previa de intercambio",
+    "replacement_preview": "Vista previa de reemplazo",
+    "why_recommended": "Por qué se recomienda",
+    "workspace_impact": "Impacto en Workspace",
+    "position_fit_comparison": "Comparación de encaje posicional",
+    "previous_player": "Jugador anterior",
+    "current_player": "Jugador actual",
+    "difference": "Diferencia",
+    "in_this_slot": "{value} en este puesto",
+    "slot_score_tip": "Diferencia entre la contribución calculada de cada jugador para este puesto táctico específico.",
+    "technical_details": "Detalles técnicos"
+  },
+  "bench": {
+    "title": "Banco",
+    "players": "{count} jugadores",
+    "empty": "No hay jugadores disponibles en el banco.",
+    "score": "Puntaje {score}"
+  },
+  "change": {
+    "title": "Análisis del cambio",
+    "last_change": "Último cambio",
+    "incoming_player": "Jugador que entra",
+    "outgoing_player": "Jugador que sale",
+    "slot": "Puesto",
+    "position_fit": "Encaje posicional",
+    "previous_score": "Puntaje del jugador anterior",
+    "current_score": "Puntaje del jugador actual",
+    "team_impact": "Impacto en el equipo",
+    "sector_changes": "Cambios por sector",
+    "summary": "Resumen",
+    "old": "Anterior",
+    "new": "Actual",
+    "excellent_tradeoff": "Excelente intercambio",
+    "balanced_improvement": "Mejora equilibrada",
+    "risky_change": "Cambio riesgoso",
+    "net_negative": "Saldo negativo",
+    "excellent_text": "Mejoró la chance de ganar y redujo el riesgo de perder sin sacrificar sectores importantes.",
+    "balanced_text": "El equipo mejora y el intercambio táctico se mantiene controlado.",
+    "risky_text": "El cambio ayuda en un área, pero el costo calculado es relevante.",
+    "negative_text": "Las probabilidades generales del equipo empeoraron.",
+    "not_available": "El Análisis del cambio aparecerá después de recalcular el Workspace."
+  },
+  "match_intelligence": {
+    "title": "Inteligencia de partido",
+    "highlights": "Señales clave",
+    "sector": {
+      "left_defense": "defensa izquierda",
+      "central_defense": "defensa central",
+      "right_defense": "defensa derecha",
+      "midfield": "mediocampo",
+      "left_attack": "ataque izquierdo",
+      "central_attack": "ataque central",
+      "right_attack": "ataque derecho"
+    },
+    "classification": {
+      "excellent": "Excelente",
+      "favorable": "Favorable",
+      "balanced": "Equilibrado",
+      "unfavorable": "Desfavorable",
+      "critical": "Crítico"
+    },
+    "profile": {
+      "title": "Perfil del partido",
+      "ours": "Nosotros: más fuerte {strongest}; más débil {weakest}.",
+      "opponent": "Rival: más fuerte {strongest}; más débil {weakest}."
+    },
+    "focus": {
+      "title": "Foco táctico",
+      "attack_best_route": {
+        "title": "Atacar por {attack_sector}",
+        "description": "{attack_sector} enfrenta {defense_sector} con un margen de {difference} puntos de rating."
+      },
+      "protect_exposed_defense": {
+        "title": "Proteger {defense_sector}",
+        "description": "Su {attack_sector} ataca tu {defense_sector} con un margen de {difference} puntos de rating."
+      },
+      "midfield_battle": {
+        "title": "Tratar el mediocampo como la batalla clave",
+        "description": "La posesión y el volumen de chances dependen de cómo sostenga el {sector}."
+      }
+    },
+    "opportunity": {
+      "attack_route": {
+        "title": "{attack_sector} es una ruta utilizable",
+        "description": "{attack_sector} contra {defense_sector} tiene un margen de {difference} puntos de rating."
+      },
+      "midfield": {
+        "title": "El mediocampo puede sostener la posesión",
+        "description": "La posesión proyectada es {possession}, suficiente para sostener volumen de chances."
+      }
+    },
+    "risk": {
+      "dangerous_route": {
+        "title": "Su {attack_sector} es peligroso",
+        "description": "Su {attack_sector} contra tu {defense_sector} tiene un margen de {difference} puntos de rating."
+      },
+      "midfield_deficit": {
+        "title": "El déficit de mediocampo puede limitar el plan",
+        "description": "La posesión proyectada es solo {possession}."
+      }
+    },
+    "summary": {
+      "defensive_risk": "Este partido probablemente se ordene alrededor de su {attack_sector} contra tu {defense_sector}.",
+      "midfield_control": "Este partido probablemente se decida en el mediocampo; la posesión proyectada es {possession}.",
+      "balanced": "El partido se ve equilibrado en los sectores tácticos principales. Pequeñas decisiones de alineación pueden decidirlo."
+    },
+    "matrix": {
+      "side": "Lado",
+      "attack": "Ataque",
+      "defense": "Defensa",
+      "diff": "Dif.",
+      "classification": "Clase",
+      "our_attack": "Nuestro ataque",
+      "opponent_attack": "Ataque rival"
+    },
+    "interpretation": {
+      "our_attack": {
+        "excellent": "Es una ruta ofensiva fuerte.",
+        "favorable": "Esta ruta ofensiva es favorable.",
+        "balanced": "Esta ruta ofensiva está equilibrada.",
+        "unfavorable": "Esta ruta ofensiva es difícil.",
+        "critical": "Esta ruta ofensiva es poco eficiente."
+      },
+      "opponent_attack": {
+        "excellent": "Es un riesgo defensivo importante.",
+        "favorable": "Es un riesgo defensivo.",
+        "balanced": "Este cruce está equilibrado.",
+        "unfavorable": "Este cruce defensivo nos favorece.",
+        "critical": "Este cruce defensivo nos favorece claramente."
+      }
+    }
+  },
+  "advisor": {
+    "title": "Asesor táctico",
+    "empty": "El Asesor táctico aparecerá después del análisis.",
+    "estimated_win": "Estimado {value} victoria",
+    "card": {
+      "action": "Acción",
+      "observation": "Observación",
+      "warning": "Advertencia"
+    },
+    "impact": {
+      "high": "Alto impacto",
+      "medium": "Impacto medio",
+      "low": "Bajo impacto",
+      "observation": "Observación"
+    },
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "category": {
+      "lineup": "Alineación",
+      "formation": "Formación",
+      "strength": "Fortaleza",
+      "weakness": "Debilidad",
+      "balance": "Balance"
+    },
+    "sector": {
+      "left_defense": "defensa izquierda",
+      "central_defense": "defensa central",
+      "right_defense": "defensa derecha",
+      "midfield": "mediocampo",
+      "left_attack": "ataque izquierdo",
+      "central_attack": "ataque central",
+      "right_attack": "ataque derecho"
+    },
+    "sector_article": {
+      "left_defense": "La defensa izquierda",
+      "central_defense": "La defensa central",
+      "right_defense": "La defensa derecha",
+      "midfield": "El mediocampo",
+      "left_attack": "El ataque izquierdo",
+      "central_attack": "El ataque central",
+      "right_attack": "El ataque derecho"
+    },
+    "sector_exposed": {
+      "left_defense": "La defensa izquierda queda expuesta",
+      "central_defense": "La defensa central queda expuesta",
+      "right_defense": "La defensa derecha queda expuesta",
+      "midfield": "El mediocampo queda expuesto",
+      "left_attack": "El ataque izquierdo queda expuesto",
+      "central_attack": "El ataque central queda expuesto",
+      "right_attack": "El ataque derecho queda expuesto"
+    },
+    "rule": {
+      "consider_formation": {
+        "title": "Usa {formation} en lugar de {current_formation}",
+        "explanation": "Esta formación evaluada mejora la probabilidad de victoria en {win_delta}. Cambios por sector: {sector_summary}."
+      },
+      "use_formation": {
+        "title": "Usa {formation} en lugar de {current_formation}",
+        "explanation": "Esta formación evaluada mejora la probabilidad de victoria en {win_delta}. Cambios por sector: {sector_summary}."
+      },
+      "strongest_sector": {
+        "title": "{sector_with_article} es tu zona más fuerte",
+        "explanation": "Tu rating calculado de {sector} es actualmente {value}. No hace falta actuar allí antes de atender zonas más riesgosas."
+      },
+      "exposed_sector": {
+        "title": "{sector_exposed}",
+        "explanation": "El rival supera tu {sector} correspondiente por {gap} puntos de rating. Es contexto táctico salvo que un cambio evaluado lo mejore."
+      },
+      "defensive_exposure": {
+        "title": "{sector_exposed}",
+        "explanation": "El {opponent_sector} rival supera tu {sector} correspondiente por {gap} puntos de rating. Es una advertencia hasta que un cambio evaluado de alineación o formación lo mejore."
+      },
+      "defensive_observation": {
+        "title": "El cruce de {sector} requiere atención",
+        "explanation": "El {opponent_sector} rival supera tu {sector} correspondiente por {gap} puntos de rating. Es contexto táctico, no una instrucción no evaluada."
+      },
+      "inefficient_flank": {
+        "title": "{sector_with_article} es una vía ofensiva poco eficiente",
+        "explanation": "Tu {sector} enfrenta una {opponent_sector} rival superior por {gap} puntos. No lo trates como recomendación de refuerzo salvo que un cambio evaluado mejore el resultado."
+      },
+      "best_attack_matchup": {
+        "title": "{sector_with_article} es tu mejor ruta ofensiva",
+        "explanation": "Tu {sector} es el cruce más favorable contra la {opponent_sector} rival, con un margen calculado de {gap} puntos."
+      },
+      "low_possession": {
+        "title": "La posesión es baja",
+        "explanation": "La posesión actual es {possession}. Es contexto táctico salvo que una formación o cambio de alineación evaluado mejore el resultado."
+      },
+      "unbalanced_attack": {
+        "title": "Tu ataque está concentrado en un enfrentamiento desfavorable",
+        "explanation": "Tus ratings de ataque están concentrados en un canal. Es contexto táctico salvo que una alternativa evaluada mejore el resultado."
+      },
+      "unbalanced_defense": {
+        "title": "Tu defensa está despareja",
+        "explanation": "Tus ratings defensivos están desparejos. Es contexto de riesgo salvo que un cambio evaluado mejore el resultado."
+      },
+      "favorable_concentration": {
+        "title": "La concentración ofensiva apunta a su debilidad",
+        "explanation": "Tu canal ofensivo más fuerte, {sector}, apunta a la defensa rival correspondiente más débil, {opponent_sector}."
+      },
+      "favorable_attack_concentration": {
+        "title": "La concentración ofensiva apunta a su debilidad",
+        "explanation": "Tu canal ofensivo más fuerte, {sector}, apunta a la defensa rival correspondiente más débil, {opponent_sector}."
+      },
+      "unfavorable_concentration": {
+        "title": "La concentración ofensiva apunta a una defensa fuerte",
+        "explanation": "Tu canal ofensivo más fuerte, {sector}, apunta a {opponent_sector}, que no es el sector defensivo más débil del rival."
+      },
+      "unfavorable_attack_concentration": {
+        "title": "La concentración ofensiva apunta a una defensa fuerte",
+        "explanation": "Tu canal ofensivo más fuerte, {sector}, apunta a {opponent_sector}, que no es el sector defensivo más débil del rival."
+      },
+      "keep_lineup_change": {
+        "title": "Mantén a {incoming} en {slot}",
+        "explanation": "Reemplazar a {outgoing} por {incoming} mejoró este puesto y suma aproximadamente {win_delta} de probabilidad de victoria."
+      },
+      "revert_lineup_change": {
+        "title": "Revierte a {incoming} en {slot}",
+        "explanation": "Reemplazar a {outgoing} por {incoming} redujo la probabilidad de victoria en {win_delta}. Revierte este cambio del Workspace."
+      },
+      "neutral_lineup_change": {
+        "title": "{incoming} en {slot} es neutral",
+        "explanation": "Reemplazar a {outgoing} por {incoming} no produjo una mejora medible de victoria. Trátalo como preferencia, no como recomendación."
+      }
+    }
+  }
+}
