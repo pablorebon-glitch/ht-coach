@@ -174,6 +174,8 @@ Deliverables:
 - Players CSV selector and loaded player count
 - Opponent selector
 - Formation selector generated from the full supported catalog
+- Squad availability selector using Current Available Squad by default and Full
+  Strength Squad for simulation
 - Select All, Clear All, and Favorites preset for 3-5-2 and 4-5-1
 - Optimization worker
 - Workspace settings persistence
@@ -194,6 +196,9 @@ Acceptance criteria:
 - Last selected CSV path, opponent, and formations are restored.
 - Last successful analysis is restored from serializable view-model data.
 - Any supported formation can be analyzed and restored from persisted results.
+- Injured players are excluded from initial Match recommendations, Workspace
+  recalculation, Bench and replacement candidates in Current Available mode.
+- Full Strength Match simulation can include unavailable players and displays a warning.
 - Engine calculations remain unchanged.
 
 ### Epic 7: Reports

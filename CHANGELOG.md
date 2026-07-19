@@ -64,6 +64,10 @@
   current-available versus full-strength Squad Builder modes, health summary,
   availability impact, positional coverage, unavailable player explanations and Players
   table availability filtering.
+- Added Alpha 0.5.2.1 Match Availability Integration so Match recommendations,
+  Workspace recalculation, Bench, replacement candidates and Player Intelligence use
+  Current Available Squad by default, while Full Strength simulation remains available
+  with a clear warning.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.

@@ -163,6 +163,8 @@ Purpose:
 Content:
 
 - Players CSV selector and load status.
+- Squad availability selector with Current Available Squad as the default and Full
+  Strength Squad as a clearly warned simulation mode.
 - Selected opponent selector.
 - Formation checklist generated from the centralized formation catalog.
 - Select All, Clear All, and Favorites controls. Favorites preserve the familiar
@@ -171,6 +173,8 @@ Content:
 - Analyze Match action.
 - Progress indicator.
 - Compact recommended-result summary and analysis metadata row.
+- Availability impact note showing unavailable player count and warning when Full
+  Strength results include unavailable players.
 - Analysis inputs that collapse after success and reopen without rerunning analysis.
 - Persistent collapsible Analysis Setup with a visible toggle. Showing or hiding setup
   preserves selected values, current results and Workspace state.

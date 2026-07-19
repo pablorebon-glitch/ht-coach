@@ -2,7 +2,9 @@ from PySide6.QtCore import QObject, QThread, QTimer
 
 from dataclasses import replace
 
+from engine.squad_health.availability_service import CURRENT_AVAILABLE
 from ht_coach_app.change_analysis.service import ChangeAnalysisService
+from ht_coach_app.core.localization import t
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
@@ -152,7 +154,8 @@ class MatchController(QObject):
     def _load_players(self):
         try:
             players = self._service.load_players(
-                self._view.players_csv_path()
+                self._view.players_csv_path(),
+                availability_mode=self._availability_mode(),
             )
         except Exception as exc:
             self._view.show_error(
@@ -190,7 +193,7 @@ class MatchController(QObject):
             True
         )
         self._view.show_status(
-            "Starting match analysis..."
+            t("match.status_recalculating_recommendation")
         )
 
         self._thread = QThread(self)
@@ -198,7 +201,8 @@ class MatchController(QObject):
             self._service,
             self._view.players_csv_path(),
             self._view.selected_opponent_name(),
-            self._view.selected_formations()
+            self._view.selected_formations(),
+            availability_mode=self._availability_mode(),
         )
         self._worker.moveToThread(
             self._thread
@@ -267,7 +271,7 @@ class MatchController(QObject):
         else:
             self._view.set_processing(True)
         self._view.show_status(
-            "Updating Workspace analysis..."
+            t("match.status_updating_available_lineup")
         )
 
         self._thread = QThread(self)
@@ -277,6 +281,7 @@ class MatchController(QObject):
             self._view.selected_opponent_name(),
             list(workspace_state.workspace_boards.keys()),
             workspace_state=workspace_state,
+            availability_mode=self._availability_mode(),
         )
         self._worker.moveToThread(
             self._thread
@@ -436,14 +441,16 @@ class MatchController(QObject):
             MatchWorkspaceSettings(
                 players_csv_path=self._view.players_csv_path(),
                 opponent_name=self._view.selected_opponent_name(),
-                selected_formations=self._view.selected_formations()
+                selected_formations=self._view.selected_formations(),
+                squad_availability_mode=self._availability_mode(),
             )
         )
 
     def _load_current_roster_for_inspector(self, show_errors):
         try:
             players = self._service.load_players(
-                self._view.players_csv_path()
+                self._view.players_csv_path(),
+                availability_mode=self._availability_mode(),
             )
         except Exception as exc:
             self._roster_players = []
@@ -458,3 +465,9 @@ class MatchController(QObject):
     def _set_view_roster_players(self, players):
         if hasattr(self._view, "set_roster_players"):
             self._view.set_roster_players(players)
+
+    def _availability_mode(self):
+        if hasattr(self._view, "availability_mode"):
+            return self._view.availability_mode()
+
+        return CURRENT_AVAILABLE

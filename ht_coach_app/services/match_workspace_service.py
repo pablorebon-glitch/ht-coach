@@ -11,6 +11,11 @@ from engine.advisor.recommendation_types import (
     RecommendationConfidence,
 )
 from engine.analyzers.team_rater import TeamRater
+from engine.squad_health.availability_service import (
+    CURRENT_AVAILABLE,
+    FULL_STRENGTH,
+    AvailabilityService,
+)
 from engine.optimizers.formation_optimizer import FormationOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
 from engine.match_intelligence import MatchIntelligenceEngine
@@ -24,6 +29,7 @@ from engine.match_intelligence.models import (
 )
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import normalize_position_key
+from ht_coach_app.core.localization import t
 from ht_coach_app.core.side_formatting import normalize_side_value
 from ht_coach_app.change_analysis.models import ChangeAnalysisResult
 from ht_coach_app.change_analysis.service import (
@@ -131,6 +137,9 @@ class MatchAnalysisResult:
     match_intelligence: MatchIntelligenceResult | None = None
     change_analysis: ChangeAnalysisResult | None = None
     tactical_advisor: list[Recommendation] = field(default_factory=list)
+    availability_mode: str = CURRENT_AVAILABLE
+    availability_warning: str = ""
+    unavailable_players_count: int = 0
 
     @property
     def recommended_formation(self):
@@ -149,11 +158,13 @@ class MatchWorkspaceService:
         self,
         opponent_service,
         importer=None,
-        optimizer=FormationOptimizer.optimize_against
+        optimizer=FormationOptimizer.optimize_against,
+        availability_service=None
     ):
         self._opponent_service = opponent_service
         self._importer = importer
         self._optimizer = optimizer
+        self._availability_service = availability_service or AvailabilityService()
 
     def supported_formations(self):
         return list(FORMATION_BY_NAME.keys())
@@ -164,24 +175,43 @@ class MatchWorkspaceService:
     def list_opponents(self):
         return self._opponent_service.list_opponents()
 
-    def load_players_count(self, players_csv_path):
+    def load_players_count(self, players_csv_path, availability_mode=CURRENT_AVAILABLE):
         return len(
-            self._load_players(players_csv_path)
+            self._load_players(
+                players_csv_path,
+                availability_mode=availability_mode,
+            )
         )
 
-    def load_players(self, players_csv_path):
+    def load_players(self, players_csv_path, availability_mode=CURRENT_AVAILABLE):
         self.validate_players_csv_path(players_csv_path)
-        return self._load_players(players_csv_path)
+        return self._load_players(
+            players_csv_path,
+            availability_mode=availability_mode,
+        )
 
-    def analyze(self, players_csv_path, opponent_name, formation_names):
+    def analyze(
+        self,
+        players_csv_path,
+        opponent_name,
+        formation_names,
+        availability_mode=CURRENT_AVAILABLE,
+    ):
         self.validate_inputs(
             players_csv_path,
             opponent_name,
             formation_names
         )
 
-        players = self._load_players(
+        mode = self._availability_service.normalize_mode(
+            availability_mode
+        )
+        all_players = self._load_all_players(
             players_csv_path
+        )
+        players = self._eligible_players(
+            all_players,
+            mode,
         )
 
         opponent = self._opponent_service.get_opponent(
@@ -215,7 +245,10 @@ class MatchWorkspaceService:
             formations=mapped_results,
             players_csv_filename=Path(players_csv_path).name,
             analyzed_formations=list(formation_names),
-            completed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            completed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            availability_mode=mode,
+            availability_warning=self._availability_warning(mode),
+            unavailable_players_count=self._unavailable_count(all_players),
         )
 
         return self._with_decision_lab(
@@ -227,6 +260,7 @@ class MatchWorkspaceService:
         players_csv_path,
         opponent_name,
         workspace_state,
+        availability_mode=CURRENT_AVAILABLE,
     ):
         formation_names = list(
             workspace_state.workspace_boards.keys()
@@ -237,8 +271,15 @@ class MatchWorkspaceService:
             formation_names
         )
 
-        players = self._load_players(
+        mode = self._availability_service.normalize_mode(
+            availability_mode
+        )
+        all_players = self._load_all_players(
             players_csv_path
+        )
+        players = self._eligible_players(
+            all_players,
+            mode,
         )
         players_by_name = {
             player.name: player
@@ -303,7 +344,10 @@ class MatchWorkspaceService:
             formations=mapped_results,
             players_csv_filename=Path(players_csv_path).name,
             analyzed_formations=formation_names,
-            completed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            completed_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            availability_mode=mode,
+            availability_warning=self._availability_warning(mode),
+            unavailable_players_count=self._unavailable_count(all_players),
         )
 
         return self._with_decision_lab(
@@ -363,7 +407,14 @@ class MatchWorkspaceService:
                 "The selected players.csv file does not exist."
             )
 
-    def _load_players(self, players_csv_path):
+    def _load_players(self, players_csv_path, availability_mode=CURRENT_AVAILABLE):
+        players = self._load_all_players(players_csv_path)
+        return self._eligible_players(
+            players,
+            self._availability_service.normalize_mode(availability_mode),
+        )
+
+    def _load_all_players(self, players_csv_path):
         importer = self._importer
 
         if importer is None:
@@ -374,6 +425,24 @@ class MatchWorkspaceService:
         return importer(
             str(players_csv_path)
         )
+
+    def _eligible_players(self, players, mode):
+        return self._availability_service.eligible_players(
+            players,
+            mode,
+        )
+
+    def _unavailable_count(self, players):
+        return len(
+            self._availability_service.unavailable_records(players)
+        )
+
+    @staticmethod
+    def _availability_warning(mode):
+        if mode == FULL_STRENGTH:
+            return t("match.availability_full_strength_warning")
+
+        return ""
 
     def _lineup_from_board(self, board, players_by_name):
         lineup = Lineup()
@@ -603,6 +672,9 @@ class MatchWorkspaceService:
             match_intelligence=match_intelligence,
             change_analysis=result.change_analysis,
             tactical_advisor=result.tactical_advisor,
+            availability_mode=result.availability_mode,
+            availability_warning=result.availability_warning,
+            unavailable_players_count=result.unavailable_players_count,
         )
         return with_tactical_advisor(enriched)
 
@@ -695,6 +767,9 @@ def match_analysis_result_from_dict(data):
         players_csv_filename=data.get("players_csv_filename", ""),
         analyzed_formations=list(data.get("analyzed_formations", [])),
         completed_at=data.get("completed_at", ""),
+        availability_mode=data.get("availability_mode", CURRENT_AVAILABLE),
+        availability_warning=data.get("availability_warning", ""),
+        unavailable_players_count=int(data.get("unavailable_players_count", 0)),
         formations=[
             FormationAnalysisResult(
                 formation_name=item.get("formation_name", ""),
@@ -808,6 +883,9 @@ def match_analysis_result_from_dict(data):
             match_intelligence=match_intelligence,
             change_analysis=result.change_analysis,
             tactical_advisor=result.tactical_advisor,
+            availability_mode=result.availability_mode,
+            availability_warning=result.availability_warning,
+            unavailable_players_count=result.unavailable_players_count,
         )
 
     return result
@@ -830,6 +908,9 @@ def with_tactical_advisor(result):
         match_intelligence=getattr(result, "match_intelligence", None),
         change_analysis=result.change_analysis,
         tactical_advisor=list(recommendations),
+        availability_mode=result.availability_mode,
+        availability_warning=result.availability_warning,
+        unavailable_players_count=result.unavailable_players_count,
     )
 
 

@@ -175,7 +175,7 @@ Modules:
 - `models.py`: availability status, health summary, coverage and impact view models.
 - `availability_classifier.py`: converts the imported `Lesiones` value into
   `AVAILABLE`, `INJURED`, `UNKNOWN`, and future-compatible states.
-- `availability_service.py`: owns the eligibility rule used by Squad Builder.
+- `availability_service.py`: owns the eligibility rule used by Squad Builder and Match.
 - `availability_impact_analyzer.py`: compares Current Available and Full Strength
   evaluated outputs without recalculating ratings.
 - `health_summary.py`: builds unavailable-player, affected-area and positional coverage
@@ -602,6 +602,7 @@ User clicks Analyze Match
   -> MatchController validates selected CSV, opponent, and formations
   -> MatchAnalysisWorker runs MatchWorkspaceService off the UI thread
   -> MatchWorkspaceService loads players with importers.csv_importer
+  -> MatchWorkspaceService applies Squad Health eligibility for Current Available mode
   -> MatchWorkspaceService calls FormationOptimizer.optimize_against
   -> Service maps engine result to serializable MatchAnalysisResult view models
   -> Decision Lab creates deterministic explanations from those view models

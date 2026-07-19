@@ -22,6 +22,10 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from engine.squad_health.availability_service import (
+    CURRENT_AVAILABLE,
+    FULL_STRENGTH,
+)
 from engine.advisor.recommendation_engine import (
     format_win_delta,
     impact_band,
@@ -140,6 +144,23 @@ class MatchPage(BasePage):
 
         self.players_loaded_label = QLabel(t("match.no_players_loaded"))
 
+        availability_label = QLabel(t("match.availability_mode"))
+        self.availability_label = availability_label
+        self.availability_combo = QComboBox()
+        self.availability_combo.addItem(
+            t("match.availability_current"),
+            CURRENT_AVAILABLE,
+        )
+        self.availability_combo.addItem(
+            t("match.availability_full_strength"),
+            FULL_STRENGTH,
+        )
+        self.availability_combo.currentIndexChanged.connect(
+            self._emit_workspace_changed
+        )
+        self.availability_warning_label = QLabel("")
+        self.availability_warning_label.setWordWrap(True)
+
         opponent_label = QLabel(t("match.opponent"))
         self.opponent_label = opponent_label
         self.opponent_combo = QComboBox()
@@ -208,14 +229,17 @@ class MatchPage(BasePage):
         layout.addWidget(browse_button, 0, 2)
         layout.addWidget(load_button, 0, 3)
         layout.addWidget(self.players_loaded_label, 1, 1, 1, 3)
-        layout.addWidget(opponent_label, 2, 0)
-        layout.addWidget(self.opponent_combo, 2, 1, 1, 3)
-        layout.addWidget(formation_label, 3, 0)
-        layout.addWidget(formation_actions_widget, 3, 1, 1, 3)
-        layout.addWidget(self.formations_container, 4, 1, 1, 3)
-        layout.addWidget(self.formation_warning_label, 5, 1, 1, 3)
-        layout.addWidget(self.status_label, 6, 0, 1, 3)
-        layout.addWidget(self.analyze_button, 6, 3)
+        layout.addWidget(availability_label, 2, 0)
+        layout.addWidget(self.availability_combo, 2, 1, 1, 3)
+        layout.addWidget(self.availability_warning_label, 3, 1, 1, 3)
+        layout.addWidget(opponent_label, 4, 0)
+        layout.addWidget(self.opponent_combo, 4, 1, 1, 3)
+        layout.addWidget(formation_label, 5, 0)
+        layout.addWidget(formation_actions_widget, 5, 1, 1, 3)
+        layout.addWidget(self.formations_container, 6, 1, 1, 3)
+        layout.addWidget(self.formation_warning_label, 7, 1, 1, 3)
+        layout.addWidget(self.status_label, 8, 0, 1, 3)
+        layout.addWidget(self.analyze_button, 8, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
@@ -305,6 +329,14 @@ class MatchPage(BasePage):
                 name in selected
             )
 
+        availability_index = self.availability_combo.findData(
+            settings.squad_availability_mode
+        )
+        self.availability_combo.setCurrentIndex(
+            availability_index if availability_index >= 0 else 0
+        )
+        self._update_availability_warning()
+
         self._applying_settings = False
         self._update_formation_warning()
 
@@ -322,6 +354,9 @@ class MatchPage(BasePage):
             name for name, checkbox in self._formation_checks.items()
             if checkbox.isChecked()
         ]
+
+    def availability_mode(self):
+        return self.availability_combo.currentData() or CURRENT_AVAILABLE
 
     def select_all_formations(self):
         self._set_checked_formations(
@@ -450,6 +485,14 @@ class MatchPage(BasePage):
                 self._build_recommended_summary(
                     recommended
                 )
+            )
+
+        if (
+            getattr(result, "availability_warning", "")
+            or getattr(result, "unavailable_players_count", 0)
+        ):
+            self.results_layout.addWidget(
+                self._build_availability_panel(result)
             )
 
         if result.decision_lab is not None:
@@ -631,6 +674,34 @@ class MatchPage(BasePage):
 
         layout.setColumnStretch(1, 1)
 
+        return card
+
+    def _build_availability_panel(self, result):
+        card = QFrame()
+        card.setObjectName("metadataPanel")
+        layout = QGridLayout(card)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(4)
+
+        title = QLabel(t("match.availability_panel_title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title, 0, 0)
+        layout.addWidget(
+            QLabel(
+                t(
+                    "match.unavailable_players_count",
+                    count=getattr(result, "unavailable_players_count", 0),
+                )
+            ),
+            0,
+            1,
+        )
+        warning = getattr(result, "availability_warning", "")
+        if warning:
+            warning_label = QLabel(warning)
+            warning_label.setWordWrap(True)
+            layout.addWidget(warning_label, 1, 0, 1, 2)
         return card
 
     def _build_match_intelligence_panel(self, intelligence):
@@ -1418,9 +1489,21 @@ class MatchPage(BasePage):
 
     def _emit_workspace_changed(self):
         self._update_formation_warning()
+        self._update_availability_warning()
 
         if not self._applying_settings:
             self.workspace_changed.emit()
+
+    def _update_availability_warning(self):
+        if not hasattr(self, "availability_warning_label"):
+            return
+
+        if self.availability_mode() == FULL_STRENGTH:
+            self.availability_warning_label.setText(
+                t("match.availability_full_strength_warning")
+            )
+        else:
+            self.availability_warning_label.setText("")
 
     def _update_formation_warning(self):
         if not hasattr(self, "formation_warning_label"):
