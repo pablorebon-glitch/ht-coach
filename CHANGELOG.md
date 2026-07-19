@@ -47,6 +47,8 @@
   Warning.
 - Added centralized tactical matchup mapping for own attack versus opponent defense and
   opponent attack versus own defense.
+- Added Advisor localization coverage for current and backward-compatible Tactical
+  Advisor keys in English and Spanish.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -149,6 +151,10 @@
 - Tactical Advisor ranking now prioritizes actions, caps them at three, keeps at most
   two context cards, and prevents generic strength notes from displacing actionable
   recommendations.
+- Tactical Advisor localization now falls back to English and then to a safe generic
+  message instead of rendering raw `advisor.*` keys.
+- Improved Spanish Advisor copy for sector articles, exposed sectors and attack
+  concentration observations.
 
 ### Notes
 

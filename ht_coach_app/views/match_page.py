@@ -1198,7 +1198,16 @@ class MatchPage(BasePage):
         for key, value in dict(params or {}).items():
             text = str(value)
             if text.startswith("{") and text.endswith("}"):
-                localized[key] = t(text[1:-1])
+                localization_key = text[1:-1]
+                localized[key] = t(localization_key)
+                if localization_key.startswith("advisor.sector."):
+                    sector_key = localization_key.rsplit(".", 1)[-1]
+                    localized[f"{key}_with_article"] = t(
+                        f"advisor.sector_article.{sector_key}"
+                    )
+                    localized[f"{key}_exposed"] = t(
+                        f"advisor.sector_exposed.{sector_key}"
+                    )
             else:
                 localized[key] = value
         return localized

@@ -186,40 +186,82 @@
       "central_attack": "central attack",
       "right_attack": "right attack"
     },
+    "sector_article": {
+      "left_defense": "Left defense",
+      "central_defense": "Central defense",
+      "right_defense": "Right defense",
+      "midfield": "Midfield",
+      "left_attack": "Left attack",
+      "central_attack": "Central attack",
+      "right_attack": "Right attack"
+    },
+    "sector_exposed": {
+      "left_defense": "Left defense is exposed",
+      "central_defense": "Central defense is exposed",
+      "right_defense": "Right defense is exposed",
+      "midfield": "Midfield is exposed",
+      "left_attack": "Left attack is exposed",
+      "central_attack": "Central attack is exposed",
+      "right_attack": "Right attack is exposed"
+    },
     "rule": {
+      "consider_formation": {
+        "title": "Use {formation} instead of {current_formation}",
+        "explanation": "This evaluated formation improves win probability by {win_delta}. Sector changes: {sector_summary}."
+      },
       "use_formation": {
         "title": "Use {formation} instead of {current_formation}",
         "explanation": "This evaluated formation improves win probability by {win_delta}. Sector changes: {sector_summary}."
       },
       "strongest_sector": {
-        "title": "{sector} is your strongest area",
+        "title": "{sector_with_article} is your strongest area",
         "explanation": "Your calculated {sector} rating is currently {value}. No action is required there before addressing higher-risk areas."
       },
+      "exposed_sector": {
+        "title": "{sector_exposed}",
+        "explanation": "The opponent is ahead of your matching {sector} by {gap} rating points. Treat this as matchup context unless an evaluated change improves it."
+      },
       "defensive_exposure": {
-        "title": "{sector} is exposed",
+        "title": "{sector_exposed}",
         "explanation": "The opponent's {opponent_sector} is {gap} rating points above your matching {sector}. This is a warning until an evaluated lineup or formation change improves it."
       },
       "defensive_observation": {
-        "title": "{sector} matchup needs attention",
+        "title": "{sector_with_article} matchup needs attention",
         "explanation": "The opponent's {opponent_sector} is ahead of your matching {sector} by {gap} rating points. Treat this as matchup context, not an unevaluated instruction."
       },
       "inefficient_flank": {
-        "title": "{sector} is an inefficient route",
+        "title": "{sector_with_article} is an inefficient route",
         "explanation": "Your {sector} is {gap} rating points below the opponent's matching {opponent_sector}. Do not treat this as a recommendation to strengthen it unless an evaluated change improves the result."
       },
       "best_attack_matchup": {
-        "title": "{sector} is your best attacking route",
+        "title": "{sector_with_article} is your best attacking route",
         "explanation": "Your {sector} is the closest matchup against the opponent's {opponent_sector}, with a calculated margin of {gap} rating points."
       },
       "low_possession": {
         "title": "Possession is low",
         "explanation": "Current possession is {possession}. This is tactical context unless an evaluated formation or lineup change increases the match result."
       },
+      "unbalanced_attack": {
+        "title": "Attack is concentrated in an unfavorable matchup",
+        "explanation": "Your attack is concentrated in one channel. Treat this as tactical context unless an evaluated alternative improves the result."
+      },
+      "unbalanced_defense": {
+        "title": "Defense is uneven",
+        "explanation": "Your defensive ratings are uneven. Treat this as risk context unless an evaluated change improves the result."
+      },
       "favorable_concentration": {
         "title": "Attack concentration matches their weakness",
         "explanation": "Your strongest attacking channel, {sector}, targets the opponent's weakest matching defense, {opponent_sector}."
       },
+      "favorable_attack_concentration": {
+        "title": "Attack concentration matches their weakness",
+        "explanation": "Your strongest attacking channel, {sector}, targets the opponent's weakest matching defense, {opponent_sector}."
+      },
       "unfavorable_concentration": {
+        "title": "Attack concentration targets a stronger defense",
+        "explanation": "Your strongest attacking channel, {sector}, targets {opponent_sector}, which is not the opponent's weakest defensive sector."
+      },
+      "unfavorable_attack_concentration": {
         "title": "Attack concentration targets a stronger defense",
         "explanation": "Your strongest attacking channel, {sector}, targets {opponent_sector}, which is not the opponent's weakest defensive sector."
       },

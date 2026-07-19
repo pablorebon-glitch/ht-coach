@@ -1,5 +1,16 @@
 import json
+import logging
 from pathlib import Path
+
+
+LOGGER = logging.getLogger(__name__)
+TRANSLATION_UNAVAILABLE = "Translation unavailable"
+
+
+class _SafeFormatParams(dict):
+    def __missing__(self, key):
+        LOGGER.warning("Missing localization parameter: %s", key)
+        return TRANSLATION_UNAVAILABLE
 
 
 class LocalizationService:
@@ -33,12 +44,14 @@ class LocalizationService:
         if text is None:
             text = self._lookup("en", key)
         if text is None:
-            text = key
+            LOGGER.warning("Missing localization key: %s", key)
+            return TRANSLATION_UNAVAILABLE
 
         try:
-            return text.format(**params)
+            return text.format_map(_SafeFormatParams(params))
         except (KeyError, ValueError):
-            return text
+            LOGGER.warning("Invalid localization template: %s", key)
+            return TRANSLATION_UNAVAILABLE
 
     def _lookup(self, language, key):
         catalog = self._load_catalog(language)

@@ -3,7 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ht_coach_app.core.localization import LocalizationService
+from ht_coach_app.core.localization import (
+    TRANSLATION_UNAVAILABLE,
+    LocalizationService,
+)
 from ht_coach_app.persistence.app_settings_repository import (
     AppSettings,
     AppSettingsRepository,
@@ -51,10 +54,10 @@ class LocalizationServiceTest(unittest.TestCase):
 
             self.assertEqual(service.t("hello.name", name="Pablo"), "Hello Pablo")
 
-    def test_missing_translation_returns_key_without_crashing(self):
+    def test_missing_translation_returns_safe_fallback_without_crashing(self):
         service = LocalizationService(language="en")
 
-        self.assertEqual(service.t("missing.translation"), "missing.translation")
+        self.assertEqual(service.t("missing.translation"), TRANSLATION_UNAVAILABLE)
 
     def test_parameter_substitution_is_safe(self):
         service = LocalizationService(language="en")
