@@ -3,6 +3,27 @@ import pandas as pd
 from models.player import Player
 
 
+INJURY_COLUMN = "Lesiones"
+
+
+def parse_injury_value(value):
+
+    if pd.isna(value):
+        return None, ""
+
+    raw = str(value).strip()
+
+    if not raw:
+        return None, raw
+
+    try:
+        numeric = float(raw.replace(",", "."))
+    except (TypeError, ValueError):
+        return None, raw
+
+    return numeric, raw
+
+
 def load_players(path: str):
 
     df = pd.read_csv(path)
@@ -10,6 +31,12 @@ def load_players(path: str):
     players = []
 
     for _, row in df.iterrows():
+
+        injury_value, injury_raw = parse_injury_value(
+            row[INJURY_COLUMN]
+            if INJURY_COLUMN in row
+            else None
+        )
 
         player = Player(
             name=row["Nombre"],
@@ -28,7 +55,9 @@ def load_players(path: str):
             experience=int(row["Experiencia"]),
             leadership=int(row["Liderazgo"]),
             tsi=int(row["TSI"]),
-            salary=int(row["Salario"])
+            salary=int(row["Salario"]),
+            injury=injury_value,
+            injury_raw=injury_raw
         )
 
         players.append(player)

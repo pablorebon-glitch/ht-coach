@@ -123,6 +123,55 @@
       "limitation_gap": "{tactic} is less supported than the squad's strongest capabilities."
     }
   },
+  "availability": {
+    "mode_label": "Squad availability",
+    "mode": {
+      "current": "Current Available Squad",
+      "full_strength": "Full Strength Squad"
+    },
+    "full_strength_warning": "Full Strength is a theoretical squad and may include unavailable players.",
+    "health_title": "Squad Health",
+    "health_empty": "Squad health appears after loading a roster.",
+    "unavailable_players": "Unavailable players",
+    "impact_title": "Availability impact",
+    "impact_empty": "Availability impact appears after comparing current and full-strength squads.",
+    "coverage_title": "Positional coverage",
+    "player_name": "Name",
+    "status": "Status",
+    "injury_value": "Injury",
+    "expected_role": "Expected role",
+    "role": "Role",
+    "coverage": "Coverage",
+    "depth": "Depth",
+    "summary_count": "{available} of {total} players available",
+    "unavailable_starters_value": "Unavailable starters: {count}",
+    "affected_areas_value": "Affected areas: {areas}",
+    "severity_value": "Severity: {severity}",
+    "score_difference_value": "Overall score: {value}",
+    "most_affected_area_value": "Most affected area: {area}",
+    "replacement_value": "Replacement: {replacement}",
+    "formation_impact_value": "Formation impact: {impact}",
+    "filter": {
+      "all": "All",
+      "available": "Available",
+      "unavailable": "Unavailable",
+      "injured": "Injured",
+      "unknown": "Unknown"
+    },
+    "reason": {
+      "available": "Available",
+      "injured": "Not selected because the player is currently injured.",
+      "unknown": "Availability status is unknown from the imported data.",
+      "not_enough_players": "There are not enough eligible players to build an Ideal XI."
+    },
+    "status_message": {
+      "updating_ideal_xi": "Updating Ideal XI...",
+      "recalculating_formation": "Recalculating formation...",
+      "evaluating_formations": "Evaluating available formations...",
+      "updating_availability": "Updating squad availability...",
+      "updating_readiness": "Updating tactical readiness..."
+    }
+  },
   "match": {
     "title": "Match",
     "subtitle": "Analyze a match against a saved opponent.",

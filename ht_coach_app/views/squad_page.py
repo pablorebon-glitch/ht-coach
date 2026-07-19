@@ -21,7 +21,11 @@ from PySide6.QtWidgets import (
 
 from ht_coach_app.core.localization import t
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
-from ht_coach_app.services.squad_builder_service import AUTO_FORMATION
+from ht_coach_app.services.squad_builder_service import (
+    AVAILABILITY_CURRENT,
+    AVAILABILITY_FULL_STRENGTH,
+    AUTO_FORMATION,
+)
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 from ht_coach_app.widgets.sortable_table_item import SortableTableItem
@@ -35,6 +39,7 @@ class SquadPage(BasePage):
     export_requested = Signal()
     player_selected = Signal(str)
     ideal_formation_changed = Signal(str)
+    availability_mode_changed = Signal(str)
 
     HEADERS = [
         "Name",
@@ -56,6 +61,7 @@ class SquadPage(BasePage):
         "Pos. Score",
         "Pos. Rank",
         "Best Position",
+        "Availability",
     ]
 
     def __init__(self, parent=None):
@@ -120,6 +126,19 @@ class SquadPage(BasePage):
             self.filters_changed
         )
 
+        self.availability_filter_combo = QComboBox()
+        for label, key in [
+            (t("availability.filter.all"), "all"),
+            (t("availability.filter.available"), "available"),
+            (t("availability.filter.unavailable"), "unavailable"),
+            (t("availability.filter.injured"), "injured"),
+            (t("availability.filter.unknown"), "unknown"),
+        ]:
+            self.availability_filter_combo.addItem(label, key)
+        self.availability_filter_combo.currentIndexChanged.connect(
+            self.filters_changed
+        )
+
         layout.addWidget(QLabel("Players CSV"), 0, 0)
         layout.addWidget(self.path_edit, 0, 1, 1, 4)
         layout.addWidget(browse_button, 0, 5)
@@ -136,6 +155,7 @@ class SquadPage(BasePage):
         layout.addWidget(self.minimum_stamina, 2, 6)
         layout.addWidget(self.speciality_combo, 2, 7)
         layout.addWidget(self.position_combo, 2, 8)
+        layout.addWidget(self.availability_filter_combo, 2, 9)
         layout.setColumnStretch(1, 1)
 
         self.body_layout.addWidget(panel)
@@ -166,6 +186,18 @@ class SquadPage(BasePage):
         self.ideal_formation_combo.currentTextChanged.connect(
             self.ideal_formation_changed
         )
+        self.availability_combo = QComboBox()
+        self.availability_combo.addItem(
+            t("availability.mode.current"),
+            AVAILABILITY_CURRENT,
+        )
+        self.availability_combo.addItem(
+            t("availability.mode.full_strength"),
+            AVAILABILITY_FULL_STRENGTH,
+        )
+        self.availability_combo.currentIndexChanged.connect(
+            self._emit_availability_mode
+        )
         self.ideal_best_label = QLabel(t("squad_builder.empty_title"))
         self.ideal_best_label.setObjectName("sectionTitle")
         self.ideal_score_label = QLabel("")
@@ -175,11 +207,16 @@ class SquadPage(BasePage):
 
         summary_layout.addWidget(QLabel(t("squad_builder.formation")), 0, 0)
         summary_layout.addWidget(self.ideal_formation_combo, 0, 1)
-        summary_layout.addWidget(self.ideal_best_label, 0, 2)
-        summary_layout.addWidget(self.ideal_score_label, 0, 3)
-        summary_layout.addWidget(self.ideal_confidence_label, 0, 4)
-        summary_layout.addWidget(self.ideal_reason_label, 1, 0, 1, 5)
-        summary_layout.setColumnStretch(2, 1)
+        summary_layout.addWidget(QLabel(t("availability.mode_label")), 0, 2)
+        summary_layout.addWidget(self.availability_combo, 0, 3)
+        summary_layout.addWidget(self.ideal_best_label, 0, 4)
+        summary_layout.addWidget(self.ideal_score_label, 0, 5)
+        summary_layout.addWidget(self.ideal_confidence_label, 0, 6)
+        summary_layout.addWidget(self.ideal_reason_label, 1, 0, 1, 7)
+        self.simulation_warning_label = QLabel("")
+        self.simulation_warning_label.setWordWrap(True)
+        summary_layout.addWidget(self.simulation_warning_label, 2, 0, 1, 7)
+        summary_layout.setColumnStretch(4, 1)
         layout.addWidget(summary)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -263,6 +300,51 @@ class SquadPage(BasePage):
             QHeaderView.Stretch
         )
 
+        health_title = QLabel(t("availability.health_title"))
+        health_title.setObjectName("sectionTitle")
+        self.health_summary_label = QLabel(t("availability.health_empty"))
+        self.health_summary_label.setWordWrap(True)
+
+        unavailable_title = QLabel(t("availability.unavailable_players"))
+        unavailable_title.setObjectName("sectionTitle")
+        self.unavailable_table = QTableWidget(0, 4)
+        self.unavailable_table.setHorizontalHeaderLabels(
+            [
+                t("availability.player_name"),
+                t("availability.status"),
+                t("availability.injury_value"),
+                t("availability.expected_role"),
+            ]
+        )
+        self.unavailable_table.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        self.unavailable_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        impact_title = QLabel(t("availability.impact_title"))
+        impact_title.setObjectName("sectionTitle")
+        self.impact_label = QLabel(t("availability.impact_empty"))
+        self.impact_label.setWordWrap(True)
+
+        coverage_title = QLabel(t("availability.coverage_title"))
+        coverage_title.setObjectName("sectionTitle")
+        self.coverage_table = QTableWidget(0, 3)
+        self.coverage_table.setHorizontalHeaderLabels(
+            [
+                t("availability.role"),
+                t("availability.coverage"),
+                t("availability.depth"),
+            ]
+        )
+        self.coverage_table.setEditTriggers(
+            QAbstractItemView.NoEditTriggers
+        )
+        self.coverage_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
         ranking_title = QLabel(t("squad_builder.best_formations"))
         ranking_title.setObjectName("sectionTitle")
         self.ideal_ranking_table = QTableWidget(0, 6)
@@ -299,6 +381,14 @@ class SquadPage(BasePage):
         side_layout.addWidget(self.readiness_detail_label)
         side_layout.addWidget(affinity_title)
         side_layout.addWidget(self.formation_affinity_table)
+        side_layout.addWidget(health_title)
+        side_layout.addWidget(self.health_summary_label)
+        side_layout.addWidget(unavailable_title)
+        side_layout.addWidget(self.unavailable_table)
+        side_layout.addWidget(impact_title)
+        side_layout.addWidget(self.impact_label)
+        side_layout.addWidget(coverage_title)
+        side_layout.addWidget(self.coverage_table)
         side_layout.addWidget(ranking_title)
         side_layout.addWidget(self.ideal_ranking_table)
         side_layout.addStretch(1)
@@ -429,6 +519,12 @@ class SquadPage(BasePage):
         )
         self.ideal_formation_combo.blockSignals(False)
 
+    def set_availability_mode(self, mode):
+        index = self.availability_combo.findData(mode)
+        self.availability_combo.blockSignals(True)
+        self.availability_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.availability_combo.blockSignals(False)
+
     def set_specialties(self, specialties):
         current = self.speciality_combo.currentText()
         self.speciality_combo.blockSignals(True)
@@ -449,6 +545,7 @@ class SquadPage(BasePage):
             "minimum_stamina": self.minimum_stamina.value(),
             "speciality": self.speciality_combo.currentText(),
             "selected_position": self.position_combo.currentText(),
+            "availability": self.availability_filter_combo.currentData() or "all",
         }
 
     def set_players(self, rows):
@@ -476,6 +573,7 @@ class SquadPage(BasePage):
                 f"{row.selected_position_score:.2f}",
                 row.selected_position_rank or "",
                 row.best_position,
+                row.availability_status,
             ]
             sort_values = [
                 row.name.casefold(),
@@ -497,6 +595,7 @@ class SquadPage(BasePage):
                 row.selected_position_score,
                 row.selected_position_rank or None,
                 row.best_position.casefold(),
+                row.availability_status.casefold(),
             ]
 
             for column, value in enumerate(values):
@@ -517,6 +616,8 @@ class SquadPage(BasePage):
         self.ideal_reason_label.setText(t("squad_builder.empty_message"))
         self.ideal_ranking_table.setRowCount(0)
         self._set_squad_identity(None)
+        self.simulation_warning_label.setText("")
+        self._set_health_summary(None)
 
     def show_ideal_xi(
         self,
@@ -549,8 +650,10 @@ class SquadPage(BasePage):
             )
         )
         self.ideal_reason_label.setText(result.reason)
+        self.simulation_warning_label.setText(result.simulation_warning)
         self._set_ideal_rankings(result.rankings)
         self._set_squad_identity(result.squad_identity)
+        self._set_health_summary(result.health_summary)
 
         boards = [
             self._formation_board_mapper.to_board(
@@ -688,6 +791,113 @@ class SquadPage(BasePage):
                         sort_values[column],
                     ),
                 )
+
+    def _set_health_summary(self, summary):
+        if summary is None:
+            self.health_summary_label.setText(t("availability.health_empty"))
+            self.unavailable_table.setRowCount(0)
+            self.impact_label.setText(t("availability.impact_empty"))
+            self.coverage_table.setRowCount(0)
+            return
+
+        self.health_summary_label.setText(
+            "\n".join(
+                [
+                    t(
+                        "availability.summary_count",
+                        available=summary.available_count,
+                        total=summary.total_count,
+                    ),
+                    t(
+                        "availability.unavailable_starters_value",
+                        count=summary.unavailable_starters,
+                    ),
+                    t(
+                        "availability.affected_areas_value",
+                        areas=", ".join(summary.affected_areas) or "-",
+                    ),
+                    t(
+                        "availability.severity_value",
+                        severity=summary.severity,
+                    ),
+                ]
+            )
+        )
+        self._set_unavailable_players(summary.unavailable_players)
+        self._set_impact(summary.impact)
+        self._set_coverage(summary.coverage)
+
+    def _set_unavailable_players(self, players):
+        self.unavailable_table.setRowCount(len(players or []))
+
+        for row, player in enumerate(players or []):
+            values = [
+                player.player_name,
+                f"{player.status_label} - {player.injury_value}".strip(" -"),
+                player.best_position,
+                player.expected_role,
+            ]
+            for column, value in enumerate(values):
+                self.unavailable_table.setItem(
+                    row,
+                    column,
+                    SortableTableItem(
+                        value,
+                        str(value).casefold(),
+                    ),
+                )
+
+    def _set_impact(self, impact):
+        if impact is None:
+            self.impact_label.setText(t("availability.impact_empty"))
+            return
+
+        self.impact_label.setText(
+            "\n".join(
+                [
+                    t(
+                        "availability.score_difference_value",
+                        value=f"{impact.overall_score_difference:.2f}",
+                    ),
+                    t(
+                        "availability.most_affected_area_value",
+                        area=impact.most_affected_area or "-",
+                    ),
+                    t(
+                        "availability.replacement_value",
+                        replacement=impact.replacement_summary or "-",
+                    ),
+                    t(
+                        "availability.formation_impact_value",
+                        impact=impact.formation_impact or "-",
+                    ),
+                ]
+            )
+        )
+
+    def _set_coverage(self, coverage_rows):
+        self.coverage_table.setRowCount(len(coverage_rows or []))
+
+        for row, coverage in enumerate(coverage_rows or []):
+            values = [
+                coverage.role,
+                coverage.classification,
+                str(coverage.eligible_alternatives),
+            ]
+            for column, value in enumerate(values):
+                self.coverage_table.setItem(
+                    row,
+                    column,
+                    SortableTableItem(
+                        value,
+                        str(value).casefold(),
+                    ),
+                )
+
+    def _emit_availability_mode(self):
+        self.availability_mode_changed.emit(
+            self.availability_combo.currentData() or AVAILABILITY_CURRENT
+        )
 
     def _show_selected_tactic_detail(self):
         selected = self.readiness_table.selectedItems()

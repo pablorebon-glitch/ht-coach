@@ -125,6 +125,9 @@ Deliverables:
 - Squad Identity and Tactical Readiness panel replacing Preferred Style wording with
   descriptive identity, strengths, weaknesses, tactic capability readiness, formation
   affinity and main player contributors.
+- Squad Health and Availability with Current Available Squad default, Full Strength
+  simulation, centralized injury eligibility, health summary, unavailable player
+  explanation, availability impact and positional coverage.
 
 Acceptance criteria:
 
@@ -134,6 +137,8 @@ Acceptance criteria:
 - Switching formation rebuilds the Ideal XI summary, pitch and player explanation.
 - Squad Identity describes long-term roster capability without opponent context or
   match-tactic recommendations.
+- Injured players from the `Lesiones` CSV field are excluded before Squad Builder
+  optimization in Current Available mode and included only in Full Strength simulation.
 - Import errors do not crash the app.
 - Match receives roster path changes without restarting the app.
 - No engine formulas or optimizer calculations are changed.

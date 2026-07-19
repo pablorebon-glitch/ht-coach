@@ -123,6 +123,55 @@
       "limitation_gap": "{tactic} esta menos respaldada que las capacidades mas fuertes del plantel."
     }
   },
+  "availability": {
+    "mode_label": "Disponibilidad del plantel",
+    "mode": {
+      "current": "Plantel disponible actualmente",
+      "full_strength": "Plantel completo"
+    },
+    "full_strength_warning": "Plantel completo es una simulacion teorica y puede incluir jugadores no disponibles.",
+    "health_title": "Salud del plantel",
+    "health_empty": "La salud del plantel aparece despues de cargar un roster.",
+    "unavailable_players": "Jugadores no disponibles",
+    "impact_title": "Impacto de disponibilidad",
+    "impact_empty": "El impacto aparece al comparar plantel actual y plantel completo.",
+    "coverage_title": "Cobertura posicional",
+    "player_name": "Nombre",
+    "status": "Estado",
+    "injury_value": "Lesion",
+    "expected_role": "Rol esperado",
+    "role": "Rol",
+    "coverage": "Cobertura",
+    "depth": "Profundidad",
+    "summary_count": "{available} de {total} jugadores disponibles",
+    "unavailable_starters_value": "Titulares no disponibles: {count}",
+    "affected_areas_value": "Areas afectadas: {areas}",
+    "severity_value": "Severidad: {severity}",
+    "score_difference_value": "Score general: {value}",
+    "most_affected_area_value": "Area mas afectada: {area}",
+    "replacement_value": "Reemplazo: {replacement}",
+    "formation_impact_value": "Impacto de formacion: {impact}",
+    "filter": {
+      "all": "Todos",
+      "available": "Disponible",
+      "unavailable": "No disponible",
+      "injured": "Lesionado",
+      "unknown": "Desconocido"
+    },
+    "reason": {
+      "available": "Disponible",
+      "injured": "No seleccionado porque el jugador esta lesionado actualmente.",
+      "unknown": "El estado de disponibilidad es desconocido en los datos importados.",
+      "not_enough_players": "No hay suficientes jugadores elegibles para construir un XI ideal."
+    },
+    "status_message": {
+      "updating_ideal_xi": "Actualizando XI ideal...",
+      "recalculating_formation": "Recalculando formacion...",
+      "evaluating_formations": "Evaluando formaciones disponibles...",
+      "updating_availability": "Actualizando disponibilidad del plantel...",
+      "updating_readiness": "Actualizando preparacion tactica..."
+    }
+  },
   "match": {
     "title": "Partido",
     "subtitle": "Analiza un partido contra un rival guardado.",

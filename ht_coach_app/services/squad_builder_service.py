@@ -1,7 +1,19 @@
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 from engine.analyzers.formation_analyzer import FormationAnalyzer
+from engine.analyzers.player_analyzer import PlayerAnalyzer
 from engine.optimizers.formation_optimizer import FormationOptimizer
+from engine.squad_health.availability_impact_analyzer import (
+    AvailabilityImpactAnalyzer,
+)
+from engine.squad_health.availability_service import (
+    CURRENT_AVAILABLE,
+    FULL_STRENGTH,
+    AvailabilityService,
+)
+from engine.squad_health.health_summary import HealthSummaryBuilder
+from engine.squad_health.models import HealthSummaryResult
 from ht_coach_app.core.localization import t
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.services.match_workspace_service import (
@@ -14,6 +26,8 @@ from models.tactic import Tactic
 
 
 AUTO_FORMATION = "Auto"
+AVAILABILITY_CURRENT = CURRENT_AVAILABLE
+AVAILABILITY_FULL_STRENGTH = FULL_STRENGTH
 
 
 @dataclass(frozen=True)
@@ -80,11 +94,25 @@ class IdealXIResult:
     formations: list[FormationAnalysisResult] = field(default_factory=list)
     selected_formation: FormationAnalysisResult | None = None
     squad_identity: SquadIdentityResult = field(default_factory=SquadIdentityResult)
+    health_summary: HealthSummaryResult | None = None
+    availability_mode: str = AVAILABILITY_CURRENT
+    simulation_warning: str = ""
 
 
 class SquadBuilderService:
-    def __init__(self, optimizer=FormationOptimizer.optimize):
+    def __init__(
+        self,
+        optimizer=FormationOptimizer.optimize,
+        availability_service=None,
+        impact_analyzer=None,
+        health_summary_builder=None,
+        analyzer=PlayerAnalyzer,
+    ):
         self._optimizer = optimizer
+        self._availability_service = availability_service or AvailabilityService()
+        self._impact_analyzer = impact_analyzer or AvailabilityImpactAnalyzer()
+        self._health_summary_builder = health_summary_builder or HealthSummaryBuilder()
+        self._analyzer = analyzer
 
     def supported_formations(self):
         return list(FORMATION_BY_NAME.keys())
@@ -92,7 +120,90 @@ class SquadBuilderService:
     def selection_options(self):
         return [AUTO_FORMATION] + self.supported_formations()
 
-    def build(self, players, formation_name=AUTO_FORMATION):
+    def eligible_players(self, players, availability_mode=AVAILABILITY_CURRENT):
+        return self._availability_service.eligible_players(
+            players,
+            self._availability_service.normalize_mode(availability_mode),
+        )
+
+    def build(
+        self,
+        players,
+        formation_name=AUTO_FORMATION,
+        availability_mode=AVAILABILITY_CURRENT,
+    ):
+        mode = self._availability_service.normalize_mode(availability_mode)
+        eligible_players = self._availability_service.eligible_players(
+            players,
+            mode,
+        )
+        current_result = self._build_for_players(
+            eligible_players,
+            formation_name,
+            mode,
+        )
+        full_result = None
+
+        if mode == AVAILABILITY_CURRENT:
+            full_result = self._build_for_players(
+                players,
+                formation_name,
+                AVAILABILITY_FULL_STRENGTH,
+            )
+        else:
+            full_result = current_result
+
+        records = self._availability_service.classify_roster(players)
+        availability_by_name = {
+            record.player_name: record
+            for record in records
+        }
+        impact = (
+            self._impact_analyzer.analyze(
+                current_result,
+                full_result,
+                availability_by_name,
+            )
+            if full_result is not None
+            else None
+        )
+        details_by_name = self._player_details_by_name(players)
+        health_summary = self._health_summary_builder.build(
+            players=players,
+            eligible_players=eligible_players,
+            availability_records=records,
+            player_details_by_name=details_by_name,
+            mode_label=self._availability_mode_label(mode),
+            impact=impact,
+        )
+
+        return self._with_health(
+            current_result,
+            health_summary,
+            mode,
+        )
+
+    def _build_for_players(
+        self,
+        players,
+        formation_name=AUTO_FORMATION,
+        availability_mode=AVAILABILITY_CURRENT,
+    ):
+        if len(players) < 11:
+            return IdealXIResult(
+                mode=formation_name or AUTO_FORMATION,
+                selected_formation_name="",
+                best_formation_name="",
+                overall_score=0.0,
+                confidence=t("squad_builder.confidence.low"),
+                reason=t("availability.reason.not_enough_players"),
+                squad_identity=SquadIdentityResult(
+                    identity=t("squad_identity.empty_title"),
+                    explanation=t("availability.reason.not_enough_players"),
+                ),
+                availability_mode=availability_mode,
+            )
+
         engine_results = self._optimizer(
             players,
             list(FORMATION_BY_NAME.values()),
@@ -110,6 +221,7 @@ class SquadBuilderService:
                     identity=t("squad_identity.empty_title"),
                     explanation=t("squad_identity.empty_message"),
                 ),
+                availability_mode=availability_mode,
             )
 
         best = engine_results[0]
@@ -190,6 +302,33 @@ class SquadBuilderService:
             formations=mapped_formations,
             selected_formation=selected_formation,
             squad_identity=identity,
+            availability_mode=availability_mode,
+            simulation_warning=(
+                t("availability.full_strength_warning")
+                if availability_mode == AVAILABILITY_FULL_STRENGTH
+                else ""
+            ),
+        )
+
+    def _with_health(self, result, health_summary, mode):
+        return IdealXIResult(
+            mode=result.mode,
+            selected_formation_name=result.selected_formation_name,
+            best_formation_name=result.best_formation_name,
+            overall_score=result.overall_score,
+            confidence=result.confidence,
+            reason=result.reason,
+            rankings=result.rankings,
+            formations=result.formations,
+            selected_formation=result.selected_formation,
+            squad_identity=result.squad_identity,
+            health_summary=health_summary,
+            availability_mode=mode,
+            simulation_warning=(
+                t("availability.full_strength_warning")
+                if mode == AVAILABILITY_FULL_STRENGTH
+                else ""
+            ),
         )
 
     def _map_formation_result(
@@ -568,6 +707,52 @@ class SquadBuilderService:
             )
             for player, score in scored[:limit]
         )
+
+    def _player_details_by_name(self, players):
+        details = {}
+        supported = [
+            "GOALKEEPER",
+            "CENTRAL_DEFENDER",
+            "WING_BACK",
+            "INNER_MIDFIELDER",
+            "WINGER",
+            "FORWARD",
+        ]
+
+        for player in players:
+            best_position, best_score = self._analyzer.best_position(player)
+            rankings = []
+
+            for position in supported:
+                score = self._analyzer.rank_players(
+                    [player],
+                    position,
+                )[0].score
+                rankings.append(
+                    (
+                        format_position(position),
+                        float(score),
+                        1,
+                    )
+                )
+
+            details[player.name] = SimpleNamespace(
+                player=SimpleNamespace(
+                    name=player.name,
+                    best_position=format_position(best_position),
+                    best_position_score=float(best_score),
+                ),
+                rankings=rankings,
+            )
+
+        return details
+
+    @staticmethod
+    def _availability_mode_label(mode):
+        if mode == AVAILABILITY_FULL_STRENGTH:
+            return t("availability.mode.full_strength")
+
+        return t("availability.mode.current")
 
     def _player_averages(self, players):
         fields = [

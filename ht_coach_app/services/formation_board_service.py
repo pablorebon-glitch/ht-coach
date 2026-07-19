@@ -197,7 +197,7 @@ class FormationBoardMapper:
                 else None
             )
             specialty = (
-                detail.player.speciality
+                self._availability_specialty(detail.player)
                 if detail is not None
                 else ""
             )
@@ -252,6 +252,20 @@ class FormationBoardMapper:
             return name
 
         return f"{name[:15].rstrip()}..."
+
+    @staticmethod
+    def _availability_specialty(detail_player):
+        availability = str(
+            getattr(detail_player, "availability_status", "") or ""
+        )
+        specialty = str(
+            getattr(detail_player, "speciality", "") or ""
+        )
+
+        if availability and availability != "Available":
+            return availability
+
+        return specialty
 
     @staticmethod
     def _stable_player_id(formation_name, lineup_player, index):

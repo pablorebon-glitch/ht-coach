@@ -1,7 +1,10 @@
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
+from ht_coach_app.core.localization import t
 from ht_coach_app.services.squad_builder_service import (
+    AVAILABILITY_CURRENT,
+    AVAILABILITY_FULL_STRENGTH,
     AUTO_FORMATION,
     SquadBuilderService,
 )
@@ -25,6 +28,7 @@ class SquadController:
         self._roster = None
         self._visible_rows = []
         self._ideal_selection = AUTO_FORMATION
+        self._availability_mode = AVAILABILITY_CURRENT
 
         self._connect_view()
         self.refresh()
@@ -52,6 +56,10 @@ class SquadController:
             self._view.ideal_formation_changed.connect(
                 self._show_ideal_xi
             )
+        if hasattr(self._view, "availability_mode_changed"):
+            self._view.availability_mode_changed.connect(
+                self._change_availability_mode
+            )
 
     def refresh(self):
         self._view.set_supported_positions(
@@ -62,6 +70,16 @@ class SquadController:
                 self._builder_service.selection_options()
             )
         settings = self._settings_repository.load()
+        self._availability_mode = (
+            settings.squad_availability_mode
+            if settings.squad_availability_mode
+            in {AVAILABILITY_CURRENT, AVAILABILITY_FULL_STRENGTH}
+            else AVAILABILITY_CURRENT
+        )
+        if hasattr(self._view, "set_availability_mode"):
+            self._view.set_availability_mode(
+                self._availability_mode
+            )
         self._view.set_csv_path(
             settings.players_csv_path
         )
@@ -124,7 +142,8 @@ class SquadController:
             minimum_form=filters["minimum_form"],
             minimum_stamina=filters["minimum_stamina"],
             speciality=filters["speciality"],
-            selected_position=filters["selected_position"]
+            selected_position=filters["selected_position"],
+            availability=filters.get("availability", "all")
         )
         self._view.set_players(
             self._visible_rows
@@ -143,18 +162,44 @@ class SquadController:
         result = self._builder_service.build(
             self._roster.players,
             self._ideal_selection,
+            self._availability_mode,
+        )
+        roster_players = (
+            self._builder_service.eligible_players(
+                self._roster.players,
+                self._availability_mode,
+            )
+            if hasattr(self._builder_service, "eligible_players")
+            else self._roster.players
         )
         details_by_name = {
             row.name: self._service.player_detail(
-                self._roster.players,
+                roster_players,
                 row.name,
             )
-            for row in self._roster.rows
+            for row in self._service.map_players(roster_players)
         }
         self._view.show_ideal_xi(
             result,
             player_details_by_name=details_by_name,
-            roster_players=self._roster.players,
+            roster_players=roster_players,
+        )
+
+    def _change_availability_mode(self, mode):
+        self._availability_mode = (
+            mode
+            if mode in {AVAILABILITY_CURRENT, AVAILABILITY_FULL_STRENGTH}
+            else AVAILABILITY_CURRENT
+        )
+        self._save_roster_path(
+            self._view.csv_path()
+        )
+        if hasattr(self._view, "show_status"):
+            self._view.show_status(
+                t("availability.status_message.updating_availability")
+            )
+        self._show_ideal_xi(
+            self._ideal_selection
         )
 
     def _show_player_detail(self, player_name):
@@ -201,6 +246,7 @@ class SquadController:
             MatchWorkspaceSettings(
                 players_csv_path=str(path),
                 opponent_name=settings.opponent_name,
-                selected_formations=settings.selected_formations
+                selected_formations=settings.selected_formations,
+                squad_availability_mode=self._availability_mode,
             )
         )

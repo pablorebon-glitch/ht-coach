@@ -3,6 +3,7 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
+from engine.squad_health.availability_service import AvailabilityService
 from ht_coach_app.core.position_formatting import (
     format_position,
     normalize_position_value,
@@ -46,6 +47,9 @@ class PlayerRow:
     selected_position_rank: int = 0
     best_position: str = ""
     best_position_score: float = 0.0
+    availability_status: str = "Available"
+    availability_filter_key: str = "available"
+    injury_value: str = ""
 
 
 @dataclass(frozen=True)
@@ -78,10 +82,12 @@ class SquadService:
     def __init__(
         self,
         importer=None,
-        analyzer=PlayerAnalyzer
+        analyzer=PlayerAnalyzer,
+        availability_service=None
     ):
         self._importer = importer
         self._analyzer = analyzer
+        self._availability_service = availability_service or AvailabilityService()
 
     def supported_positions(self):
         return list(SUPPORTED_POSITIONS.keys())
@@ -121,6 +127,9 @@ class SquadService:
         )
 
         rows = []
+        availability = self._availability_service.availability_by_name(
+            players
+        )
 
         for player in players:
             best_position, best_score = self._analyzer.best_position(
@@ -130,6 +139,7 @@ class SquadService:
                 player.name,
                 (0.0, 0)
             )
+            availability_record = availability[player.name]
 
             rows.append(
                 PlayerRow(
@@ -155,6 +165,15 @@ class SquadService:
                         normalize_position_value(best_position)
                     ),
                     best_position_score=float(best_score),
+                    availability_status=self._availability_label(
+                        availability_record
+                    ),
+                    availability_filter_key=self._availability_filter_key(
+                        availability_record
+                    ),
+                    injury_value=self._injury_label(
+                        availability_record.injury_value
+                    ),
                 )
             )
 
@@ -167,10 +186,12 @@ class SquadService:
         minimum_form=0,
         minimum_stamina=0,
         speciality="",
-        selected_position=""
+        selected_position="",
+        availability="all"
     ):
         query = str(search_text).strip().lower()
         selected_speciality = str(speciality).strip()
+        availability_filter = str(availability or "all").strip()
 
         filtered = []
 
@@ -185,6 +206,13 @@ class SquadService:
                 continue
 
             if selected_speciality and row.speciality != selected_speciality:
+                continue
+
+            if (
+                availability_filter
+                and availability_filter != "all"
+                and row.availability_filter_key != availability_filter
+            ):
                 continue
 
             filtered.append(row)
@@ -287,3 +315,35 @@ class SquadService:
             )
             for index, player_score in enumerate(ranking)
         }
+
+    @staticmethod
+    def _availability_label(record):
+        status = record.status.value.title().replace("_", " ")
+
+        if record.injury_value and record.injury_value > 0:
+            return f"{status} - {SquadService._injury_label(record.injury_value)}"
+
+        return status
+
+    @staticmethod
+    def _availability_filter_key(record):
+        if record.status.value == "INJURED":
+            return "injured"
+
+        if record.status.value == "UNKNOWN":
+            return "unknown"
+
+        if not record.eligible_for_selection:
+            return "unavailable"
+
+        return "available"
+
+    @staticmethod
+    def _injury_label(value):
+        if value is None:
+            return ""
+
+        if float(value).is_integer():
+            return str(int(value))
+
+        return f"{float(value):.1f}"

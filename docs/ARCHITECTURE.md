@@ -48,6 +48,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  squad_health/
 models/
 importers/
 database/
@@ -155,7 +156,42 @@ Suggested services:
     tactical readiness, formation affinity, contributor and board view models.
   - Describes long-term squad capability only; it does not consider opponents and does
     not recommend match tactics.
+  - Applies centralized squad availability filtering before optimization in Current
+    Available Squad mode.
+  - Compares Current Available against Full Strength using already evaluated formation
+    outputs for impact analysis.
   - Does not duplicate optimizer behavior or introduce rating formulas.
+
+### Squad Health
+
+`engine/squad_health/`
+
+The Squad Health domain is the authoritative source for availability and eligibility.
+It does not score players or formations. It classifies imported health data and filters
+candidate pools before existing optimizers run.
+
+Modules:
+
+- `models.py`: availability status, health summary, coverage and impact view models.
+- `availability_classifier.py`: converts the imported `Lesiones` value into
+  `AVAILABLE`, `INJURED`, `UNKNOWN`, and future-compatible states.
+- `availability_service.py`: owns the eligibility rule used by Squad Builder.
+- `availability_impact_analyzer.py`: compares Current Available and Full Strength
+  evaluated outputs without recalculating ratings.
+- `health_summary.py`: builds unavailable-player, affected-area and positional coverage
+  summaries from existing roster and position evaluation data.
+
+CSV interpretation:
+
+- The importer reads the `Lesiones` column when present.
+- Empty or missing injury values are treated as no injury data and safely eligible.
+- Numeric zero is available.
+- Any numeric value greater than zero is classified conservatively as `INJURED` and is
+  not eligible for Current Available Squad.
+- Malformed non-empty values are classified as `UNKNOWN`; they remain eligible because
+  the current import format does not provide enough information to exclude safely.
+- Suspension is represented in the domain model for future support, but no suspension
+  status is inferred from the current CSV.
 
 - `OpponentService`
   - Manages saved opponents.

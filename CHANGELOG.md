@@ -60,6 +60,10 @@
 - Added Alpha 0.5.1 Squad Identity and Tactical Readiness, replacing the ambiguous
   Team Profile wording with descriptive squad identity, tactic capability readiness,
   formation affinity and main player contributors.
+- Added Alpha 0.5.2 Squad Health and Availability with centralized injury parsing,
+  current-available versus full-strength Squad Builder modes, health summary,
+  availability impact, positional coverage, unavailable player explanations and Players
+  table availability filtering.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.

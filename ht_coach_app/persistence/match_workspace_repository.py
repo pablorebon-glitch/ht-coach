@@ -16,6 +16,7 @@ class MatchWorkspaceSettings:
     selected_formations: list[str] = field(
         default_factory=lambda: list(DEFAULT_FORMATION_NAMES)
     )
+    squad_availability_mode: str = "current_available"
 
 
 class MatchWorkspaceRepository:
@@ -46,6 +47,10 @@ class MatchWorkspaceRepository:
                     "selected_formations",
                     DEFAULT_FORMATION_NAMES
                 )
+            ),
+            squad_availability_mode=data.get(
+                "squad_availability_mode",
+                "current_available"
             ),
         )
 

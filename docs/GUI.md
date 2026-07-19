@@ -92,6 +92,17 @@ Content:
   limitations, main contributors and compatible formations.
 - Formation Affinity for every supported formation, reusing existing Squad Builder
   formation optimization results.
+- Squad availability selector with Current Available Squad as the default and Full
+  Strength Squad as a clearly labeled theoretical simulation.
+- Squad Health panel showing available player count, unavailable starters, affected
+  areas and severity.
+- Unavailable players table with name, status, injury value, best role and expected
+  role when available.
+- Availability impact comparing Current Available Squad against Full Strength Squad
+  using already evaluated outputs.
+- Positional coverage by broad role: Goalkeeper, Central Defense, Wing Defense,
+  Midfield, Winger and Forward.
+- Availability column and filter in the Players tab.
 - Player Intelligence inspector inside the Formation Board for selected Ideal XI
   players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,
@@ -118,6 +129,8 @@ Expected controls:
 - Best Formations ranking table.
 - Tactical Readiness selector and detail display.
 - Formation Affinity table.
+- Availability mode selector.
+- Availability filter in the Players table.
 
 ### Opponents View
 
