@@ -150,6 +150,96 @@
     "negative_text": "Las probabilidades generales del equipo empeoraron.",
     "not_available": "El Análisis del cambio aparecerá después de recalcular el Workspace."
   },
+  "match_intelligence": {
+    "title": "Inteligencia de partido",
+    "highlights": "Señales clave",
+    "sector": {
+      "left_defense": "defensa izquierda",
+      "central_defense": "defensa central",
+      "right_defense": "defensa derecha",
+      "midfield": "mediocampo",
+      "left_attack": "ataque izquierdo",
+      "central_attack": "ataque central",
+      "right_attack": "ataque derecho"
+    },
+    "classification": {
+      "excellent": "Excelente",
+      "favorable": "Favorable",
+      "balanced": "Equilibrado",
+      "unfavorable": "Desfavorable",
+      "critical": "Crítico"
+    },
+    "profile": {
+      "title": "Perfil del partido",
+      "ours": "Nosotros: más fuerte {strongest}; más débil {weakest}.",
+      "opponent": "Rival: más fuerte {strongest}; más débil {weakest}."
+    },
+    "focus": {
+      "title": "Foco táctico",
+      "attack_best_route": {
+        "title": "Atacar por {attack_sector}",
+        "description": "{attack_sector} enfrenta {defense_sector} con un margen de {difference} puntos de rating."
+      },
+      "protect_exposed_defense": {
+        "title": "Proteger {defense_sector}",
+        "description": "Su {attack_sector} ataca tu {defense_sector} con un margen de {difference} puntos de rating."
+      },
+      "midfield_battle": {
+        "title": "Tratar el mediocampo como la batalla clave",
+        "description": "La posesión y el volumen de chances dependen de cómo sostenga el {sector}."
+      }
+    },
+    "opportunity": {
+      "attack_route": {
+        "title": "{attack_sector} es una ruta utilizable",
+        "description": "{attack_sector} contra {defense_sector} tiene un margen de {difference} puntos de rating."
+      },
+      "midfield": {
+        "title": "El mediocampo puede sostener la posesión",
+        "description": "La posesión proyectada es {possession}, suficiente para sostener volumen de chances."
+      }
+    },
+    "risk": {
+      "dangerous_route": {
+        "title": "Su {attack_sector} es peligroso",
+        "description": "Su {attack_sector} contra tu {defense_sector} tiene un margen de {difference} puntos de rating."
+      },
+      "midfield_deficit": {
+        "title": "El déficit de mediocampo puede limitar el plan",
+        "description": "La posesión proyectada es solo {possession}."
+      }
+    },
+    "summary": {
+      "defensive_risk": "Este partido probablemente se ordene alrededor de su {attack_sector} contra tu {defense_sector}.",
+      "midfield_control": "Este partido probablemente se decida en el mediocampo; la posesión proyectada es {possession}.",
+      "balanced": "El partido se ve equilibrado en los sectores tácticos principales. Pequeñas decisiones de alineación pueden decidirlo."
+    },
+    "matrix": {
+      "side": "Lado",
+      "attack": "Ataque",
+      "defense": "Defensa",
+      "diff": "Dif.",
+      "classification": "Clase",
+      "our_attack": "Nuestro ataque",
+      "opponent_attack": "Ataque rival"
+    },
+    "interpretation": {
+      "our_attack": {
+        "excellent": "Es una ruta ofensiva fuerte.",
+        "favorable": "Esta ruta ofensiva es favorable.",
+        "balanced": "Esta ruta ofensiva está equilibrada.",
+        "unfavorable": "Esta ruta ofensiva es difícil.",
+        "critical": "Esta ruta ofensiva es poco eficiente."
+      },
+      "opponent_attack": {
+        "excellent": "Es un riesgo defensivo importante.",
+        "favorable": "Es un riesgo defensivo.",
+        "balanced": "Este cruce está equilibrado.",
+        "unfavorable": "Este cruce defensivo nos favorece.",
+        "critical": "Este cruce defensivo nos favorece claramente."
+      }
+    }
+  },
   "advisor": {
     "title": "Asesor táctico",
     "empty": "El Asesor táctico aparecerá después del análisis.",

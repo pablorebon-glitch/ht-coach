@@ -20,6 +20,12 @@ optimization logic, tactic math, probability calculations, or formation scoring.
 The Tactical Advisor lives under `engine/advisor`, but it is an expert-system layer over
 already evaluated result data. It does not alter engine formulas or optimizer behavior.
 
+Match Intelligence lives under `engine/match_intelligence`. It is a deterministic
+interpretation layer over already evaluated match results. It profiles both teams,
+classifies attack-versus-defense matchups, detects opportunities and risks, generates
+three tactical focuses, builds a compact matrix and writes a short narrative summary
+without recalculating ratings or calling optimizers.
+
 ## Target Layers
 
 ```text
@@ -30,6 +36,7 @@ ht_coach_app/
   controllers/
   services/
   reasoning/
+  match_intelligence/
   change_analysis/
   player_intelligence/
   workspace/
@@ -152,6 +159,8 @@ Suggested services:
   - Formats copy-ready match summaries and recommended lineup text from view models.
   - Runs Decision Lab reasoning after optimization finishes, using only serializable
     analysis view-model data and existing engine outputs.
+  - Runs Match Intelligence after optimization finishes, using already evaluated team
+    and opponent ratings from the recommended or current Workspace result.
   - Runs Tactical Advisor recommendations over already evaluated results and persists
     serializable recommendation view models.
 
@@ -236,6 +245,32 @@ Initial rules:
 Rules use existing calculated values only. They do not call `TeamRater`,
 `LineupOptimizer`, `FormationOptimizer`, probability, xG, Decision Lab or Player
 Intelligence formulas.
+
+When Match Intelligence is present, Tactical Advisor consumes its matchup view models
+instead of reinterpreting attack-versus-defense sectors locally. Advisor ranking,
+thresholds and action requirements remain separate.
+
+### Match Intelligence
+
+`engine/match_intelligence/`
+
+Match Intelligence answers where the match is strong, weak, exposed and likely to be
+decided.
+
+Modules:
+
+- `models.py`: serializable tactical intelligence view models.
+- `matchup.py`: canonical own-attack and opponent-attack sector mapping.
+- `matchup_analyzer.py`: matchup differences and classification as Excellent,
+  Favorable, Balanced, Unfavorable or Critical.
+- `strengths.py`: team and opponent profile extraction.
+- `summary.py`: opportunity detection and deterministic narrative summary.
+- `risks.py`: opponent route, defensive and midfield risk detection.
+- `focus_analyzer.py`: exactly three concise tactical focus items.
+- `intelligence_engine.py`: orchestrates all analyzers.
+
+The module consumes already evaluated `MatchAnalysisResult` data. It does not modify
+TeamRater, LineupOptimizer, TacticOptimizer, probabilities, xG, ratings or Decision Lab.
 
 Advisor card types are intentionally strict:
 
@@ -522,6 +557,8 @@ User clicks Analyze Match
   -> MatchWorkspaceService calls FormationOptimizer.optimize_against
   -> Service maps engine result to serializable MatchAnalysisResult view models
   -> Decision Lab creates deterministic explanations from those view models
+  -> Match Intelligence creates tactical profiles, matchup classifications,
+     opportunities, risks, three focuses, a summary and a matrix
   -> MatchWorkspaceRepository persists the last successful result
   -> MatchPage renders Decision Lab, recommended summary, Formation Board,
      comparison table and detailed XI
@@ -533,7 +570,7 @@ User clicks Analyze Match
   -> ChangeAnalysisService compares previous and current evaluated Workspace results
   -> MatchPage renders Change Analysis above the local result tabs
   -> RecommendationEngine ranks Tactical Advisor recommendations
-  -> MatchPage renders Tactical Advisor as an informational panel
+  -> MatchPage renders Match Intelligence and Tactical Advisor as informational panels
 ```
 
 The engine remains unaware of the desktop application.

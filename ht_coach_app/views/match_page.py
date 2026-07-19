@@ -460,6 +460,13 @@ class MatchPage(BasePage):
                 )
             )
 
+        if getattr(result, "match_intelligence", None) is not None:
+            self.results_layout.addWidget(
+                self._build_match_intelligence_panel(
+                    result.match_intelligence
+                )
+            )
+
         if result.change_analysis is not None:
             self.results_layout.addWidget(
                 self._build_change_analysis_panel(
@@ -625,6 +632,145 @@ class MatchPage(BasePage):
         layout.setColumnStretch(1, 1)
 
         return card
+
+    def _build_match_intelligence_panel(self, intelligence):
+        card = QFrame()
+        card.setObjectName("compactDecisionLab")
+        layout = QGridLayout(card)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(6)
+
+        title = QLabel(t("match_intelligence.title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title, 0, 0, 1, 3)
+
+        summary = QLabel(
+            t(
+                intelligence.summary_key,
+                **self._localized_params(intelligence.summary_params),
+            )
+        )
+        summary.setWordWrap(True)
+        summary.setObjectName("compactDecisionText")
+        layout.addWidget(summary, 1, 0, 1, 3)
+
+        focuses = QWidget()
+        focus_layout = QVBoxLayout(focuses)
+        focus_layout.setContentsMargins(0, 0, 0, 0)
+        focus_layout.setSpacing(2)
+        focus_layout.addWidget(
+            self._mini_heading(t("match_intelligence.focus.title"))
+        )
+        for focus in intelligence.tactical_focuses[:3]:
+            label = QLabel(
+                t(
+                    focus.title_key,
+                    **self._localized_params(focus.params),
+                )
+            )
+            label.setObjectName("metadataValue")
+            focus_layout.addWidget(label)
+        layout.addWidget(focuses, 2, 0)
+
+        profile = QWidget()
+        profile_layout = QVBoxLayout(profile)
+        profile_layout.setContentsMargins(0, 0, 0, 0)
+        profile_layout.setSpacing(2)
+        profile_layout.addWidget(
+            self._mini_heading(t("match_intelligence.profile.title"))
+        )
+        profile_layout.addWidget(
+            QLabel(
+                t(
+                    "match_intelligence.profile.ours",
+                    strongest=t(
+                        f"match_intelligence.sector.{intelligence.our_profile.strongest_sector}"
+                    ),
+                    weakest=t(
+                        f"match_intelligence.sector.{intelligence.our_profile.weakest_sector}"
+                    ),
+                )
+            )
+        )
+        profile_layout.addWidget(
+            QLabel(
+                t(
+                    "match_intelligence.profile.opponent",
+                    strongest=t(
+                        f"match_intelligence.sector.{intelligence.opponent_profile.strongest_sector}"
+                    ),
+                    weakest=t(
+                        f"match_intelligence.sector.{intelligence.opponent_profile.weakest_sector}"
+                    ),
+                )
+            )
+        )
+        layout.addWidget(profile, 2, 1)
+
+        highlights = QWidget()
+        highlights_layout = QVBoxLayout(highlights)
+        highlights_layout.setContentsMargins(0, 0, 0, 0)
+        highlights_layout.setSpacing(2)
+        highlights_layout.addWidget(
+            self._mini_heading(t("match_intelligence.highlights"))
+        )
+        for item in list(intelligence.opportunities[:1]) + list(intelligence.risks[:1]):
+            highlights_layout.addWidget(
+                QLabel(
+                    t(
+                        item.title_key,
+                        **self._localized_params(item.params),
+                    )
+                )
+            )
+        layout.addWidget(highlights, 2, 2)
+
+        matrix = self._build_matchup_matrix(intelligence.matrix)
+        layout.addWidget(matrix, 3, 0, 1, 3)
+
+        for column in range(3):
+            layout.setColumnStretch(column, 1)
+        return card
+
+    def _build_matchup_matrix(self, matrix):
+        table = QTableWidget(6, 5)
+        table.setObjectName("comparisonTable")
+        table.setHorizontalHeaderLabels(
+            [
+                t("match_intelligence.matrix.side"),
+                t("match_intelligence.matrix.attack"),
+                t("match_intelligence.matrix.defense"),
+                t("match_intelligence.matrix.diff"),
+                t("match_intelligence.matrix.classification"),
+            ]
+        )
+        self._configure_table(table)
+        table.setMinimumHeight(210)
+        rows = [
+            (t("match_intelligence.matrix.our_attack"), item)
+            for item in matrix.our_attack_rows
+        ] + [
+            (t("match_intelligence.matrix.opponent_attack"), item)
+            for item in matrix.opponent_attack_rows
+        ]
+
+        for row, (side, item) in enumerate(rows[:6]):
+            marker = ""
+            if item.is_best_route:
+                marker = "+"
+            elif item.is_worst_route:
+                marker = "!"
+            values = [
+                side,
+                t(f"match_intelligence.sector.{item.attack_sector}"),
+                t(f"match_intelligence.sector.{item.defense_sector}"),
+                f"{item.difference:+.0f}",
+                f"{marker} {t(f'match_intelligence.classification.{item.classification.lower()}')}".strip(),
+            ]
+            for column, value in enumerate(values):
+                table.setItem(row, column, QTableWidgetItem(value))
+        return table
 
     def _build_decision_lab_panel(self, decision_lab, recommended):
         card = QFrame()
@@ -1150,6 +1296,46 @@ class MatchPage(BasePage):
             "weaknesses": [
                 weakness.classification
                 for weakness in result.decision_lab.opponent_weaknesses
+            ],
+        }
+
+    def match_intelligence_rows(self, result):
+        intelligence = getattr(result, "match_intelligence", None)
+        if intelligence is None:
+            return {}
+        return {
+            "formation": intelligence.formation_name,
+            "focuses": [
+                focus.code
+                for focus in intelligence.tactical_focuses
+            ],
+            "opportunities": [
+                item.code
+                for item in intelligence.opportunities
+            ],
+            "risks": [
+                item.code
+                for item in intelligence.risks
+            ],
+            "our_attack_matrix": [
+                (
+                    item.attack_sector,
+                    item.defense_sector,
+                    item.classification,
+                    item.is_best_route,
+                    item.is_worst_route,
+                )
+                for item in intelligence.matrix.our_attack_rows
+            ],
+            "opponent_attack_matrix": [
+                (
+                    item.attack_sector,
+                    item.defense_sector,
+                    item.classification,
+                    item.is_best_route,
+                    item.is_worst_route,
+                )
+                for item in intelligence.matrix.opponent_attack_rows
             ],
         }
 

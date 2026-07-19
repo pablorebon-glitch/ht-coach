@@ -58,6 +58,10 @@ class AdvisorContext:
     def change_analysis(self):
         return getattr(self.result, "change_analysis", None)
 
+    @property
+    def match_intelligence(self):
+        return getattr(self.result, "match_intelligence", None)
+
 
 class RecommendationEngine:
     def __init__(self, rules=None, ranker=None):
@@ -161,19 +165,30 @@ class WeaknessRule(RecommendationRule):
 
         own_defense = _rating_values(getattr(current, "team_ratings", None))
         opponent = _rating_values(getattr(current, "opponent_ratings", None))
-        gaps = {}
-        for opponent_attack in ATTACK_SECTORS:
-            own_sector = own_defense_for_opponent_attack(opponent_attack)
-            gaps[opponent_attack] = (
-                opponent.get(opponent_attack, 0.0)
-                - own_defense.get(own_sector, 0.0)
+        intelligence = context.match_intelligence
+        if intelligence is not None:
+            matchups = list(
+                getattr(intelligence, "opponent_attack_matchups", ()) or ()
+            )
+            if matchups:
+                matchup = max(matchups, key=lambda item: item.difference)
+                opponent_attack = matchup.attack_sector
+                own_sector = matchup.defense_sector
+                gap = float(matchup.difference)
+            else:
+                opponent_attack, own_sector, gap = self._raw_gap(
+                    own_defense,
+                    opponent,
+                )
+        else:
+            opponent_attack, own_sector, gap = self._raw_gap(
+                own_defense,
+                opponent,
             )
 
-        opponent_attack, gap = max(gaps.items(), key=lambda item: item[1])
         if gap < self.MIN_GAP:
             return None
 
-        own_sector = own_defense_for_opponent_attack(opponent_attack)
         is_warning = gap >= self.WARNING_GAP
         return Recommendation(
             code=f"weakness:{opponent_attack}->{own_sector}",
@@ -205,6 +220,21 @@ class WeaknessRule(RecommendationRule):
             },
         )
 
+    def _raw_gap(self, own_defense, opponent):
+        gaps = {}
+        for opponent_attack in ATTACK_SECTORS:
+            own_sector = own_defense_for_opponent_attack(opponent_attack)
+            gaps[opponent_attack] = (
+                own_sector,
+                opponent.get(opponent_attack, 0.0)
+                - own_defense.get(own_sector, 0.0),
+            )
+        opponent_attack, (own_sector, gap) = max(
+            gaps.items(),
+            key=lambda item: item[1][1],
+        )
+        return opponent_attack, own_sector, gap
+
 
 class AttackMatchupRule(RecommendationRule):
     OPPORTUNITY_MARGIN = -2.0
@@ -220,14 +250,30 @@ class AttackMatchupRule(RecommendationRule):
         if not ours or not opponent:
             return None
 
-        matchups = []
-        for attack_sector in ATTACK_SECTORS:
-            defense_sector = opposing_defense_for_own_attack(attack_sector)
-            margin = ours.get(attack_sector, 0.0) - opponent.get(
-                defense_sector,
-                0.0,
-            )
-            matchups.append((attack_sector, defense_sector, margin))
+        intelligence = context.match_intelligence
+        if intelligence is not None:
+            matchups = [
+                (
+                    item.attack_sector,
+                    item.defense_sector,
+                    float(item.difference),
+                )
+                for item in (
+                    getattr(intelligence, "our_attack_matchups", ()) or ()
+                )
+            ]
+        else:
+            matchups = []
+            for attack_sector in ATTACK_SECTORS:
+                defense_sector = opposing_defense_for_own_attack(attack_sector)
+                margin = ours.get(attack_sector, 0.0) - opponent.get(
+                    defense_sector,
+                    0.0,
+                )
+                matchups.append((attack_sector, defense_sector, margin))
+
+        if not matchups:
+            return None
 
         attack_sector, defense_sector, margin = min(
             matchups,

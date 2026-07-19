@@ -150,6 +150,96 @@
     "negative_text": "Overall team probabilities became worse.",
     "not_available": "Change Analysis will appear after a Workspace recalculation."
   },
+  "match_intelligence": {
+    "title": "Match Intelligence",
+    "highlights": "Key Signals",
+    "sector": {
+      "left_defense": "left defense",
+      "central_defense": "central defense",
+      "right_defense": "right defense",
+      "midfield": "midfield",
+      "left_attack": "left attack",
+      "central_attack": "central attack",
+      "right_attack": "right attack"
+    },
+    "classification": {
+      "excellent": "Excellent",
+      "favorable": "Favorable",
+      "balanced": "Balanced",
+      "unfavorable": "Unfavorable",
+      "critical": "Critical"
+    },
+    "profile": {
+      "title": "Team Profile",
+      "ours": "Us: strongest {strongest}; weakest {weakest}.",
+      "opponent": "Opponent: strongest {strongest}; weakest {weakest}."
+    },
+    "focus": {
+      "title": "Tactical Focus",
+      "attack_best_route": {
+        "title": "Attack through {attack_sector}",
+        "description": "{attack_sector} faces {defense_sector} with a {difference} rating margin."
+      },
+      "protect_exposed_defense": {
+        "title": "Protect {defense_sector}",
+        "description": "Their {attack_sector} attacks your {defense_sector} with a {difference} rating margin."
+      },
+      "midfield_battle": {
+        "title": "Treat midfield as the key battle",
+        "description": "Possession and chance volume depend on how well {sector} holds."
+      }
+    },
+    "opportunity": {
+      "attack_route": {
+        "title": "{attack_sector} is a usable route",
+        "description": "{attack_sector} versus {defense_sector} has a {difference} rating margin."
+      },
+      "midfield": {
+        "title": "Midfield can support possession",
+        "description": "Projected possession is {possession}, which should support chance volume."
+      }
+    },
+    "risk": {
+      "dangerous_route": {
+        "title": "Their {attack_sector} is dangerous",
+        "description": "Their {attack_sector} versus your {defense_sector} has a {difference} rating margin."
+      },
+      "midfield_deficit": {
+        "title": "Midfield deficit can limit the plan",
+        "description": "Projected possession is only {possession}."
+      }
+    },
+    "summary": {
+      "defensive_risk": "This match is likely to be shaped by their {attack_sector} against your {defense_sector}.",
+      "midfield_control": "This match is likely to be decided in midfield; projected possession is {possession}.",
+      "balanced": "This match looks balanced across the main tactical sectors. Small lineup choices may decide it."
+    },
+    "matrix": {
+      "side": "Side",
+      "attack": "Attack",
+      "defense": "Defense",
+      "diff": "Diff",
+      "classification": "Class",
+      "our_attack": "Our attack",
+      "opponent_attack": "Opponent attack"
+    },
+    "interpretation": {
+      "our_attack": {
+        "excellent": "This is a strong attacking route.",
+        "favorable": "This attacking route is favorable.",
+        "balanced": "This attacking route is balanced.",
+        "unfavorable": "This attacking route is difficult.",
+        "critical": "This attacking route is inefficient."
+      },
+      "opponent_attack": {
+        "excellent": "This is a major defensive risk.",
+        "favorable": "This is a defensive risk.",
+        "balanced": "This matchup is balanced.",
+        "unfavorable": "This defensive matchup is favorable for us.",
+        "critical": "This defensive matchup strongly favors us."
+      }
+    }
+  },
   "advisor": {
     "title": "Tactical Advisor",
     "empty": "Tactical Advisor will appear after analysis.",

@@ -289,8 +289,11 @@ Acceptance criteria:
   Observation and Warning cards, reserve impact badges for measured evaluated changes,
   centralize sector matchup mapping, and prevent unevaluated tactical context from
   appearing as actionable advice.
-- Alpha 0.4.8 Opponent Tactical Analysis: deepen opponent-specific tactical
-  interpretation beyond the current sector comparison.
+- Alpha 0.4.8 Match Intelligence: add a central deterministic tactical interpretation
+  layer with matchup classification, team profiles, opportunities, risks, three
+  tactical focuses, a narrative summary and a compact matrix.
+- Alpha 0.4.9 What-If Lab: explore controlled tactical alternatives from the evaluated
+  Workspace without changing stable engine formulas.
 - Match scenario history.
 - Exportable reports.
 - Advanced opponent scouting notes.

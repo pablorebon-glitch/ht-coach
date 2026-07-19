@@ -155,6 +155,8 @@ Content:
 - Change Analysis panel after Workspace recalculation, comparing the previous evaluated
   Workspace to the current evaluated Workspace with last change, position fit, team
   impact, changed sectors only and a deterministic summary.
+- Match Intelligence panel with team profile, opponent profile, three tactical focuses,
+  key opportunities, key risks and a compact matchup matrix.
 - Tactical Advisor panel with three to five ranked, informational recommendations
   derived from the current evaluated Workspace.
 - Formation comparison table with deltas versus the recommendation.
@@ -287,6 +289,20 @@ Responsibilities:
 - Show a compact top recommendation card, coaching-style reasons, meaningful risks,
   tactic-specific observations, sector matchup notes, and optimization impact.
 - Keep copy-ready text plain and readable.
+
+### MatchIntelligencePanel
+
+Responsibilities:
+
+- Display deterministic tactical interpretation from already evaluated Match Workspace
+  data.
+- Show exactly three tactical focus items.
+- Show our profile and opponent profile without exposing raw engine objects.
+- Show key opportunities and risks as localized text.
+- Render a compact matchup matrix for our attacks against opponent defenses and
+  opponent attacks against our defenses.
+- Highlight best and worst attacking routes with compact markers.
+- Avoid recalculating ratings, probabilities, xG or optimizer results.
 
 ### LineupTable
 

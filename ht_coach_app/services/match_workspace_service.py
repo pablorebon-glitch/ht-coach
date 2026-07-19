@@ -13,6 +13,15 @@ from engine.advisor.recommendation_types import (
 from engine.analyzers.team_rater import TeamRater
 from engine.optimizers.formation_optimizer import FormationOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
+from engine.match_intelligence import MatchIntelligenceEngine
+from engine.match_intelligence.models import (
+    IntelligenceItem,
+    MatchIntelligenceResult,
+    MatchupInsight,
+    MatchupMatrix,
+    TacticalFocus,
+    TeamProfile,
+)
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import normalize_position_key
 from ht_coach_app.core.side_formatting import normalize_side_value
@@ -119,6 +128,7 @@ class MatchAnalysisResult:
     )
     completed_at: str = ""
     decision_lab: DecisionLabResult | None = None
+    match_intelligence: MatchIntelligenceResult | None = None
     change_analysis: ChangeAnalysisResult | None = None
     tactical_advisor: list[Recommendation] = field(default_factory=list)
 
@@ -577,6 +587,10 @@ class MatchWorkspaceService:
             decision_lab = DecisionLab().analyze(result)
         except Exception:
             decision_lab = None
+        try:
+            match_intelligence = MatchIntelligenceEngine().analyze(result)
+        except Exception:
+            match_intelligence = None
 
         enriched = MatchAnalysisResult(
             player_count=result.player_count,
@@ -586,6 +600,7 @@ class MatchWorkspaceService:
             analyzed_formations=result.analyzed_formations,
             completed_at=result.completed_at,
             decision_lab=decision_lab,
+            match_intelligence=match_intelligence,
             change_analysis=result.change_analysis,
             tactical_advisor=result.tactical_advisor,
         )
@@ -659,6 +674,9 @@ def match_analysis_result_to_dict(result):
     data = asdict(result)
     data["decision_lab"] = decision_lab_result_to_dict(
         result.decision_lab
+    )
+    data["match_intelligence"] = match_intelligence_result_to_dict(
+        result.match_intelligence
     )
     data["change_analysis"] = change_analysis_result_to_dict(
         result.change_analysis
@@ -743,6 +761,9 @@ def match_analysis_result_from_dict(data):
         decision_lab=_decision_lab_from_dict(
             data.get("decision_lab")
         ),
+        match_intelligence=match_intelligence_result_from_dict(
+            data.get("match_intelligence")
+        ),
         change_analysis=change_analysis_result_from_dict(
             data.get("change_analysis")
         ),
@@ -757,24 +778,37 @@ def match_analysis_result_from_dict(data):
         ],
     )
 
-    if result.decision_lab is None and result.formations:
+    decision_lab = result.decision_lab
+    match_intelligence = result.match_intelligence
+
+    if decision_lab is None and result.formations:
         try:
             decision_lab = DecisionLab().analyze(result)
         except Exception:
             decision_lab = None
 
-        if decision_lab is not None:
-            return MatchAnalysisResult(
-                player_count=result.player_count,
-                opponent_name=result.opponent_name,
-                formations=result.formations,
-                players_csv_filename=result.players_csv_filename,
-                analyzed_formations=result.analyzed_formations,
-                completed_at=result.completed_at,
-                decision_lab=decision_lab,
-                change_analysis=result.change_analysis,
-                tactical_advisor=result.tactical_advisor,
-            )
+    if match_intelligence is None and result.formations:
+        try:
+            match_intelligence = MatchIntelligenceEngine().analyze(result)
+        except Exception:
+            match_intelligence = None
+
+    if (
+        decision_lab is not result.decision_lab
+        or match_intelligence is not result.match_intelligence
+    ):
+        return MatchAnalysisResult(
+            player_count=result.player_count,
+            opponent_name=result.opponent_name,
+            formations=result.formations,
+            players_csv_filename=result.players_csv_filename,
+            analyzed_formations=result.analyzed_formations,
+            completed_at=result.completed_at,
+            decision_lab=decision_lab,
+            match_intelligence=match_intelligence,
+            change_analysis=result.change_analysis,
+            tactical_advisor=result.tactical_advisor,
+        )
 
     return result
 
@@ -793,6 +827,7 @@ def with_tactical_advisor(result):
         analyzed_formations=result.analyzed_formations,
         completed_at=result.completed_at,
         decision_lab=result.decision_lab,
+        match_intelligence=getattr(result, "match_intelligence", None),
         change_analysis=result.change_analysis,
         tactical_advisor=list(recommendations),
     )
@@ -945,6 +980,124 @@ def _decision_lab_from_dict(data):
         )
     except (TypeError, ValueError, AttributeError):
         return None
+
+
+def match_intelligence_result_to_dict(result):
+    if result is None:
+        return None
+    return asdict(result)
+
+
+def match_intelligence_result_from_dict(data):
+    if not isinstance(data, dict):
+        return None
+
+    try:
+        return MatchIntelligenceResult(
+            formation_name=data.get("formation_name", ""),
+            our_profile=_team_profile_from_dict(
+                data.get("our_profile", {})
+            ),
+            opponent_profile=_team_profile_from_dict(
+                data.get("opponent_profile", {})
+            ),
+            our_attack_matchups=tuple(
+                _matchup_insight_from_dict(item)
+                for item in data.get("our_attack_matchups", [])
+                if isinstance(item, dict)
+            ),
+            opponent_attack_matchups=tuple(
+                _matchup_insight_from_dict(item)
+                for item in data.get("opponent_attack_matchups", [])
+                if isinstance(item, dict)
+            ),
+            opportunities=tuple(
+                _intelligence_item_from_dict(item)
+                for item in data.get("opportunities", [])
+                if isinstance(item, dict)
+            ),
+            risks=tuple(
+                _intelligence_item_from_dict(item)
+                for item in data.get("risks", [])
+                if isinstance(item, dict)
+            ),
+            tactical_focuses=tuple(
+                _tactical_focus_from_dict(item)
+                for item in data.get("tactical_focuses", [])
+                if isinstance(item, dict)
+            ),
+            summary_key=data.get("summary_key", ""),
+            summary_params=dict(data.get("summary_params", {})),
+            matrix=_matchup_matrix_from_dict(data.get("matrix", {})),
+            schema_version=int(data.get("schema_version", 1)),
+        )
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _team_profile_from_dict(data):
+    return TeamProfile(
+        strongest_sector=data.get("strongest_sector", ""),
+        weakest_sector=data.get("weakest_sector", ""),
+        most_balanced_area=data.get("most_balanced_area", ""),
+        most_vulnerable_area=data.get("most_vulnerable_area", ""),
+    )
+
+
+def _matchup_insight_from_dict(data):
+    return MatchupInsight(
+        code=data.get("code", ""),
+        perspective=data.get("perspective", ""),
+        attack_sector=data.get("attack_sector", ""),
+        defense_sector=data.get("defense_sector", ""),
+        attack_value=float(data.get("attack_value", 0.0)),
+        defense_value=float(data.get("defense_value", 0.0)),
+        difference=float(data.get("difference", 0.0)),
+        classification=data.get("classification", ""),
+        advantage=data.get("advantage", ""),
+        interpretation_key=data.get("interpretation_key", ""),
+        params=dict(data.get("params", {})),
+        is_best_route=bool(data.get("is_best_route", False)),
+        is_worst_route=bool(data.get("is_worst_route", False)),
+    )
+
+
+def _intelligence_item_from_dict(data):
+    return IntelligenceItem(
+        code=data.get("code", ""),
+        title_key=data.get("title_key", ""),
+        description_key=data.get("description_key", ""),
+        confidence=data.get("confidence", ""),
+        severity=data.get("severity", ""),
+        params=dict(data.get("params", {})),
+        values=dict(data.get("values", {})),
+    )
+
+
+def _tactical_focus_from_dict(data):
+    return TacticalFocus(
+        code=data.get("code", ""),
+        title_key=data.get("title_key", ""),
+        description_key=data.get("description_key", ""),
+        params=dict(data.get("params", {})),
+    )
+
+
+def _matchup_matrix_from_dict(data):
+    if not isinstance(data, dict):
+        return MatchupMatrix()
+    return MatchupMatrix(
+        our_attack_rows=tuple(
+            _matchup_insight_from_dict(item)
+            for item in data.get("our_attack_rows", [])
+            if isinstance(item, dict)
+        ),
+        opponent_attack_rows=tuple(
+            _matchup_insight_from_dict(item)
+            for item in data.get("opponent_attack_rows", [])
+            if isinstance(item, dict)
+        ),
+    )
 
 
 def _recommendation_to_dict(recommendation):

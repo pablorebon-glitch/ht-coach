@@ -49,6 +49,11 @@
   opponent attack versus own defense.
 - Added Advisor localization coverage for current and backward-compatible Tactical
   Advisor keys in English and Spanish.
+- Added Alpha 0.4.8 Match Intelligence with deterministic matchup analysis, team
+  profiles, opportunities, risks, exactly three tactical focuses, narrative summary and
+  matchup matrix.
+- Added `engine/match_intelligence` as a serializable interpretation layer over already
+  evaluated Match Workspace results.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -155,6 +160,10 @@
   message instead of rendering raw `advisor.*` keys.
 - Improved Spanish Advisor copy for sector articles, exposed sectors and attack
   concentration observations.
+- Match results now show a Match Intelligence panel between Decision Lab and Tactical
+  Advisor.
+- Tactical Advisor can consume Match Intelligence matchup view models when they are
+  available.
 
 ### Notes
 
@@ -172,3 +181,5 @@
 - Actionable Tactical Advisor changes do not modify optimization formulas, player
   ratings, xG, probabilities, tactic behavior, Decision Lab, Player Intelligence or
   position weights.
+- Match Intelligence does not modify TeamRater, optimizers, xG, probability formulas,
+  rating formulas or Decision Lab.
