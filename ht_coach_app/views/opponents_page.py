@@ -1,6 +1,9 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -13,8 +16,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ht_coach_app.core.localization import localization_service, t
+from ht_coach_app.services.opponent_ratings_clipboard_parser import (
+    parse_opponent_ratings_clipboard,
+)
+from ht_coach_app.services.opponent_service import HATTRICK_SECTOR_ORDER
 from ht_coach_app.views.base_page import BasePage
-from ht_coach_app.widgets.rating_input_grid import RatingInputGrid
+from ht_coach_app.widgets.rating_input_grid import RATING_LABELS, RatingInputGrid
 
 
 class OpponentsPage(BasePage):
@@ -26,8 +34,8 @@ class OpponentsPage(BasePage):
 
     def __init__(self, parent=None):
         super().__init__(
-            "Opponents",
-            "Manage saved opponents and scouting ratings.",
+            t("opponents.title"),
+            t("opponents.subtitle"),
             parent
         )
         self._current_name = None
@@ -78,8 +86,8 @@ class OpponentsPage(BasePage):
     def confirm_delete(self, name):
         result = QMessageBox.question(
             self,
-            "Delete opponent",
-            f"Delete {name}?",
+            t("opponents.delete_title"),
+            t("opponents.delete_message", name=name),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -121,9 +129,9 @@ class OpponentsPage(BasePage):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        title = QLabel("Saved opponents")
-        title.setObjectName("sectionTitle")
-        layout.addWidget(title)
+        self.saved_title = QLabel(t("opponents.saved"))
+        self.saved_title.setObjectName("sectionTitle")
+        layout.addWidget(self.saved_title)
 
         self.opponent_list = QListWidget()
         self.opponent_list.setSelectionMode(
@@ -134,11 +142,11 @@ class OpponentsPage(BasePage):
         )
         layout.addWidget(self.opponent_list, 1)
 
-        new_button = QPushButton("New")
-        new_button.clicked.connect(
+        self.new_button = QPushButton(t("opponents.new"))
+        self.new_button.clicked.connect(
             self.new_requested.emit
         )
-        layout.addWidget(new_button)
+        layout.addWidget(self.new_button)
 
         return panel
 
@@ -149,20 +157,22 @@ class OpponentsPage(BasePage):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
-        title = QLabel("Opponent details")
-        title.setObjectName("sectionTitle")
-        layout.addWidget(title)
+        self.details_title = QLabel(t("opponents.details"))
+        self.details_title.setObjectName("sectionTitle")
+        layout.addWidget(self.details_title)
 
         self.message_label = QLabel("")
         self.message_label.setWordWrap(True)
         layout.addWidget(self.message_label)
 
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Opponent name")
-        layout.addWidget(QLabel("Name"))
+        self.name_input.setPlaceholderText(t("opponents.name_placeholder"))
+        self.name_label = QLabel(t("opponents.name"))
+        layout.addWidget(self.name_label)
         layout.addWidget(self.name_input)
 
-        layout.addWidget(QLabel("Ratings"))
+        self.ratings_label = QLabel(t("opponents.ratings"))
+        layout.addWidget(self.ratings_label)
         self.ratings_grid = RatingInputGrid()
         layout.addWidget(self.ratings_grid)
         layout.addStretch(1)
@@ -170,24 +180,36 @@ class OpponentsPage(BasePage):
         button_row = QHBoxLayout()
         button_row.setSpacing(8)
 
-        save_button = QPushButton("Save")
-        save_button.clicked.connect(
+        self.paste_ratings_button = QPushButton(t("opponents.paste_ratings"))
+        self.paste_ratings_button.setAccessibleName(
+            t("opponents.paste_ratings")
+        )
+        self.paste_ratings_button.setToolTip(
+            t("opponents.paste_ratings_tip")
+        )
+        self.paste_ratings_button.clicked.connect(
+            self._paste_ratings_from_clipboard
+        )
+
+        self.save_button = QPushButton(t("opponents.save"))
+        self.save_button.clicked.connect(
             self.save_requested.emit
         )
 
-        duplicate_button = QPushButton("Duplicate")
-        duplicate_button.clicked.connect(
+        self.duplicate_button = QPushButton(t("opponents.duplicate"))
+        self.duplicate_button.clicked.connect(
             self.duplicate_requested.emit
         )
 
-        delete_button = QPushButton("Delete")
-        delete_button.clicked.connect(
+        self.delete_button = QPushButton(t("opponents.delete"))
+        self.delete_button.clicked.connect(
             self.delete_requested.emit
         )
 
-        button_row.addWidget(save_button)
-        button_row.addWidget(duplicate_button)
-        button_row.addWidget(delete_button)
+        button_row.addWidget(self.paste_ratings_button)
+        button_row.addWidget(self.save_button)
+        button_row.addWidget(self.duplicate_button)
+        button_row.addWidget(self.delete_button)
         button_row.addStretch(1)
 
         layout.addLayout(button_row)
@@ -201,3 +223,141 @@ class OpponentsPage(BasePage):
         self.selection_changed.emit(
             current.data(Qt.UserRole)
         )
+
+    def _paste_ratings_from_clipboard(self):
+        clipboard_text = QApplication.clipboard().text()
+        result = parse_opponent_ratings_clipboard(clipboard_text)
+        if not result.success:
+            self.show_error(
+                t(result.error_key or "opponents.clipboard.error.no_ratings")
+            )
+            return
+
+        if not self._show_clipboard_preview(result):
+            self.show_status(t("opponents.clipboard.cancelled"))
+            return
+
+        existing_name = self.name_input.text().strip()
+        team_warning = ""
+        if result.team_name and not existing_name:
+            self.name_input.setText(result.team_name)
+        elif result.team_name and existing_name != result.team_name:
+            team_warning = (
+                t(
+                    "opponents.clipboard.team_differs",
+                    team=result.team_name,
+                )
+            )
+
+        self.ratings_grid.update_rating_values(result.ratings)
+        import_message = t(
+            "opponents.clipboard.imported",
+            count=len(result.ratings),
+            total=len(HATTRICK_SECTOR_ORDER),
+        )
+        self.show_status(
+            "\n".join(
+                item
+                for item in [team_warning, import_message]
+                if item
+            )
+        )
+
+    def _show_clipboard_preview(self, result):
+        dialog = OpponentRatingsClipboardPreviewDialog(result, self)
+        return dialog.exec() == QDialog.Accepted
+
+    def retranslate_ui(self):
+        self.set_page_text(
+            t("opponents.title"),
+            t("opponents.subtitle"),
+        )
+        self.saved_title.setText(t("opponents.saved"))
+        self.details_title.setText(t("opponents.details"))
+        self.new_button.setText(t("opponents.new"))
+        self.paste_ratings_button.setText(t("opponents.paste_ratings"))
+        self.paste_ratings_button.setAccessibleName(t("opponents.paste_ratings"))
+        self.paste_ratings_button.setToolTip(t("opponents.paste_ratings_tip"))
+        self.save_button.setText(t("opponents.save"))
+        self.duplicate_button.setText(t("opponents.duplicate"))
+        self.delete_button.setText(t("opponents.delete"))
+        self.name_label.setText(t("opponents.name"))
+        self.name_input.setPlaceholderText(t("opponents.name_placeholder"))
+        self.ratings_label.setText(t("opponents.ratings"))
+        self.ratings_grid.retranslate_ui()
+
+
+class OpponentRatingsClipboardPreviewDialog(QDialog):
+    def __init__(self, result, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(t("opponents.clipboard.title"))
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        title = QLabel(t("opponents.clipboard.preview_title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title)
+
+        message = QLabel(self._preview_text(result))
+        message.setWordWrap(True)
+        message.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        layout.addWidget(message)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        buttons.button(QDialogButtonBox.Ok).setText(t("opponents.clipboard.apply"))
+        buttons.button(QDialogButtonBox.Cancel).setText(t("opponents.clipboard.cancel"))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        buttons.button(QDialogButtonBox.Ok).setDefault(True)
+        buttons.button(QDialogButtonBox.Ok).setFocus()
+
+    def _preview_text(self, result):
+        lines = [
+            t("opponents.clipboard.team", value=result.team_name or "-"),
+            t("opponents.clipboard.team_id", value=result.team_id or "-"),
+            t("opponents.clipboard.match_id", value=result.match_id or "-"),
+            t(
+                "opponents.clipboard.ratings_found",
+                count=len(result.ratings),
+                total=len(HATTRICK_SECTOR_ORDER),
+            ),
+            "",
+        ]
+        for field in HATTRICK_SECTOR_ORDER:
+            if field in result.ratings:
+                lines.append(
+                    t(
+                        "opponents.clipboard.rating_line",
+                        label=t(RATING_LABELS[field]),
+                        value=_format_rating(result.ratings[field]),
+                    )
+                )
+        missing = [
+            t(RATING_LABELS[field])
+            for field in HATTRICK_SECTOR_ORDER
+            if field not in result.ratings
+        ]
+        if missing:
+            lines.extend(
+                [
+                    "",
+                    t(
+                        "opponents.clipboard.missing",
+                        values=", ".join(missing),
+                    ),
+                ]
+            )
+        return "\n".join(lines)
+
+
+def _format_rating(value):
+    text = f"{float(value):.2f}"
+    if localization_service().language == "es":
+        return text.replace(".", ",")
+    return text

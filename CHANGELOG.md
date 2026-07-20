@@ -81,6 +81,9 @@
 - Added Alpha 0.5.4.2 Transfer Planner readability polish with semantic detail
   sections, centralized presentation mapping, localized list formatting and
   language-switch refresh without rerunning analysis.
+- Added Alpha 0.5.4.3 opponent rating input improvements with Hattrick sector order,
+  clipboard import preview, Spanish/English Hattrick table parsing and comma/point
+  decimal entry support.
 - Added Alpha 0.5.4.1 opponent rating calibration with explicit Hattrick decimal
   versus HT Coach internal rating scale labels, canonical sector matchups and
   persisted serializable Match result comparison view models.
@@ -204,6 +207,8 @@
   alternative profiles and technical details.
 - Transfer Planner priority rows now keep full localized values available as tooltips
   for dense table columns.
+- Opponent ratings now display in canonical Hattrick order and manual inputs accept
+  both decimal comma and decimal point while keeping internal values numeric.
 - Missing localization keys and template parameters now fall back to localized safe
   text instead of showing technical placeholder text.
 
@@ -228,3 +233,6 @@
 - Opponent rating calibration does not introduce a conversion multiplier between
   Hattrick decimal ratings and HT Coach internal contribution ratings. Direct
   advantage labels are shown only when both ratings share the same source scale.
+- Opponent clipboard import is presentation/data-entry only; it does not change rating
+  formulas, sector calibration, cross-sector matchup mappings, optimizers or
+  probability logic.

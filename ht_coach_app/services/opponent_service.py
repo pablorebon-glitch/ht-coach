@@ -4,32 +4,33 @@ from models.opponent import Opponent
 from models.team_ratings import TeamRatings
 
 
-RATING_FIELDS = (
-    "left_defense",
-    "central_defense",
-    "right_defense",
+HATTRICK_SECTOR_ORDER = (
     "midfield",
-    "left_attack",
-    "central_attack",
+    "right_defense",
+    "central_defense",
+    "left_defense",
     "right_attack",
-)
-
-OPTIONAL_RATING_FIELDS = (
+    "central_attack",
+    "left_attack",
     "indirect_defense",
     "indirect_attack",
 )
+
+RATING_FIELDS = HATTRICK_SECTOR_ORDER[:7]
+
+OPTIONAL_RATING_FIELDS = HATTRICK_SECTOR_ORDER[7:]
 
 ALL_RATING_FIELDS = RATING_FIELDS + OPTIONAL_RATING_FIELDS
 
 
 DEFAULT_RATINGS = {
-    "left_defense": 25.0,
-    "central_defense": 35.0,
-    "right_defense": 24.0,
     "midfield": 40.0,
-    "left_attack": 25.0,
-    "central_attack": 30.0,
+    "right_defense": 24.0,
+    "central_defense": 35.0,
+    "left_defense": 25.0,
     "right_attack": 24.0,
+    "central_attack": 30.0,
+    "left_attack": 25.0,
     "indirect_defense": None,
     "indirect_attack": None,
 }

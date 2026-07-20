@@ -293,7 +293,20 @@ receives a view-ready result from `SquadController` through `TransferPlannerServ
 - `OpponentService`
   - Manages saved opponents.
   - Owns validation rules for opponent names and rating values.
+  - Exposes the canonical Hattrick sector entry order:
+    midfield, right defense, central defense, left defense, right attack, central
+    attack, left attack, indirect set pieces defense and indirect set pieces attack.
   - Delegates storage to persistence repositories.
+
+`ht_coach_app/services/opponent_ratings_clipboard_parser.py` parses plain text copied
+from Hattrick rating tables. It accepts Spanish and English sector aliases, extracts
+optional team/match metadata for preview, keeps decimal values authoritative, ignores
+average-rating/game-plan rows and uses explicit `Indirect set pieces` context before
+mapping generic Defense/Attack rows to indirect sectors.
+
+The parser treats clipboard content as untrusted text. It does not render markup, open
+links, call the network or modify analytical state. Clipboard metadata is preview-only;
+opponent JSON compatibility remains unchanged.
 
 - `MatchWorkspaceService`
   - Calls `FormationOptimizer`, `LineupOptimizer`, and matchup optimization entry points.

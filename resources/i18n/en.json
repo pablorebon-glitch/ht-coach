@@ -44,6 +44,54 @@
     "subtitle": "Review and export future recommendations and match summaries.",
     "placeholder": "Reports will be implemented in a later epic."
   },
+  "opponents": {
+    "title": "Opponents",
+    "subtitle": "Manage saved opponents and scouting ratings.",
+    "saved": "Saved opponents",
+    "details": "Opponent details",
+    "new": "New",
+    "save": "Save",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "delete_title": "Delete opponent",
+    "delete_message": "Delete {name}?",
+    "name": "Name",
+    "name_placeholder": "Opponent name",
+    "ratings": "Ratings",
+    "paste_ratings": "Paste Ratings",
+    "paste_ratings_tip": "Paste ratings copied from Hattrick from the clipboard.",
+    "rating": {
+      "midfield": "Midfield",
+      "right_defense": "Right Defense",
+      "central_defense": "Central Defense",
+      "left_defense": "Left Defense",
+      "right_attack": "Right Attack",
+      "central_attack": "Central Attack",
+      "left_attack": "Left Attack",
+      "indirect_defense": "Indirect Set Pieces Defense",
+      "indirect_attack": "Indirect Set Pieces Attack"
+    },
+    "clipboard": {
+      "title": "Clipboard Import",
+      "preview_title": "Clipboard ratings preview",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "cancelled": "Clipboard import cancelled.",
+      "team": "Team: {value}",
+      "team_id": "Team ID: {value}",
+      "match_id": "Match ID: {value}",
+      "ratings_found": "Ratings found: {count} of {total}",
+      "rating_line": "{label}: {value}",
+      "missing": "Fields not found: {values}",
+      "imported": "Imported successfully. Fields updated: {count} of {total}.",
+      "team_differs": "Copied team differs from current opponent: {team}. Existing name was kept.",
+      "error": {
+        "empty": "The clipboard is empty.",
+        "too_large": "Clipboard text is too large to import safely.",
+        "no_ratings": "No Hattrick ratings were found in the clipboard."
+      }
+    }
+  },
   "squad_builder": {
     "ideal_xi": "Ideal XI",
     "players": "Players",

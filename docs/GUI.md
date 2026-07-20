@@ -177,6 +177,17 @@ Content:
 - Opponent name field.
 - Seven required sector ratings plus optional indirect defense and indirect attack
   ratings for Hattrick imports that include them.
+- Ratings are shown in Hattrick order: Midfield, Right Defense, Central Defense, Left
+  Defense, Right Attack, Central Attack, Left Attack, Indirect Set Pieces Defense and
+  Indirect Set Pieces Attack.
+- Manual rating inputs accept comma and point decimals in any UI language, then display
+  values using the active application language.
+- Paste Ratings imports copied Hattrick table text through a localized preview. Apply
+  updates only parsed fields; Cancel and invalid clipboard data leave the form
+  unchanged.
+- Clipboard import supports Spanish and English Hattrick labels, ignores average-rating
+  rows, and only maps generic Defense/Attack rows inside the Indirect Set Pieces
+  section.
 - Save, new, duplicate, delete, and select actions.
 
 Expected controls:
@@ -184,6 +195,8 @@ Expected controls:
 - List selection.
 - Text input for name.
 - Numeric rating inputs.
+- Paste Ratings action.
+- Clipboard import preview with Apply and Cancel.
 - Duplicate action.
 - Confirmation dialog for delete.
 - Validation messages for empty name or invalid rating.
