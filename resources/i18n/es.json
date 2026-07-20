@@ -44,6 +44,54 @@
     "subtitle": "Revisa y exporta futuras recomendaciones y resúmenes de partido.",
     "placeholder": "Los reportes se implementarán en un próximo epic."
   },
+  "opponents": {
+    "title": "Rivales",
+    "subtitle": "Gestiona rivales guardados y calificaciones observadas.",
+    "saved": "Rivales guardados",
+    "details": "Detalles del rival",
+    "new": "Nuevo",
+    "save": "Guardar",
+    "duplicate": "Duplicar",
+    "delete": "Eliminar",
+    "delete_title": "Eliminar rival",
+    "delete_message": "Eliminar {name}?",
+    "name": "Nombre",
+    "name_placeholder": "Nombre del rival",
+    "ratings": "Calificaciones",
+    "paste_ratings": "Pegar calificaciones",
+    "paste_ratings_tip": "Pega desde el portapapeles las calificaciones copiadas desde Hattrick.",
+    "rating": {
+      "midfield": "Mediocampo",
+      "right_defense": "Defensa derecha",
+      "central_defense": "Defensa central",
+      "left_defense": "Defensa izquierda",
+      "right_attack": "Ataque derecho",
+      "central_attack": "Ataque central",
+      "left_attack": "Ataque izquierdo",
+      "indirect_defense": "Defensa de tiro indirecto",
+      "indirect_attack": "Ataque de tiro indirecto"
+    },
+    "clipboard": {
+      "title": "Importar desde portapapeles",
+      "preview_title": "Vista previa de calificaciones",
+      "apply": "Aplicar",
+      "cancel": "Cancelar",
+      "cancelled": "Importacion desde portapapeles cancelada.",
+      "team": "Equipo: {value}",
+      "team_id": "ID de equipo: {value}",
+      "match_id": "ID de partido: {value}",
+      "ratings_found": "Calificaciones encontradas: {count} de {total}",
+      "rating_line": "{label}: {value}",
+      "missing": "Campos no encontrados: {values}",
+      "imported": "Importado correctamente. Campos actualizados: {count} de {total}.",
+      "team_differs": "El equipo copiado difiere del rival actual: {team}. Se mantuvo el nombre existente.",
+      "error": {
+        "empty": "El portapapeles esta vacio.",
+        "too_large": "El texto del portapapeles es demasiado grande para importarlo de forma segura.",
+        "no_ratings": "No se encontraron calificaciones de Hattrick en el portapapeles."
+      }
+    }
+  },
   "squad_builder": {
     "ideal_xi": "XI ideal",
     "players": "Jugadores",

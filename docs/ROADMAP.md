@@ -166,6 +166,9 @@ Deliverables:
 - Opponents view
 - Opponent list
 - Rating editor
+- Hattrick-order rating entry
+- Clipboard import for copied Hattrick ratings
+- Locale-tolerant decimal rating input
 - Save, update, duplicate, delete, and select actions
 - Repository/service/controller boundaries
 - Validation feedback
@@ -176,6 +179,9 @@ Acceptance criteria:
 - Users can maintain multiple opponents.
 - Empty or invalid opponent names are rejected.
 - Saved opponents are available to Match Analysis.
+- Clipboard import supports partial data safely and does not overwrite missing fields.
+- Opponent rating input improvements do not change rating calibration, cross-sector
+  matchups, formulas, optimizers or probability calculations.
 - No new opponent workflow is added to the legacy Tkinter app.
 
 ### Epic 6: Match Analysis
