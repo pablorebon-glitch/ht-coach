@@ -17,6 +17,8 @@ class MatchWorkspaceSettings:
         default_factory=lambda: list(DEFAULT_FORMATION_NAMES)
     )
     squad_availability_mode: str = "current_available"
+    squad_training_focus: str = "unknown"
+    squad_planning_horizon: str = "current"
 
 
 class MatchWorkspaceRepository:
@@ -51,6 +53,14 @@ class MatchWorkspaceRepository:
             squad_availability_mode=data.get(
                 "squad_availability_mode",
                 "current_available"
+            ),
+            squad_training_focus=data.get(
+                "squad_training_focus",
+                "unknown",
+            ),
+            squad_planning_horizon=data.get(
+                "squad_planning_horizon",
+                "current",
             ),
         )
 

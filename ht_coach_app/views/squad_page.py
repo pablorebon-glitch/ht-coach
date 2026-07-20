@@ -40,6 +40,8 @@ class SquadPage(BasePage):
     player_selected = Signal(str)
     ideal_formation_changed = Signal(str)
     availability_mode_changed = Signal(str)
+    planning_horizon_changed = Signal(str)
+    training_focus_changed = Signal(str)
 
     HEADERS = [
         "Name",
@@ -73,6 +75,7 @@ class SquadPage(BasePage):
         self._state = "empty"
         self._formation_board_mapper = FormationBoardMapper()
         self._readiness_rows = []
+        self._evolution_details = []
         self._build_controls()
         self._build_content()
 
@@ -167,6 +170,7 @@ class SquadPage(BasePage):
 
         self._build_ideal_tab()
         self._build_players_tab()
+        self._build_evolution_tab()
         self.body_layout.addWidget(self.tabs, 1)
 
     def _build_ideal_tab(self):
@@ -468,6 +472,199 @@ class SquadPage(BasePage):
         tab_layout.addWidget(splitter, 1)
         self.tabs.addTab(tab, t("squad_builder.players"))
 
+    def _build_evolution_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        controls = QFrame()
+        controls.setObjectName("workspacePanel")
+        controls_layout = QHBoxLayout(controls)
+        controls_layout.setContentsMargins(12, 10, 12, 10)
+        controls_layout.setSpacing(8)
+
+        self.planning_horizon_combo = QComboBox()
+        self.planning_horizon_combo.currentIndexChanged.connect(
+            self._emit_planning_horizon
+        )
+        self.training_focus_combo = QComboBox()
+        self.training_focus_combo.currentIndexChanged.connect(
+            self._emit_training_focus
+        )
+        self.evolution_filter_combo = QComboBox()
+        self.evolution_filter_combo.currentIndexChanged.connect(
+            self._apply_evolution_filter
+        )
+        for label, key in [
+            (t("evolution.filter.all"), "all"),
+            (t("evolution.filter.at_risk"), "at_risk"),
+            (t("evolution.filter.no_successor"), "no_successor"),
+            (t("evolution.filter.development"), "development"),
+            (t("evolution.filter.veterans"), "veterans"),
+            (t("evolution.filter.training_aligned"), "training_aligned"),
+            (t("evolution.filter.dependencies"), "dependencies"),
+        ]:
+            self.evolution_filter_combo.addItem(label, key)
+
+        controls_layout.addWidget(QLabel(t("evolution.planning_horizon")))
+        controls_layout.addWidget(self.planning_horizon_combo)
+        controls_layout.addWidget(QLabel(t("evolution.training_focus")))
+        controls_layout.addWidget(self.training_focus_combo)
+        controls_layout.addWidget(QLabel(t("evolution.filter.label")))
+        controls_layout.addWidget(self.evolution_filter_combo)
+        controls_layout.addStretch(1)
+        layout.addWidget(controls)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(8)
+
+        self.evolution_summary_label = QLabel(t("evolution.empty"))
+        self.evolution_summary_label.setWordWrap(True)
+        content_layout.addWidget(
+            self._panel(
+                t("evolution.summary_title"),
+                self.evolution_summary_label,
+            )
+        )
+
+        self.age_structure_label = QLabel(t("evolution.empty"))
+        self.age_structure_label.setWordWrap(True)
+        self.age_band_table = QTableWidget(0, 2)
+        self.age_band_table.setHorizontalHeaderLabels(
+            [t("evolution.age_band_header"), t("evolution.count")]
+        )
+        self.age_band_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        self.role_age_table = QTableWidget(0, 7)
+        self.role_age_table.setHorizontalHeaderLabels(
+            [
+                t("availability.role"),
+                t("evolution.age_band.development"),
+                t("evolution.age_band.prime"),
+                t("evolution.age_band.experienced"),
+                t("evolution.age_band.veteran"),
+                t("evolution.age_band.late_career"),
+                t("evolution.age_band.unknown"),
+            ]
+        )
+        self.role_age_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        content_layout.addWidget(
+            self._panel(
+                t("evolution.age_structure"),
+                self.age_structure_label,
+                self.age_band_table,
+                self.role_age_table,
+            )
+        )
+
+        self.succession_table = QTableWidget(0, 9)
+        self.succession_table.setHorizontalHeaderLabels(
+            [
+                t("availability.role"),
+                t("evolution.full_strength_starter"),
+                t("evolution.available_starter"),
+                t("evolution.primary_backup"),
+                t("evolution.potential_successor"),
+                t("evolution.succession_readiness"),
+                t("evolution.operational_risk"),
+                t("evolution.structural_risk"),
+                t("evolution.current_depth"),
+            ]
+        )
+        self.succession_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        content_layout.addWidget(
+            self._panel(t("evolution.succession_map"), self.succession_table)
+        )
+
+        self.development_table = QTableWidget(0, 8)
+        self.development_table.setHorizontalHeaderLabels(
+            [
+                t("evolution.player_name"),
+                t("evolution.current_best_role"),
+                t("evolution.age_band_header"),
+                t("evolution.squad_status"),
+                t("evolution.future_role_header"),
+                t("evolution.formation_usage"),
+                t("evolution.training_alignment"),
+                t("availability.status"),
+            ]
+        )
+        self.development_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        content_layout.addWidget(
+            self._panel(
+                t("evolution.development_candidates"),
+                self.development_table,
+            )
+        )
+
+        self.training_alignment_label = QLabel(t("evolution.empty"))
+        self.training_alignment_label.setWordWrap(True)
+        self.identity_continuity_label = QLabel(t("evolution.empty"))
+        self.identity_continuity_label.setWordWrap(True)
+        content_layout.addWidget(
+            self._panel(
+                t("evolution.training_alignment"),
+                self.training_alignment_label,
+            )
+        )
+        content_layout.addWidget(
+            self._panel(
+                t("evolution.identity_continuity"),
+                self.identity_continuity_label,
+            )
+        )
+
+        self.priority_risk_table = QTableWidget(0, 8)
+        self.priority_risk_table.setHorizontalHeaderLabels(
+            [
+                t("evolution.priority"),
+                t("availability.role"),
+                t("evolution.horizon_header"),
+                t("evolution.risk_level"),
+                t("evolution.risk_type"),
+                t("evolution.reason"),
+                t("evolution.internal_solution"),
+                t("evolution.training_support"),
+            ]
+        )
+        self.priority_risk_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        content_layout.addWidget(
+            self._panel(t("evolution.priority_risks"), self.priority_risk_table)
+        )
+
+        self.player_evolution_combo = QComboBox()
+        self.player_evolution_combo.currentIndexChanged.connect(
+            self._show_selected_evolution_detail
+        )
+        self.player_evolution_detail_label = QLabel(t("evolution.select_player"))
+        self.player_evolution_detail_label.setWordWrap(True)
+        content_layout.addWidget(
+            self._panel(
+                t("evolution.player_details"),
+                self.player_evolution_combo,
+                self.player_evolution_detail_label,
+            )
+        )
+
+        scroll.setWidget(content)
+        layout.addWidget(scroll, 1)
+        self.tabs.addTab(tab, t("evolution.tab"))
+
     def csv_path(self):
         return self.path_edit.text().strip()
 
@@ -524,6 +721,37 @@ class SquadPage(BasePage):
         self.availability_combo.blockSignals(True)
         self.availability_combo.setCurrentIndex(index if index >= 0 else 0)
         self.availability_combo.blockSignals(False)
+
+    def set_evolution_options(self, horizons, training_focuses):
+        self.planning_horizon_combo.blockSignals(True)
+        self.planning_horizon_combo.clear()
+        for horizon in horizons:
+            self.planning_horizon_combo.addItem(
+                self._label("horizon", horizon),
+                horizon,
+            )
+        self.planning_horizon_combo.blockSignals(False)
+
+        self.training_focus_combo.blockSignals(True)
+        self.training_focus_combo.clear()
+        for focus in training_focuses:
+            self.training_focus_combo.addItem(
+                self._label("training", focus),
+                focus,
+            )
+        self.training_focus_combo.blockSignals(False)
+
+    def set_planning_horizon(self, horizon):
+        index = self.planning_horizon_combo.findData(horizon)
+        self.planning_horizon_combo.blockSignals(True)
+        self.planning_horizon_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.planning_horizon_combo.blockSignals(False)
+
+    def set_training_focus(self, focus):
+        index = self.training_focus_combo.findData(focus)
+        self.training_focus_combo.blockSignals(True)
+        self.training_focus_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.training_focus_combo.blockSignals(False)
 
     def set_specialties(self, specialties):
         current = self.speciality_combo.currentText()
@@ -898,6 +1126,376 @@ class SquadPage(BasePage):
         self.availability_mode_changed.emit(
             self.availability_combo.currentData() or AVAILABILITY_CURRENT
         )
+
+    def _emit_planning_horizon(self):
+        self.planning_horizon_changed.emit(
+            self.planning_horizon_combo.currentData() or "current"
+        )
+
+    def _emit_training_focus(self):
+        self.training_focus_changed.emit(
+            self.training_focus_combo.currentData() or "unknown"
+        )
+
+    def show_evolution_empty(self):
+        self.evolution_summary_label.setText(t("evolution.empty"))
+        self.age_structure_label.setText(t("evolution.empty"))
+        for table in [
+            self.age_band_table,
+            self.role_age_table,
+            self.succession_table,
+            self.development_table,
+            self.priority_risk_table,
+        ]:
+            table.setRowCount(0)
+        self.training_alignment_label.setText(t("evolution.empty"))
+        self.identity_continuity_label.setText(t("evolution.empty"))
+        self._evolution_details = []
+        self.player_evolution_combo.clear()
+        self.player_evolution_detail_label.setText(t("evolution.select_player"))
+
+    def show_evolution(self, result):
+        self._last_evolution_result = result
+        self.evolution_summary_label.setText(
+            "\n".join(result.summary_sentences) or t("evolution.empty")
+        )
+        self._set_age_structure(result.age_structure)
+        self._set_succession_map(result.succession_map)
+        self._set_development_candidates(result.development_candidates)
+        self._set_training_alignment(result.training_alignment)
+        self._set_identity_continuity(result.identity_continuity)
+        self._set_priority_risks(result.priority_risks)
+        self._set_player_evolution_details(result.player_details)
+        self._apply_evolution_filter()
+
+    def _set_age_structure(self, age_structure):
+        self.age_structure_label.setText(
+            "\n".join(
+                [
+                    t(
+                        "evolution.average_squad_age",
+                        value=self._format_age_value(
+                            age_structure.average_squad_age
+                        ),
+                    ),
+                    t(
+                        "evolution.median_squad_age",
+                        value=self._format_age_value(
+                            age_structure.median_squad_age
+                        ),
+                    ),
+                    t(
+                        "evolution.full_strength_xi_age",
+                        value=self._format_age_value(
+                            age_structure.average_full_strength_xi_age
+                        ),
+                    ),
+                    t(
+                        "evolution.current_available_xi_age",
+                        value=self._format_age_value(
+                            age_structure.average_current_available_xi_age
+                        ),
+                    ),
+                    t(
+                        "evolution.youngest_player",
+                        player=age_structure.youngest_player or t("evolution.unknown"),
+                    ),
+                    t(
+                        "evolution.oldest_player",
+                        player=age_structure.oldest_player or t("evolution.unknown"),
+                    ),
+                ]
+            )
+        )
+        self.age_band_table.setRowCount(len(age_structure.age_band_counts))
+        for row, item in enumerate(age_structure.age_band_counts):
+            self._set_table_row(
+                self.age_band_table,
+                row,
+                [self._label("age_band", item.age_band), item.count],
+            )
+        self.role_age_table.setRowCount(len(age_structure.role_distribution))
+        for row, item in enumerate(age_structure.role_distribution):
+            self._set_table_row(
+                self.role_age_table,
+                row,
+                [
+                    item.role,
+                    item.development,
+                    item.prime,
+                    item.experienced,
+                    item.veteran,
+                    item.late_career,
+                    item.unknown,
+                ],
+            )
+
+    def _set_succession_map(self, rows):
+        self._succession_rows = list(rows or [])
+        self.succession_table.setRowCount(len(self._succession_rows))
+        for row, item in enumerate(self._succession_rows):
+            self._set_table_row(
+                self.succession_table,
+                row,
+                [
+                    item.role,
+                    self._player_with_band(
+                        item.full_strength_starter,
+                        item.starter_age_band,
+                    ),
+                    item.current_available_starter or "-",
+                    self._player_with_band(item.primary_backup, item.backup_age_band),
+                    self._player_with_band(
+                        item.potential_successor,
+                        item.successor_age_band,
+                    ),
+                    self._label("succession", item.succession_readiness),
+                    self._label("risk", item.operational_risk),
+                    self._label("risk", item.structural_risk),
+                    item.current_depth,
+                ],
+            )
+
+    def _set_development_candidates(self, rows):
+        self._development_rows = list(rows or [])
+        self.development_table.setRowCount(len(self._development_rows))
+        for row, item in enumerate(self._development_rows):
+            self._set_table_row(
+                self.development_table,
+                row,
+                [
+                    item.player_name,
+                    item.current_best_role,
+                    self._label("age_band", item.age_band),
+                    self._label("status", item.current_squad_status),
+                    self._label("future_role", item.potential_future_role),
+                    item.formation_usage,
+                    self._label("alignment", item.training_alignment),
+                    item.current_availability,
+                ],
+            )
+
+    def _set_training_alignment(self, alignment):
+        self.training_alignment_label.setText(
+            "\n".join(
+                [
+                    t(
+                        "evolution.current_training_value",
+                        value=self._label("training", alignment.current_training),
+                    ),
+                    t(
+                        "evolution.training_alignment_value",
+                        value=self._label("alignment", alignment.alignment),
+                    ),
+                    t(
+                        "evolution.supports_value",
+                        values=", ".join(alignment.strongly_supports) or "-",
+                    ),
+                    t(
+                        "evolution.not_addressed_value",
+                        values=", ".join(alignment.not_addressed) or "-",
+                    ),
+                    t(
+                        "evolution.players_benefiting_value",
+                        values=", ".join(alignment.players_benefiting) or "-",
+                    ),
+                    alignment.explanation,
+                ]
+            )
+        )
+
+    def _set_identity_continuity(self, continuity):
+        self.identity_continuity_label.setText(
+            "\n".join(
+                [
+                    t(
+                        "evolution.current_identity_value",
+                        value=continuity.current_identity or "-",
+                    ),
+                    t(
+                        "evolution.continuity_value",
+                        value=self._label("continuity", continuity.continuity),
+                    ),
+                    continuity.reason,
+                    t(
+                        "evolution.key_contributors_value",
+                        values=", ".join(continuity.key_contributors) or "-",
+                    ),
+                ]
+            )
+        )
+
+    def _set_priority_risks(self, rows):
+        self._risk_rows = list(rows or [])
+        self.priority_risk_table.setRowCount(len(self._risk_rows))
+        for row, item in enumerate(self._risk_rows):
+            self._set_table_row(
+                self.priority_risk_table,
+                row,
+                [
+                    item.priority,
+                    item.role,
+                    self._label("horizon", item.planning_horizon),
+                    self._label("risk", item.risk_level),
+                    item.risk_type,
+                    item.reason,
+                    self._label("succession", item.internal_solution_status),
+                    self._label("alignment", item.training_support),
+                ],
+            )
+
+    def _set_player_evolution_details(self, details):
+        current = self.player_evolution_combo.currentData()
+        self._evolution_details = list(details or [])
+        self.player_evolution_combo.blockSignals(True)
+        self.player_evolution_combo.clear()
+        for detail in self._evolution_details:
+            self.player_evolution_combo.addItem(
+                detail.player_name,
+                detail.player_name,
+            )
+        index = self.player_evolution_combo.findData(current)
+        self.player_evolution_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.player_evolution_combo.blockSignals(False)
+        self._show_selected_evolution_detail()
+
+    def _show_selected_evolution_detail(self):
+        player_name = self.player_evolution_combo.currentData()
+        detail = next(
+            (
+                item
+                for item in self._evolution_details
+                if item.player_name == player_name
+            ),
+            None,
+        )
+        if detail is None:
+            self.player_evolution_detail_label.setText(
+                t("evolution.select_player")
+            )
+            return
+
+        self.player_evolution_detail_label.setText(
+            "\n".join(
+                [
+                    t("evolution.current_role_value", value=detail.current_role),
+                    t(
+                        "evolution.squad_status_value",
+                        value=self._label("status", detail.current_squad_status),
+                    ),
+                    t(
+                        "evolution.age_band_value",
+                        value=self._label("age_band", detail.age_band),
+                    ),
+                    t(
+                        "evolution.formation_usage_value",
+                        value=detail.formation_usage,
+                    ),
+                    t(
+                        "evolution.availability_value",
+                        value=detail.current_availability,
+                    ),
+                    t(
+                        "evolution.future_role_value",
+                        value=self._label("future_role", detail.potential_future_role),
+                    ),
+                    t(
+                        "evolution.succession_relationships_value",
+                        values=", ".join(detail.succession_relationships) or "-",
+                    ),
+                    t(
+                        "evolution.training_alignment_value",
+                        value=self._label("alignment", detail.training_alignment),
+                    ),
+                    t(
+                        "evolution.dependency_level_value",
+                        value=self._label("risk", detail.dependency_level),
+                    ),
+                    t(
+                        "evolution.strengths_value",
+                        values=", ".join(detail.strengths) or "-",
+                    ),
+                    t(
+                        "evolution.limitations_value",
+                        values=", ".join(detail.limitations) or "-",
+                    ),
+                ]
+            )
+        )
+
+    def _apply_evolution_filter(self):
+        key = self.evolution_filter_combo.currentData() or "all"
+        for row, item in enumerate(getattr(self, "_succession_rows", [])):
+            visible = (
+                key == "all"
+                or key == "at_risk"
+                and item.structural_risk in {"high", "critical"}
+                or key == "no_successor"
+                and item.succession_readiness == "no_successor"
+                or key == "veterans"
+                and item.starter_age_band in {"veteran", "late_career"}
+            )
+            self.succession_table.setRowHidden(row, not visible)
+        for row, item in enumerate(getattr(self, "_development_rows", [])):
+            visible = (
+                key in {"all", "development"}
+                or key == "training_aligned"
+                and item.training_alignment == "strong"
+            )
+            self.development_table.setRowHidden(row, not visible)
+        for row, item in enumerate(getattr(self, "_risk_rows", [])):
+            visible = (
+                key == "all"
+                or key == "at_risk"
+                or key == "dependencies"
+                and bool(item.key_dependency)
+                or key == "no_successor"
+                and item.risk_type == "No Successor"
+            )
+            self.priority_risk_table.setRowHidden(row, not visible)
+
+    def _panel(self, title, *widgets):
+        panel = QFrame()
+        panel.setObjectName("workspacePanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        title_label = QLabel(title)
+        title_label.setObjectName("sectionTitle")
+        layout.addWidget(title_label)
+        for widget in widgets:
+            layout.addWidget(widget)
+        return panel
+
+    def _set_table_row(self, table, row, values):
+        for column, value in enumerate(values):
+            table.setItem(
+                row,
+                column,
+                SortableTableItem(
+                    value,
+                    value if isinstance(value, (int, float)) else str(value).casefold(),
+                ),
+            )
+
+    def _label(self, category, key):
+        normalized = str(key or "unknown").strip()
+        lookup_key = f"evolution.{category}.{normalized}"
+        value = t(lookup_key)
+        if value in {lookup_key, "Translation unavailable"}:
+            return normalized.replace("_", " ").title()
+        return value
+
+    @staticmethod
+    def _format_age_value(value):
+        if value is None:
+            return "-"
+        return f"{value:.1f}"
+
+    def _player_with_band(self, player_name, age_band):
+        if not player_name:
+            return "-"
+        return f"{player_name} - {self._label('age_band', age_band)}"
 
     def _show_selected_tactic_detail(self):
         selected = self.readiness_table.selectedItems()

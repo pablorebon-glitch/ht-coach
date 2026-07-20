@@ -75,7 +75,7 @@ Content:
 - CSV path selector.
 - Load and reload buttons.
 - Export visible rows button.
-- Two tabs: Ideal XI and Players.
+- Three tabs: Ideal XI, Players and Evolution.
 - Ideal XI tab with a top formation selector containing Auto and every supported
   formation from the centralized catalog.
 - Auto mode evaluates every supported formation and displays the best roster fit.
@@ -103,6 +103,17 @@ Content:
 - Positional coverage by broad role: Goalkeeper, Central Defense, Wing Defense,
   Midfield, Winger and Forward.
 - Availability column and filter in the Players tab.
+- Evolution tab for long-term squad planning without overloading the Ideal XI workflow.
+- Planning Horizon selector with Current, Short Term and Medium Term perspectives.
+- Current Training Focus selector with Unknown as the safe default.
+- Age Structure section with textual averages, youngest/oldest player, age bands and
+  broad role distribution.
+- Succession Map showing full-strength starter, current available starter, backup,
+  potential successor, readiness, operational risk and structural risk.
+- Development Candidates, Training Alignment, Identity Continuity, Priority Risks and
+  Player Evolution Details sections.
+- Evolution filters for at-risk positions, no successor, development candidates,
+  veterans, training-aligned players and key dependencies.
 - Player Intelligence inspector inside the Formation Board for selected Ideal XI
   players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,

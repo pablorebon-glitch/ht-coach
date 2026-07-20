@@ -8,6 +8,7 @@ from ht_coach_app.services.squad_builder_service import (
     AUTO_FORMATION,
     SquadBuilderService,
 )
+from ht_coach_app.services.squad_evolution_service import SquadEvolutionService
 from ht_coach_app.services.squad_service import SquadValidationError
 
 
@@ -18,17 +19,25 @@ class SquadController:
         service,
         settings_repository,
         app_events=None,
-        builder_service=None
+        builder_service=None,
+        evolution_service=None,
     ):
         self._view = view
         self._service = service
         self._builder_service = builder_service or SquadBuilderService()
+        self._evolution_service = evolution_service or SquadEvolutionService(
+            builder_service=self._builder_service
+        )
         self._settings_repository = settings_repository
         self._app_events = app_events
         self._roster = None
         self._visible_rows = []
         self._ideal_selection = AUTO_FORMATION
         self._availability_mode = AVAILABILITY_CURRENT
+        self._planning_horizon = "current"
+        self._training_focus = "unknown"
+        self._last_full_strength_result = None
+        self._last_current_available_result = None
 
         self._connect_view()
         self.refresh()
@@ -60,6 +69,14 @@ class SquadController:
             self._view.availability_mode_changed.connect(
                 self._change_availability_mode
             )
+        if hasattr(self._view, "planning_horizon_changed"):
+            self._view.planning_horizon_changed.connect(
+                self._change_planning_horizon
+            )
+        if hasattr(self._view, "training_focus_changed"):
+            self._view.training_focus_changed.connect(
+                self._change_training_focus
+            )
 
     def refresh(self):
         self._view.set_supported_positions(
@@ -80,6 +97,21 @@ class SquadController:
             self._view.set_availability_mode(
                 self._availability_mode
             )
+        self._planning_horizon = self._evolution_service.normalize_horizon(
+            getattr(settings, "squad_planning_horizon", "current")
+        )
+        self._training_focus = self._evolution_service.normalize_training_focus(
+            getattr(settings, "squad_training_focus", "unknown")
+        )
+        if hasattr(self._view, "set_evolution_options"):
+            self._view.set_evolution_options(
+                self._evolution_service.planning_horizons(),
+                self._evolution_service.training_focuses(),
+            )
+        if hasattr(self._view, "set_planning_horizon"):
+            self._view.set_planning_horizon(self._planning_horizon)
+        if hasattr(self._view, "set_training_focus"):
+            self._view.set_training_focus(self._training_focus)
         self._view.set_csv_path(
             settings.players_csv_path
         )
@@ -93,6 +125,9 @@ class SquadController:
 
     def _load(self):
         self._view.show_loading()
+        self._evolution_service.clear_cache()
+        self._last_full_strength_result = None
+        self._last_current_available_result = None
 
         try:
             self._roster = self._service.load_roster(
@@ -118,6 +153,7 @@ class SquadController:
         self._show_ideal_xi(
             self._ideal_selection
         )
+        self._show_evolution()
 
         if self._app_events is not None:
             self._app_events.roster_changed.emit(
@@ -164,6 +200,10 @@ class SquadController:
             self._ideal_selection,
             self._availability_mode,
         )
+        if self._availability_mode == AVAILABILITY_CURRENT:
+            self._last_current_available_result = result
+        elif self._availability_mode == AVAILABILITY_FULL_STRENGTH:
+            self._last_full_strength_result = result
         roster_players = (
             self._builder_service.eligible_players(
                 self._roster.players,
@@ -184,6 +224,7 @@ class SquadController:
             player_details_by_name=details_by_name,
             roster_players=roster_players,
         )
+        self._show_evolution()
 
     def _change_availability_mode(self, mode):
         self._availability_mode = (
@@ -201,6 +242,37 @@ class SquadController:
         self._show_ideal_xi(
             self._ideal_selection
         )
+
+    def _change_planning_horizon(self, horizon):
+        self._planning_horizon = self._evolution_service.normalize_horizon(
+            horizon
+        )
+        self._save_roster_path(self._view.csv_path())
+        self._show_evolution()
+
+    def _change_training_focus(self, training_focus):
+        self._training_focus = self._evolution_service.normalize_training_focus(
+            training_focus
+        )
+        self._save_roster_path(self._view.csv_path())
+        self._show_evolution()
+
+    def _show_evolution(self):
+        if not hasattr(self._view, "show_evolution"):
+            return
+
+        if self._roster is None:
+            self._view.show_evolution_empty()
+            return
+
+        result = self._evolution_service.analyze(
+            self._roster.players,
+            planning_horizon=self._planning_horizon,
+            training_focus=self._training_focus,
+            full_strength_result=self._last_full_strength_result,
+            current_available_result=self._last_current_available_result,
+        )
+        self._view.show_evolution(result)
 
     def _show_player_detail(self, player_name):
         if self._roster is None:
@@ -248,5 +320,7 @@ class SquadController:
                 opponent_name=settings.opponent_name,
                 selected_formations=settings.selected_formations,
                 squad_availability_mode=self._availability_mode,
+                squad_training_focus=self._training_focus,
+                squad_planning_horizon=self._planning_horizon,
             )
         )

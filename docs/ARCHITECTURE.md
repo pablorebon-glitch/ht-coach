@@ -48,6 +48,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  squad_evolution/
   squad_health/
 models/
 importers/
@@ -188,6 +189,56 @@ CSV interpretation:
 - Numeric zero is available.
 - Any numeric value greater than zero is classified conservatively as `INJURED` and is
   not eligible for Current Available Squad.
+
+### Squad Evolution
+
+`engine/squad_evolution/`
+
+Squad Evolution is a planning domain. It does not modify player ratings, TeamRater,
+LineupOptimizer, FormationOptimizer, probability calculations or match formulas. It
+classifies long-term roster structure using existing player attributes, existing
+position-fit analyzers, Squad Builder outputs and Squad Health availability records.
+
+Age interpretation:
+
+- `Player.age` is interpreted as age in years.
+- `Player.days` is interpreted as Hattrick age days when present.
+- `total_age_days` is calculated only when both years and days are available.
+- Missing or malformed age fields become `Unknown`; the app does not invent precision.
+
+Centralized age bands:
+
+- Development: 17-22
+- Prime: 23-28
+- Experienced: 29-31
+- Veteran: 32-34
+- Late Career: 35+
+
+Planning horizons are Current, Short Term and Medium Term. They alter planning risk
+interpretation and priority ordering; they do not fabricate future skills, exact decline,
+retirement dates, market values or transfer prices.
+
+Starter hierarchy deliberately separates:
+
+- Full Strength Ideal XI: normal structural starter hierarchy for succession.
+- Current Available Ideal XI: immediate operational coverage when availability changes.
+
+This prevents temporary injury replacements from becoming long-term starters in the
+succession map.
+
+Squad Evolution outputs:
+
+- Age structure by squad, full-strength XI, current-available XI and broad role.
+- Succession map with starter, current available starter, backup, successor readiness,
+  operational risk and structural risk.
+- Dependency analysis for roles relying on one aging or hard-to-replace player.
+- Development candidates and possible future-role labels without exact ceiling claims.
+- Current training focus and strategic alignment against renewal gaps.
+- Identity continuity based on Squad Identity contributors and succession risks.
+- Ranked priority risks with deterministic tie-breaking.
+
+Planning scores and risk levels are separate from match-performance ratings. They are
+for transfer-planning context in Alpha 0.5.4, not Hattrick match prediction.
 - Malformed non-empty values are classified as `UNKNOWN`; they remain eligible because
   the current import format does not provide enough information to exclude safely.
 - Suspension is represented in the domain model for future support, but no suspension

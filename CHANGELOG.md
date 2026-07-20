@@ -68,6 +68,10 @@
   Workspace recalculation, Bench, replacement candidates and Player Intelligence use
   Current Available Squad by default, while Full Strength simulation remains available
   with a clear warning.
+- Added Alpha 0.5.3 Squad Evolution and Succession Planning with an Evolution tab,
+  centralized age bands, planning horizons, succession map, dependency analysis,
+  development candidates, training focus alignment, identity continuity and ranked
+  planning risks.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.

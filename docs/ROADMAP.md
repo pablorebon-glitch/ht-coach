@@ -128,6 +128,10 @@ Deliverables:
 - Squad Health and Availability with Current Available Squad default, Full Strength
   simulation, centralized injury eligibility, health summary, unavailable player
   explanation, availability impact and positional coverage.
+- Squad Evolution and Succession Planning with centralized age bands, planning
+  horizons, full-strength versus current-available starter hierarchy, succession map,
+  dependency analysis, development candidates, current training focus, training
+  alignment, identity continuity and ranked planning risks.
 
 Acceptance criteria:
 
@@ -142,6 +146,8 @@ Acceptance criteria:
 - Import errors do not crash the app.
 - Match receives roster path changes without restarting the app.
 - No engine formulas or optimizer calculations are changed.
+- Evolution planning risk remains separate from match-performance ratings and avoids
+  exact retirement, future-skill, market-value or transfer-price predictions.
 
 ### Epic 5: Opponent Manager
 
