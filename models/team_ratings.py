@@ -17,3 +17,7 @@ class TeamRatings:
     central_attack: float = 0
 
     right_attack: float = 0
+
+    indirect_defense: float | None = None
+
+    indirect_attack: float | None = None

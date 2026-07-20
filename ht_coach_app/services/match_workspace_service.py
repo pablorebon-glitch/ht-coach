@@ -27,6 +27,11 @@ from engine.match_intelligence.models import (
     TacticalFocus,
     TeamProfile,
 )
+from engine.ratings import (
+    SOURCE_HT_COACH_INTERNAL,
+    SectorComparison as RatingSectorComparison,
+    build_sector_comparisons,
+)
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import normalize_position_key
 from ht_coach_app.core.localization import t
@@ -88,6 +93,22 @@ class TeamRatingsResult:
     left_attack: float = 0.0
     central_attack: float = 0.0
     right_attack: float = 0.0
+    indirect_defense: float | None = None
+    indirect_attack: float | None = None
+
+
+@dataclass(frozen=True)
+class SectorRatingComparisonResult:
+    matchup_key: str
+    our_sector: str
+    opponent_sector: str
+    our_value: float | None
+    opponent_value: float | None
+    our_scale: str
+    opponent_scale: str
+    difference: float | None
+    advantage: str
+    comparable: bool
 
 
 @dataclass(frozen=True)
@@ -121,6 +142,9 @@ class FormationAnalysisResult:
     order_gain: float = 0.0
     tactic_gain: float = 0.0
     total_gain: float = 0.0
+    sector_rating_comparisons: list[SectorRatingComparisonResult] = field(
+        default_factory=list
+    )
 
 
 @dataclass(frozen=True)
@@ -507,6 +531,12 @@ class MatchWorkspaceService:
             expected_goals = float(
                 result.match_evaluation.expected_goals
             )
+            team_ratings = self._map_team_ratings(
+                getattr(result, "ratings", None)
+            )
+            mapped_opponent_ratings = self._map_team_ratings(
+                opponent_ratings
+            )
 
             mapped.append(
                 FormationAnalysisResult(
@@ -546,12 +576,8 @@ class MatchWorkspaceService:
                         in enumerate(result.lineup.players)
                     ],
                     is_recommended=(index == 0),
-                    team_ratings=self._map_team_ratings(
-                        getattr(result, "ratings", None)
-                    ),
-                    opponent_ratings=self._map_team_ratings(
-                        opponent_ratings
-                    ),
+                    team_ratings=team_ratings,
+                    opponent_ratings=mapped_opponent_ratings,
                     baseline_win_probability=float(
                         getattr(
                             result,
@@ -625,7 +651,11 @@ class MatchWorkspaceService:
                                 win_probability
                             )
                         )
-                    )
+                    ),
+                    sector_rating_comparisons=self._map_sector_comparisons(
+                        team_ratings,
+                        mapped_opponent_ratings,
+                    ),
                 )
             )
 
@@ -705,7 +735,24 @@ class MatchWorkspaceService:
             right_attack=float(
                 getattr(ratings, "right_attack", 0.0)
             ),
+            indirect_defense=_optional_float(
+                getattr(ratings, "indirect_defense", None)
+            ),
+            indirect_attack=_optional_float(
+                getattr(ratings, "indirect_attack", None)
+            ),
         )
+
+    @staticmethod
+    def _map_sector_comparisons(team_ratings, opponent_ratings):
+        return [
+            _sector_rating_comparison_from_domain(comparison)
+            for comparison in build_sector_comparisons(
+                team_ratings,
+                opponent_ratings,
+                our_scale=SOURCE_HT_COACH_INTERNAL,
+            )
+        ]
 
     @staticmethod
     def _enum_value(value):
@@ -815,6 +862,11 @@ def match_analysis_result_from_dict(data):
                 order_gain=float(item.get("order_gain", 0.0)),
                 tactic_gain=float(item.get("tactic_gain", 0.0)),
                 total_gain=float(item.get("total_gain", 0.0)),
+                sector_rating_comparisons=[
+                    _sector_rating_comparison_from_dict(comparison)
+                    for comparison in item.get("sector_rating_comparisons", [])
+                    if isinstance(comparison, dict)
+                ],
                 lineup=[
                     LineupPlayerResult(
                         number=int(player.get("number", index + 1)),
@@ -926,6 +978,49 @@ def _team_ratings_from_dict(data):
         left_attack=float(data.get("left_attack", 0.0)),
         central_attack=float(data.get("central_attack", 0.0)),
         right_attack=float(data.get("right_attack", 0.0)),
+        indirect_defense=_optional_float(data.get("indirect_defense")),
+        indirect_attack=_optional_float(data.get("indirect_attack")),
+    )
+
+
+def _optional_float(value):
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _sector_rating_comparison_from_domain(comparison):
+    if isinstance(comparison, RatingSectorComparison):
+        return SectorRatingComparisonResult(
+            matchup_key=comparison.matchup_key,
+            our_sector=comparison.our_sector,
+            opponent_sector=comparison.opponent_sector,
+            our_value=comparison.our_value,
+            opponent_value=comparison.opponent_value,
+            our_scale=comparison.our_scale,
+            opponent_scale=comparison.opponent_scale,
+            difference=comparison.difference,
+            advantage=comparison.advantage,
+            comparable=comparison.comparable,
+        )
+    return comparison
+
+
+def _sector_rating_comparison_from_dict(data):
+    return SectorRatingComparisonResult(
+        matchup_key=data.get("matchup_key", ""),
+        our_sector=data.get("our_sector", ""),
+        opponent_sector=data.get("opponent_sector", ""),
+        our_value=_optional_float(data.get("our_value")),
+        opponent_value=_optional_float(data.get("opponent_value")),
+        our_scale=data.get("our_scale", ""),
+        opponent_scale=data.get("opponent_scale", ""),
+        difference=_optional_float(data.get("difference")),
+        advantage=data.get("advantage", "not_directly_comparable"),
+        comparable=bool(data.get("comparable", False)),
     )
 
 

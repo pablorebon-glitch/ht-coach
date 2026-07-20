@@ -1,6 +1,6 @@
 import json
 import os
-from dataclasses import asdict
+from dataclasses import MISSING, asdict, fields
 
 from models.opponent import Opponent
 from models.team_ratings import TeamRatings
@@ -211,10 +211,17 @@ class OpponentManager:
     def _from_dict(
         data
     ):
+        raw_ratings = data.get("ratings", {})
+        rating_values = {}
+        for field in fields(TeamRatings):
+            if field.name in raw_ratings:
+                rating_values[field.name] = raw_ratings[field.name]
+            elif field.default is not MISSING:
+                rating_values[field.name] = field.default
 
         return Opponent(
             name=data["name"],
             ratings=TeamRatings(
-                **data["ratings"]
+                **rating_values
             )
         )

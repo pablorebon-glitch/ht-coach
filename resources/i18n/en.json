@@ -6,6 +6,9 @@
     "help": "Help",
     "not_implemented": "This shell action will be implemented in a later epic."
   },
+  "common": {
+    "not_available": "Not available"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "squad": "Squad",
@@ -401,6 +404,83 @@
       "moderate": "Moderate",
       "limited": "Limited",
       "unknown": "Unknown"
+    },
+    "summary": {
+      "no_urgent_need": "No urgent transfer need detected.",
+      "top_priority": "Top transfer profile priority is {value}.",
+      "profile_based": "Recommendations are profile-based and do not use live market data."
+    },
+    "skill": {
+      "goalkeeper": "Goalkeeper",
+      "defending": "Defending",
+      "playmaking": "Playmaking",
+      "winger": "Winger",
+      "passing": "Passing",
+      "scoring": "Scoring",
+      "set_pieces": "Set Pieces",
+      "experience": "Experience",
+      "leadership": "Leadership"
+    },
+    "literal": {
+      "role": {
+        "goalkeeper": "Goalkeeper",
+        "central_defense": "Central Defense",
+        "wing_defense": "Wing Defense",
+        "midfield": "Midfield",
+        "winger": "Winger",
+        "forward": "Forward"
+      },
+      "position": {
+        "goalkeeper": "Goalkeeper",
+        "central_defender": "Central Defender",
+        "wing_defender": "Wing Defender",
+        "inner_midfielder": "Inner Midfielder",
+        "winger": "Winger",
+        "forward": "Forward"
+      },
+      "target_role": {
+        "immediate_starter": "Immediate Starter",
+        "starter_candidate": "Starter Candidate",
+        "rotation_player": "Rotation Player",
+        "reliable_backup": "Reliable Backup",
+        "development_prospect": "Development Prospect",
+        "specialist": "Specialist",
+        "no_transfer_needed": "No Transfer Needed"
+      },
+      "specialty": {
+        "header_preferred": "Header preferred",
+        "quick_optional": "Quick optional",
+        "technical_optional": "Technical optional",
+        "unpredictable_optional": "Unpredictable optional"
+      },
+      "formation": {
+        "all_supported": "All supported formations"
+      },
+      "impact_dimension": {
+        "succession_risk": "Succession Risk",
+        "dependency_risk": "Dependency Risk",
+        "current_coverage": "Current Coverage",
+        "formation_flexibility": "Formation Flexibility",
+        "training_pipeline": "Training Pipeline",
+        "age_balance": "Age Balance"
+      },
+      "impact": {
+        "no_exact_delta": "No exact performance delta is projected for an abstract profile."
+      },
+      "tradeoff": {
+        "immediate_depth": "Prioritizes immediate depth over optional versatility.",
+        "structural_risk": "Addresses structural risk before luxury upgrades.",
+        "temporary_issue": "May be less urgent once temporary availability improves.",
+        "training_focus": "May not align strongly with the current training focus."
+      },
+      "no_action": {
+        "coverage_adequate": "Coverage appears adequate today.",
+        "monitor_availability": "Monitor the role for availability changes.",
+        "no_structural_action": "No structural transfer action is currently required.",
+        "starter_may_hold": "The current starter may remain adequate, but the squad keeps the identified planning risk.",
+        "role_exposed": "The role remains exposed if availability or form changes.",
+        "gap_unresolved": "The structural gap remains unresolved without an internal successor or profile recruitment."
+      }
     }
   },
   "availability": {
@@ -520,6 +600,38 @@
     "order_side": "Order Side",
     "board_error_title": "Formation board could not render",
     "board_error_message": "The comparison and Detailed XI tabs are still available. Board error: {error}"
+  },
+  "sector_rating": {
+    "title": "Opponent Rating Calibration",
+    "scale_note": "Ratings are shown with their source scale. Direct advantage is calculated only when both values share the same scale.",
+    "matchup": "Matchup",
+    "our_rating": "HT Coach rating",
+    "opponent_rating": "Opponent rating",
+    "difference": "Difference",
+    "assessment": "Assessment",
+    "not_available": "Not available",
+    "not_comparable": "Not directly comparable",
+    "scale": {
+      "ht_coach_internal_contribution": "{value} internal",
+      "hattrick_decimal": "{value} HT"
+    },
+    "advantage": {
+      "ours": "HT Coach advantage",
+      "opponent": "Opponent advantage",
+      "balanced": "Balanced",
+      "not_directly_comparable": "Different scales"
+    },
+    "matchup_key": {
+      "midfield": "Midfield",
+      "our_left_attack": "Our left attack vs their right defense",
+      "our_central_attack": "Our central attack vs their central defense",
+      "our_right_attack": "Our right attack vs their left defense",
+      "opponent_left_attack": "Their left attack vs our right defense",
+      "opponent_central_attack": "Their central attack vs our central defense",
+      "opponent_right_attack": "Their right attack vs our left defense",
+      "indirect_defense": "Indirect defense",
+      "indirect_attack": "Indirect attack"
+    }
   },
   "workspace": {
     "formation_board": "Formation Board",

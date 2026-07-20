@@ -30,6 +30,8 @@ from engine.advisor.recommendation_engine import (
     format_win_delta,
     impact_band,
 )
+from engine.ratings import format_rating_value
+from ht_coach_app.core.localization import localization_service
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
@@ -510,6 +512,15 @@ class MatchPage(BasePage):
                 )
             )
 
+        if recommended is not None and getattr(
+            recommended,
+            "sector_rating_comparisons",
+            None,
+        ):
+            self.results_layout.addWidget(
+                self._build_sector_rating_panel(recommended)
+            )
+
         if result.change_analysis is not None:
             self.results_layout.addWidget(
                 self._build_change_analysis_panel(
@@ -674,6 +685,61 @@ class MatchPage(BasePage):
 
         layout.setColumnStretch(1, 1)
 
+        return card
+
+    def _build_sector_rating_panel(self, formation):
+        card = QFrame()
+        card.setObjectName("compactDecisionLab")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(10, 7, 10, 7)
+        layout.setSpacing(6)
+
+        title = QLabel(t("sector_rating.title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title)
+
+        note = QLabel(t("sector_rating.scale_note"))
+        note.setWordWrap(True)
+        note.setObjectName("compactDecisionText")
+        layout.addWidget(note)
+
+        table = QTableWidget(
+            len(formation.sector_rating_comparisons),
+            5,
+        )
+        table.setObjectName("comparisonTable")
+        table.setHorizontalHeaderLabels(
+            [
+                t("sector_rating.matchup"),
+                t("sector_rating.our_rating"),
+                t("sector_rating.opponent_rating"),
+                t("sector_rating.difference"),
+                t("sector_rating.assessment"),
+            ]
+        )
+        self._configure_table(table)
+        table.setMinimumHeight(
+            82 + 26 * max(1, len(formation.sector_rating_comparisons))
+        )
+
+        for row, comparison in enumerate(formation.sector_rating_comparisons):
+            values = [
+                t(f"sector_rating.matchup_key.{comparison.matchup_key}"),
+                self._sector_rating_text(
+                    comparison.our_value,
+                    comparison.our_scale,
+                ),
+                self._sector_rating_text(
+                    comparison.opponent_value,
+                    comparison.opponent_scale,
+                ),
+                self._sector_difference_text(comparison),
+                t(f"sector_rating.advantage.{comparison.advantage}"),
+            ]
+            for column, value in enumerate(values):
+                table.setItem(row, column, QTableWidgetItem(value))
+
+        layout.addWidget(table)
         return card
 
     def _build_availability_panel(self, result):
@@ -1444,6 +1510,24 @@ class MatchPage(BasePage):
         if change.value_type == "percent":
             return self._format_delta_percent(change.difference)
         return self._format_delta_number(change.difference)
+
+    def _sector_rating_text(self, value, scale):
+        text = format_rating_value(
+            value,
+            scale,
+            language=localization_service().language,
+        )
+        if not text:
+            return t("sector_rating.not_available")
+        return t(
+            f"sector_rating.scale.{scale}",
+            value=text,
+        )
+
+    def _sector_difference_text(self, comparison):
+        if not comparison.comparable or comparison.difference is None:
+            return t("sector_rating.not_comparable")
+        return self._format_delta_number(comparison.difference)
 
     def _advisor_badge_label(self, recommendation):
         if not recommendation.is_action:

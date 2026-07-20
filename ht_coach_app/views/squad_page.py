@@ -32,6 +32,69 @@ from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 from ht_coach_app.widgets.sortable_table_item import SortableTableItem
 
 
+TRANSFER_LITERAL_KEYS = {
+    "role": {
+        "Goalkeeper": "goalkeeper",
+        "Central Defense": "central_defense",
+        "Wing Defense": "wing_defense",
+        "Midfield": "midfield",
+        "Winger": "winger",
+        "Forward": "forward",
+    },
+    "position": {
+        "Goalkeeper": "goalkeeper",
+        "Central Defender": "central_defender",
+        "Wing Defender": "wing_defender",
+        "Inner Midfielder": "inner_midfielder",
+        "Winger": "winger",
+        "Forward": "forward",
+    },
+    "target_role": {
+        "Immediate Starter": "immediate_starter",
+        "Starter Candidate": "starter_candidate",
+        "Rotation Player": "rotation_player",
+        "Reliable Backup": "reliable_backup",
+        "Development Prospect": "development_prospect",
+        "Specialist": "specialist",
+        "No Transfer Needed": "no_transfer_needed",
+    },
+    "specialty": {
+        "Header preferred": "header_preferred",
+        "Quick optional": "quick_optional",
+        "Technical optional": "technical_optional",
+        "Unpredictable optional": "unpredictable_optional",
+    },
+    "formation": {
+        "All supported formations": "all_supported",
+    },
+    "impact_dimension": {
+        "Succession Risk": "succession_risk",
+        "Dependency Risk": "dependency_risk",
+        "Current Coverage": "current_coverage",
+        "Formation Flexibility": "formation_flexibility",
+        "Training Pipeline": "training_pipeline",
+        "Age Balance": "age_balance",
+    },
+    "impact": {
+        "No exact performance delta is projected for an abstract profile.": "no_exact_delta",
+    },
+    "tradeoff": {
+        "Prioritizes immediate depth over optional versatility.": "immediate_depth",
+        "Addresses structural risk before luxury upgrades.": "structural_risk",
+        "May be less urgent once temporary availability improves.": "temporary_issue",
+        "May not align strongly with the current training focus.": "training_focus",
+    },
+    "no_action": {
+        "Coverage appears adequate today.": "coverage_adequate",
+        "Monitor the role for availability changes.": "monitor_availability",
+        "No structural transfer action is currently required.": "no_structural_action",
+        "The current starter may remain adequate, but the squad keeps the identified planning risk.": "starter_may_hold",
+        "The role remains exposed if availability or form changes.": "role_exposed",
+        "The structural gap remains unresolved without an internal successor or profile recruitment.": "gap_unresolved",
+    },
+}
+
+
 class SquadPage(BasePage):
     browse_requested = Signal()
     load_requested = Signal()
@@ -1339,7 +1402,10 @@ class SquadPage(BasePage):
                 [
                     t(
                         "transfer.top_priority_value",
-                        value=summary.top_priority or "-",
+                        value=self._transfer_literal(
+                            "role",
+                            summary.top_priority,
+                        ) if summary.top_priority else "-",
                     ),
                     t(
                         "transfer.structural_needs_value",
@@ -1364,7 +1430,7 @@ class SquadPage(BasePage):
                             summary.selected_planning_objective,
                         ),
                     ),
-                    *summary.summary_sentences,
+                    *self._transfer_summary_sentences(summary),
                 ]
             )
         )
@@ -1375,10 +1441,13 @@ class SquadPage(BasePage):
                 row,
                 [
                     need.priority_rank,
-                    need.role,
+                    self._transfer_literal("role", need.role),
                     self._transfer_label("urgency", need.urgency),
                     self._transfer_label("need_type", need.need_type),
-                    need.target_squad_role,
+                    self._transfer_literal(
+                        "target_role",
+                        need.target_squad_role,
+                    ),
                     self._transfer_label("action", need.recommended_action),
                     self._transfer_label(
                         "internal",
@@ -1410,7 +1479,10 @@ class SquadPage(BasePage):
     def _profile_text(self, need):
         profile = need.recommended_profile
         lines = [
-            t("transfer.need_role_value", value=need.role),
+            t(
+                "transfer.need_role_value",
+                value=self._transfer_literal("role", need.role),
+            ),
             t(
                 "transfer.need_type_value",
                 value=self._transfer_label("need_type", need.need_type),
@@ -1433,12 +1505,21 @@ class SquadPage(BasePage):
             return "\n".join(lines)
         lines.extend(
             [
-                t("transfer.position_value", value=profile.position),
-                t("transfer.target_role_value", value=profile.target_role),
+                t(
+                    "transfer.position_value",
+                    value=self._transfer_literal("position", profile.position),
+                ),
+                t(
+                    "transfer.target_role_value",
+                    value=self._transfer_literal(
+                        "target_role",
+                        profile.target_role,
+                    ),
+                ),
                 t("transfer.age_range_value", value=profile.age_range),
                 t(
                     "transfer.primary_skill_value",
-                    skill=self._skill_label(profile.primary_skill.skill),
+                    skill=self._transfer_skill(profile.primary_skill.skill),
                     minimum=profile.primary_skill.minimum_level,
                     preferred=profile.primary_skill.preferred_level,
                     stretch=profile.primary_skill.stretch_level,
@@ -1446,7 +1527,7 @@ class SquadPage(BasePage):
                 t(
                     "transfer.secondary_skills_value",
                     values=", ".join(
-                        self._skill_label(skill.skill)
+                        self._transfer_skill(skill.skill)
                         for skill in profile.secondary_skills
                     )
                     or "-",
@@ -1454,14 +1535,18 @@ class SquadPage(BasePage):
                 t(
                     "transfer.optional_skills_value",
                     values=", ".join(
-                        self._skill_label(skill)
+                        self._transfer_skill(skill)
                         for skill in profile.optional_skills
                     )
                     or "-",
                 ),
                 t(
                     "transfer.specialty_value",
-                    values=", ".join(profile.specialty_preferences) or "-",
+                    value=", ".join(
+                        self._transfer_literal("specialty", specialty)
+                        for specialty in profile.specialty_preferences
+                    )
+                    or "-",
                 ),
                 t(
                     "transfer.training_compatibility_value",
@@ -1472,7 +1557,11 @@ class SquadPage(BasePage):
                 ),
                 t(
                     "transfer.formations_value",
-                    values=", ".join(profile.formation_compatibility) or "-",
+                    values=", ".join(
+                        self._transfer_literal("formation", formation)
+                        for formation in profile.formation_compatibility
+                    )
+                    or "-",
                 ),
                 t(
                     "transfer.identity_value",
@@ -1483,7 +1572,11 @@ class SquadPage(BasePage):
                 ),
                 t(
                     "transfer.tradeoffs_value",
-                    values=", ".join(profile.tradeoffs) or "-",
+                    values=", ".join(
+                        self._transfer_literal("tradeoff", tradeoff)
+                        for tradeoff in profile.tradeoffs
+                    )
+                    or "-",
                 ),
             ]
         )
@@ -1501,9 +1594,19 @@ class SquadPage(BasePage):
                 ),
                 t(
                     "transfer.impact_dimensions_value",
-                    values=", ".join(need.impact_projection.dimensions) or "-",
+                    values=", ".join(
+                        self._transfer_literal(
+                            "impact_dimension",
+                            dimension,
+                        )
+                        for dimension in need.impact_projection.dimensions
+                    )
+                    or "-",
                 ),
-                need.impact_projection.no_exact_delta_statement,
+                self._transfer_literal(
+                    "impact",
+                    need.impact_projection.no_exact_delta_statement,
+                ),
                 t(
                     "transfer.source_risks_value",
                     values=", ".join(
@@ -1519,9 +1622,18 @@ class SquadPage(BasePage):
         scenario = need.no_action_scenario
         return "\n".join(
             [
-                t("transfer.no_action_current", value=scenario.current),
-                t("transfer.no_action_short", value=scenario.short_term),
-                t("transfer.no_action_medium", value=scenario.medium_term),
+                t(
+                    "transfer.no_action_current",
+                    value=self._transfer_literal("no_action", scenario.current),
+                ),
+                t(
+                    "transfer.no_action_short",
+                    value=self._transfer_literal("no_action", scenario.short_term),
+                ),
+                t(
+                    "transfer.no_action_medium",
+                    value=self._transfer_literal("no_action", scenario.medium_term),
+                ),
             ]
         )
 
@@ -1532,9 +1644,16 @@ class SquadPage(BasePage):
                 t(
                     "transfer.alternative_profile_value",
                     index=index,
-                    role=profile.target_role,
+                    role=self._transfer_literal(
+                        "target_role",
+                        profile.target_role,
+                    ),
+                    position=self._transfer_literal(
+                        "position",
+                        profile.position,
+                    ),
                     age=profile.age_range,
-                    skill=self._skill_label(profile.primary_skill.skill),
+                    skill=self._transfer_skill(profile.primary_skill.skill),
                     level=profile.primary_skill.minimum_level,
                 )
             )
@@ -1890,7 +2009,7 @@ class SquadPage(BasePage):
         normalized = str(key or "unknown").strip()
         lookup_key = f"evolution.{category}.{normalized}"
         value = t(lookup_key)
-        if value in {lookup_key, "Translation unavailable"}:
+        if value in {lookup_key, "Translation unavailable", "Not available", "No disponible"}:
             return normalized.replace("_", " ").title()
         return value
 
@@ -1898,9 +2017,40 @@ class SquadPage(BasePage):
         normalized = str(key or "unknown").strip()
         lookup_key = f"transfer.{category}.{normalized}"
         value = t(lookup_key)
-        if value in {lookup_key, "Translation unavailable"}:
+        if value in {lookup_key, "Translation unavailable", "Not available", "No disponible"}:
             return normalized.replace("_", " ").title()
         return value
+
+    def _transfer_literal(self, category, value):
+        if value is None or value == "":
+            return t("common.not_available")
+        text = str(value).strip()
+        literal_key = TRANSFER_LITERAL_KEYS.get(category, {}).get(text)
+        if literal_key:
+            label = t(f"transfer.literal.{category}.{literal_key}")
+            if label not in {"Translation unavailable", "Not available", "No disponible"}:
+                return label
+        return text.replace("_", " ").title()
+
+    def _transfer_skill(self, skill):
+        normalized = str(skill or "").strip()
+        if not normalized:
+            return t("common.not_available")
+        label = t(f"transfer.skill.{normalized}")
+        if label in {"Translation unavailable", "Not available", "No disponible"}:
+            return normalized.replace("_", " ").title()
+        return label
+
+    def _transfer_summary_sentences(self, summary):
+        if not summary.top_priority:
+            return [t("transfer.summary.no_urgent_need")]
+        return [
+            t(
+                "transfer.summary.top_priority",
+                value=self._transfer_literal("role", summary.top_priority),
+            ),
+            t("transfer.summary.profile_based"),
+        ]
 
     @staticmethod
     def _skill_label(skill):

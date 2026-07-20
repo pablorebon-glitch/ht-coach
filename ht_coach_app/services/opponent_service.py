@@ -14,6 +14,13 @@ RATING_FIELDS = (
     "right_attack",
 )
 
+OPTIONAL_RATING_FIELDS = (
+    "indirect_defense",
+    "indirect_attack",
+)
+
+ALL_RATING_FIELDS = RATING_FIELDS + OPTIONAL_RATING_FIELDS
+
 
 DEFAULT_RATINGS = {
     "left_defense": 25.0,
@@ -23,6 +30,8 @@ DEFAULT_RATINGS = {
     "left_attack": 25.0,
     "central_attack": 30.0,
     "right_attack": 24.0,
+    "indirect_defense": None,
+    "indirect_attack": None,
 }
 
 
@@ -174,5 +183,34 @@ class OpponentService:
 
             values[field] = numeric_value
 
-        return TeamRatings(**values)
+        for field in OPTIONAL_RATING_FIELDS:
+            value = ratings.get(field)
+            if value is None or value == "":
+                values[field] = None
+                continue
 
+            if isinstance(value, bool):
+                raise OpponentValidationError(
+                    f"{field.replace('_', ' ').title()} must be numeric."
+                )
+
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError) as exc:
+                raise OpponentValidationError(
+                    f"{field.replace('_', ' ').title()} must be numeric."
+                ) from exc
+
+            if not math.isfinite(numeric_value):
+                raise OpponentValidationError(
+                    f"{field.replace('_', ' ').title()} must be finite."
+                )
+
+            if numeric_value < 0:
+                raise OpponentValidationError(
+                    f"{field.replace('_', ' ').title()} must be zero or greater."
+                )
+
+            values[field] = numeric_value
+
+        return TeamRatings(**values)

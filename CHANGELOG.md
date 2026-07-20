@@ -78,6 +78,11 @@
 - Added `engine/transfer_planner` as a deterministic planning layer over Squad
   Evolution outputs, explicitly excluding live market data, exact prices and exact
   future performance deltas.
+- Added Alpha 0.5.4.1 opponent rating calibration with explicit Hattrick decimal
+  versus HT Coach internal rating scale labels, canonical sector matchups and
+  persisted serializable Match result comparison view models.
+- Added optional indirect defense and indirect attack fields to saved opponents while
+  preserving the existing seven required sector ratings and JSON compatibility.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
@@ -188,6 +193,11 @@
   Advisor.
 - Tactical Advisor can consume Match Intelligence matchup view models when they are
   available.
+- Transfer Planner presentation now localizes profile roles, target roles, positions,
+  skills, specialties, formation relevance, impact dimensions, tradeoffs and no-action
+  scenarios in English and Spanish.
+- Missing localization keys and template parameters now fall back to localized safe
+  text instead of showing technical placeholder text.
 
 ### Notes
 
@@ -207,3 +217,6 @@
   position weights.
 - Match Intelligence does not modify TeamRater, optimizers, xG, probability formulas,
   rating formulas or Decision Lab.
+- Opponent rating calibration does not introduce a conversion multiplier between
+  Hattrick decimal ratings and HT Coach internal contribution ratings. Direct
+  advantage labels are shown only when both ratings share the same source scale.

@@ -6,6 +6,9 @@
     "help": "Ayuda",
     "not_implemented": "Esta acción se implementará en un próximo epic."
   },
+  "common": {
+    "not_available": "No disponible"
+  },
   "nav": {
     "dashboard": "Panel",
     "squad": "Plantel",
@@ -401,6 +404,83 @@
       "moderate": "Moderado",
       "limited": "Limitado",
       "unknown": "Desconocido"
+    },
+    "summary": {
+      "no_urgent_need": "No se detecta una necesidad urgente de fichaje.",
+      "top_priority": "La prioridad principal de fichaje es {value}.",
+      "profile_based": "Las recomendaciones se basan en perfiles y no usan datos de mercado en vivo."
+    },
+    "skill": {
+      "goalkeeper": "Porteria",
+      "defending": "Defensa",
+      "playmaking": "Jugadas",
+      "winger": "Lateral",
+      "passing": "Pases",
+      "scoring": "Anotacion",
+      "set_pieces": "Balon parado",
+      "experience": "Experiencia",
+      "leadership": "Liderazgo"
+    },
+    "literal": {
+      "role": {
+        "goalkeeper": "Porteria",
+        "central_defense": "Defensa central",
+        "wing_defense": "Defensa lateral",
+        "midfield": "Mediocampo",
+        "winger": "Lateral",
+        "forward": "Delantero"
+      },
+      "position": {
+        "goalkeeper": "Portero",
+        "central_defender": "Defensa central",
+        "wing_defender": "Defensa lateral",
+        "inner_midfielder": "Mediocampista central",
+        "winger": "Lateral",
+        "forward": "Delantero"
+      },
+      "target_role": {
+        "immediate_starter": "Titular inmediato",
+        "starter_candidate": "Candidato a titular",
+        "rotation_player": "Jugador de rotacion",
+        "reliable_backup": "Relevo confiable",
+        "development_prospect": "Proyecto de desarrollo",
+        "specialist": "Especialista",
+        "no_transfer_needed": "Sin fichaje necesario"
+      },
+      "specialty": {
+        "header_preferred": "Cabeceador preferido",
+        "quick_optional": "Rapido opcional",
+        "technical_optional": "Tecnico opcional",
+        "unpredictable_optional": "Imprevisible opcional"
+      },
+      "formation": {
+        "all_supported": "Todas las formaciones soportadas"
+      },
+      "impact_dimension": {
+        "succession_risk": "Riesgo de sucesion",
+        "dependency_risk": "Riesgo de dependencia",
+        "current_coverage": "Cobertura actual",
+        "formation_flexibility": "Flexibilidad de formacion",
+        "training_pipeline": "Camino de entrenamiento",
+        "age_balance": "Balance de edad"
+      },
+      "impact": {
+        "no_exact_delta": "No se proyecta una diferencia exacta de rendimiento para un perfil abstracto."
+      },
+      "tradeoff": {
+        "immediate_depth": "Prioriza profundidad inmediata sobre versatilidad opcional.",
+        "structural_risk": "Atiende riesgo estructural antes que mejoras de lujo.",
+        "temporary_issue": "Puede ser menos urgente cuando mejore la disponibilidad temporal.",
+        "training_focus": "Puede no alinearse fuerte con el entrenamiento actual."
+      },
+      "no_action": {
+        "coverage_adequate": "La cobertura parece adecuada hoy.",
+        "monitor_availability": "Observar el rol ante cambios de disponibilidad.",
+        "no_structural_action": "No se requiere una accion estructural de fichaje ahora.",
+        "starter_may_hold": "El titular actual puede seguir siendo adecuado, pero el plantel conserva el riesgo de planificacion identificado.",
+        "role_exposed": "El rol queda expuesto si cambian la disponibilidad o la forma.",
+        "gap_unresolved": "La brecha estructural sigue sin resolverse sin un sucesor interno o un fichaje de perfil."
+      }
     }
   },
   "availability": {
@@ -520,6 +600,38 @@
     "order_side": "Lado orden",
     "board_error_title": "La cancha no pudo renderizarse",
     "board_error_message": "La comparación y el XI detallado siguen disponibles. Error de cancha: {error}"
+  },
+  "sector_rating": {
+    "title": "Calibracion de ratings del rival",
+    "scale_note": "Los ratings se muestran con su escala de origen. La ventaja directa solo se calcula cuando ambos valores comparten la misma escala.",
+    "matchup": "Cruce",
+    "our_rating": "Rating HT Coach",
+    "opponent_rating": "Rating rival",
+    "difference": "Diferencia",
+    "assessment": "Lectura",
+    "not_available": "No disponible",
+    "not_comparable": "No comparable directamente",
+    "scale": {
+      "ht_coach_internal_contribution": "{value} interno",
+      "hattrick_decimal": "{value} HT"
+    },
+    "advantage": {
+      "ours": "Ventaja HT Coach",
+      "opponent": "Ventaja rival",
+      "balanced": "Equilibrado",
+      "not_directly_comparable": "Escalas distintas"
+    },
+    "matchup_key": {
+      "midfield": "Mediocampo",
+      "our_left_attack": "Nuestro ataque izquierdo vs su defensa derecha",
+      "our_central_attack": "Nuestro ataque central vs su defensa central",
+      "our_right_attack": "Nuestro ataque derecho vs su defensa izquierda",
+      "opponent_left_attack": "Su ataque izquierdo vs nuestra defensa derecha",
+      "opponent_central_attack": "Su ataque central vs nuestra defensa central",
+      "opponent_right_attack": "Su ataque derecho vs nuestra defensa izquierda",
+      "indirect_defense": "Defensa indirectos",
+      "indirect_attack": "Ataque indirectos"
+    }
   },
   "workspace": {
     "formation_board": "Cancha",
