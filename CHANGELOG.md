@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added Alpha 0.5.5.1 Decision Lab localization and Match Intelligence clarity:
+  localized Decision Lab presentation/copy, explicit recommendation-support wording,
+  and calibrated Match Intelligence display for non-comparable rating scales.
 - Added Alpha 0.4.2.1 Compact Match Workspace with a responsive full-pitch view,
   horizontal board/inspector splitter, compact formation footer and internal Player
   Intelligence scrolling.

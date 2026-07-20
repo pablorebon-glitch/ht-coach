@@ -43,8 +43,12 @@ from ht_coach_app.change_analysis.service import (
 )
 from ht_coach_app.reasoning.decision_lab import DecisionLab
 from ht_coach_app.reasoning.explanation_formatter import (
+    confidence_level_label,
     decision_lab_result_to_dict,
     format_decision_lab_copy,
+    localized_decision_reason,
+    localized_decision_risk,
+    localized_decision_summary,
 )
 from ht_coach_app.reasoning.models import (
     ConfidenceAssessment,
@@ -1345,16 +1349,26 @@ def format_match_summary(result):
             [
                 "",
                 "Decision Lab",
-                f"Confidence: {result.decision_lab.confidence.level}",
-                f"Summary: {result.decision_lab.summary}",
+                (
+                    f"{t('decision_lab.recommendation_confidence')}: "
+                    f"{confidence_level_label(result.decision_lab.confidence.level)}"
+                ),
+                (
+                    f"{t('change.summary')}: "
+                    f"{localized_decision_summary(result.decision_lab.summary)}"
+                ),
             ]
         )
 
         for reason in result.decision_lab.reasons[:3]:
-            lines.append(f"- {reason.title}: {reason.description}")
+            title, description = localized_decision_reason(reason)
+            lines.append(f"- {title}: {description}")
 
         for risk in result.decision_lab.risks[:2]:
-            lines.append(f"- Risk: {risk.title}: {risk.description}")
+            title, description = localized_decision_risk(risk)
+            lines.append(
+                f"- {t('decision_lab.copy.risks')}: {title}: {description}"
+            )
 
     return "\n".join(lines)
 

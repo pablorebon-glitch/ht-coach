@@ -254,17 +254,22 @@ Content:
 - Player Intelligence inspector with profile label, coach's note, why-selected points,
   contribution bars, strengths, limitations, alternatives, collapsed technical details
   and internal overflow scrolling.
-- Compact Decision Lab row with recommendation confidence and play-to-win, secure-draw
-  and avoid-defeat perspectives derived from existing result data. Full copy output
-  remains available.
+- Compact Decision Lab row with localized recommendation confidence, explicit
+  recommendation-support wording, and play-to-win, secure-draw and avoid-defeat
+  perspectives derived from existing result data. Recommendation support is not
+  presented as a match probability. Full copy output remains available.
 - Change Analysis panel after Workspace recalculation, comparing the previous evaluated
   Workspace to the current evaluated Workspace with last change, position fit, team
   impact, changed sectors only and a deterministic summary.
-- Match Intelligence panel with team profile, opponent profile, three tactical focuses,
-  key opportunities, key risks and a compact matchup matrix.
+- Match Intelligence panel with team profile, opponent profile, tactical focuses, key
+  opportunities, key risks and a compact matchup matrix. When HT Coach internal team
+  ratings and imported Hattrick decimal opponent ratings are not directly comparable,
+  the UI hides direct margins, advantage classes and difference-based signals while
+  retaining profile and possession context.
 - Opponent Rating Calibration panel that labels HT Coach internal ratings and imported
   Hattrick decimal ratings by source scale and only shows direct advantages when the
-  compared values share the same scale.
+  compared values share the same scale. If scales differ, the difference column is not
+  shown.
 - Tactical Advisor panel with three to five ranked, informational recommendations
   derived from the current evaluated Workspace.
 - Formation comparison table with deltas versus the recommendation.

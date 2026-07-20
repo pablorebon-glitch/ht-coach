@@ -446,6 +446,14 @@ Modules:
 The module consumes already evaluated `MatchAnalysisResult` data. It does not modify
 TeamRater, LineupOptimizer, TacticOptimizer, probabilities, xG, ratings or Decision Lab.
 
+The PySide6 Match page is responsible for scale-aware presentation. If the recommended
+formation carries Opponent Rating Calibration rows where HT Coach internal contribution
+ratings and Hattrick decimal opponent ratings are not directly comparable, the view
+does not display direct matchup margins, advantage classes or difference-based tactical
+signals from Match Intelligence. It keeps within-team profile context and possession
+signals, and the Opponent Rating Calibration table continues to show the raw values with
+their source scales. No conversion factor is introduced.
+
 Advisor card types are intentionally strict:
 
 - `ACTION`: a concrete evaluated formation or Workspace lineup change with before/after

@@ -717,6 +717,127 @@
     "board_error_title": "Formation board could not render",
     "board_error_message": "The comparison and Detailed XI tabs are still available. Board error: {error}"
   },
+  "decision_lab": {
+    "recommendation_confidence": "Recommendation confidence",
+    "recommendation_support_value": "Recommendation support: {value}",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "confidence_explanation": {
+      "single_formation": "Support is limited because no alternative formation was analyzed.",
+      "clear_advantage": "The recommended option has clear support against the analyzed alternatives.",
+      "not_decisive": "The recommendation is supported, but the margin is not decisive.",
+      "tied": "The leading formations are effectively tied."
+    },
+    "summary": {
+      "single_formation": "Only one formation was analyzed, so there is no meaningful formation comparison.",
+      "tied": "The decision is marginal; the best alternatives are effectively tied.",
+      "more_attack": "Creates considerably more attacking output while maintaining similar defensive protection.",
+      "more_defense": "Improves defensive protection at the cost of some attacking output.",
+      "balance": "The recommendation offers the best overall balance."
+    },
+    "copy": {
+      "empty": "No Decision Lab result available.",
+      "title": "HT COACH DECISION LAB",
+      "recommendation": "Recommendation",
+      "main_conclusion": "Main conclusion",
+      "why": "Why",
+      "risks": "Risks",
+      "tactical_observations": "Tactical observations",
+      "optimization_impact": "Optimization impact"
+    },
+    "reason": {
+      "highest_win": {
+        "title": "Highest win probability"
+      },
+      "small_edge": {
+        "title": "Small win-probability edge"
+      },
+      "tied": {
+        "title": "Effectively tied",
+        "description": "The two formations are effectively tied."
+      },
+      "probability_delta": {
+        "description": "{value} versus the next analyzed alternative."
+      },
+      "xg_positive": {
+        "title": "Creates more attacking output"
+      },
+      "xg_negative": {
+        "title": "Attacking output sacrifice"
+      },
+      "xg_delta": {
+        "description": "{value} xG versus the next analyzed alternative."
+      },
+      "possession_positive": {
+        "title": "Keeps a possession edge"
+      },
+      "possession_negative": {
+        "title": "Accepts a possession sacrifice"
+      },
+      "possession_delta": {
+        "description": "{value} possession versus the next analyzed alternative."
+      },
+      "attacking_output": {
+        "title": "Attacking output"
+      },
+      "optimization": {
+        "title": "Optimization impact",
+        "description": "The existing optimizer found the largest improvement inside the evaluated lineup, orders, or tactic choices."
+      }
+    },
+    "risk": {
+      "limited_attack": {
+        "title": "Limited attacking output"
+      },
+      "opponent_xg": {
+        "title": "Opponent pressure"
+      },
+      "defensive_channel": {
+        "title": "Defensive vulnerability",
+        "description": "One defensive channel needs attention against the opponent's matching attack."
+      }
+    },
+    "xg": {
+      "ours": {
+        "low": "Creates limited attacking output at {value} xG.",
+        "moderate": "Produces a moderate {value} xG.",
+        "dangerous": "Creates dangerous attacking output at {value} xG.",
+        "very_high": "Generates very high attacking output at {value} xG."
+      },
+      "opponent": {
+        "low": "Opponent attacking output remains low at {value} xG.",
+        "moderate": "Opponent still projects a moderate {value} xG.",
+        "dangerous": "Opponent remains dangerous at {value} xG.",
+        "very_high": "Opponent creates very high scoring pressure at {value} xG."
+      }
+    },
+    "tactic": {
+      "normal": "Normal",
+      "attack_in_the_middle": "Attack in the Middle",
+      "attack_on_wings": "Attack on Wings",
+      "pressing": "Pressing",
+      "counter_attacks": "Counter-Attacks",
+      "play_creatively": "Play Creatively",
+      "long_shots": "Long Shots"
+    },
+    "observation": {
+      "normal_retained": "Normal was retained because no specialized tactic produced a meaningful improvement.",
+      "tactic_marginal": "{tactic} was selected, but its improvement over Normal is marginal.",
+      "tactic_gain": "{tactic} improved the evaluated win probability over Normal.",
+      "wings_favorable": "{tactic} is supported by at least one favorable wing matchup.",
+      "wings_not_clear": "{tactic} was selected, but the wing matchups are not clearly favorable."
+    },
+    "optimization": {
+      "lineup": "Better XI",
+      "orders": "Individual orders",
+      "tactic": "Team tactic",
+      "total": "Total improvement: {value}",
+      "marginal": "Optimization changes produced only a marginal improvement."
+    }
+  },
   "sector_rating": {
     "title": "Opponent Rating Calibration",
     "scale_note": "Ratings are shown with their source scale. Direct advantage is calculated only when both values share the same scale.",
@@ -803,6 +924,8 @@
   "match_intelligence": {
     "title": "Match Intelligence",
     "highlights": "Key Signals",
+    "scale_limitation": "Opponent ratings are on a Hattrick decimal scale while HT Coach team ratings are internal contribution ratings. Direct margins and advantage classes are hidden; profile and possession signals remain available.",
+    "not_comparable": "Not comparable",
     "sector": {
       "left_defense": "left defense",
       "central_defense": "central defense",
