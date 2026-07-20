@@ -341,6 +341,12 @@ Acceptance criteria:
   Decision Lab presentation/copy, label recommendation support separately from match
   probabilities, and suppress direct Match Intelligence margins when rating scales are
   not comparable.
+- Alpha 0.5.6 Rating Engine Alignment Audit: document the full rating pipeline,
+  formalize source-scale concepts, validate Hattrick decimal imports, test quarter-step
+  hypotheses, and classify current TeamRater values as not yet directly convertible to
+  Hattrick decimal ratings.
+- Alpha 0.5.6.1 Historical Fixture Collection and Rating Estimator Research: collect
+  complete own-team match fixtures before attempting any estimator or conversion.
 - Alpha 0.4.9 What-If Lab: explore controlled tactical alternatives from the evaluated
   Workspace without changing stable engine formulas.
 - Match scenario history.

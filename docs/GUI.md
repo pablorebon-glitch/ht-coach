@@ -270,6 +270,9 @@ Content:
   Hattrick decimal ratings by source scale and only shows direct advantages when the
   compared values share the same scale. If scales differ, the difference column is not
   shown.
+- Rating Engine Alignment diagnostics classify current TeamRater values as internal
+  contribution totals. The normal Match UI must not display own-team Hattrick decimal
+  ratings unless a future evidence-backed conversion is introduced.
 - Tactical Advisor panel with three to five ranked, informational recommendations
   derived from the current evaluated Workspace.
 - Formation comparison table with deltas versus the recommendation.

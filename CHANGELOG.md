@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added Alpha 0.5.6 Rating Engine Alignment Audit with typed rating scale concepts,
+  Hattrick decimal descriptive mapping, candidate quarter-step conversion tests,
+  developer diagnostics and `docs/RATING_ENGINE_ALIGNMENT.md`.
 - Added Alpha 0.5.5.1 Decision Lab localization and Match Intelligence clarity:
   localized Decision Lab presentation/copy, explicit recommendation-support wording,
   and calibrated Match Intelligence display for non-comparable rating scales.
