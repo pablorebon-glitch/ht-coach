@@ -120,14 +120,20 @@ Content:
   training compatibility preference and specialty preference.
 - Transfer Planner priority table showing role, urgency, need type, target role,
   recommended action and internal-solution status.
-- Transfer Planner detail panel with recommended profile, qualitative impact, no-action
-  scenario and alternative profiles.
+- Transfer Planner detail panel split into semantic sections: recommendation summary,
+  recommended profile, why this transfer, expected impact, no-action scenario,
+  alternative profiles and technical details.
 - Transfer recommendations are profile-based only. They do not name real players, use
   live Transfer Market data, estimate exact prices or claim exact future performance
   deltas.
 - Transfer Planner roles, positions, target roles, skills, specialties, formations,
   tradeoffs, impact dimensions and no-action scenarios must pass through the
   localization layer before reaching the UI.
+- Transfer Planner presentation strings are composed by the application presenter, not
+  by the planner. Language changes refresh the visible sections and priority table from
+  the cached view result without rerunning analysis or changing profile values.
+- Transfer Planner lists use localized conjunctions, so English copy uses `and` and
+  Spanish copy uses `y` in readable multi-value sentences.
 - Player Intelligence inspector inside the Formation Board for selected Ideal XI
   players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,

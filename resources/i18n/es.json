@@ -7,7 +7,9 @@
     "not_implemented": "Esta acción se implementará en un próximo epic."
   },
   "common": {
-    "not_available": "No disponible"
+    "not_available": "No disponible",
+    "list_two": "{first} y {second}",
+    "list_many": "{items} y {last}"
   },
   "nav": {
     "dashboard": "Panel",
@@ -315,6 +317,57 @@
     "no_action_medium": "Mediano plazo: {value}",
     "alternative_profile_value": "{role}: {position}, edad {age}, principal {skill}",
     "no_alternatives": "No se sugiere un perfil alternativo.",
+    "alternative_title": "Alternativa {index}: {role}",
+    "section": {
+      "recommendation_summary": "Resumen de recomendacion",
+      "recommended_profile": "Perfil recomendado",
+      "why_this_transfer": "Por que incorporar",
+      "expected_impact": "Impacto esperado",
+      "no_action": "Si no se actua",
+      "alternative_profiles": "Perfiles alternativos",
+      "technical_details": "Detalles tecnicos"
+    },
+    "field": {
+      "position": "Posicion",
+      "urgency": "Urgencia",
+      "need_type": "Necesidad",
+      "action": "Accion",
+      "target_role": "Rol objetivo",
+      "confidence": "Confianza",
+      "planning_horizon": "Horizonte",
+      "age_range": "Rango de edad",
+      "training_compatibility": "Compatibilidad de entrenamiento",
+      "formation_relevance": "Relevancia en formaciones",
+      "identity_fit": "Encaje con identidad",
+      "primary_skill": "Habilidad principal",
+      "secondary_skills": "Habilidades secundarias",
+      "optional_skills": "Habilidades opcionales",
+      "specialty_preference": "Especialidad preferida",
+      "minimum": "Minimo",
+      "preferred": "Preferido",
+      "stretch": "Ideal",
+      "qualitative_impact": "Impacto esperado",
+      "training_effect": "Efecto en entrenamiento",
+      "identity_effect": "Efecto en identidad",
+      "impact_dimensions": "Areas principales",
+      "current_horizon": "Situacion actual",
+      "short_term": "Corto plazo",
+      "medium_term": "Mediano plazo",
+      "main_tradeoff": "Compromiso principal",
+      "confidence_reasons": "Motivos de confianza",
+      "data_limitations": "Limitaciones de datos"
+    },
+    "reason": {
+      "structural_gap": "Este perfil atiende una brecha estructural del plantel.",
+      "temporary_issue": "Este perfil protege el rol mientras la disponibilidad es inestable.",
+      "no_internal_solution": "No hay una solucion interna clara para este rol.",
+      "emergency_cover": "La cobertura actual es de emergencia y no una solucion confiable.",
+      "development_path": "Hay un camino de desarrollo interno, pero el perfil mantiene cubierto el plan.",
+      "training_pipeline_gap": "El entrenamiento actual no cubre fuertemente esta area.",
+      "identity_continuity": "El rol sostiene la identidad actual del plantel.",
+      "formation_support": "El perfil ayuda en {formations}.",
+      "source_risk": "Nivel de riesgo: {risk}."
+    },
     "objective": {
       "balanced": "Equilibrado",
       "promotion_push": "Buscar ascenso",
@@ -389,7 +442,7 @@
       "unknown": "Desconocida",
       "strongly_compatible": "Muy compatible",
       "compatible": "Compatible",
-      "neutral": "Neutral",
+      "neutral": "Neutra",
       "poorly_compatible": "Poco compatible"
     },
     "identity": {
@@ -420,6 +473,13 @@
       "set_pieces": "Balon parado",
       "experience": "Experiencia",
       "leadership": "Liderazgo"
+    },
+    "skill_level": {
+      "Inadequate": "Insuficiente",
+      "Passable": "Aceptable",
+      "Solid": "Bueno",
+      "Excellent": "Excelente",
+      "Formidable": "Formidable"
     },
     "literal": {
       "role": {
@@ -480,6 +540,14 @@
         "starter_may_hold": "El titular actual puede seguir siendo adecuado, pero el plantel conserva el riesgo de planificacion identificado.",
         "role_exposed": "El rol queda expuesto si cambian la disponibilidad o la forma.",
         "gap_unresolved": "La brecha estructural sigue sin resolverse sin un sucesor interno o un fichaje de perfil."
+      },
+      "confidence_reason": {
+        "starter_depth_available": "La jerarquia de titulares y la profundidad estan disponibles."
+      },
+      "data_limitation": {
+        "starter_age_unknown": "La edad del titular es desconocida.",
+        "training_focus_unknown": "El foco de entrenamiento es desconocido.",
+        "starter_hierarchy_incomplete": "La jerarquia de titulares con plantel completo esta incompleta."
       }
     }
   },

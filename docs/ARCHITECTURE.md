@@ -280,6 +280,12 @@ app, normalizes user constraints, caches the last plan for repeated view refresh
 persists the selected planning objective, budget tier, age strategy, training-fit
 preference and specialty preference through the shared workspace settings repository.
 
+`ht_coach_app/services/transfer_planner_presenter.py` is the presentation boundary for
+Transfer Planner text. It converts already computed transfer needs into localized,
+view-ready rows and semantic detail sections. The presenter owns label mapping, safe
+fallbacks and localized list formatting; it does not call the planner, alter profile
+values or change analytical behavior.
+
 The Squad page displays Transfer Planner as a planning tab beside Ideal XI, Players and
 Evolution. The view never calls Squad Evolution or optimization code directly; it
 receives a view-ready result from `SquadController` through `TransferPlannerService`.

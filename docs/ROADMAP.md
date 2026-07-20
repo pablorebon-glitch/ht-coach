@@ -134,7 +134,8 @@ Deliverables:
   alignment, identity continuity and ranked planning risks.
 - Transfer Planner with abstract player-profile priorities, configurable planning
   objective, budget tier, age strategy, training-fit preference, specialty preference,
-  qualitative impact, alternatives and no-action scenario.
+  qualitative impact, alternatives, no-action scenario, localized semantic detail
+  sections and readable list formatting.
 
 Acceptance criteria:
 
@@ -153,6 +154,8 @@ Acceptance criteria:
   exact retirement, future-skill, market-value or transfer-price predictions.
 - Transfer Planner reuses Squad Evolution outputs and avoids live market data, real
   player recommendations, exact prices and exact future performance deltas.
+- Transfer Planner presentation changes must stay in the desktop presenter layer and
+  must not change planner ranking, generated profiles or analytical formulas.
 
 ### Epic 5: Opponent Manager
 
