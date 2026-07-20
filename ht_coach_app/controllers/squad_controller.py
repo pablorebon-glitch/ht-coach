@@ -89,6 +89,10 @@ class SquadController:
             self._view.transfer_constraints_changed.connect(
                 self._change_transfer_constraints
             )
+        if hasattr(self._view, "squad_tab_changed"):
+            self._view.squad_tab_changed.connect(
+                self._change_squad_tab
+            )
 
     def refresh(self):
         self._view.set_supported_positions(
@@ -140,6 +144,10 @@ class SquadController:
         self._view.set_csv_path(
             settings.players_csv_path
         )
+        if hasattr(self._view, "set_selected_tab"):
+            self._view.set_selected_tab(
+                getattr(settings, "squad_selected_tab", "ideal")
+            )
 
     def _browse(self):
         path = self._view.choose_players_file()
@@ -309,6 +317,33 @@ class SquadController:
         self._save_roster_path(self._view.csv_path())
         self._show_transfer_plan()
 
+    def _change_squad_tab(self, tab_key):
+        settings = self._settings_repository.load()
+        self._settings_repository.save(
+            MatchWorkspaceSettings(
+                players_csv_path=settings.players_csv_path,
+                opponent_name=settings.opponent_name,
+                selected_formations=settings.selected_formations,
+                squad_availability_mode=self._availability_mode,
+                squad_training_focus=self._training_focus,
+                squad_planning_horizon=self._planning_horizon,
+                transfer_planning_objective=(
+                    self._transfer_constraints.planning_objective
+                ),
+                transfer_budget_tier=self._transfer_constraints.budget_tier,
+                transfer_age_strategy=(
+                    self._transfer_constraints.preferred_age_strategy
+                ),
+                transfer_training_preference=(
+                    self._transfer_constraints.training_compatibility_preference
+                ),
+                transfer_specialty_preference=(
+                    self._transfer_constraints.specialty_preference
+                ),
+                squad_selected_tab=tab_key or "ideal",
+            )
+        )
+
     def _show_transfer_plan(self):
         if not hasattr(self._view, "show_transfer_plan"):
             return
@@ -381,6 +416,11 @@ class SquadController:
                 ),
                 transfer_specialty_preference=(
                     self._transfer_constraints.specialty_preference
+                ),
+                squad_selected_tab=(
+                    self._view.selected_tab_key()
+                    if hasattr(self._view, "selected_tab_key")
+                    else getattr(settings, "squad_selected_tab", "ideal")
                 ),
             )
         )

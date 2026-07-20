@@ -136,6 +136,9 @@ Deliverables:
   objective, budget tier, age strategy, training-fit preference, specialty preference,
   qualitative impact, alternatives, no-action scenario, localized semantic detail
   sections and readable list formatting.
+- UX Consistency and Product Polish with shared PySide6 design tokens, semantic badges,
+  card and empty-state patterns, standardized tables, localized main-screen copy,
+  preserved Squad presentation state and documented accessibility/responsive guidance.
 
 Acceptance criteria:
 
@@ -156,6 +159,8 @@ Acceptance criteria:
   player recommendations, exact prices and exact future performance deltas.
 - Transfer Planner presentation changes must stay in the desktop presenter layer and
   must not change planner ranking, generated profiles or analytical formulas.
+- UX polish does not introduce a new analytical engine and does not change analytical
+  meaning, thresholds, rankings, formulas or optimizer scoring.
 
 ### Epic 5: Opponent Manager
 

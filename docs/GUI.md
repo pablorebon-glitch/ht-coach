@@ -46,6 +46,21 @@ This structure supports future growth better than a single tab notebook.
 +---------------------------------------------------------------+
 ```
 
+## Shared UX Patterns
+
+Alpha 0.5.5 introduces a lightweight design system under
+`ht_coach_app/ui/design_system/`.
+
+- Spacing, typography, colors and metrics are centralized.
+- `StatusBadge` is used for semantic statuses such as readiness, urgency,
+  availability and actions.
+- `EmptyState` replaces blank panels for no-data, loading and recoverable states.
+- Shared table configuration standardizes row height, selection, header behavior and
+  scrolling.
+- Page headers can show a compact current-source indicator so loaded CSV paths remain
+  visible without dominating the workspace.
+- Squad preserves the selected tab as presentation state without rerunning analysis.
+
 ## Views
 
 ### Dashboard View
@@ -123,6 +138,8 @@ Content:
 - Transfer Planner detail panel split into semantic sections: recommendation summary,
   recommended profile, why this transfer, expected impact, no-action scenario,
   alternative profiles and technical details.
+- Transfer Planner priority rows use semantic badges for urgency and recommended action
+  so Buy Now, Develop Internally and Monitor are easier to scan.
 - Transfer recommendations are profile-based only. They do not name real players, use
   live Transfer Market data, estimate exact prices or claim exact future performance
   deltas.

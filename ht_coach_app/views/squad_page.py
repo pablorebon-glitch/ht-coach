@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from ht_coach_app.ui.design_system.badges import StatusBadge
+from ht_coach_app.ui.design_system.tables import configure_table
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.services.squad_builder_service import (
     AVAILABILITY_CURRENT,
@@ -47,6 +49,7 @@ class SquadPage(BasePage):
     planning_horizon_changed = Signal(str)
     training_focus_changed = Signal(str)
     transfer_constraints_changed = Signal(object)
+    squad_tab_changed = Signal(str)
 
     HEADERS = [
         "Name",
@@ -82,10 +85,12 @@ class SquadPage(BasePage):
         self._readiness_rows = []
         self._evolution_details = []
         self._transfer_needs = []
+        self._tab_keys = []
         self._last_transfer_result = None
         self._transfer_presenter = current_transfer_presenter()
         self._build_controls()
         self._build_content()
+        self._configure_tables()
 
     def _build_controls(self):
         panel = QFrame()
@@ -175,6 +180,7 @@ class SquadPage(BasePage):
         self.tabs = QTabWidget()
         self.tabs.setObjectName("squadTabs")
         self.tabs.setDocumentMode(True)
+        self.tabs.currentChanged.connect(self._emit_squad_tab_changed)
 
         self._build_ideal_tab()
         self._build_players_tab()
@@ -410,7 +416,7 @@ class SquadPage(BasePage):
         splitter.setSizes([820, 320])
         layout.addWidget(splitter, 1)
 
-        self.tabs.addTab(tab, t("squad_builder.ideal_xi"))
+        self._add_squad_tab(tab, t("squad_builder.ideal_xi"), "ideal")
 
     def _build_players_tab(self):
         tab = QWidget()
@@ -479,7 +485,7 @@ class SquadPage(BasePage):
         splitter.addWidget(detail_panel)
         splitter.setSizes([760, 280])
         tab_layout.addWidget(splitter, 1)
-        self.tabs.addTab(tab, t("squad_builder.players"))
+        self._add_squad_tab(tab, t("squad_builder.players"), "players")
 
     def _build_evolution_tab(self):
         tab = QWidget()
@@ -672,7 +678,7 @@ class SquadPage(BasePage):
 
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
-        self.tabs.addTab(tab, t("evolution.tab"))
+        self._add_squad_tab(tab, t("evolution.tab"), "evolution")
 
     def _build_transfer_tab(self):
         tab = QWidget()
@@ -838,13 +844,25 @@ class SquadPage(BasePage):
         splitter.addWidget(right_scroll)
         splitter.setSizes([560, 520])
         layout.addWidget(splitter, 1)
-        self.tabs.addTab(tab, t("transfer.tab"))
+        self._add_squad_tab(tab, t("transfer.tab"), "transfer")
 
     def csv_path(self):
         return self.path_edit.text().strip()
 
     def set_csv_path(self, path):
         self.path_edit.setText(path)
+        filename = path.split("\\")[-1].split("/")[-1] if path else ""
+        self.set_source_indicator(filename, "neutral")
+
+    def selected_tab_key(self):
+        index = self.tabs.currentIndex()
+        if 0 <= index < len(self._tab_keys):
+            return self._tab_keys[index]
+        return "ideal"
+
+    def set_selected_tab(self, tab_key):
+        if tab_key in self._tab_keys:
+            self.tabs.setCurrentIndex(self._tab_keys.index(tab_key))
 
     def choose_players_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1476,6 +1494,12 @@ class SquadPage(BasePage):
         self._set_transfer_section_visibility()
 
     def show_transfer_plan(self, result):
+        previous_need_id = ""
+        selected = self.transfer_priority_table.selectedItems()
+        if selected:
+            row = selected[0].row()
+            if 0 <= row < len(self._transfer_needs):
+                previous_need_id = self._transfer_needs[row].need_id
         self._last_transfer_result = result
         self._transfer_presenter = current_transfer_presenter()
         self._transfer_needs = list(result.needs or [])
@@ -1490,8 +1514,44 @@ class SquadPage(BasePage):
                 row,
                 self._transfer_presenter.priority_row(need),
             )
+            urgency_label = self._transfer_label("urgency", need.urgency)
+            action_label = self._transfer_label(
+                "action",
+                need.recommended_action,
+            )
+            self.transfer_priority_table.setCellWidget(
+                row,
+                2,
+                StatusBadge(
+                    self._risk_status(need.urgency),
+                    urgency_label,
+                    compact=True,
+                    accessible_description=t(
+                        "transfer.urgency_value",
+                        value=urgency_label,
+                    ),
+                ),
+            )
+            self.transfer_priority_table.setCellWidget(
+                row,
+                5,
+                StatusBadge(
+                    self._action_status(need.recommended_action),
+                    action_label,
+                    compact=True,
+                    accessible_description=t(
+                        "transfer.action_value",
+                        value=action_label,
+                    ),
+                ),
+            )
         if self._transfer_needs:
-            self.transfer_priority_table.selectRow(0)
+            selected_row = 0
+            for row, need in enumerate(self._transfer_needs):
+                if need.need_id == previous_need_id:
+                    selected_row = row
+                    break
+            self.transfer_priority_table.selectRow(selected_row)
             self._show_selected_transfer_need()
         else:
             self.transfer_summary_detail_label.setText(t("transfer.no_needs"))
@@ -1898,6 +1958,34 @@ class SquadPage(BasePage):
         layout.addWidget(content_label)
         return section
 
+    def _configure_tables(self):
+        numeric_player_columns = set(range(1, 15)) | {16, 17}
+        table_configs = [
+            (self.players_table, numeric_player_columns),
+            (self.rankings_table, {1, 2}),
+            (self.readiness_table, set()),
+            (self.formation_affinity_table, {1, 2, 3}),
+            (self.unavailable_table, set()),
+            (self.coverage_table, {2}),
+            (self.ideal_ranking_table, {0, 2, 3, 4, 5}),
+            (self.age_band_table, {1}),
+            (self.role_age_table, set(range(1, 7))),
+            (self.succession_table, {7}),
+            (self.development_table, set()),
+            (self.priority_risk_table, {0}),
+            (self.transfer_priority_table, {0}),
+        ]
+        for table, numeric_columns in table_configs:
+            configure_table(table, numeric_columns)
+
+    def _add_squad_tab(self, tab, label, key):
+        self._tab_keys.append(key)
+        self.tabs.addTab(tab, label)
+
+    def _emit_squad_tab_changed(self, index):
+        if 0 <= index < len(self._tab_keys):
+            self.squad_tab_changed.emit(self._tab_keys[index])
+
     def _mini_heading(self, title):
         label = QLabel(title)
         label.setObjectName("sectionTitle")
@@ -1931,6 +2019,28 @@ class SquadPage(BasePage):
 
     def _transfer_summary_sentences(self, summary):
         return self._transfer_presenter.summary_sentences(summary)
+
+    @staticmethod
+    def _risk_status(value):
+        normalized = str(value or "").lower()
+        if normalized == "critical":
+            return "critical"
+        if normalized in {"high", "medium", "monitor"}:
+            return "warning"
+        if normalized == "low":
+            return "neutral"
+        return "unknown"
+
+    @staticmethod
+    def _action_status(value):
+        normalized = str(value or "").lower()
+        if normalized == "buy_now":
+            return "critical"
+        if normalized in {"recruit_and_develop", "monitor"}:
+            return "warning"
+        if normalized in {"develop_internally", "no_action_required"}:
+            return "positive"
+        return "unknown"
 
     @staticmethod
     def _skill_label(skill):

@@ -124,7 +124,7 @@ class OpponentsPage(BasePage):
 
     def _build_list_panel(self):
         panel = QFrame()
-        panel.setFrameShape(QFrame.StyledPanel)
+        panel.setObjectName("workspacePanel")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
@@ -152,7 +152,7 @@ class OpponentsPage(BasePage):
 
     def _build_editor_panel(self):
         panel = QFrame()
-        panel.setFrameShape(QFrame.StyledPanel)
+        panel.setObjectName("workspacePanel")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
