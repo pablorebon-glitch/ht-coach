@@ -75,7 +75,7 @@ Content:
 - CSV path selector.
 - Load and reload buttons.
 - Export visible rows button.
-- Three tabs: Ideal XI, Players and Evolution.
+- Four tabs: Ideal XI, Players, Evolution and Transfer Planner.
 - Ideal XI tab with a top formation selector containing Auto and every supported
   formation from the centralized catalog.
 - Auto mode evaluates every supported formation and displays the best roster fit.
@@ -114,6 +114,17 @@ Content:
   Player Evolution Details sections.
 - Evolution filters for at-risk positions, no successor, development candidates,
   veterans, training-aligned players and key dependencies.
+- Transfer Planner tab that turns Squad Evolution outputs into abstract player-profile
+  recommendations for recruitment planning.
+- Transfer Planner constraints for planning objective, budget tier, age strategy,
+  training compatibility preference and specialty preference.
+- Transfer Planner priority table showing role, urgency, need type, target role,
+  recommended action and internal-solution status.
+- Transfer Planner detail panel with recommended profile, qualitative impact, no-action
+  scenario and alternative profiles.
+- Transfer recommendations are profile-based only. They do not name real players, use
+  live Transfer Market data, estimate exact prices or claim exact future performance
+  deltas.
 - Player Intelligence inspector inside the Formation Board for selected Ideal XI
   players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,
@@ -142,6 +153,8 @@ Expected controls:
 - Formation Affinity table.
 - Availability mode selector.
 - Availability filter in the Players table.
+- Transfer Planner selectors for objective, budget, age strategy, training fit and
+  preferred specialty.
 
 ### Opponents View
 

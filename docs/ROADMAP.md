@@ -132,6 +132,9 @@ Deliverables:
   horizons, full-strength versus current-available starter hierarchy, succession map,
   dependency analysis, development candidates, current training focus, training
   alignment, identity continuity and ranked planning risks.
+- Transfer Planner with abstract player-profile priorities, configurable planning
+  objective, budget tier, age strategy, training-fit preference, specialty preference,
+  qualitative impact, alternatives and no-action scenario.
 
 Acceptance criteria:
 
@@ -148,6 +151,8 @@ Acceptance criteria:
 - No engine formulas or optimizer calculations are changed.
 - Evolution planning risk remains separate from match-performance ratings and avoids
   exact retirement, future-skill, market-value or transfer-price predictions.
+- Transfer Planner reuses Squad Evolution outputs and avoids live market data, real
+  player recommendations, exact prices and exact future performance deltas.
 
 ### Epic 5: Opponent Manager
 
