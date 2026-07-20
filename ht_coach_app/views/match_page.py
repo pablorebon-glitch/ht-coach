@@ -34,6 +34,14 @@ from engine.advisor.recommendation_engine import (
 )
 from engine.ratings import format_rating_value
 from ht_coach_app.core.localization import localization_service
+from ht_coach_app.reasoning.explanation_formatter import (
+    confidence_level_label,
+    decision_lab_support_label,
+    localized_confidence_explanation,
+    localized_decision_reason,
+    localized_decision_risk,
+    localized_decision_summary,
+)
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
@@ -512,7 +520,8 @@ class MatchPage(BasePage):
         if getattr(result, "match_intelligence", None) is not None:
             self.results_layout.addWidget(
                 self._build_match_intelligence_panel(
-                    result.match_intelligence
+                    result.match_intelligence,
+                    recommended,
                 )
             )
 
@@ -707,20 +716,22 @@ class MatchPage(BasePage):
         note.setObjectName("compactDecisionText")
         layout.addWidget(note)
 
+        comparable = self._sector_ratings_comparable(formation)
+        column_labels = [
+            t("sector_rating.matchup"),
+            t("sector_rating.our_rating"),
+            t("sector_rating.opponent_rating"),
+        ]
+        if comparable:
+            column_labels.append(t("sector_rating.difference"))
+        column_labels.append(t("sector_rating.assessment"))
+
         table = QTableWidget(
             len(formation.sector_rating_comparisons),
-            5,
+            len(column_labels),
         )
         table.setObjectName("comparisonTable")
-        table.setHorizontalHeaderLabels(
-            [
-                t("sector_rating.matchup"),
-                t("sector_rating.our_rating"),
-                t("sector_rating.opponent_rating"),
-                t("sector_rating.difference"),
-                t("sector_rating.assessment"),
-            ]
-        )
+        table.setHorizontalHeaderLabels(column_labels)
         self._configure_table(table)
         table.setMinimumHeight(
             82 + 26 * max(1, len(formation.sector_rating_comparisons))
@@ -737,9 +748,10 @@ class MatchPage(BasePage):
                     comparison.opponent_value,
                     comparison.opponent_scale,
                 ),
-                self._sector_difference_text(comparison),
-                t(f"sector_rating.advantage.{comparison.advantage}"),
             ]
+            if comparable:
+                values.append(self._sector_difference_text(comparison))
+            values.append(t(f"sector_rating.advantage.{comparison.advantage}"))
             for column, value in enumerate(values):
                 table.setItem(row, column, QTableWidgetItem(value))
 
@@ -774,7 +786,8 @@ class MatchPage(BasePage):
             layout.addWidget(warning_label, 1, 0, 1, 2)
         return card
 
-    def _build_match_intelligence_panel(self, intelligence):
+    def _build_match_intelligence_panel(self, intelligence, formation=None):
+        comparable = self._sector_ratings_comparable(formation)
         card = QFrame()
         card.setObjectName("compactDecisionLab")
         layout = QGridLayout(card)
@@ -796,6 +809,14 @@ class MatchPage(BasePage):
         summary.setObjectName("compactDecisionText")
         layout.addWidget(summary, 1, 0, 1, 3)
 
+        content_row = 2
+        if not comparable:
+            scale_note = QLabel(t("match_intelligence.scale_limitation"))
+            scale_note.setWordWrap(True)
+            scale_note.setObjectName("compactDecisionText")
+            layout.addWidget(scale_note, content_row, 0, 1, 3)
+            content_row += 1
+
         focuses = QWidget()
         focus_layout = QVBoxLayout(focuses)
         focus_layout.setContentsMargins(0, 0, 0, 0)
@@ -803,7 +824,10 @@ class MatchPage(BasePage):
         focus_layout.addWidget(
             self._mini_heading(t("match_intelligence.focus.title"))
         )
-        for focus in intelligence.tactical_focuses[:3]:
+        for focus in self._visible_match_intelligence_focuses(
+            intelligence,
+            comparable,
+        )[:3]:
             label = QLabel(
                 t(
                     focus.title_key,
@@ -812,7 +836,7 @@ class MatchPage(BasePage):
             )
             label.setObjectName("metadataValue")
             focus_layout.addWidget(label)
-        layout.addWidget(focuses, 2, 0)
+        layout.addWidget(focuses, content_row, 0)
 
         profile = QWidget()
         profile_layout = QVBoxLayout(profile)
@@ -847,7 +871,7 @@ class MatchPage(BasePage):
                 )
             )
         )
-        layout.addWidget(profile, 2, 1)
+        layout.addWidget(profile, content_row, 1)
 
         highlights = QWidget()
         highlights_layout = QVBoxLayout(highlights)
@@ -856,7 +880,10 @@ class MatchPage(BasePage):
         highlights_layout.addWidget(
             self._mini_heading(t("match_intelligence.highlights"))
         )
-        for item in list(intelligence.opportunities[:1]) + list(intelligence.risks[:1]):
+        for item in self._visible_match_intelligence_items(
+            intelligence,
+            comparable,
+        )[:2]:
             highlights_layout.addWidget(
                 QLabel(
                     t(
@@ -865,16 +892,16 @@ class MatchPage(BasePage):
                     )
                 )
             )
-        layout.addWidget(highlights, 2, 2)
+        layout.addWidget(highlights, content_row, 2)
 
-        matrix = self._build_matchup_matrix(intelligence.matrix)
-        layout.addWidget(matrix, 3, 0, 1, 3)
+        matrix = self._build_matchup_matrix(intelligence.matrix, comparable)
+        layout.addWidget(matrix, content_row + 1, 0, 1, 3)
 
         for column in range(3):
             layout.setColumnStretch(column, 1)
         return card
 
-    def _build_matchup_matrix(self, matrix):
+    def _build_matchup_matrix(self, matrix, comparable=True):
         table = QTableWidget(6, 5)
         table.setObjectName("comparisonTable")
         table.setHorizontalHeaderLabels(
@@ -898,20 +925,56 @@ class MatchPage(BasePage):
 
         for row, (side, item) in enumerate(rows[:6]):
             marker = ""
-            if item.is_best_route:
+            if comparable and item.is_best_route:
                 marker = "+"
-            elif item.is_worst_route:
+            elif comparable and item.is_worst_route:
                 marker = "!"
+            classification = (
+                f"{marker} {t(f'match_intelligence.classification.{item.classification.lower()}')}".strip()
+                if comparable
+                else t("match_intelligence.not_comparable")
+            )
             values = [
                 side,
                 t(f"match_intelligence.sector.{item.attack_sector}"),
                 t(f"match_intelligence.sector.{item.defense_sector}"),
-                f"{item.difference:+.0f}",
-                f"{marker} {t(f'match_intelligence.classification.{item.classification.lower()}')}".strip(),
+                (
+                    f"{item.difference:+.0f}"
+                    if comparable
+                    else t("sector_rating.not_comparable")
+                ),
+                classification,
             ]
             for column, value in enumerate(values):
                 table.setItem(row, column, QTableWidgetItem(value))
         return table
+
+    def _visible_match_intelligence_focuses(self, intelligence, comparable):
+        if comparable:
+            return list(intelligence.tactical_focuses)
+        return [
+            focus for focus in intelligence.tactical_focuses
+            if focus.code == "midfield_battle"
+        ]
+
+    def _visible_match_intelligence_items(self, intelligence, comparable):
+        items = list(intelligence.opportunities) + list(intelligence.risks)
+        if comparable:
+            return items
+        return [
+            item for item in items
+            if "difference" not in dict(item.params or {})
+        ]
+
+    def _sector_ratings_comparable(self, formation):
+        comparisons = getattr(
+            formation,
+            "sector_rating_comparisons",
+            None,
+        )
+        if not comparisons:
+            return True
+        return all(comparison.comparable for comparison in comparisons)
 
     def _build_decision_lab_panel(self, decision_lab, recommended):
         card = QFrame()
@@ -928,27 +991,33 @@ class MatchPage(BasePage):
         confidence = QLabel(
             t(
                 "match.recommendation_confidence",
-                level=decision_lab.confidence.level,
+                level=confidence_level_label(decision_lab.confidence.level),
             )
         )
         confidence.setObjectName("recommendedBadge")
         layout.addWidget(confidence, 0, 3)
 
+        support = QLabel(
+            decision_lab_support_label(decision_lab.confidence_score)
+        )
+        support.setObjectName("compactDecisionText")
+        layout.addWidget(support, 0, 4)
+
         if recommended is None:
-            headline = QLabel(decision_lab.headline)
+            headline = QLabel(localized_decision_summary(decision_lab.summary))
             headline.setWordWrap(True)
-            layout.addWidget(headline, 1, 0, 1, 4)
+            layout.addWidget(headline, 1, 0, 1, 5)
             return card
 
         reason = (
-            decision_lab.reasons[0].description
+            localized_decision_reason(decision_lab.reasons[0])[1]
             if decision_lab.reasons
-            else decision_lab.headline
+            else localized_decision_summary(decision_lab.summary)
         )
         risk = (
-            decision_lab.risks[0].description
+            localized_decision_risk(decision_lab.risks[0])[1]
             if decision_lab.risks
-            else decision_lab.summary
+            else localized_decision_summary(decision_lab.summary)
         )
         scenarios = [
             (
@@ -959,7 +1028,7 @@ class MatchPage(BasePage):
             (
                 t("match.secure_draw"),
                 self._format_percent(recommended.draw_probability),
-                decision_lab.confidence.explanation,
+                localized_confidence_explanation(decision_lab.confidence),
             ),
             (
                 t("match.avoid_defeat"),
@@ -1434,8 +1503,12 @@ class MatchPage(BasePage):
         intelligence = getattr(result, "match_intelligence", None)
         if intelligence is None:
             return {}
+        formation = getattr(result, "recommended_formation", None)
         return {
             "formation": intelligence.formation_name,
+            "ratings_comparable": self._sector_ratings_comparable(
+                formation
+            ),
             "focuses": [
                 focus.code
                 for focus in intelligence.tactical_focuses

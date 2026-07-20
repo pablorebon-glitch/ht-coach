@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from engine.advisor.recommendation_engine import RecommendationEngine
 from engine.match_intelligence import MatchIntelligenceEngine
@@ -17,6 +18,7 @@ from ht_coach_app.core.localization import LocalizationService, configure_locali
 from ht_coach_app.services.match_workspace_service import (
     FormationAnalysisResult,
     MatchAnalysisResult,
+    SectorRatingComparisonResult,
     TeamRatingsResult,
     match_analysis_result_from_dict,
     match_analysis_result_to_dict,
@@ -24,11 +26,12 @@ from ht_coach_app.services.match_workspace_service import (
 )
 
 try:
-    from PySide6.QtWidgets import QApplication, QLabel
+    from PySide6.QtWidgets import QApplication, QLabel, QTableWidget
     from ht_coach_app.views.match_page import MatchPage
 except Exception:
     QApplication = None
     QLabel = None
+    QTableWidget = None
     MatchPage = None
 
 
@@ -75,6 +78,23 @@ def formation(team=None, opponent=None, possession=0.52):
             right_attack=30,
         ),
     )
+
+
+def non_comparable_sector_comparisons():
+    return [
+        SectorRatingComparisonResult(
+            matchup_key="midfield",
+            our_sector="midfield",
+            opponent_sector="midfield",
+            our_value=40,
+            opponent_value=7.25,
+            our_scale="ht_coach_internal_contribution",
+            opponent_scale="hattrick_decimal",
+            difference=None,
+            advantage="not_directly_comparable",
+            comparable=False,
+        )
+    ]
 
 
 def result(team=None, opponent=None, possession=0.52):
@@ -342,3 +362,69 @@ class MatchIntelligenceViewTest(unittest.TestCase):
         self.assertEqual(rows["formation"], "3-5-2")
         self.assertEqual(rows["focuses"][0], "attack_best_route")
         self.assertEqual(len(rows["our_attack_matrix"]), 3)
+
+    def test_incompatible_scales_hide_matchup_differences_and_classes(self):
+        match_result = MatchAnalysisResult(
+            player_count=20,
+            opponent_name="Rival FC",
+            analyzed_formations=["3-5-2"],
+            formations=[
+                replace(
+                    formation(),
+                    sector_rating_comparisons=(
+                        non_comparable_sector_comparisons()
+                    ),
+                )
+            ],
+            match_intelligence=MatchIntelligenceEngine().analyze(result()),
+        )
+        page = MatchPage()
+        page.show_results(match_result)
+
+        labels = [label.text() for label in page.findChildren(QLabel)]
+        rows = page.match_intelligence_rows(match_result)
+
+        self.assertTrue(
+            any("Direct margins and advantage classes are hidden" in text for text in labels)
+        )
+        self.assertEqual(
+            page._visible_match_intelligence_focuses(
+                match_result.match_intelligence,
+                comparable=False,
+            )[0].code,
+            "midfield_battle",
+        )
+        self.assertTrue(rows["ratings_comparable"] is False)
+        self.assertNotIn("+", " ".join(labels))
+        self.assertNotIn("Excellent", labels)
+
+    def test_rating_calibration_hides_difference_column_when_not_comparable(self):
+        match_result = MatchAnalysisResult(
+            player_count=20,
+            opponent_name="Rival FC",
+            analyzed_formations=["3-5-2"],
+            formations=[
+                replace(
+                    formation(),
+                    sector_rating_comparisons=(
+                        non_comparable_sector_comparisons()
+                    ),
+                )
+            ],
+        )
+        page = MatchPage()
+        page.show_results(match_result)
+
+        headers = []
+        for table in page.findChildren(QTableWidget):
+            headers.append(
+                [
+                    table.horizontalHeaderItem(column).text()
+                    for column in range(table.columnCount())
+                ]
+            )
+
+        self.assertIn(
+            ["Matchup", "HT Coach rating", "Opponent rating", "Assessment"],
+            headers,
+        )

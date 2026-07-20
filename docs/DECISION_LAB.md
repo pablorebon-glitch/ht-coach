@@ -65,6 +65,16 @@ Confidence is deterministic and uses:
 Confidence levels are `HIGH`, `MEDIUM`, and `LOW`. They describe confidence in the
 recommendation relative to the analyzed alternatives, not certainty about the real match.
 
+The user-facing percentage shown for Decision Lab confidence is labeled as
+`Recommendation support`. It is a deterministic support score for the recommendation,
+not a win, draw, loss, avoid-defeat, possession or xG probability. Match probabilities
+remain shown separately as win, draw and loss values from the existing Match analysis.
+
+Decision Lab presentation and copy text pass through the localization layer. The stored
+reasoning view model may contain stable internal English labels for backward
+compatibility, but the Match page and copied Decision Lab summary translate supported
+reason, risk, confidence, tactic and optimization labels at render time.
+
 ## Sector Matchups
 
 Decision Lab compares:

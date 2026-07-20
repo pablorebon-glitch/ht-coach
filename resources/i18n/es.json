@@ -717,6 +717,127 @@
     "board_error_title": "La cancha no pudo renderizarse",
     "board_error_message": "La comparación y el XI detallado siguen disponibles. Error de cancha: {error}"
   },
+  "decision_lab": {
+    "recommendation_confidence": "Confianza de la recomendacion",
+    "recommendation_support_value": "Soporte de recomendacion: {value}",
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "confidence_explanation": {
+      "single_formation": "El soporte es limitado porque no se analizo otra formacion.",
+      "clear_advantage": "La opcion recomendada tiene soporte claro frente a las alternativas analizadas.",
+      "not_decisive": "La recomendacion tiene soporte, pero el margen no es decisivo.",
+      "tied": "Las formaciones principales estan practicamente empatadas."
+    },
+    "summary": {
+      "single_formation": "Solo se analizo una formacion, por lo que no hay una comparacion significativa.",
+      "tied": "La decision es marginal; las mejores alternativas estan practicamente empatadas.",
+      "more_attack": "Genera bastante mas produccion ofensiva y mantiene una proteccion defensiva similar.",
+      "more_defense": "Mejora la proteccion defensiva con algun costo de produccion ofensiva.",
+      "balance": "La recomendacion ofrece el mejor equilibrio general."
+    },
+    "copy": {
+      "empty": "No hay resultado de Decision Lab disponible.",
+      "title": "HT COACH DECISION LAB",
+      "recommendation": "Recomendacion",
+      "main_conclusion": "Conclusion principal",
+      "why": "Motivos",
+      "risks": "Riesgos",
+      "tactical_observations": "Observaciones tacticas",
+      "optimization_impact": "Impacto de optimizacion"
+    },
+    "reason": {
+      "highest_win": {
+        "title": "Mayor probabilidad de victoria"
+      },
+      "small_edge": {
+        "title": "Pequena ventaja de victoria"
+      },
+      "tied": {
+        "title": "Practicamente empatado",
+        "description": "Las dos formaciones estan practicamente empatadas."
+      },
+      "probability_delta": {
+        "description": "{value} frente a la siguiente alternativa analizada."
+      },
+      "xg_positive": {
+        "title": "Genera mas produccion ofensiva"
+      },
+      "xg_negative": {
+        "title": "Sacrificio de produccion ofensiva"
+      },
+      "xg_delta": {
+        "description": "{value} xG frente a la siguiente alternativa analizada."
+      },
+      "possession_positive": {
+        "title": "Mantiene ventaja de posesion"
+      },
+      "possession_negative": {
+        "title": "Acepta un sacrificio de posesion"
+      },
+      "possession_delta": {
+        "description": "{value} de posesion frente a la siguiente alternativa analizada."
+      },
+      "attacking_output": {
+        "title": "Produccion ofensiva"
+      },
+      "optimization": {
+        "title": "Impacto de optimizacion",
+        "description": "El optimizador existente encontro la mejora principal en la alineacion, las ordenes o la tactica evaluadas."
+      }
+    },
+    "risk": {
+      "limited_attack": {
+        "title": "Produccion ofensiva limitada"
+      },
+      "opponent_xg": {
+        "title": "Presion rival"
+      },
+      "defensive_channel": {
+        "title": "Vulnerabilidad defensiva",
+        "description": "Un canal defensivo requiere atencion frente al ataque correspondiente del rival."
+      }
+    },
+    "xg": {
+      "ours": {
+        "low": "Genera produccion ofensiva limitada con {value} xG.",
+        "moderate": "Produce un xG moderado de {value}.",
+        "dangerous": "Genera produccion ofensiva peligrosa con {value} xG.",
+        "very_high": "Genera produccion ofensiva muy alta con {value} xG."
+      },
+      "opponent": {
+        "low": "La produccion ofensiva rival se mantiene baja en {value} xG.",
+        "moderate": "El rival proyecta un xG moderado de {value}.",
+        "dangerous": "El rival sigue siendo peligroso con {value} xG.",
+        "very_high": "El rival genera presion de gol muy alta con {value} xG."
+      }
+    },
+    "tactic": {
+      "normal": "Normal",
+      "attack_in_the_middle": "Ataque por el centro",
+      "attack_on_wings": "Ataque por las bandas",
+      "pressing": "Presion",
+      "counter_attacks": "Contraataques",
+      "play_creatively": "Jugar creativamente",
+      "long_shots": "Tiros lejanos"
+    },
+    "observation": {
+      "normal_retained": "Se mantuvo Normal porque ninguna tactica especializada produjo una mejora significativa.",
+      "tactic_marginal": "Se eligio {tactic}, pero su mejora sobre Normal es marginal.",
+      "tactic_gain": "{tactic} mejoro la probabilidad de victoria evaluada sobre Normal.",
+      "wings_favorable": "{tactic} esta respaldada por al menos un cruce favorable en banda.",
+      "wings_not_clear": "Se eligio {tactic}, pero los cruces por banda no son claramente favorables."
+    },
+    "optimization": {
+      "lineup": "Mejor XI",
+      "orders": "Ordenes individuales",
+      "tactic": "Tactica de equipo",
+      "total": "Mejora total: {value}",
+      "marginal": "Los cambios de optimizacion produjeron solo una mejora marginal."
+    }
+  },
   "sector_rating": {
     "title": "Calibracion de ratings del rival",
     "scale_note": "Los ratings se muestran con su escala de origen. La ventaja directa solo se calcula cuando ambos valores comparten la misma escala.",
@@ -803,6 +924,8 @@
   "match_intelligence": {
     "title": "Inteligencia de partido",
     "highlights": "Señales clave",
+    "scale_limitation": "Los ratings del rival estan en escala decimal de Hattrick y los ratings del equipo de HT Coach son contribuciones internas. Se ocultan margenes directos y clases de ventaja; el perfil y la posesion siguen disponibles.",
+    "not_comparable": "No comparable",
     "sector": {
       "left_defense": "defensa izquierda",
       "central_defense": "defensa central",

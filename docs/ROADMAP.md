@@ -337,6 +337,10 @@ Acceptance criteria:
 - Alpha 0.4.8 Match Intelligence: add a central deterministic tactical interpretation
   layer with matchup classification, team profiles, opportunities, risks, three
   tactical focuses, a narrative summary and a compact matrix.
+- Alpha 0.5.5.1 Decision Lab Localization and Match Intelligence Clarity: localize
+  Decision Lab presentation/copy, label recommendation support separately from match
+  probabilities, and suppress direct Match Intelligence margins when rating scales are
+  not comparable.
 - Alpha 0.4.9 What-If Lab: explore controlled tactical alternatives from the evaluated
   Workspace without changing stable engine formulas.
 - Match scenario history.

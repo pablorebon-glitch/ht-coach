@@ -4,6 +4,7 @@ from ht_coach_app.reasoning.decision_lab import DecisionLab
 from ht_coach_app.reasoning.explanation_formatter import (
     format_decision_lab_copy,
 )
+from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.services.match_workspace_service import (
     FormationAnalysisResult,
     MatchAnalysisResult,
@@ -89,6 +90,9 @@ def result(*formations):
 
 
 class DecisionLabRulesTest(unittest.TestCase):
+    def setUp(self):
+        configure_localization("en")
+
     def test_meaningful_win_advantage_and_xg_reason(self):
         analysis = DecisionLab().analyze(
             result(
@@ -429,6 +433,36 @@ class DecisionLabRulesTest(unittest.TestCase):
             "stronger option",
             analysis.comparisons[0].conclusion
         )
+
+    def test_spanish_copy_localizes_decision_lab_without_raw_english(self):
+        configure_localization("es")
+        analysis = DecisionLab().analyze(
+            result(
+                formation("3-5-2", 0.58, xg=2.4),
+                formation("4-5-1", 0.52, xg=1.8),
+            )
+        )
+
+        text = format_decision_lab_copy(analysis)
+
+        self.assertIn("Soporte de recomendacion", text)
+        self.assertIn("Mayor probabilidad de victoria", text)
+        self.assertNotIn("Highest win probability", text)
+        self.assertNotIn("Recommendation confidence", text)
+        self.assertNotIn("Clear advantage over", text)
+
+    def test_decision_lab_support_is_not_labeled_as_match_probability(self):
+        analysis = DecisionLab().analyze(
+            result(
+                formation("3-5-2", 0.58, xg=2.4),
+                formation("4-5-1", 0.52, xg=1.8),
+            )
+        )
+
+        text = format_decision_lab_copy(analysis)
+
+        self.assertIn("Recommendation support", text)
+        self.assertNotIn("Confidence: 85", text)
 
 
 if __name__ == "__main__":
