@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ht_coach_app.core.localization import t
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.rating_input_grid import RatingInputGrid
 
@@ -26,8 +27,8 @@ class OpponentsPage(BasePage):
 
     def __init__(self, parent=None):
         super().__init__(
-            "Opponents",
-            "Manage saved opponents and scouting ratings.",
+            t("opponents.title"),
+            t("opponents.subtitle"),
             parent
         )
         self._current_name = None
@@ -78,8 +79,8 @@ class OpponentsPage(BasePage):
     def confirm_delete(self, name):
         result = QMessageBox.question(
             self,
-            "Delete opponent",
-            f"Delete {name}?",
+            t("opponents.delete_title"),
+            t("opponents.delete_message", name=name),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -116,14 +117,14 @@ class OpponentsPage(BasePage):
 
     def _build_list_panel(self):
         panel = QFrame()
-        panel.setFrameShape(QFrame.StyledPanel)
+        panel.setObjectName("workspacePanel")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        title = QLabel("Saved opponents")
-        title.setObjectName("sectionTitle")
-        layout.addWidget(title)
+        self.saved_title = QLabel(t("opponents.saved"))
+        self.saved_title.setObjectName("sectionTitle")
+        layout.addWidget(self.saved_title)
 
         self.opponent_list = QListWidget()
         self.opponent_list.setSelectionMode(
@@ -134,35 +135,37 @@ class OpponentsPage(BasePage):
         )
         layout.addWidget(self.opponent_list, 1)
 
-        new_button = QPushButton("New")
-        new_button.clicked.connect(
+        self.new_button = QPushButton(t("opponents.new"))
+        self.new_button.clicked.connect(
             self.new_requested.emit
         )
-        layout.addWidget(new_button)
+        layout.addWidget(self.new_button)
 
         return panel
 
     def _build_editor_panel(self):
         panel = QFrame()
-        panel.setFrameShape(QFrame.StyledPanel)
+        panel.setObjectName("workspacePanel")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
-        title = QLabel("Opponent details")
-        title.setObjectName("sectionTitle")
-        layout.addWidget(title)
+        self.details_title = QLabel(t("opponents.details"))
+        self.details_title.setObjectName("sectionTitle")
+        layout.addWidget(self.details_title)
 
         self.message_label = QLabel("")
         self.message_label.setWordWrap(True)
         layout.addWidget(self.message_label)
 
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Opponent name")
-        layout.addWidget(QLabel("Name"))
+        self.name_input.setPlaceholderText(t("opponents.name_placeholder"))
+        self.name_label = QLabel(t("opponents.name"))
+        layout.addWidget(self.name_label)
         layout.addWidget(self.name_input)
 
-        layout.addWidget(QLabel("Ratings"))
+        self.ratings_label = QLabel(t("opponents.ratings"))
+        layout.addWidget(self.ratings_label)
         self.ratings_grid = RatingInputGrid()
         layout.addWidget(self.ratings_grid)
         layout.addStretch(1)
@@ -170,24 +173,24 @@ class OpponentsPage(BasePage):
         button_row = QHBoxLayout()
         button_row.setSpacing(8)
 
-        save_button = QPushButton("Save")
-        save_button.clicked.connect(
+        self.save_button = QPushButton(t("opponents.save"))
+        self.save_button.clicked.connect(
             self.save_requested.emit
         )
 
-        duplicate_button = QPushButton("Duplicate")
-        duplicate_button.clicked.connect(
+        self.duplicate_button = QPushButton(t("opponents.duplicate"))
+        self.duplicate_button.clicked.connect(
             self.duplicate_requested.emit
         )
 
-        delete_button = QPushButton("Delete")
-        delete_button.clicked.connect(
+        self.delete_button = QPushButton(t("opponents.delete"))
+        self.delete_button.clicked.connect(
             self.delete_requested.emit
         )
 
-        button_row.addWidget(save_button)
-        button_row.addWidget(duplicate_button)
-        button_row.addWidget(delete_button)
+        button_row.addWidget(self.save_button)
+        button_row.addWidget(self.duplicate_button)
+        button_row.addWidget(self.delete_button)
         button_row.addStretch(1)
 
         layout.addLayout(button_row)
@@ -201,3 +204,18 @@ class OpponentsPage(BasePage):
         self.selection_changed.emit(
             current.data(Qt.UserRole)
         )
+
+    def retranslate_ui(self):
+        self.set_page_text(
+            t("opponents.title"),
+            t("opponents.subtitle"),
+        )
+        self.saved_title.setText(t("opponents.saved"))
+        self.details_title.setText(t("opponents.details"))
+        self.new_button.setText(t("opponents.new"))
+        self.save_button.setText(t("opponents.save"))
+        self.duplicate_button.setText(t("opponents.duplicate"))
+        self.delete_button.setText(t("opponents.delete"))
+        self.name_label.setText(t("opponents.name"))
+        self.name_input.setPlaceholderText(t("opponents.name_placeholder"))
+        self.ratings_label.setText(t("opponents.ratings"))

@@ -39,6 +39,21 @@
     "subtitle": "Review and export future recommendations and match summaries.",
     "placeholder": "Reports will be implemented in a later epic."
   },
+  "opponents": {
+    "title": "Opponents",
+    "subtitle": "Manage saved opponents and scouting ratings.",
+    "saved": "Saved Opponents",
+    "details": "Opponent Details",
+    "new": "New",
+    "save": "Save",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "delete_title": "Delete Opponent",
+    "delete_message": "Delete {name}?",
+    "name": "Name",
+    "name_placeholder": "Opponent name",
+    "ratings": "Ratings"
+  },
   "squad_builder": {
     "ideal_xi": "Ideal XI",
     "players": "Players",
@@ -162,7 +177,7 @@
     "player_name": "Name",
     "current_best_role": "Current best role",
     "squad_status": "Squad status",
-    "future_role": "Future role",
+    "future_role_label": "Future role",
     "formation_usage": "Formation usage",
     "training_alignment": "Training Alignment",
     "identity_continuity": "Identity Continuity",
