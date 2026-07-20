@@ -78,6 +78,9 @@
 - Added `engine/transfer_planner` as a deterministic planning layer over Squad
   Evolution outputs, explicitly excluding live market data, exact prices and exact
   future performance deltas.
+- Added Alpha 0.5.4.2 Transfer Planner readability polish with semantic detail
+  sections, centralized presentation mapping, localized list formatting and
+  language-switch refresh without rerunning analysis.
 - Added Alpha 0.5.4.1 opponent rating calibration with explicit Hattrick decimal
   versus HT Coach internal rating scale labels, canonical sector matchups and
   persisted serializable Match result comparison view models.
@@ -196,6 +199,11 @@
 - Transfer Planner presentation now localizes profile roles, target roles, positions,
   skills, specialties, formation relevance, impact dimensions, tradeoffs and no-action
   scenarios in English and Spanish.
+- Transfer Planner detail output is now grouped into recommendation summary,
+  recommended profile, why this transfer, expected impact, no-action scenario,
+  alternative profiles and technical details.
+- Transfer Planner priority rows now keep full localized values available as tooltips
+  for dense table columns.
 - Missing localization keys and template parameters now fall back to localized safe
   text instead of showing technical placeholder text.
 

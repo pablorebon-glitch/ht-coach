@@ -7,7 +7,9 @@
     "not_implemented": "This shell action will be implemented in a later epic."
   },
   "common": {
-    "not_available": "Not available"
+    "not_available": "Not available",
+    "list_two": "{first} and {second}",
+    "list_many": "{items} and {last}"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -315,6 +317,57 @@
     "no_action_medium": "Medium term: {value}",
     "alternative_profile_value": "{role}: {position}, age {age}, primary {skill}",
     "no_alternatives": "No alternative profile is suggested.",
+    "alternative_title": "Alternative {index}: {role}",
+    "section": {
+      "recommendation_summary": "Recommendation Summary",
+      "recommended_profile": "Recommended Profile",
+      "why_this_transfer": "Why This Transfer",
+      "expected_impact": "Expected Impact",
+      "no_action": "If No Action Is Taken",
+      "alternative_profiles": "Alternative Profiles",
+      "technical_details": "Technical Details"
+    },
+    "field": {
+      "position": "Position",
+      "urgency": "Urgency",
+      "need_type": "Need type",
+      "action": "Action",
+      "target_role": "Target squad role",
+      "confidence": "Confidence",
+      "planning_horizon": "Planning horizon",
+      "age_range": "Age range",
+      "training_compatibility": "Training compatibility",
+      "formation_relevance": "Formation relevance",
+      "identity_fit": "Identity compatibility",
+      "primary_skill": "Primary skill",
+      "secondary_skills": "Secondary skills",
+      "optional_skills": "Optional skills",
+      "specialty_preference": "Specialty preference",
+      "minimum": "Minimum",
+      "preferred": "Preferred",
+      "stretch": "Stretch",
+      "qualitative_impact": "Expected impact",
+      "training_effect": "Training effect",
+      "identity_effect": "Identity effect",
+      "impact_dimensions": "Main areas",
+      "current_horizon": "Current",
+      "short_term": "Short Term",
+      "medium_term": "Medium Term",
+      "main_tradeoff": "Main tradeoff",
+      "confidence_reasons": "Confidence reasons",
+      "data_limitations": "Data limitations"
+    },
+    "reason": {
+      "structural_gap": "This profile addresses a structural squad gap.",
+      "temporary_issue": "This profile protects the role while availability is unstable.",
+      "no_internal_solution": "There is no clear internal solution for this role.",
+      "emergency_cover": "Current cover is emergency depth rather than a reliable solution.",
+      "development_path": "There is an internal development path, but the profile keeps the plan covered.",
+      "training_pipeline_gap": "Current training does not strongly cover this area.",
+      "identity_continuity": "The role supports the current squad identity.",
+      "formation_support": "The profile supports {formations}.",
+      "source_risk": "Risk level: {risk}."
+    },
     "objective": {
       "balanced": "Balanced",
       "promotion_push": "Promotion Push",
@@ -421,6 +474,13 @@
       "experience": "Experience",
       "leadership": "Leadership"
     },
+    "skill_level": {
+      "Inadequate": "Inadequate",
+      "Passable": "Passable",
+      "Solid": "Solid",
+      "Excellent": "Excellent",
+      "Formidable": "Formidable"
+    },
     "literal": {
       "role": {
         "goalkeeper": "Goalkeeper",
@@ -480,6 +540,14 @@
         "starter_may_hold": "The current starter may remain adequate, but the squad keeps the identified planning risk.",
         "role_exposed": "The role remains exposed if availability or form changes.",
         "gap_unresolved": "The structural gap remains unresolved without an internal successor or profile recruitment."
+      },
+      "confidence_reason": {
+        "starter_depth_available": "Starter hierarchy and depth data are available."
+      },
+      "data_limitation": {
+        "starter_age_unknown": "Starter age is unknown.",
+        "training_focus_unknown": "Training focus is unknown.",
+        "starter_hierarchy_incomplete": "Full-strength starter hierarchy is incomplete."
       }
     }
   },
