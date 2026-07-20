@@ -24,6 +24,7 @@ class MatchWorkspaceSettings:
     transfer_age_strategy: str = "balanced"
     transfer_training_preference: str = "any"
     transfer_specialty_preference: str = "no_preference"
+    squad_selected_tab: str = "ideal"
 
 
 class MatchWorkspaceRepository:
@@ -86,6 +87,10 @@ class MatchWorkspaceRepository:
             transfer_specialty_preference=data.get(
                 "transfer_specialty_preference",
                 "no_preference",
+            ),
+            squad_selected_tab=data.get(
+                "squad_selected_tab",
+                "ideal",
             ),
         )
 

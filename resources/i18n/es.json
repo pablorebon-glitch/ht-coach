@@ -39,6 +39,21 @@
     "subtitle": "Revisa y exporta futuras recomendaciones y resúmenes de partido.",
     "placeholder": "Los reportes se implementarán en un próximo epic."
   },
+  "opponents": {
+    "title": "Rivales",
+    "subtitle": "Gestiona rivales guardados y ratings de scouting.",
+    "saved": "Rivales guardados",
+    "details": "Detalle del rival",
+    "new": "Nuevo",
+    "save": "Guardar",
+    "duplicate": "Duplicar",
+    "delete": "Eliminar",
+    "delete_title": "Eliminar rival",
+    "delete_message": "Eliminar {name}?",
+    "name": "Nombre",
+    "name_placeholder": "Nombre del rival",
+    "ratings": "Ratings"
+  },
   "squad_builder": {
     "ideal_xi": "XI ideal",
     "players": "Jugadores",
@@ -162,7 +177,7 @@
     "player_name": "Nombre",
     "current_best_role": "Mejor rol actual",
     "squad_status": "Estado en plantel",
-    "future_role": "Rol futuro",
+    "future_role_label": "Rol futuro",
     "formation_usage": "Uso en formaciones",
     "training_alignment": "Alineacion de entrenamiento",
     "identity_continuity": "Continuidad de identidad",

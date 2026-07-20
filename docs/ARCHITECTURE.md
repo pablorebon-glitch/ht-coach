@@ -98,6 +98,22 @@ Expected modules:
 - `localization.py`: loads UI translation catalogs, returns localized strings, applies
   English fallback and parameter substitution.
 
+### UI Design System
+
+`ht_coach_app/ui/design_system/`
+
+The design system is a lightweight PySide6 layer for presentation consistency. It owns
+tokens for spacing, typography, colors and layout metrics plus shared components for
+semantic badges, cards, section headers, empty states and table configuration.
+
+The design system is presentation-only. It must not call engine code, run analysis,
+change rankings or reinterpret analytical results. Views may use design-system
+components to display already computed statuses, warnings and summaries.
+
+Semantic statuses are Positive, Neutral, Warning, Critical, Unavailable and Unknown.
+They are mapped consistently in `colors.py` and rendered with text-bearing
+`StatusBadge` widgets so status is not conveyed by color alone.
+
 ### Controllers
 
 `ht_coach_app/controllers/`

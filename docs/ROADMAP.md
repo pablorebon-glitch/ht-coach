@@ -135,6 +135,9 @@ Deliverables:
 - Transfer Planner with abstract player-profile priorities, configurable planning
   objective, budget tier, age strategy, training-fit preference, specialty preference,
   qualitative impact, alternatives and no-action scenario.
+- UX Consistency and Product Polish with shared PySide6 design tokens, semantic badges,
+  card and empty-state patterns, standardized tables, localized main-screen copy,
+  preserved Squad presentation state and documented accessibility/responsive guidance.
 
 Acceptance criteria:
 
@@ -153,6 +156,8 @@ Acceptance criteria:
   exact retirement, future-skill, market-value or transfer-price predictions.
 - Transfer Planner reuses Squad Evolution outputs and avoids live market data, real
   player recommendations, exact prices and exact future performance deltas.
+- UX polish does not introduce a new analytical engine and does not change analytical
+  meaning, thresholds, rankings, formulas or optimizer scoring.
 
 ### Epic 5: Opponent Manager
 

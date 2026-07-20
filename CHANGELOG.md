@@ -78,6 +78,12 @@
 - Added `engine/transfer_planner` as a deterministic planning layer over Squad
   Evolution outputs, explicitly excluding live market data, exact prices and exact
   future performance deltas.
+- Added Alpha 0.5.5 UX Consistency and Product Polish with a lightweight PySide6 design
+  system, semantic badges, shared empty states, shared table configuration, localized
+  Opponents copy and persisted Squad tab presentation state.
+- Added `docs/UX_DESIGN_SYSTEM.md` documenting design tokens, semantic colors, badge
+  rules, card patterns, empty/loading/error states, terminology, accessibility,
+  responsive desktop assumptions and the manual UX checklist.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.
