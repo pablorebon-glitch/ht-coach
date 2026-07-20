@@ -59,6 +59,16 @@ class LocalizationServiceTest(unittest.TestCase):
 
         self.assertEqual(service.t("missing.translation"), TRANSLATION_UNAVAILABLE)
 
+    def test_missing_spanish_translation_returns_localized_safe_fallback(self):
+        service = LocalizationService(language="es")
+
+        self.assertEqual(service.t("missing.translation"), "No disponible")
+
+    def test_missing_format_parameter_does_not_show_internal_placeholder(self):
+        service = LocalizationService(language="es")
+
+        self.assertEqual(service.t("bench.players"), "No disponible jugadores")
+
     def test_parameter_substitution_is_safe(self):
         service = LocalizationService(language="en")
 

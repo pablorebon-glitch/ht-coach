@@ -4,13 +4,17 @@ from pathlib import Path
 
 
 LOGGER = logging.getLogger(__name__)
-TRANSLATION_UNAVAILABLE = "Translation unavailable"
+TRANSLATION_UNAVAILABLE = "Not available"
 
 
 class _SafeFormatParams(dict):
+    def __init__(self, fallback, params):
+        super().__init__(params)
+        self._fallback = fallback
+
     def __missing__(self, key):
         LOGGER.warning("Missing localization parameter: %s", key)
-        return TRANSLATION_UNAVAILABLE
+        return self._fallback
 
 
 class LocalizationService:
@@ -40,18 +44,24 @@ class LocalizationService:
         self._load_catalog(normalized)
 
     def t(self, key, **params):
+        fallback = self._fallback_text()
         text = self._lookup(self._language, key)
         if text is None:
             text = self._lookup("en", key)
         if text is None:
             LOGGER.warning("Missing localization key: %s", key)
-            return TRANSLATION_UNAVAILABLE
+            return fallback
 
         try:
-            return text.format_map(_SafeFormatParams(params))
+            return text.format_map(_SafeFormatParams(fallback, params))
         except (KeyError, ValueError):
             LOGGER.warning("Invalid localization template: %s", key)
-            return TRANSLATION_UNAVAILABLE
+            return fallback
+
+    def _fallback_text(self):
+        if self._language == "es":
+            return "No disponible"
+        return TRANSLATION_UNAVAILABLE
 
     def _lookup(self, language, key):
         catalog = self._load_catalog(language)

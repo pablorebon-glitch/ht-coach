@@ -125,6 +125,9 @@ Content:
 - Transfer recommendations are profile-based only. They do not name real players, use
   live Transfer Market data, estimate exact prices or claim exact future performance
   deltas.
+- Transfer Planner roles, positions, target roles, skills, specialties, formations,
+  tradeoffs, impact dimensions and no-action scenarios must pass through the
+  localization layer before reaching the UI.
 - Player Intelligence inspector inside the Formation Board for selected Ideal XI
   players, including why recommended, position fit, role and alternatives.
 - Sortable player table with core skills, form, stamina, experience, leadership, TSI,
@@ -166,7 +169,8 @@ Content:
 
 - Opponent list.
 - Opponent name field.
-- Seven-sector rating editor.
+- Seven required sector ratings plus optional indirect defense and indirect attack
+  ratings for Hattrick imports that include them.
 - Save, new, duplicate, delete, and select actions.
 
 Expected controls:
@@ -222,6 +226,9 @@ Content:
   impact, changed sectors only and a deterministic summary.
 - Match Intelligence panel with team profile, opponent profile, three tactical focuses,
   key opportunities, key risks and a compact matchup matrix.
+- Opponent Rating Calibration panel that labels HT Coach internal ratings and imported
+  Hattrick decimal ratings by source scale and only shows direct advantages when the
+  compared values share the same scale.
 - Tactical Advisor panel with three to five ranked, informational recommendations
   derived from the current evaluated Workspace.
 - Formation comparison table with deltas versus the recommendation.

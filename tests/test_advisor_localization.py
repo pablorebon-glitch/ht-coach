@@ -298,7 +298,7 @@ class AdvisorLocalizationCoverageTest(unittest.TestCase):
 
         text = service.t("advisor.rule.missing_forever.title")
 
-        self.assertEqual(text, TRANSLATION_UNAVAILABLE)
+        self.assertEqual(text, "No disponible")
 
     def test_parameter_substitution_works_in_english(self):
         service = LocalizationService("en")
@@ -324,7 +324,8 @@ class AdvisorLocalizationCoverageTest(unittest.TestCase):
         service = LocalizationService("es")
         text = service.t("advisor.rule.keep_lineup_change.title")
 
-        self.assertIn(TRANSLATION_UNAVAILABLE, text)
+        self.assertIn("No disponible", text)
+        self.assertNotIn(TRANSLATION_UNAVAILABLE, text)
         self.assertNotIn("{incoming}", text)
         self.assertNotIn("{slot}", text)
 

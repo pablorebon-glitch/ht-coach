@@ -26,6 +26,12 @@ classifies attack-versus-defense matchups, detects opportunities and risks, gene
 three tactical focuses, builds a compact matrix and writes a short narrative summary
 without recalculating ratings or calling optimizers.
 
+Opponent rating calibration lives under `engine/ratings` as a presentation adapter.
+It labels Hattrick decimal ratings and HT Coach internal contribution ratings with
+their source scale, builds canonical sector matchup rows, and only calculates a direct
+advantage when both values share the same scale. It must not introduce conversion
+multipliers, offsets, TeamRater changes, optimizer changes or probability changes.
+
 ## Target Layers
 
 ```text
