@@ -84,6 +84,12 @@
 - Added Alpha 0.5.4.3 opponent rating input improvements with Hattrick sector order,
   clipboard import preview, Spanish/English Hattrick table parsing and comma/point
   decimal entry support.
+- Added Alpha 0.5.5 UX Consistency and Product Polish with a lightweight PySide6 design
+  system, semantic badges, shared empty states, shared table configuration, localized
+  Opponents copy and persisted Squad tab presentation state.
+- Added `docs/UX_DESIGN_SYSTEM.md` documenting design tokens, semantic colors, badge
+  rules, card patterns, empty/loading/error states, terminology, accessibility,
+  responsive desktop assumptions and the manual UX checklist.
 - Added Alpha 0.5.4.1 opponent rating calibration with explicit Hattrick decimal
   versus HT Coach internal rating scale labels, canonical sector matchups and
   persisted serializable Match result comparison view models.

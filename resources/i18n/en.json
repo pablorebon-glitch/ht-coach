@@ -215,7 +215,7 @@
     "player_name": "Name",
     "current_best_role": "Current best role",
     "squad_status": "Squad status",
-    "future_role": "Future role",
+    "future_role_label": "Future role",
     "formation_usage": "Formation usage",
     "training_alignment": "Training Alignment",
     "identity_continuity": "Identity Continuity",

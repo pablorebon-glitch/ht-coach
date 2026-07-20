@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from ht_coach_app.ui.design_system.empty_state import EmptyState
+from ht_coach_app.ui.design_system.tables import configure_table
 from engine.squad_health.availability_service import (
     CURRENT_AVAILABLE,
     FULL_STRENGTH,
@@ -347,6 +349,8 @@ class MatchPage(BasePage):
 
     def set_players_csv_path(self, path):
         self.players_path_edit.setText(path)
+        filename = path.split("\\")[-1].split("/")[-1] if path else ""
+        self.set_source_indicator(filename, "neutral")
 
     def selected_opponent_name(self):
         return self.opponent_combo.currentText().strip()
@@ -1306,13 +1310,11 @@ class MatchPage(BasePage):
         return card
 
     def _configure_table(self, table):
-        table.setEditTriggers(
-            QAbstractItemView.NoEditTriggers
-        )
+        configure_table(table)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionMode(
             QAbstractItemView.NoSelection
         )
-        table.verticalHeader().setVisible(False)
         table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
         )
@@ -1336,16 +1338,8 @@ class MatchPage(BasePage):
         panel = QFrame()
         panel.setObjectName("statePanel")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(6)
-
-        title_label = QLabel(title)
-        title_label.setObjectName("sectionTitle")
-        message_label = QLabel(message)
-        message_label.setWordWrap(True)
-
-        layout.addWidget(title_label)
-        layout.addWidget(message_label)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(EmptyState(title, message))
         self.results_layout.addWidget(panel)
         self.results_layout.addStretch(1)
 
