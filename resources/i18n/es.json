@@ -870,6 +870,22 @@
       "indirect_attack": "Ataque indirectos"
     }
   },
+  "rating_alignment": {
+    "hattrick_rating": "Rating Hattrick",
+    "internal_contribution": "Contribucion interna",
+    "quarter_step_rating": "Rating por cuartos",
+    "hattrick_decimal_rating": "Rating Hattrick decimal",
+    "exact_representation": "Representacion exacta",
+    "converted_rating": "Rating convertido",
+    "estimated_rating": "Rating estimado",
+    "alignment_confidence": "Confianza de alineacion",
+    "directly_comparable": "Comparable directamente",
+    "not_directly_comparable": "No comparable directamente",
+    "conversion_unsupported": "Conversion no soportada",
+    "rating_source": "Fuente del rating",
+    "rounding_policy": "Politica de redondeo",
+    "technical_rating_details": "Detalles tecnicos del rating"
+  },
   "workspace": {
     "formation_board": "Cancha",
     "reset": "Restaurar Workspace",

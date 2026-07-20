@@ -32,6 +32,14 @@ their source scale, builds canonical sector matchup rows, and only calculates a 
 advantage when both values share the same scale. It must not introduce conversion
 multipliers, offsets, TeamRater changes, optimizer changes or probability changes.
 
+Alpha 0.5.6 adds `engine/ratings/rating_alignment.py` as an audit and diagnostics layer
+for rating scale identity. It formalizes internal contribution, Hattrick decimal,
+quarter-step and unknown sources, validates Hattrick decimal descriptive sublevels, and
+records candidate conversion behavior without adopting an internal-to-decimal
+conversion. The audit classification is C: current TeamRater sector values remain
+internal contribution totals and are not directly comparable with imported Hattrick
+decimal ratings.
+
 ## Target Layers
 
 ```text
