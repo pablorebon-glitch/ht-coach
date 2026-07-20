@@ -19,6 +19,11 @@ class MatchWorkspaceSettings:
     squad_availability_mode: str = "current_available"
     squad_training_focus: str = "unknown"
     squad_planning_horizon: str = "current"
+    transfer_planning_objective: str = "balanced"
+    transfer_budget_tier: str = "unspecified"
+    transfer_age_strategy: str = "balanced"
+    transfer_training_preference: str = "any"
+    transfer_specialty_preference: str = "no_preference"
 
 
 class MatchWorkspaceRepository:
@@ -61,6 +66,26 @@ class MatchWorkspaceRepository:
             squad_planning_horizon=data.get(
                 "squad_planning_horizon",
                 "current",
+            ),
+            transfer_planning_objective=data.get(
+                "transfer_planning_objective",
+                "balanced",
+            ),
+            transfer_budget_tier=data.get(
+                "transfer_budget_tier",
+                "unspecified",
+            ),
+            transfer_age_strategy=data.get(
+                "transfer_age_strategy",
+                "balanced",
+            ),
+            transfer_training_preference=data.get(
+                "transfer_training_preference",
+                "any",
+            ),
+            transfer_specialty_preference=data.get(
+                "transfer_specialty_preference",
+                "no_preference",
             ),
         )
 

@@ -10,6 +10,8 @@ from ht_coach_app.services.squad_builder_service import (
 )
 from ht_coach_app.services.squad_evolution_service import SquadEvolutionService
 from ht_coach_app.services.squad_service import SquadValidationError
+from ht_coach_app.services.transfer_planner_service import TransferPlannerService
+from engine.transfer_planner.models import TransferConstraints
 
 
 class SquadController:
@@ -21,12 +23,16 @@ class SquadController:
         app_events=None,
         builder_service=None,
         evolution_service=None,
+        transfer_planner_service=None,
     ):
         self._view = view
         self._service = service
         self._builder_service = builder_service or SquadBuilderService()
         self._evolution_service = evolution_service or SquadEvolutionService(
             builder_service=self._builder_service
+        )
+        self._transfer_planner_service = (
+            transfer_planner_service or TransferPlannerService()
         )
         self._settings_repository = settings_repository
         self._app_events = app_events
@@ -38,6 +44,8 @@ class SquadController:
         self._training_focus = "unknown"
         self._last_full_strength_result = None
         self._last_current_available_result = None
+        self._last_evolution_result = None
+        self._transfer_constraints = TransferConstraints()
 
         self._connect_view()
         self.refresh()
@@ -77,6 +85,10 @@ class SquadController:
             self._view.training_focus_changed.connect(
                 self._change_training_focus
             )
+        if hasattr(self._view, "transfer_constraints_changed"):
+            self._view.transfer_constraints_changed.connect(
+                self._change_transfer_constraints
+            )
 
     def refresh(self):
         self._view.set_supported_positions(
@@ -112,6 +124,19 @@ class SquadController:
             self._view.set_planning_horizon(self._planning_horizon)
         if hasattr(self._view, "set_training_focus"):
             self._view.set_training_focus(self._training_focus)
+        self._transfer_constraints = (
+            self._transfer_planner_service.constraints_from_settings(settings)
+        )
+        if hasattr(self._view, "set_transfer_options"):
+            self._view.set_transfer_options(
+                self._transfer_planner_service.planning_objectives(),
+                self._transfer_planner_service.budget_tiers(),
+                self._transfer_planner_service.age_strategies(),
+                self._transfer_planner_service.training_preferences(),
+                self._transfer_planner_service.specialty_preferences(),
+            )
+        if hasattr(self._view, "set_transfer_constraints"):
+            self._view.set_transfer_constraints(self._transfer_constraints)
         self._view.set_csv_path(
             settings.players_csv_path
         )
@@ -128,6 +153,7 @@ class SquadController:
         self._evolution_service.clear_cache()
         self._last_full_strength_result = None
         self._last_current_available_result = None
+        self._last_evolution_result = None
 
         try:
             self._roster = self._service.load_roster(
@@ -272,7 +298,28 @@ class SquadController:
             full_strength_result=self._last_full_strength_result,
             current_available_result=self._last_current_available_result,
         )
+        self._last_evolution_result = result
         self._view.show_evolution(result)
+        self._show_transfer_plan()
+
+    def _change_transfer_constraints(self, constraints):
+        self._transfer_constraints = (
+            self._transfer_planner_service.normalize_constraints(constraints)
+        )
+        self._save_roster_path(self._view.csv_path())
+        self._show_transfer_plan()
+
+    def _show_transfer_plan(self):
+        if not hasattr(self._view, "show_transfer_plan"):
+            return
+        if self._last_evolution_result is None:
+            self._view.show_transfer_plan_empty()
+            return
+        result = self._transfer_planner_service.build_plan(
+            self._last_evolution_result,
+            self._transfer_constraints,
+        )
+        self._view.show_transfer_plan(result)
 
     def _show_player_detail(self, player_name):
         if self._roster is None:
@@ -322,5 +369,18 @@ class SquadController:
                 squad_availability_mode=self._availability_mode,
                 squad_training_focus=self._training_focus,
                 squad_planning_horizon=self._planning_horizon,
+                transfer_planning_objective=(
+                    self._transfer_constraints.planning_objective
+                ),
+                transfer_budget_tier=self._transfer_constraints.budget_tier,
+                transfer_age_strategy=(
+                    self._transfer_constraints.preferred_age_strategy
+                ),
+                transfer_training_preference=(
+                    self._transfer_constraints.training_compatibility_preference
+                ),
+                transfer_specialty_preference=(
+                    self._transfer_constraints.specialty_preference
+                ),
             )
         )

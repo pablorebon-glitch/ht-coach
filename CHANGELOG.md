@@ -72,6 +72,12 @@
   centralized age bands, planning horizons, succession map, dependency analysis,
   development candidates, training focus alignment, identity continuity and ranked
   planning risks.
+- Added Alpha 0.5.4 Transfer Planner with profile-based recruitment priorities,
+  planning constraints, internal-solution guidance, qualitative impact, no-action
+  scenarios and Squad-tab integration.
+- Added `engine/transfer_planner` as a deterministic planning layer over Squad
+  Evolution outputs, explicitly excluding live market data, exact prices and exact
+  future performance deltas.
 - Added centralized tactical workspace metrics for pitch ratio, card sizing, normalized
   formation spacing, splitter proportions and compact panel spacing.
 - Added the Alpha 0.2 Squad Manager milestone for the PySide6 desktop app.

@@ -259,6 +259,150 @@
       "critical": "Critica"
     }
   },
+  "transfer": {
+    "tab": "Planificador de fichajes",
+    "empty": "Ejecuta Evolucion del plantel para generar perfiles de fichaje.",
+    "objective_label": "Objetivo",
+    "budget_label": "Presupuesto",
+    "age_strategy_label": "Edad",
+    "training_preference_label": "Entrenamiento",
+    "specialty_preference_label": "Especialidad",
+    "summary_title": "Resumen del plan",
+    "priorities": "Perfiles prioritarios",
+    "rank": "#",
+    "urgency_header": "Urgencia",
+    "need_type_header": "Necesidad",
+    "target_role_header": "Rol objetivo",
+    "action_header": "Accion",
+    "internal_solution_header": "Solucion interna",
+    "select_priority": "Selecciona un perfil prioritario para revisar la recomendacion.",
+    "profile_title": "Perfil recomendado",
+    "impact_title": "Impacto esperado",
+    "no_action_title": "Si no se actua",
+    "alternatives_title": "Perfiles alternativos",
+    "top_priority_value": "Prioridad principal: {value}",
+    "structural_needs_value": "Necesidades estructurales: {value}",
+    "development_needs_value": "Necesidades de desarrollo: {value}",
+    "internal_solutions_value": "Soluciones internas disponibles: {value}",
+    "critical_dependencies_value": "Dependencias criticas: {value}",
+    "objective_value": "Objetivo: {value}",
+    "no_needs": "No se requieren perfiles de fichaje actualmente.",
+    "need_role_value": "Rol: {value}",
+    "need_type_value": "Necesidad: {value}",
+    "urgency_value": "Urgencia: {value}",
+    "action_value": "Accion recomendada: {value}",
+    "confidence_value": "Confianza: {value}",
+    "no_profile_required": "No se requiere un perfil externo para esta prioridad.",
+    "position_value": "Posicion: {value}",
+    "target_role_value": "Rol objetivo: {value}",
+    "age_range_value": "Rango de edad: {value}",
+    "primary_skill_value": "Habilidad principal: {skill} ({minimum}-{preferred}, ideal {stretch})",
+    "secondary_skills_value": "Habilidades secundarias: {values}",
+    "optional_skills_value": "Habilidades opcionales: {values}",
+    "specialty_value": "Especialidad: {value}",
+    "training_compatibility_value": "Compatibilidad de entrenamiento: {value}",
+    "formations_value": "Relevancia en formaciones: {values}",
+    "identity_value": "Encaje con identidad: {value}",
+    "tradeoffs_value": "Compromisos: {values}",
+    "qualitative_impact_value": "Impacto cualitativo: {value}",
+    "impact_dimensions_value": "Areas de impacto: {values}",
+    "source_risks_value": "Riesgos de origen: {values}",
+    "no_action_current": "Actual: {value}",
+    "no_action_short": "Corto plazo: {value}",
+    "no_action_medium": "Mediano plazo: {value}",
+    "alternative_profile_value": "{role}: {position}, edad {age}, principal {skill}",
+    "no_alternatives": "No se sugiere un perfil alternativo.",
+    "objective": {
+      "balanced": "Equilibrado",
+      "promotion_push": "Buscar ascenso",
+      "long_term_development": "Desarrollo a largo plazo",
+      "squad_renewal": "Renovacion del plantel",
+      "immediate_stability": "Estabilidad inmediata"
+    },
+    "budget": {
+      "unspecified": "Sin especificar",
+      "restricted": "Restringido",
+      "moderate": "Moderado",
+      "flexible": "Flexible"
+    },
+    "age_strategy": {
+      "any": "Cualquiera",
+      "immediate_performance": "Rendimiento inmediato",
+      "balanced": "Equilibrado",
+      "trainable": "Entrenable",
+      "youth_development": "Desarrollo joven"
+    },
+    "training_preference": {
+      "any": "Cualquiera",
+      "prefer_compatible": "Preferir compatible",
+      "require_compatible": "Exigir compatible"
+    },
+    "specialty": {
+      "no_preference": "Sin preferencia",
+      "Header": "Cabeceador",
+      "Quick": "Rapido",
+      "Technical": "Tecnico",
+      "Powerful": "Potente",
+      "Unpredictable": "Imprevisible"
+    },
+    "urgency": {
+      "critical": "Critica",
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "monitor": "Observar"
+    },
+    "need_type": {
+      "immediate_starter": "Titular inmediato",
+      "starter_competition": "Competencia titular",
+      "rotation_depth": "Profundidad de rotacion",
+      "reliable_backup": "Relevo confiable",
+      "succession_replacement": "Reemplazo de sucesion",
+      "development_prospect": "Proyecto de desarrollo",
+      "specialist": "Especialista",
+      "no_transfer_needed": "Sin fichaje necesario"
+    },
+    "action": {
+      "buy_now": "Comprar ahora",
+      "recruit_and_develop": "Fichar y desarrollar",
+      "develop_internally": "Desarrollar internamente",
+      "monitor": "Observar",
+      "no_action_required": "Sin accion requerida"
+    },
+    "internal": {
+      "ready_internal_solution": "Solucion interna lista",
+      "near_ready_internal_solution": "Solucion interna casi lista",
+      "development_path_available": "Camino de desarrollo disponible",
+      "emergency_internal_cover_only": "Solo cobertura de emergencia",
+      "no_internal_solution": "Sin solucion interna",
+      "unknown": "Desconocido"
+    },
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "training_compatibility": {
+      "unknown": "Desconocida",
+      "strongly_compatible": "Muy compatible",
+      "compatible": "Compatible",
+      "neutral": "Neutral",
+      "poorly_compatible": "Poco compatible"
+    },
+    "identity": {
+      "core_identity_support": "Refuerza la identidad principal",
+      "secondary_identity_support": "Refuerza identidad secundaria",
+      "identity_neutral": "Neutral para la identidad",
+      "alternative_identity_option": "Opcion de identidad alternativa"
+    },
+    "impact": {
+      "major": "Mayor",
+      "meaningful": "Significativo",
+      "moderate": "Moderado",
+      "limited": "Limitado",
+      "unknown": "Desconocido"
+    }
+  },
   "availability": {
     "mode_label": "Disponibilidad del plantel",
     "mode": {

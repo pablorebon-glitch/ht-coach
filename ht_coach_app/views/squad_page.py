@@ -26,6 +26,7 @@ from ht_coach_app.services.squad_builder_service import (
     AVAILABILITY_FULL_STRENGTH,
     AUTO_FORMATION,
 )
+from engine.transfer_planner.models import TransferConstraints
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 from ht_coach_app.widgets.sortable_table_item import SortableTableItem
@@ -42,6 +43,7 @@ class SquadPage(BasePage):
     availability_mode_changed = Signal(str)
     planning_horizon_changed = Signal(str)
     training_focus_changed = Signal(str)
+    transfer_constraints_changed = Signal(object)
 
     HEADERS = [
         "Name",
@@ -76,6 +78,7 @@ class SquadPage(BasePage):
         self._formation_board_mapper = FormationBoardMapper()
         self._readiness_rows = []
         self._evolution_details = []
+        self._transfer_needs = []
         self._build_controls()
         self._build_content()
 
@@ -171,6 +174,7 @@ class SquadPage(BasePage):
         self._build_ideal_tab()
         self._build_players_tab()
         self._build_evolution_tab()
+        self._build_transfer_tab()
         self.body_layout.addWidget(self.tabs, 1)
 
     def _build_ideal_tab(self):
@@ -665,6 +669,120 @@ class SquadPage(BasePage):
         layout.addWidget(scroll, 1)
         self.tabs.addTab(tab, t("evolution.tab"))
 
+    def _build_transfer_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        controls = QFrame()
+        controls.setObjectName("workspacePanel")
+        controls_layout = QGridLayout(controls)
+        controls_layout.setContentsMargins(12, 10, 12, 10)
+        controls_layout.setHorizontalSpacing(8)
+        controls_layout.setVerticalSpacing(8)
+
+        self.transfer_objective_combo = QComboBox()
+        self.transfer_budget_combo = QComboBox()
+        self.transfer_age_strategy_combo = QComboBox()
+        self.transfer_training_preference_combo = QComboBox()
+        self.transfer_specialty_combo = QComboBox()
+        for combo in [
+            self.transfer_objective_combo,
+            self.transfer_budget_combo,
+            self.transfer_age_strategy_combo,
+            self.transfer_training_preference_combo,
+            self.transfer_specialty_combo,
+        ]:
+            combo.currentIndexChanged.connect(
+                self._emit_transfer_constraints
+            )
+
+        controls_layout.addWidget(QLabel(t("transfer.objective_label")), 0, 0)
+        controls_layout.addWidget(self.transfer_objective_combo, 0, 1)
+        controls_layout.addWidget(QLabel(t("transfer.budget_label")), 0, 2)
+        controls_layout.addWidget(self.transfer_budget_combo, 0, 3)
+        controls_layout.addWidget(QLabel(t("transfer.age_strategy_label")), 0, 4)
+        controls_layout.addWidget(self.transfer_age_strategy_combo, 0, 5)
+        controls_layout.addWidget(QLabel(t("transfer.training_preference_label")), 1, 0)
+        controls_layout.addWidget(self.transfer_training_preference_combo, 1, 1)
+        controls_layout.addWidget(QLabel(t("transfer.specialty_preference_label")), 1, 2)
+        controls_layout.addWidget(self.transfer_specialty_combo, 1, 3)
+        controls_layout.setColumnStretch(5, 1)
+        layout.addWidget(controls)
+
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setChildrenCollapsible(False)
+
+        left = QFrame()
+        left.setObjectName("workspacePanel")
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(12, 12, 12, 12)
+        left_layout.setSpacing(8)
+        self.transfer_summary_label = QLabel(t("transfer.empty"))
+        self.transfer_summary_label.setWordWrap(True)
+        self.transfer_priority_table = QTableWidget(0, 7)
+        self.transfer_priority_table.setHorizontalHeaderLabels(
+            [
+                t("transfer.rank"),
+                t("availability.role"),
+                t("transfer.urgency_header"),
+                t("transfer.need_type_header"),
+                t("transfer.target_role_header"),
+                t("transfer.action_header"),
+                t("transfer.internal_solution_header"),
+            ]
+        )
+        self.transfer_priority_table.setSelectionBehavior(
+            QAbstractItemView.SelectRows
+        )
+        self.transfer_priority_table.setSelectionMode(
+            QAbstractItemView.SingleSelection
+        )
+        self.transfer_priority_table.itemSelectionChanged.connect(
+            self._show_selected_transfer_need
+        )
+        self.transfer_priority_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+        left_layout.addWidget(self._mini_heading(t("transfer.summary_title")))
+        left_layout.addWidget(self.transfer_summary_label)
+        left_layout.addWidget(self._mini_heading(t("transfer.priorities")))
+        left_layout.addWidget(self.transfer_priority_table, 1)
+
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setFrameShape(QFrame.NoFrame)
+        right = QFrame()
+        right.setObjectName("workspacePanel")
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(12, 12, 12, 12)
+        right_layout.setSpacing(8)
+        self.transfer_profile_label = QLabel(t("transfer.select_priority"))
+        self.transfer_profile_label.setWordWrap(True)
+        self.transfer_impact_label = QLabel("")
+        self.transfer_impact_label.setWordWrap(True)
+        self.transfer_no_action_label = QLabel("")
+        self.transfer_no_action_label.setWordWrap(True)
+        self.transfer_alternatives_label = QLabel("")
+        self.transfer_alternatives_label.setWordWrap(True)
+        right_layout.addWidget(self._mini_heading(t("transfer.profile_title")))
+        right_layout.addWidget(self.transfer_profile_label)
+        right_layout.addWidget(self._mini_heading(t("transfer.impact_title")))
+        right_layout.addWidget(self.transfer_impact_label)
+        right_layout.addWidget(self._mini_heading(t("transfer.no_action_title")))
+        right_layout.addWidget(self.transfer_no_action_label)
+        right_layout.addWidget(self._mini_heading(t("transfer.alternatives_title")))
+        right_layout.addWidget(self.transfer_alternatives_label)
+        right_layout.addStretch(1)
+        right_scroll.setWidget(right)
+
+        splitter.addWidget(left)
+        splitter.addWidget(right_scroll)
+        splitter.setSizes([560, 520])
+        layout.addWidget(splitter, 1)
+        self.tabs.addTab(tab, t("transfer.tab"))
+
     def csv_path(self):
         return self.path_edit.text().strip()
 
@@ -752,6 +870,51 @@ class SquadPage(BasePage):
         self.training_focus_combo.blockSignals(True)
         self.training_focus_combo.setCurrentIndex(index if index >= 0 else 0)
         self.training_focus_combo.blockSignals(False)
+
+    def set_transfer_options(
+        self,
+        objectives,
+        budgets,
+        age_strategies,
+        training_preferences,
+        specialty_preferences,
+    ):
+        for combo, values, category in [
+            (self.transfer_objective_combo, objectives, "objective"),
+            (self.transfer_budget_combo, budgets, "budget"),
+            (self.transfer_age_strategy_combo, age_strategies, "age_strategy"),
+            (
+                self.transfer_training_preference_combo,
+                training_preferences,
+                "training_preference",
+            ),
+            (self.transfer_specialty_combo, specialty_preferences, "specialty"),
+        ]:
+            combo.blockSignals(True)
+            combo.clear()
+            for value in values:
+                combo.addItem(self._transfer_label(category, value), value)
+            combo.blockSignals(False)
+
+    def set_transfer_constraints(self, constraints):
+        values = [
+            (self.transfer_objective_combo, constraints.planning_objective),
+            (self.transfer_budget_combo, constraints.budget_tier),
+            (
+                self.transfer_age_strategy_combo,
+                constraints.preferred_age_strategy,
+            ),
+            (
+                self.transfer_training_preference_combo,
+                constraints.training_compatibility_preference,
+            ),
+            (self.transfer_specialty_combo, constraints.specialty_preference),
+        ]
+        for combo, value in values:
+            index = combo.findData(value)
+            combo.blockSignals(True)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.blockSignals(False)
 
     def set_specialties(self, specialties):
         current = self.speciality_combo.currentText()
@@ -1137,6 +1300,246 @@ class SquadPage(BasePage):
             self.training_focus_combo.currentData() or "unknown"
         )
 
+    def _emit_transfer_constraints(self):
+        self.transfer_constraints_changed.emit(
+            TransferConstraints(
+                planning_objective=(
+                    self.transfer_objective_combo.currentData() or "balanced"
+                ),
+                budget_tier=(
+                    self.transfer_budget_combo.currentData() or "unspecified"
+                ),
+                preferred_age_strategy=(
+                    self.transfer_age_strategy_combo.currentData() or "balanced"
+                ),
+                training_compatibility_preference=(
+                    self.transfer_training_preference_combo.currentData() or "any"
+                ),
+                specialty_preference=(
+                    self.transfer_specialty_combo.currentData()
+                    or "no_preference"
+                ),
+            )
+        )
+
+    def show_transfer_plan_empty(self):
+        self._transfer_needs = []
+        self.transfer_summary_label.setText(t("transfer.empty"))
+        self.transfer_priority_table.setRowCount(0)
+        self.transfer_profile_label.setText(t("transfer.select_priority"))
+        self.transfer_impact_label.setText("")
+        self.transfer_no_action_label.setText("")
+        self.transfer_alternatives_label.setText("")
+
+    def show_transfer_plan(self, result):
+        self._transfer_needs = list(result.needs or [])
+        summary = result.summary
+        self.transfer_summary_label.setText(
+            "\n".join(
+                [
+                    t(
+                        "transfer.top_priority_value",
+                        value=summary.top_priority or "-",
+                    ),
+                    t(
+                        "transfer.structural_needs_value",
+                        value=summary.structural_need_count,
+                    ),
+                    t(
+                        "transfer.development_needs_value",
+                        value=summary.development_need_count,
+                    ),
+                    t(
+                        "transfer.internal_solutions_value",
+                        value=summary.internal_solution_count,
+                    ),
+                    t(
+                        "transfer.critical_dependencies_value",
+                        value=summary.critical_dependency_count,
+                    ),
+                    t(
+                        "transfer.objective_value",
+                        value=self._transfer_label(
+                            "objective",
+                            summary.selected_planning_objective,
+                        ),
+                    ),
+                    *summary.summary_sentences,
+                ]
+            )
+        )
+        self.transfer_priority_table.setRowCount(len(self._transfer_needs))
+        for row, need in enumerate(self._transfer_needs):
+            self._set_table_row(
+                self.transfer_priority_table,
+                row,
+                [
+                    need.priority_rank,
+                    need.role,
+                    self._transfer_label("urgency", need.urgency),
+                    self._transfer_label("need_type", need.need_type),
+                    need.target_squad_role,
+                    self._transfer_label("action", need.recommended_action),
+                    self._transfer_label(
+                        "internal",
+                        need.internal_solution_status,
+                    ),
+                ],
+            )
+        if self._transfer_needs:
+            self.transfer_priority_table.selectRow(0)
+            self._show_selected_transfer_need()
+        else:
+            self.transfer_profile_label.setText(t("transfer.no_needs"))
+
+    def _show_selected_transfer_need(self):
+        selected = self.transfer_priority_table.selectedItems()
+        if not selected:
+            return
+        row = selected[0].row()
+        if row < 0 or row >= len(self._transfer_needs):
+            return
+        need = self._transfer_needs[row]
+        self.transfer_profile_label.setText(self._profile_text(need))
+        self.transfer_impact_label.setText(self._impact_text(need))
+        self.transfer_no_action_label.setText(self._no_action_text(need))
+        self.transfer_alternatives_label.setText(
+            self._alternatives_text(need.alternative_profiles)
+        )
+
+    def _profile_text(self, need):
+        profile = need.recommended_profile
+        lines = [
+            t("transfer.need_role_value", value=need.role),
+            t(
+                "transfer.need_type_value",
+                value=self._transfer_label("need_type", need.need_type),
+            ),
+            t(
+                "transfer.urgency_value",
+                value=self._transfer_label("urgency", need.urgency),
+            ),
+            t(
+                "transfer.action_value",
+                value=self._transfer_label("action", need.recommended_action),
+            ),
+            t(
+                "transfer.confidence_value",
+                value=self._transfer_label("confidence", need.confidence),
+            ),
+        ]
+        if profile is None:
+            lines.append(t("transfer.no_profile_required"))
+            return "\n".join(lines)
+        lines.extend(
+            [
+                t("transfer.position_value", value=profile.position),
+                t("transfer.target_role_value", value=profile.target_role),
+                t("transfer.age_range_value", value=profile.age_range),
+                t(
+                    "transfer.primary_skill_value",
+                    skill=self._skill_label(profile.primary_skill.skill),
+                    minimum=profile.primary_skill.minimum_level,
+                    preferred=profile.primary_skill.preferred_level,
+                    stretch=profile.primary_skill.stretch_level,
+                ),
+                t(
+                    "transfer.secondary_skills_value",
+                    values=", ".join(
+                        self._skill_label(skill.skill)
+                        for skill in profile.secondary_skills
+                    )
+                    or "-",
+                ),
+                t(
+                    "transfer.optional_skills_value",
+                    values=", ".join(
+                        self._skill_label(skill)
+                        for skill in profile.optional_skills
+                    )
+                    or "-",
+                ),
+                t(
+                    "transfer.specialty_value",
+                    values=", ".join(profile.specialty_preferences) or "-",
+                ),
+                t(
+                    "transfer.training_compatibility_value",
+                    value=self._transfer_label(
+                        "training_compatibility",
+                        profile.training_compatibility,
+                    ),
+                ),
+                t(
+                    "transfer.formations_value",
+                    values=", ".join(profile.formation_compatibility) or "-",
+                ),
+                t(
+                    "transfer.identity_value",
+                    value=self._transfer_label(
+                        "identity",
+                        profile.identity_compatibility,
+                    ),
+                ),
+                t(
+                    "transfer.tradeoffs_value",
+                    values=", ".join(profile.tradeoffs) or "-",
+                ),
+            ]
+        )
+        return "\n".join(lines)
+
+    def _impact_text(self, need):
+        return "\n".join(
+            [
+                t(
+                    "transfer.qualitative_impact_value",
+                    value=self._transfer_label(
+                        "impact",
+                        need.impact_projection.qualitative_impact,
+                    ),
+                ),
+                t(
+                    "transfer.impact_dimensions_value",
+                    values=", ".join(need.impact_projection.dimensions) or "-",
+                ),
+                need.impact_projection.no_exact_delta_statement,
+                t(
+                    "transfer.source_risks_value",
+                    values=", ".join(
+                        self._label("risk", risk)
+                        for risk in need.source_risks
+                    )
+                    or "-",
+                ),
+            ]
+        )
+
+    def _no_action_text(self, need):
+        scenario = need.no_action_scenario
+        return "\n".join(
+            [
+                t("transfer.no_action_current", value=scenario.current),
+                t("transfer.no_action_short", value=scenario.short_term),
+                t("transfer.no_action_medium", value=scenario.medium_term),
+            ]
+        )
+
+    def _alternatives_text(self, profiles):
+        lines = []
+        for index, profile in enumerate(profiles or (), start=1):
+            lines.append(
+                t(
+                    "transfer.alternative_profile_value",
+                    index=index,
+                    role=profile.target_role,
+                    age=profile.age_range,
+                    skill=self._skill_label(profile.primary_skill.skill),
+                    level=profile.primary_skill.minimum_level,
+                )
+            )
+        return "\n".join(lines) or t("transfer.no_alternatives")
+
     def show_evolution_empty(self):
         self.evolution_summary_label.setText(t("evolution.empty"))
         self.age_structure_label.setText(t("evolution.empty"))
@@ -1467,6 +1870,11 @@ class SquadPage(BasePage):
             layout.addWidget(widget)
         return panel
 
+    def _mini_heading(self, title):
+        label = QLabel(title)
+        label.setObjectName("sectionTitle")
+        return label
+
     def _set_table_row(self, table, row, values):
         for column, value in enumerate(values):
             table.setItem(
@@ -1485,6 +1893,18 @@ class SquadPage(BasePage):
         if value in {lookup_key, "Translation unavailable"}:
             return normalized.replace("_", " ").title()
         return value
+
+    def _transfer_label(self, category, key):
+        normalized = str(key or "unknown").strip()
+        lookup_key = f"transfer.{category}.{normalized}"
+        value = t(lookup_key)
+        if value in {lookup_key, "Translation unavailable"}:
+            return normalized.replace("_", " ").title()
+        return value
+
+    @staticmethod
+    def _skill_label(skill):
+        return str(skill or "").replace("_", " ").title()
 
     @staticmethod
     def _format_age_value(value):

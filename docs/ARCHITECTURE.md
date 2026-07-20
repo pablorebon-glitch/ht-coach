@@ -244,6 +244,40 @@ for transfer-planning context in Alpha 0.5.4, not Hattrick match prediction.
 - Suspension is represented in the domain model for future support, but no suspension
   status is inferred from the current CSV.
 
+### Transfer Planner
+
+`engine/transfer_planner/`
+
+Transfer Planner is a profile recommendation layer over Squad Evolution. It consumes
+already computed succession, dependency, training alignment and identity-continuity
+outputs, then ranks abstract player profiles by urgency, planning objective and
+internal solution availability.
+
+It deliberately does not query live Transfer Market data, name real players, estimate
+exact prices, fabricate future skills or project exact performance deltas. Profile
+impact is qualitative and planning-oriented.
+
+Transfer Planner outputs:
+
+- Plan summary with top priority, structural needs, development needs, internal
+  solutions and critical dependencies.
+- Transfer needs with urgency, need type, target squad role, recommended action and
+  internal-solution status.
+- Recommended abstract player profile with age range, primary and secondary skills,
+  optional skills, specialty preference, training compatibility, formation relevance
+  and identity fit.
+- Alternative profiles for budget or development-path comparisons.
+- No-action scenario describing current, short-term and medium-term planning risk.
+
+`ht_coach_app/services/transfer_planner_service.py` adapts this domain to the desktop
+app, normalizes user constraints, caches the last plan for repeated view refreshes and
+persists the selected planning objective, budget tier, age strategy, training-fit
+preference and specialty preference through the shared workspace settings repository.
+
+The Squad page displays Transfer Planner as a planning tab beside Ideal XI, Players and
+Evolution. The view never calls Squad Evolution or optimization code directly; it
+receives a view-ready result from `SquadController` through `TransferPlannerService`.
+
 - `OpponentService`
   - Manages saved opponents.
   - Owns validation rules for opponent names and rating values.

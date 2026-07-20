@@ -259,6 +259,150 @@
       "critical": "Critical"
     }
   },
+  "transfer": {
+    "tab": "Transfer Planner",
+    "empty": "Run Squad Evolution to generate transfer planning profiles.",
+    "objective_label": "Objective",
+    "budget_label": "Budget",
+    "age_strategy_label": "Age strategy",
+    "training_preference_label": "Training fit",
+    "specialty_preference_label": "Specialty",
+    "summary_title": "Plan Summary",
+    "priorities": "Priority Profiles",
+    "rank": "#",
+    "urgency_header": "Urgency",
+    "need_type_header": "Need",
+    "target_role_header": "Target role",
+    "action_header": "Action",
+    "internal_solution_header": "Internal solution",
+    "select_priority": "Select a priority profile to inspect the recommendation.",
+    "profile_title": "Recommended Profile",
+    "impact_title": "Expected Impact",
+    "no_action_title": "If No Action Is Taken",
+    "alternatives_title": "Alternative Profiles",
+    "top_priority_value": "Top priority: {value}",
+    "structural_needs_value": "Structural needs: {value}",
+    "development_needs_value": "Development needs: {value}",
+    "internal_solutions_value": "Internal solutions available: {value}",
+    "critical_dependencies_value": "Critical dependencies: {value}",
+    "objective_value": "Objective: {value}",
+    "no_needs": "No transfer profiles are currently required.",
+    "need_role_value": "Role: {value}",
+    "need_type_value": "Need: {value}",
+    "urgency_value": "Urgency: {value}",
+    "action_value": "Recommended action: {value}",
+    "confidence_value": "Confidence: {value}",
+    "no_profile_required": "No external profile is required for this priority.",
+    "position_value": "Position: {value}",
+    "target_role_value": "Target role: {value}",
+    "age_range_value": "Age range: {value}",
+    "primary_skill_value": "Primary skill: {skill} ({minimum}-{preferred}, stretch {stretch})",
+    "secondary_skills_value": "Secondary skills: {values}",
+    "optional_skills_value": "Optional skills: {values}",
+    "specialty_value": "Specialty: {value}",
+    "training_compatibility_value": "Training compatibility: {value}",
+    "formations_value": "Formation relevance: {values}",
+    "identity_value": "Identity fit: {value}",
+    "tradeoffs_value": "Tradeoffs: {values}",
+    "qualitative_impact_value": "Qualitative impact: {value}",
+    "impact_dimensions_value": "Impact areas: {values}",
+    "source_risks_value": "Source risks: {values}",
+    "no_action_current": "Current: {value}",
+    "no_action_short": "Short term: {value}",
+    "no_action_medium": "Medium term: {value}",
+    "alternative_profile_value": "{role}: {position}, age {age}, primary {skill}",
+    "no_alternatives": "No alternative profile is suggested.",
+    "objective": {
+      "balanced": "Balanced",
+      "promotion_push": "Promotion Push",
+      "long_term_development": "Long-Term Development",
+      "squad_renewal": "Squad Renewal",
+      "immediate_stability": "Immediate Stability"
+    },
+    "budget": {
+      "unspecified": "Unspecified",
+      "restricted": "Restricted",
+      "moderate": "Moderate",
+      "flexible": "Flexible"
+    },
+    "age_strategy": {
+      "any": "Any",
+      "immediate_performance": "Immediate Performance",
+      "balanced": "Balanced",
+      "trainable": "Trainable",
+      "youth_development": "Youth Development"
+    },
+    "training_preference": {
+      "any": "Any",
+      "prefer_compatible": "Prefer Compatible",
+      "require_compatible": "Require Compatible"
+    },
+    "specialty": {
+      "no_preference": "No Preference",
+      "Header": "Header",
+      "Quick": "Quick",
+      "Technical": "Technical",
+      "Powerful": "Powerful",
+      "Unpredictable": "Unpredictable"
+    },
+    "urgency": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "monitor": "Monitor"
+    },
+    "need_type": {
+      "immediate_starter": "Immediate Starter",
+      "starter_competition": "Starter Competition",
+      "rotation_depth": "Rotation Depth",
+      "reliable_backup": "Reliable Backup",
+      "succession_replacement": "Succession Replacement",
+      "development_prospect": "Development Prospect",
+      "specialist": "Specialist",
+      "no_transfer_needed": "No Transfer Needed"
+    },
+    "action": {
+      "buy_now": "Buy Now",
+      "recruit_and_develop": "Recruit and Develop",
+      "develop_internally": "Develop Internally",
+      "monitor": "Monitor",
+      "no_action_required": "No Action Required"
+    },
+    "internal": {
+      "ready_internal_solution": "Ready Internal Solution",
+      "near_ready_internal_solution": "Near-Ready Internal Solution",
+      "development_path_available": "Development Path Available",
+      "emergency_internal_cover_only": "Emergency Cover Only",
+      "no_internal_solution": "No Internal Solution",
+      "unknown": "Unknown"
+    },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "training_compatibility": {
+      "unknown": "Unknown",
+      "strongly_compatible": "Strongly Compatible",
+      "compatible": "Compatible",
+      "neutral": "Neutral",
+      "poorly_compatible": "Poorly Compatible"
+    },
+    "identity": {
+      "core_identity_support": "Core Identity Support",
+      "secondary_identity_support": "Secondary Identity Support",
+      "identity_neutral": "Identity Neutral",
+      "alternative_identity_option": "Alternative Identity Option"
+    },
+    "impact": {
+      "major": "Major",
+      "meaningful": "Meaningful",
+      "moderate": "Moderate",
+      "limited": "Limited",
+      "unknown": "Unknown"
+    }
+  },
   "availability": {
     "mode_label": "Squad availability",
     "mode": {
