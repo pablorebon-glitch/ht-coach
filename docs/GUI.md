@@ -466,6 +466,12 @@ Responsibilities:
   calling the engine directly.
 - Preserve Match viewport state during automatic refresh, including scroll position,
   active result tab and selected player where the player is still present.
+- Reuse the Match result tab hierarchy, Formation Board, Pitch widget and player cards
+  during automatic refresh. Incremental updates should repaint changed labels, orders,
+  card state and analysis panels without rebuilding the pitch or resetting splitter
+  geometry.
+- Preserve splitter sizes across analysis refreshes. Pitch dimensions should change only
+  because of window, splitter or DPI changes, not because recalculated analysis returned.
 - Own Hattrick-oriented full-pitch scaling, normalized slot coordinates, card
   containment and the compact formation/tactic footer.
 - Keep reusable pitch and inspector layout behavior outside `MatchPage`.
