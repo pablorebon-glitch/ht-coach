@@ -345,8 +345,16 @@ Acceptance criteria:
   formalize source-scale concepts, validate Hattrick decimal imports, test quarter-step
   hypotheses, and classify current TeamRater values as not yet directly convertible to
   Hattrick decimal ratings.
-- Alpha 0.5.6.1 Historical Fixture Collection and Rating Estimator Research: collect
-  complete own-team match fixtures before attempting any estimator or conversion.
+- Alpha 0.5.6.1 Rating Validation Framework: add reusable fixture storage, official
+  versus predicted rating separation, completeness classification, JSON loading,
+  validation metrics, structured reports, a CLI validator and a future prediction
+  provider interface without implementing prediction or conversion.
+- Alpha 0.5.7 Midfield Rating Engine v1: only after enough complete validation fixtures
+  exist, investigate a measured midfield predictor against the validation framework.
+- Alpha 0.5.8 Defense Rating Engine v1: validate defensive sector prediction candidates
+  against real fixtures without changing existing optimizer scoring.
+- Alpha 0.5.9 Attack Rating Engine v1: validate attacking sector prediction candidates
+  against real fixtures without changing existing optimizer scoring.
 - Alpha 0.4.9 What-If Lab: explore controlled tactical alternatives from the evaluated
   Workspace without changing stable engine formulas.
 - Match scenario history.

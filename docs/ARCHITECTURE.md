@@ -40,6 +40,12 @@ conversion. The audit classification is C: current TeamRater sector values remai
 internal contribution totals and are not directly comparable with imported Hattrick
 decimal ratings.
 
+Alpha 0.5.6.1 adds `engine/rating_validation` as a Qt-independent validation framework
+for future rating engines. It stores real-match fixtures, separates official Hattrick
+ratings from supplied predictions, classifies fixture completeness, calculates error
+metrics and returns structured reports. It does not implement prediction, conversion,
+calibration, optimization or rating estimation.
+
 ## Target Layers
 
 ```text
@@ -62,6 +68,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  rating_validation/
   squad_evolution/
   squad_health/
 models/
@@ -461,6 +468,37 @@ does not display direct matchup margins, advantage classes or difference-based t
 signals from Match Intelligence. It keeps within-team profile context and possession
 signals, and the Opponent Rating Calibration table continues to show the raw values with
 their source scales. No conversion factor is introduced.
+
+### Rating Validation
+
+`engine/rating_validation/`
+
+The Rating Validation framework measures future predicted Hattrick ratings against
+official Hattrick ratings from real fixtures. It is independent of Qt and independent of
+the current optimizer stack.
+
+Modules:
+
+- `fixture.py`: fixture model, official rating model, predicted rating model,
+  completeness classification and future `RatingPredictionProvider` interface.
+- `dataset.py`: immutable fixture collection with filtering, grouping and duplicate
+  identifier protection.
+- `loader.py`: JSON fixture loading from files or directories.
+- `metrics.py`: absolute error, MAE, maximum error, RMSE, mean signed error and counts.
+- `validator.py`: fixture and dataset validation, skipped-comparison handling and metric
+  aggregation.
+- `report.py`: structured validation reports, coverage and fixture summaries.
+- `exceptions.py`: loader, fixture and duplicate-data exceptions.
+
+Rules:
+
+- official ratings are observed Hattrick decimal values;
+- predicted ratings must be supplied by fixtures or a future provider;
+- missing predictions are ignored and reported;
+- missing sectors reduce comparison coverage;
+- no HT Coach internal contribution value is converted to a Hattrick decimal rating;
+- no TeamRater, optimizer, probability, xG, Decision Lab, Match Intelligence or
+  Transfer Planner behavior is changed.
 
 Advisor card types are intentionally strict:
 

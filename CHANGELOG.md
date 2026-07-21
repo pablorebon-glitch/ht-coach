@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added Alpha 0.5.6.1 Rating Validation Framework with typed validation fixtures,
+  official-versus-predicted rating separation, completeness classification, JSON
+  dataset loading, validation metrics, structured reports, a CLI smoke tool and the
+  `docs/RATING_VALIDATION.md` guide.
 - Added Alpha 0.5.6 Rating Engine Alignment Audit with typed rating scale concepts,
   Hattrick decimal descriptive mapping, candidate quarter-step conversion tests,
   developer diagnostics and `docs/RATING_ENGINE_ALIGNMENT.md`.
