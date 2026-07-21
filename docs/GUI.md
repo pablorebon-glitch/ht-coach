@@ -292,6 +292,9 @@ Content:
   Hattrick decimal ratings by source scale and only shows direct advantages when the
   compared values share the same scale. If scales differ, the difference column is not
   shown.
+- Decision Lab, Match Intelligence, Opponent Rating Calibration and Match Analysis use
+  shared collapsible sections with independent persisted state, brief summaries,
+  keyboard-accessible headers and localized expand/collapse labels.
 - Rating Engine Alignment diagnostics classify current TeamRater values as internal
   contribution totals. The normal Match UI must not display own-team Hattrick decimal
   ratings unless a future evidence-backed conversion is introduced.

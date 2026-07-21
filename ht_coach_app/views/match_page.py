@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
 from ht_coach_app.ui.design_system.empty_state import EmptyState
 from ht_coach_app.ui.design_system.tables import configure_table
 from engine.squad_health.availability_service import (
@@ -56,6 +57,14 @@ class MatchPage(BasePage):
     copy_lineup_requested = Signal()
     workspace_recalculate_requested = Signal(object)
     workspace_changed = Signal()
+    match_section_toggled = Signal(str, bool)
+
+    MATCH_SECTION_DEFAULTS = {
+        "decision_lab": False,
+        "match_intelligence": True,
+        "rating_calibration": False,
+        "match_analysis": True,
+    }
 
     def __init__(self, parent=None):
         super().__init__(
@@ -74,6 +83,8 @@ class MatchPage(BasePage):
         self._last_workspace_state = None
         self._advisor_verbosity = "detailed"
         self._analysis_inputs_collapsed = False
+        self._match_section_states = dict(self.MATCH_SECTION_DEFAULTS)
+        self._match_sections = {}
         self._result_tabs = None
         self._formation_board_widget = None
         self.body_layout.setContentsMargins(16, 12, 16, 12)
@@ -350,6 +361,9 @@ class MatchPage(BasePage):
             availability_index if availability_index >= 0 else 0
         )
         self._update_availability_warning()
+        self.set_match_section_states(
+            getattr(settings, "match_section_states", {})
+        )
 
         self._applying_settings = False
         self._update_formation_warning()
@@ -488,80 +502,234 @@ class MatchPage(BasePage):
         self._last_workspace_state = workspace_state
         self._clear_results_widgets()
         self.collapse_analysis_inputs()
-
         recommended = result.recommended_formation
-
-        self.results_layout.addWidget(
-            self._build_analysis_context(result),
-            0,
+        sections = self._ensure_match_sections()
+        self._update_match_sections(
+            result,
+            recommended,
+            restored,
+            workspace_state,
+        )
+        for key in (
+            "decision_lab",
+            "match_intelligence",
+            "rating_calibration",
+            "match_analysis",
+        ):
+            self.results_layout.addWidget(sections[key])
+        self._restore_viewport_state(
+            viewport_state,
+            self._result_tabs,
         )
 
-        if recommended is not None:
-            self.results_layout.addWidget(
-                self._build_recommended_summary(
-                    recommended
-                )
+    def set_match_section_states(self, states):
+        for key, default in self.MATCH_SECTION_DEFAULTS.items():
+            if key in dict(states or {}):
+                self._match_section_states[key] = bool(states[key])
+            else:
+                self._match_section_states.setdefault(key, default)
+        for key, section in self._match_sections.items():
+            section.set_expanded(
+                self._match_section_states.get(
+                    key,
+                    self.MATCH_SECTION_DEFAULTS.get(key, True),
+                ),
+                emit=False,
             )
+
+    def match_section_states(self):
+        return dict(self._match_section_states)
+
+    def _ensure_match_sections(self):
+        titles = {
+            "decision_lab": t("match.decision_lab"),
+            "match_intelligence": t("match_intelligence.title"),
+            "rating_calibration": t("sector_rating.title"),
+            "match_analysis": t("match.match_analysis"),
+        }
+        for key, title in titles.items():
+            if key in self._match_sections:
+                continue
+            section = CollapsibleSection(
+                title,
+                state_key=key,
+                expanded=self._match_section_states.get(
+                    key,
+                    self.MATCH_SECTION_DEFAULTS[key],
+                ),
+            )
+            section.toggled.connect(self._match_section_toggled)
+            self._match_sections[key] = section
+        return self._match_sections
+
+    def _match_section_toggled(self, key, expanded):
+        self._match_section_states[key] = expanded
+        self.match_section_toggled.emit(key, expanded)
+
+    def _update_match_sections(
+        self,
+        result,
+        recommended,
+        restored,
+        workspace_state,
+    ):
+        sections = self._ensure_match_sections()
+
+        sections["decision_lab"].set_body_widget(
+            self._build_decision_lab_panel(
+                result.decision_lab,
+                recommended,
+            )
+            if result.decision_lab is not None
+            else self._build_unavailable_panel(
+                t("decision_lab.copy.empty")
+            )
+        )
+        sections["decision_lab"].set_summary(
+            self._decision_lab_summary(result)
+        )
+
+        intelligence = getattr(result, "match_intelligence", None)
+        sections["match_intelligence"].set_body_widget(
+            self._build_match_intelligence_panel(
+                intelligence,
+                recommended,
+            )
+            if intelligence is not None
+            else self._build_unavailable_panel(
+                t("common.not_available")
+            )
+        )
+        sections["match_intelligence"].set_summary(
+            self._match_intelligence_summary(result)
+        )
+
+        sections["rating_calibration"].set_body_widget(
+            self._build_sector_rating_panel(recommended)
+            if recommended is not None and getattr(
+                recommended,
+                "sector_rating_comparisons",
+                None,
+            )
+            else self._build_unavailable_panel(
+                t("sector_rating.not_available")
+            )
+        )
+        sections["rating_calibration"].set_summary(
+            self._rating_calibration_summary(recommended)
+        )
+
+        sections["match_analysis"].set_body_widget(
+            self._build_match_analysis_body(
+                result,
+                recommended,
+                restored,
+                workspace_state,
+            )
+        )
+        sections["match_analysis"].set_summary(
+            self._match_analysis_summary(result)
+        )
+
+    def _build_match_analysis_body(
+        self,
+        result,
+        recommended,
+        restored,
+        workspace_state,
+    ):
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        layout.addWidget(self._build_analysis_context(result))
+
+        if recommended is not None:
+            layout.addWidget(self._build_recommended_summary(recommended))
 
         if (
             getattr(result, "availability_warning", "")
             or getattr(result, "unavailable_players_count", 0)
         ):
-            self.results_layout.addWidget(
-                self._build_availability_panel(result)
-            )
-
-        if result.decision_lab is not None:
-            self.results_layout.addWidget(
-                self._build_decision_lab_panel(
-                    result.decision_lab,
-                    recommended,
-                )
-            )
-
-        if getattr(result, "match_intelligence", None) is not None:
-            self.results_layout.addWidget(
-                self._build_match_intelligence_panel(
-                    result.match_intelligence,
-                    recommended,
-                )
-            )
-
-        if recommended is not None and getattr(
-            recommended,
-            "sector_rating_comparisons",
-            None,
-        ):
-            self.results_layout.addWidget(
-                self._build_sector_rating_panel(recommended)
-            )
+            layout.addWidget(self._build_availability_panel(result))
 
         if result.change_analysis is not None:
-            self.results_layout.addWidget(
-                self._build_change_analysis_panel(
-                    result.change_analysis
-                )
+            layout.addWidget(
+                self._build_change_analysis_panel(result.change_analysis)
             )
 
         if result.tactical_advisor:
-            self.results_layout.addWidget(
-                self._build_tactical_advisor_panel(
-                    result.tactical_advisor
-                )
+            layout.addWidget(
+                self._build_tactical_advisor_panel(result.tactical_advisor)
             )
 
-        result_tabs = self._build_result_tabs(
-            result,
-            restored=restored,
-            workspace_state=workspace_state,
-        )
-        self.results_layout.addWidget(
-            result_tabs,
+        layout.addWidget(
+            self._build_result_tabs(
+                result,
+                restored=restored,
+                workspace_state=workspace_state,
+            ),
             1,
         )
-        self._restore_viewport_state(
-            viewport_state,
-            result_tabs,
+        return body
+
+    def _build_unavailable_panel(self, message):
+        panel = QFrame()
+        panel.setObjectName("metadataPanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(10, 7, 10, 7)
+        label = QLabel(message)
+        label.setObjectName("compactDecisionText")
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        return panel
+
+    def _decision_lab_summary(self, result):
+        decision_lab = getattr(result, "decision_lab", None)
+        if decision_lab is None:
+            return t("common.not_available")
+        recommended = getattr(decision_lab, "recommended_formation", None)
+        formation = getattr(recommended, "formation", "") or ""
+        if formation:
+            return t("match.section_summary.recommended", formation=formation)
+        result_recommended = getattr(result, "recommended_formation", None)
+        if result_recommended is not None:
+            return t(
+                "match.section_summary.recommended",
+                formation=result_recommended.formation_name,
+            )
+        return localized_decision_summary(decision_lab.summary)
+
+    def _match_intelligence_summary(self, result):
+        intelligence = getattr(result, "match_intelligence", None)
+        if intelligence is None:
+            return t("common.not_available")
+        return self._short_text(
+            t(
+                intelligence.summary_key,
+                **self._localized_params(intelligence.summary_params),
+            ),
+            limit=72,
+        )
+
+    def _rating_calibration_summary(self, formation):
+        if formation is None or not getattr(
+            formation,
+            "sector_rating_comparisons",
+            None,
+        ):
+            return t("match.section_summary.calibration_unavailable")
+        if self._sector_ratings_comparable(formation):
+            return t("match.section_summary.calibration_comparable")
+        return t("match.section_summary.calibration_limited")
+
+    def _match_analysis_summary(self, result):
+        recommended = getattr(result, "recommended_formation", None)
+        if recommended is None:
+            return t("match.section_summary.lineup_analyzed")
+        return t(
+            "match.section_summary.analysis_ready",
+            formation=recommended.formation_name,
         )
 
     def _capture_viewport_state(self):
@@ -1523,6 +1691,7 @@ class MatchPage(BasePage):
         self.analyze_button.setText(t("match.analyze"))
         self._sync_analysis_setup_toggle()
         self._update_formation_warning()
+        self._retranslate_match_sections()
         if self._state == "empty":
             self.clear_results()
         elif self._last_result is not None:
@@ -1530,6 +1699,30 @@ class MatchPage(BasePage):
                 self._last_result,
                 restored=self._last_restored,
                 workspace_state=self._last_workspace_state,
+            )
+
+    def _retranslate_match_sections(self):
+        if not self._match_sections:
+            return
+        titles = {
+            "decision_lab": t("match.decision_lab"),
+            "match_intelligence": t("match_intelligence.title"),
+            "rating_calibration": t("sector_rating.title"),
+            "match_analysis": t("match.match_analysis"),
+        }
+        summaries = {}
+        if self._last_result is not None:
+            recommended = self._last_result.recommended_formation
+            summaries = {
+                "decision_lab": self._decision_lab_summary(self._last_result),
+                "match_intelligence": self._match_intelligence_summary(self._last_result),
+                "rating_calibration": self._rating_calibration_summary(recommended),
+                "match_analysis": self._match_analysis_summary(self._last_result),
+            }
+        for key, section in self._match_sections.items():
+            section.retranslate(
+                titles.get(key),
+                summaries.get(key, section.summary()),
             )
 
     def set_advisor_verbosity(self, verbosity):

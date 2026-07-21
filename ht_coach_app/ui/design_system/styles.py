@@ -54,6 +54,30 @@ def application_stylesheet():
             font-weight: 650;
         }}
 
+        QFrame#collapsibleSection {{
+            background: {colors.SURFACE};
+            border: 1px solid {colors.BORDER};
+            border-radius: {metrics.CARD_RADIUS}px;
+        }}
+
+        QPushButton#collapsibleSectionHeader {{
+            background: transparent;
+            border: 0;
+            border-radius: {metrics.CARD_RADIUS}px;
+            padding: 0;
+            text-align: left;
+        }}
+
+        QPushButton#collapsibleSectionHeader:hover {{
+            background: #f8fafc;
+        }}
+
+        QLabel#collapsibleArrow {{
+            color: {colors.TEXT_SECONDARY};
+            font-weight: 650;
+            min-width: 14px;
+        }}
+
         QLabel#emptyStateTitle {{
             color: {colors.TEXT_PRIMARY};
             font-size: {typography.SECTION_TITLE_SIZE}px;

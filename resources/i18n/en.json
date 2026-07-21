@@ -8,6 +8,8 @@
   },
   "common": {
     "not_available": "Not available",
+    "expand_section": "Expand Section",
+    "collapse_section": "Collapse Section",
     "list_two": "{first} and {second}",
     "list_many": "{items} and {last}"
   },
@@ -698,6 +700,15 @@
     "xg": "xG",
     "opp_xg": "Opp xG",
     "decision_lab": "Decision Lab",
+    "match_analysis": "Match Analysis",
+    "section_summary": {
+      "recommended": "Recommended: {formation}",
+      "analysis_ready": "{formation} lineup analyzed",
+      "lineup_analyzed": "Lineup analyzed",
+      "calibration_unavailable": "Calibration unavailable",
+      "calibration_comparable": "Ratings directly comparable",
+      "calibration_limited": "Calibration limited by rating scale"
+    },
     "recommendation_confidence": "Recommendation confidence: {level}",
     "play_to_win": "Play to win",
     "secure_draw": "Secure the draw",

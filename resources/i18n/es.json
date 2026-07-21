@@ -8,6 +8,8 @@
   },
   "common": {
     "not_available": "No disponible",
+    "expand_section": "Expandir sección",
+    "collapse_section": "Colapsar sección",
     "list_two": "{first} y {second}",
     "list_many": "{items} y {last}"
   },
@@ -698,6 +700,15 @@
     "xg": "xG",
     "opp_xg": "xG rival",
     "decision_lab": "Decision Lab",
+    "match_analysis": "Analisis del partido",
+    "section_summary": {
+      "recommended": "Recomendado: {formation}",
+      "analysis_ready": "Alineacion {formation} analizada",
+      "lineup_analyzed": "Alineacion analizada",
+      "calibration_unavailable": "Calibracion no disponible",
+      "calibration_comparable": "Ratings directamente comparables",
+      "calibration_limited": "Calibracion limitada por escala de ratings"
+    },
     "recommendation_confidence": "Confianza de la recomendación: {level}",
     "play_to_win": "Jugar a ganar",
     "secure_draw": "Asegurar empate",

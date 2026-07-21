@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added collapsible Match analysis sections for Decision Lab, Match Intelligence,
+  Opponent Rating Calibration and Match Analysis, with reusable design-system
+  component, independent persisted state, keyboard-accessible headers and EN/ES labels.
 - Added Alpha 0.5.7 Weekly Training Lineup Planner with Playmaking priorities,
   Sunday-Wednesday-Thursday week handling, minute-aware exposure coverage, second-match
   lineup planning, assumed-versus-confirmed match records, competitive-cost reporting,

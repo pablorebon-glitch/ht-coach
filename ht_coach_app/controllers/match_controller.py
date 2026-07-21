@@ -78,6 +78,10 @@ class MatchController(QObject):
         self._view.workspace_changed.connect(
             self._save_current_settings
         )
+        if hasattr(self._view, "match_section_toggled"):
+            self._view.match_section_toggled.connect(
+                lambda _key, _expanded: self._save_current_settings()
+            )
 
     def _connect_app_events(self):
         if self._app_events is not None:
@@ -441,9 +445,14 @@ class MatchController(QObject):
             MatchWorkspaceSettings(
                 players_csv_path=self._view.players_csv_path(),
                 opponent_name=self._view.selected_opponent_name(),
-                selected_formations=self._view.selected_formations(),
-                squad_availability_mode=self._availability_mode(),
-            )
+            selected_formations=self._view.selected_formations(),
+            squad_availability_mode=self._availability_mode(),
+            match_section_states=(
+                self._view.match_section_states()
+                if hasattr(self._view, "match_section_states")
+                else {}
+            ),
+        )
         )
 
     def _load_current_roster_for_inspector(self, show_errors):

@@ -289,6 +289,22 @@ useful minimum height. The pitch itself does not scroll internally. Alpha 0.4.5 
 the pitch footprint and preserves the main page scroll position across selection,
 Workspace edits and automatic result refreshes.
 
+Alpha 0.5.7 adds reusable collapsible sections to Match results. Decision Lab, Match
+Intelligence, Opponent Rating Calibration and Match Analysis each keep an independent
+expanded or collapsed state. Defaults are chosen for a first launch: Match Analysis and
+Match Intelligence expanded, Decision Lab and Opponent Rating Calibration collapsed.
+
+The collapsible wrapper hides only the section body. It keeps the header and summary
+visible, keeps the underlying widgets alive while collapsed, and does not trigger a new
+analysis. Result refreshes update collapsed section contents without forcing the section
+open. The state is persisted in `match_workspace.json` as `match_section_states` so it
+survives tab changes, language changes, workspace refreshes and application restart
+where the local settings file is available.
+
+The shared component lives in `ht_coach_app/ui/design_system/collapsible_section.py`.
+Headers are clickable across their full width and support Enter and Space. Header text,
+summary text and expand/collapse tooltips pass through the localization layer.
+
 ## Future Work
 
 The workspace model reserves history and redo state so later milestones can add:
