@@ -4,6 +4,7 @@ from dataclasses import replace
 from engine.analyzers.player_analyzer import PlayerAnalyzer
 from engine.calculators.contribution_calculator import ContributionCalculator
 from engine.orders.order_modifier import OrderModifier
+from engine.optimizers.order_optimizer import OrderOptimizer
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import format_position_abbreviation
 from ht_coach_app.core.position_formatting import normalize_position_key
@@ -121,6 +122,7 @@ class WorkspaceService:
             selected_slot.slot_id,
             clicked_slot.slot_id,
             state.revision,
+            roster_players=roster_players,
             interaction_source=interaction_source,
         )
         if not applied.last_error:
@@ -411,7 +413,7 @@ class WorkspaceService:
             roster_players,
             interaction_source=interaction_source,
         )
-        return self._mark_pending(applied)
+        return self._mark_ready(applied)
 
     def swap_slots_immediately(
         self,
@@ -420,6 +422,7 @@ class WorkspaceService:
         source_slot_id,
         target_slot_id,
         expected_revision,
+        roster_players=(),
         interaction_source="",
     ):
         valid, message = self._validate_immediate_intent(
@@ -440,9 +443,10 @@ class WorkspaceService:
 
         applied = self.apply_swap(
             previewed,
+            roster_players=roster_players,
             interaction_source=interaction_source,
         )
-        return self._mark_pending(applied)
+        return self._mark_ready(applied)
 
     def validate_bench_exchange(self, state, roster_players, target_slot_id, bench_player_id):
         board = state.current_board
@@ -528,7 +532,7 @@ class WorkspaceService:
         if state.replacement_preview is not None:
             return self.apply_replacement(state, roster_players)
         if state.swap_preview is not None:
-            return self.apply_swap(state)
+            return self.apply_swap(state, roster_players=roster_players)
         return state
 
     def apply_replacement(self, state, roster_players, interaction_source=""):
@@ -599,6 +603,11 @@ class WorkspaceService:
             slots=tuple(updated_slots),
             selected_player_id=preview.replacement_player_id,
         )
+        updated_board, order_changes = self._apply_best_orders_to_slots(
+            updated_board,
+            roster_players,
+            (preview.slot_id,),
+        )
         boards = dict(state.workspace_boards)
         boards[updated_board.formation_name] = updated_board
         before_ids = self._lineup_ids(board)
@@ -621,6 +630,7 @@ class WorkspaceService:
             interaction_source=interaction_source,
             previous_slot_score=preview.current_score,
             current_slot_score=preview.replacement_score,
+            order_changes=order_changes,
         )
 
         return replace(
@@ -631,7 +641,7 @@ class WorkspaceService:
             swap_preview=None,
             history=state.history + (modification,),
             redo_stack=(),
-            evaluation_state="pending",
+            evaluation_state="ready",
             revision=state.revision + 1,
             last_error="",
             manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
@@ -641,7 +651,7 @@ class WorkspaceService:
             ),
         )
 
-    def apply_swap(self, state, interaction_source=""):
+    def apply_swap(self, state, roster_players=(), interaction_source=""):
         preview = state.swap_preview
         board = state.current_board
         if preview is None or board is None:
@@ -675,6 +685,11 @@ class WorkspaceService:
             slots=tuple(updated_slots),
             selected_player_id=source.player_id,
         )
+        updated_board, order_changes = self._apply_best_orders_to_slots(
+            updated_board,
+            roster_players,
+            (preview.source_slot_id, preview.target_slot_id),
+        )
         boards = dict(state.workspace_boards)
         boards[updated_board.formation_name] = updated_board
         before_ids = self._lineup_ids(board)
@@ -696,6 +711,7 @@ class WorkspaceService:
             revision_before=state.revision,
             revision_after=state.revision + 1,
             interaction_source=interaction_source,
+            order_changes=order_changes,
         )
 
         return replace(
@@ -706,7 +722,7 @@ class WorkspaceService:
             swap_preview=None,
             history=state.history + (modification,),
             redo_stack=(),
-            evaluation_state="pending",
+            evaluation_state="ready",
             revision=state.revision + 1,
             last_error="",
             manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
@@ -739,30 +755,25 @@ class WorkspaceService:
             return state
 
         current_score, current_totals = self._board_score(board, roster_players)
-        positioned_board, position_recommendations, position_score, position_totals = (
-            self._position_recommendations(board, roster_players, current_score)
-        )
         order_recommendations, order_score, _order_totals = self._order_recommendations(
-            positioned_board,
+            board,
             roster_players,
-            position_score,
-            position_totals,
+            current_score,
+            current_totals,
         )
         recommendations = LineupRecommendationSet(
             manual_state=(
                 ManualLineupState.RECOMMENDATIONS_AVAILABLE
-                if position_recommendations or order_recommendations
+                if order_recommendations
                 else state.manual_lineup_state
             ),
-            position_recommendations=tuple(position_recommendations),
+            position_recommendations=(),
             order_recommendations=tuple(order_recommendations),
             objective="formation_score",
             current_score=current_score,
-            recommended_score=max(position_score, order_score, current_score),
+            recommended_score=max(order_score, current_score),
             stale_revision=state.revision,
-            no_position_recommendation_reason=(
-                "" if position_recommendations else "current_arrangement_already_optimal"
-            ),
+            no_position_recommendation_reason="manual_positions_are_authoritative",
             no_order_recommendation_reason=(
                 "" if order_recommendations else "current_order_already_recommended"
             ),
@@ -771,6 +782,33 @@ class WorkspaceService:
             state,
             manual_lineup_state=recommendations.manual_state,
             recommendations=recommendations,
+            evaluation_state="ready",
+            last_error="",
+        )
+
+    def optimize_orders_for_slots(self, state, roster_players, slot_ids):
+        board = state.current_board
+        if board is None:
+            return state
+        updated_board, order_changes = self._apply_best_orders_to_slots(
+            board,
+            roster_players,
+            slot_ids,
+        )
+        if updated_board == board:
+            return replace(state, evaluation_state="ready", last_error="")
+        boards = dict(state.workspace_boards)
+        boards[updated_board.formation_name] = updated_board
+        history = state.history
+        if order_changes and history:
+            history = history[:-1] + (
+                replace(history[-1], order_changes=order_changes),
+            )
+        return replace(
+            state,
+            workspace_boards=boards,
+            history=history,
+            evaluation_state="ready",
             last_error="",
         )
 
@@ -945,7 +983,7 @@ class WorkspaceService:
             workspace_boards=workspace_boards,
             replacement_preview=None,
             swap_preview=None,
-            evaluation_state="evaluated",
+            evaluation_state="ready",
             revision=state.revision + 1,
             last_error="",
         )
@@ -955,7 +993,7 @@ class WorkspaceService:
             state,
             replacement_preview=None,
             swap_preview=None,
-            evaluation_state="updating",
+            evaluation_state="analyzing",
             last_error="",
         )
 
@@ -964,7 +1002,7 @@ class WorkspaceService:
             state,
             replacement_preview=None,
             swap_preview=None,
-            evaluation_state="failed",
+            evaluation_state="error",
             last_error=message,
         )
 
@@ -1102,11 +1140,96 @@ class WorkspaceService:
 
     @staticmethod
     def valid_orders_for_position(position):
-        normalized = WorkspaceService._position(position)
-        return (Order.NORMAL,) + tuple(
-            order
-            for order in OrderModifier.ORDER_FACTORS.get(normalized, {})
+        return tuple(
+            configuration.order
+            for configuration in WorkspaceService.valid_order_configurations_for_position(
+                position
+            )
         )
+
+    @staticmethod
+    def valid_order_configurations_for_position(position):
+        normalized = WorkspaceService._position(position)
+        return OrderOptimizer.ALLOWED_CONFIGURATIONS.get(
+            normalized,
+            OrderOptimizer.ALLOWED_CONFIGURATIONS[Position.GOALKEEPER],
+        )
+
+    def _apply_best_orders_to_slots(self, board, roster_players, slot_ids):
+        target_ids = set(slot_ids)
+        updated = board
+        changes = []
+        for slot_id in slot_ids:
+            slot = self._slot_by_id(updated, slot_id)
+            if slot is None or slot.player is None:
+                continue
+            best_order, best_side = self._best_order_for_slot(
+                updated,
+                roster_players,
+                slot_id,
+            )
+            current_order = self._order(slot.player.individual_order)
+            current_side = self._optional_side(slot.player.order_side)
+            if best_order == current_order and best_side == current_side:
+                continue
+            updated = self._board_with_order(
+                updated,
+                slot.player.player_id,
+                best_order,
+                best_side,
+            )
+            changes.append(
+                (
+                    slot.player.player_name,
+                    self._format_order_change(current_order, current_side),
+                    self._format_order_change(best_order, best_side),
+                )
+            )
+        if not target_ids:
+            return board, ()
+        return updated, tuple(changes)
+
+    def _best_order_for_slot(self, board, roster_players, slot_id):
+        slot = self._slot_by_id(board, slot_id)
+        if slot is None or slot.player is None:
+            return Order.NORMAL, None
+        current_order = self._order(slot.player.individual_order)
+        current_side = self._optional_side(slot.player.order_side)
+        current_score, _ = self._board_score(board, roster_players)
+        best_order = current_order
+        best_side = current_side
+        best_score = current_score
+        current_configuration_seen = False
+        configurations = self.valid_order_configurations_for_position(
+            slot.player.position
+        )
+        for configuration in configurations:
+            if (
+                configuration.order == current_order
+                and configuration.order_side == current_side
+            ):
+                current_configuration_seen = True
+            candidate = self._board_with_order(
+                board,
+                slot.player.player_id,
+                configuration.order,
+                configuration.order_side,
+            )
+            candidate_score, _ = self._board_score(candidate, roster_players)
+            if candidate_score > best_score + MIN_RECOMMENDATION_IMPROVEMENT:
+                best_order = configuration.order
+                best_side = configuration.order_side
+                best_score = candidate_score
+        if current_configuration_seen:
+            return best_order, best_side
+        normal = next(
+            configuration
+            for configuration in configurations
+            if configuration.order == Order.NORMAL
+        )
+        if best_score <= current_score + MIN_RECOMMENDATION_IMPROVEMENT:
+            return normal.order, normal.order_side
+        return best_order, best_side
 
     def _board_score(self, board, roster_players):
         totals = self._empty_totals()
@@ -1155,7 +1278,8 @@ class WorkspaceService:
             ),
         )
 
-    def _board_with_order(self, board, player_id, order):
+    def _board_with_order(self, board, player_id, order, order_side=None):
+        order_side_value = getattr(order_side, "value", order_side) or ""
         return replace(
             board,
             slots=tuple(
@@ -1166,6 +1290,8 @@ class WorkspaceService:
                             slot.player,
                             individual_order=order.value,
                             order_label=order.value,
+                            order_side=order_side_value,
+                            order_side_label=format_side(order_side_value),
                         )
                         if slot.player is not None
                         and slot.player.player_id == player_id
@@ -1228,6 +1354,12 @@ class WorkspaceService:
             if abs(delta) > MIN_RECOMMENDATION_IMPROVEMENT:
                 deltas.append((sector, delta))
         return tuple(deltas)
+
+    @staticmethod
+    def _format_order_change(order, order_side=None):
+        if order_side is None:
+            return order.value
+        return f"{order.value} {format_side(order_side)}"
 
     @staticmethod
     def _is_goalkeeper_slot(slot):
@@ -1390,12 +1522,12 @@ class WorkspaceService:
         return True, ""
 
     @staticmethod
-    def _mark_pending(state):
+    def _mark_ready(state):
         return replace(
             state,
             replacement_preview=None,
             swap_preview=None,
-            evaluation_state="pending",
+            evaluation_state="ready",
             last_error="",
         )
 
@@ -1541,10 +1673,10 @@ class WorkspaceService:
             position_abbreviation=format_position_abbreviation(position),
             side=side,
             side_label=side_label,
-            individual_order=getattr(template_player, "individual_order", "Normal"),
-            order_label=getattr(template_player, "order_label", "Normal"),
-            order_side=getattr(template_player, "order_side", ""),
-            order_side_label=getattr(template_player, "order_side_label", ""),
+            individual_order=getattr(player, "individual_order", "Normal"),
+            order_label=getattr(player, "order_label", "Normal"),
+            order_side=getattr(player, "order_side", ""),
+            order_side_label=getattr(player, "order_side_label", ""),
             is_selected=selected,
             is_modified=True,
             is_replacement_preview=False,

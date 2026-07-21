@@ -185,7 +185,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         self.assertTrue(state.dirty)
         self.assertEqual(
             state.status_label,
-            "Lineup manually modified",
+            "Lineup manually adjusted",
         )
 
     def test_replacement_preview_apply_cancel_and_reset(self):
@@ -232,7 +232,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         state = self.service.apply_replacement(state, self.roster)
         self.assertEqual(
             state.status_label,
-            "Lineup manually modified",
+            "Lineup manually adjusted",
         )
 
         evaluated_board = FormationBoardMapper().to_board(
@@ -242,7 +242,7 @@ class WorkspaceServiceTest(unittest.TestCase):
             state,
             [evaluated_board],
         )
-        self.assertEqual(state.status_label, "Evaluated Workspace")
+        self.assertEqual(state.status_label, "Lineup manually adjusted")
         self.assertEqual(
             state.current_board.selected_player.player_name,
             "A Replacement",
@@ -256,7 +256,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         state = self.service.apply_replacement(state, self.roster)
         self.assertEqual(
             state.status_label,
-            "Lineup manually modified",
+            "Lineup manually adjusted",
         )
 
         state = self.service.reset(state)
@@ -480,7 +480,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         self.assertFalse(cancelled.dirty)
         self.assertEqual(cancelled.revision, state.revision)
 
-    def test_position_recommendation_preserves_formation_and_current_starters(self):
+    def test_manual_position_intent_preserves_formation_and_current_starters(self):
         result = formation_result()
         board = FormationBoardMapper().to_board(result)
         state = self.service.create([board], "3-5-2")
@@ -515,11 +515,12 @@ class WorkspaceServiceTest(unittest.TestCase):
             forward_slot.slot_id,
             defender_slot.slot_id,
             state.revision,
+            roster_players=roster,
             interaction_source="TEST",
         )
         analyzed = self.service.analyze_recommendations(state, roster)
 
-        self.assertTrue(analyzed.recommendations.position_recommendations)
+        self.assertFalse(analyzed.recommendations.position_recommendations)
         self.assertEqual(
             {
                 slot.slot_id
@@ -541,14 +542,17 @@ class WorkspaceServiceTest(unittest.TestCase):
                 for player in result.lineup
             },
         )
-        self.assertFalse(
-            any(
-                "Recommended" in recommendation.explanation_code
-                for recommendation in analyzed.recommendations.position_recommendations
-            )
+        manual_forward_slot = next(
+            slot for slot in analyzed.current_board.slots
+            if slot.slot_id == defender_slot.slot_id
+        )
+        self.assertEqual(manual_forward_slot.player.player_name, "Rushton")
+        self.assertEqual(
+            analyzed.recommendations.no_position_recommendation_reason,
+            "manual_positions_are_authoritative",
         )
 
-    def test_apply_position_recommendation_updates_lineup_without_optimizer_rerun(self):
+    def test_manual_position_is_not_undone_by_recommendation_analysis(self):
         result = formation_result()
         board = FormationBoardMapper().to_board(result)
         state = self.service.create([board], "3-5-2")
@@ -582,26 +586,21 @@ class WorkspaceServiceTest(unittest.TestCase):
             forward_slot.slot_id,
             defender_slot.slot_id,
             state.revision,
+            roster_players=roster,
             interaction_source="TEST",
         )
         state = self.service.analyze_recommendations(state, roster)
 
         applied = self.service.apply_position_recommendations(state)
 
-        restored_forward = next(
+        manual_forward_slot = next(
             slot for slot in applied.current_board.slots
-            if slot.slot_id == forward_slot.slot_id
+            if slot.slot_id == defender_slot.slot_id
         )
-        self.assertIn(
-            restored_forward.player.player_name,
-            {
-                recommendation.player_display_name
-                for recommendation in state.recommendations.position_recommendations
-            },
-        )
-        self.assertEqual(applied.history[-1].kind, "position_recommendations")
+        self.assertEqual(manual_forward_slot.player.player_name, "Rushton")
+        self.assertEqual(applied.revision, state.revision)
 
-    def test_apply_individual_position_recommendation_updates_only_requested_swap(self):
+    def test_forward_can_be_manually_placed_in_midfield_without_position_recommendation(self):
         result = formation_result()
         board = FormationBoardMapper().to_board(result)
         state = self.service.create([board], "3-5-2")
@@ -610,51 +609,33 @@ class WorkspaceServiceTest(unittest.TestCase):
             if slot.player is not None
             and slot.player.player_name == "Rushton"
         )
-        defender_slot = next(
+        midfield_slot = next(
             slot for slot in state.current_board.slots
             if slot.player is not None
-            and "Central Defender" in slot.player.player_name
+            and slot.position == Position.INNER_MIDFIELDER.value
         )
         roster = [
             make_player(player.player_name)
             for player in result.lineup
         ]
-        roster = [
-            make_player("Rushton", scoring=15, defending=1, playmaking=2)
-            if player.name == "Rushton"
-            else (
-                make_player(player.name, scoring=1, defending=15, playmaking=2)
-                if player.name == defender_slot.player.player_name
-                else player
-            )
-            for player in roster
-        ]
         state = self.service.swap_slots_immediately(
             state,
             "3-5-2",
             forward_slot.slot_id,
-            defender_slot.slot_id,
+            midfield_slot.slot_id,
             state.revision,
+            roster_players=roster,
             interaction_source="TEST",
         )
         state = self.service.analyze_recommendations(state, roster)
-        recommendation = state.recommendations.position_recommendations[0]
 
-        applied = self.service.apply_position_recommendation(
-            state,
-            recommendation.player_id,
+        assigned_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.slot_id == midfield_slot.slot_id
         )
-
-        target_slot = next(
-            slot for slot in applied.current_board.slots
-            if slot.slot_id == recommendation.recommended_slot_id
-        )
-        self.assertEqual(target_slot.player.player_id, recommendation.player_id)
-        self.assertEqual(applied.history[-1].kind, "position_recommendation")
-        self.assertEqual(
-            applied.manual_lineup_state,
-            ManualLineupState.RECOMMENDATIONS_APPLIED,
-        )
+        self.assertEqual(assigned_slot.player.player_name, "Rushton")
+        self.assertEqual(assigned_slot.player.position, Position.INNER_MIDFIELDER.value)
+        self.assertFalse(state.recommendations.position_recommendations)
 
     def test_apply_individual_order_recommendation_updates_only_requested_player(self):
         state = self.service.create([self.board], "3-5-2")
@@ -721,6 +702,104 @@ class WorkspaceServiceTest(unittest.TestCase):
             "Extra Forward",
             [order.value for order in self.service.valid_orders_for_position("FORWARD")],
         )
+
+    def test_incoming_starter_receives_best_valid_order_automatically(self):
+        state = self.service.create([self.board], "3-5-2")
+        winger_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.WINGER.value
+        )
+        roster = [
+            make_player(
+                "A Replacement",
+                defending=1,
+                playmaking=20,
+                winger=1,
+                passing=1,
+                scoring=1,
+            )
+        ]
+
+        state = self.service.replace_slot_immediately(
+            state,
+            roster,
+            "3-5-2",
+            winger_slot.slot_id,
+            "a_replacement",
+            state.revision,
+            interaction_source="TEST",
+        )
+
+        updated_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.slot_id == winger_slot.slot_id
+        )
+        self.assertEqual(updated_slot.player.player_name, "A Replacement")
+        self.assertEqual(updated_slot.player.individual_order, "Towards Middle")
+        self.assertEqual(
+            state.history[-1].order_changes,
+            (("A Replacement", "Normal", "Towards Middle"),),
+        )
+
+    def test_starter_swap_recalculates_orders_for_both_affected_players(self):
+        state = self.service.create([self.board], "3-5-2")
+        winger_slots = [
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.WINGER.value
+        ]
+        roster = [
+            make_player(
+                slot.player.player_name,
+                defending=1,
+                playmaking=20,
+                winger=1,
+                passing=1,
+                scoring=1,
+            )
+            for slot in winger_slots
+        ]
+
+        state = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            winger_slots[0].slot_id,
+            winger_slots[1].slot_id,
+            state.revision,
+            roster_players=roster,
+            interaction_source="TEST",
+        )
+
+        updated_wingers = [
+            slot for slot in state.current_board.slots
+            if slot.slot_id in {winger_slots[0].slot_id, winger_slots[1].slot_id}
+        ]
+        self.assertEqual(
+            [slot.player.individual_order for slot in updated_wingers],
+            ["Towards Middle", "Towards Middle"],
+        )
+        self.assertEqual(len(state.history[-1].order_changes), 2)
+
+    def test_normal_order_remains_when_best_or_tied(self):
+        state = self.service.create([self.board], "3-5-2")
+        goalkeeper_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.GOALKEEPER.value
+        )
+
+        updated = self.service.optimize_orders_for_slots(
+            state,
+            [make_player(goalkeeper_slot.player.player_name, goalkeeper=20)],
+            (goalkeeper_slot.slot_id,),
+        )
+
+        updated_slot = next(
+            slot for slot in updated.current_board.slots
+            if slot.slot_id == goalkeeper_slot.slot_id
+        )
+        self.assertEqual(updated_slot.player.individual_order, "Normal")
 
     def test_stale_replacement_preview_is_rejected_safely(self):
         state = self.service.create([self.board], "3-5-2")
@@ -1101,6 +1180,7 @@ try:
     from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
     from ht_coach_app.views.match_page import MatchPage
+    from ht_coach_app.views.squad_page import SquadPage
     from ht_coach_app.widgets.formation_board.bench_panel import (
         BenchPanel,
         BenchPlayerCard,
@@ -1108,6 +1188,7 @@ try:
     from ht_coach_app.widgets.formation_board.formation_board import (
         FormationBoard,
     )
+    from ht_coach_app.widgets.formation_board.pitch_widget import PitchWidget
 except ModuleNotFoundError as exc:
     if exc.name != "PySide6":
         raise
@@ -1115,8 +1196,10 @@ except ModuleNotFoundError as exc:
     QApplication = None
     FormationBoard = None
     MatchPage = None
+    SquadPage = None
     BenchPanel = None
     BenchPlayerCard = None
+    PitchWidget = None
     QLabel = None
     QPushButton = None
 
@@ -1152,7 +1235,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertEqual(len(modification_calls), 1)
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Updating analysis...",
+            "Lineup manually adjusted",
         )
         self.assertEqual(
             next(
@@ -1230,7 +1313,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertTrue(board_widget.workspace_state().dirty)
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Updating analysis...",
+            "Lineup manually adjusted",
         )
 
     def test_board_routes_candidate_drop_to_replacement_preview(self):
@@ -1262,7 +1345,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertTrue(board_widget.workspace_state().dirty)
         self.assertEqual(
             board_widget.workspace_status_label.text(),
-            "Updating analysis...",
+            "Lineup manually adjusted",
         )
 
     def test_bench_panel_appears_beside_board_with_internal_scroll(self):
@@ -1373,6 +1456,40 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
 
         self.assertEqual(board_widget.current_board().selected_player_id, "")
 
+    def test_pitch_layout_matches_hattrick_vertical_orientation(self):
+        layout = get_formation_layout("3-5-2")
+        line_y = {
+            line: min(slot.normalized_y for slot in layout if slot.line == line)
+            for line in ("goalkeeper", "defense", "midfield", "forward")
+        }
+
+        self.assertLess(line_y["goalkeeper"], line_y["defense"])
+        self.assertLess(line_y["defense"], line_y["midfield"])
+        self.assertLess(line_y["midfield"], line_y["forward"])
+        for slot in layout:
+            self.assertGreaterEqual(slot.normalized_x, 0.0)
+            self.assertLessEqual(slot.normalized_x, 1.0)
+            self.assertGreaterEqual(slot.normalized_y, 0.0)
+            self.assertLessEqual(slot.normalized_y, 1.0)
+
+    def test_pitch_cards_remain_inside_drawable_pitch_after_resize(self):
+        pitch = PitchWidget()
+        pitch.show()
+        pitch.resize(720, 520)
+        pitch.set_board(self._board_model(), revision=1)
+        pitch.resize(420, 640)
+        QApplication.processEvents()
+
+        rect = pitch.pitch_rect()
+        geometries = pitch.card_geometries()
+
+        self.assertTrue(geometries)
+        for geometry in geometries:
+            self.assertGreaterEqual(geometry.left(), int(rect.left()))
+            self.assertGreaterEqual(geometry.top(), int(rect.top()))
+            self.assertLessEqual(geometry.right(), int(rect.right()) + 1)
+            self.assertLessEqual(geometry.bottom(), int(rect.bottom()) + 1)
+
     def test_board_routes_starter_drop_on_bench_card_to_exchange_preview(self):
         board_widget = FormationBoard()
         board_widget.set_boards(
@@ -1460,8 +1577,22 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertNotIn("Apply Replacement", texts)
         self.assertNotIn("Cancel Replacement", texts)
         self.assertNotIn("Recalculate Analysis", texts)
-        self.assertIn("Reset Workspace", texts)
+        self.assertNotIn("Apply All Recommendations", texts)
+        self.assertNotIn("Apply Position Recommendations", texts)
+        self.assertNotIn("Apply Order Recommendations", texts)
+        self.assertNotIn("Apply This Recommendation", texts)
+        self.assertIn("Restore Optimized Lineup", texts)
         self.assertFalse(board_widget.reset_workspace_button.isEnabled())
+
+    def test_squad_primary_toolbar_does_not_show_export_button(self):
+        page = SquadPage()
+
+        texts = [
+            button.text()
+            for button in page.findChildren(QPushButton)
+        ]
+
+        self.assertNotIn("Export Visible", texts)
 
     def test_player_intelligence_uses_workspace_impact_for_inserted_player(self):
         board_widget = FormationBoard()

@@ -23,10 +23,10 @@ class SlotLayout:
 
 
 _LINE_Y = {
-    "forward": 0.18,
-    "midfield": 0.43,
-    "defense": 0.67,
-    "goalkeeper": 0.87,
+    "goalkeeper": 0.13,
+    "defense": 0.35,
+    "midfield": 0.58,
+    "forward": 0.82,
 }
 
 

@@ -113,9 +113,6 @@ class SquadPage(BasePage):
         reload_button = QPushButton("Reload")
         reload_button.clicked.connect(self.reload_requested)
 
-        export_button = QPushButton("Export Visible")
-        export_button.clicked.connect(self.export_requested)
-
         self.loaded_label = QLabel("No players loaded")
         self.status_label = QLabel("Ready")
         self.status_label.setWordWrap(True)
@@ -160,7 +157,6 @@ class SquadPage(BasePage):
         layout.addWidget(browse_button, 0, 5)
         layout.addWidget(load_button, 0, 6)
         layout.addWidget(reload_button, 0, 7)
-        layout.addWidget(export_button, 0, 8)
         layout.addWidget(self.loaded_label, 1, 1, 1, 2)
         layout.addWidget(self.status_label, 1, 3, 1, 6)
         layout.addWidget(QLabel("Search"), 2, 0)

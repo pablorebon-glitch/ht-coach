@@ -112,12 +112,12 @@ class FormationLayoutTest(unittest.TestCase):
     def test_pitch_orientation_and_left_right_semantics(self):
         for name in SUPPORTED_FORMATIONS:
             layout = get_formation_layout(name)
-            goalkeeper_y = max(
+            goalkeeper_y = min(
                 slot.normalized_y
                 for slot in layout
                 if slot.line == "goalkeeper"
             )
-            defense_y = max(
+            defense_y = min(
                 slot.normalized_y
                 for slot in layout
                 if slot.line == "defense"
@@ -133,8 +133,9 @@ class FormationLayoutTest(unittest.TestCase):
                 if slot.line == "forward"
             )
 
-            self.assertGreater(goalkeeper_y, defense_y)
-            self.assertGreater(midfield_y, forward_y)
+            self.assertLess(goalkeeper_y, defense_y)
+            self.assertLess(defense_y, midfield_y)
+            self.assertLess(midfield_y, forward_y)
 
             for position in {slot.position for slot in layout}:
                 left = [

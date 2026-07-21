@@ -1411,7 +1411,7 @@ def _lineup_in_pitch_order(formation):
     try:
         layouts = sorted(
             get_formation_layout(formation.formation_name),
-            key=lambda slot: (-slot.normalized_y, slot.normalized_x),
+            key=lambda slot: (slot.normalized_y, slot.normalized_x),
         )
     except Exception:
         return formation.lineup

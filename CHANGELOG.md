@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added Alpha 0.5.6.2.1 Squad Builder Manual Intent and Automatic Orders: manual
+  slot assignments are treated as authoritative, affected players receive automatic
+  supported individual orders, the Formation Board uses a Hattrick-oriented pitch
+  orientation, and the primary Squad toolbar no longer shows Export.
 - Added Alpha 0.5.6.2 Squad Builder Assisted Lineup with canonical click/drag lineup
   editing, starter-to-starter click swaps, manual lineup state, assisted position/order
   recommendations, explicit apply actions and EN/ES workspace localization.
@@ -152,6 +156,10 @@
 
 ### Changed
 
+- Squad Builder Assisted Lineup now removes visible Apply All / Apply Positions /
+  Apply Orders confirmation controls. Valid edits apply immediately, automatic order
+  optimization is bounded to affected slots, and the status badge uses neutral manual
+  adjusted language instead of a permanent updating state.
 - Formation Board click-to-click and drag-and-drop starter swaps now use the same
   `WorkspaceService` operation, including goalkeeper-slot protection and duplicate
   player prevention.
@@ -238,6 +246,8 @@
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
+- Alpha 0.5.6.2.1 preserves the initial optimizer result as the restore snapshot and
+  does not add training constraints, mandatory players, rest planning or new formulas.
 - Assisted Lineup recommendations use existing internal contribution semantics only;
   they do not implement training constraints, mandatory players, Hattrick decimal
   conversion, rating estimation or optimizer scoring changes.
