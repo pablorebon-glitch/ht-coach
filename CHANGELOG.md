@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.5.7.1a Rebuild Collapsible Workspace Component: the Match analysis
+  sections now use a simple header/body Qt layout with natural `sizeHint` behavior,
+  no vertical expansion policy, no manual height animation or stale height clamps, and
+  independent persisted state. Default Match result sections are Decision Lab collapsed,
+  Match Intelligence collapsed, Opponent Rating Calibration collapsed and Match
+  Analysis expanded.
 - Added Alpha 0.5.7.1.1 Responsive Workspace Regression Fix: collapsed Match
   sections now release body height, Formation Board bench/details side panels can be
   collapsed in Match, Squad and Weekly Planner, Weekly Planner uses one unified player
