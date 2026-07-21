@@ -108,10 +108,13 @@ class CollapsibleSection(QFrame):
         changed = expanded != self._expanded
         self._expanded = expanded
         self.body_host.setVisible(expanded)
-        self.body_host.setSizePolicy(
-            self.body_host.sizePolicy().horizontalPolicy(),
-            QSizePolicy.Preferred if expanded else QSizePolicy.Ignored,
+        policy = self.body_host.sizePolicy()
+        policy.setVerticalPolicy(
+            QSizePolicy.Policy.Preferred
+            if expanded
+            else QSizePolicy.Policy.Ignored
         )
+        self.body_host.setSizePolicy(policy)
         if not expanded:
             self.body_host.setMinimumHeight(0)
             self.body_host.setMaximumHeight(0)
