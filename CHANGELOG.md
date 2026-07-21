@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added Alpha 0.5.6.2 Squad Builder Assisted Lineup with canonical click/drag lineup
+  editing, starter-to-starter click swaps, manual lineup state, assisted position/order
+  recommendations, explicit apply actions and EN/ES workspace localization.
 - Added Alpha 0.5.6.1 Rating Validation Framework with typed validation fixtures,
   official-versus-predicted rating separation, completeness classification, JSON
   dataset loading, validation metrics, structured reports, a CLI smoke tool and the
@@ -149,6 +152,9 @@
 
 ### Changed
 
+- Formation Board click-to-click and drag-and-drop starter swaps now use the same
+  `WorkspaceService` operation, including goalkeeper-slot protection and duplicate
+  player prevention.
 - Match analysis inputs now collapse after a successful or restored analysis and can be
   reopened or collapsed again through a persistent Analysis Setup toggle without
   rerunning optimization or clearing the current result.
@@ -232,6 +238,9 @@
 
 - Optimization formulas, engine ratings, optimizers and probability calculations were not
   modified.
+- Assisted Lineup recommendations use existing internal contribution semantics only;
+  they do not implement training constraints, mandatory players, Hattrick decimal
+  conversion, rating estimation or optimizer scoring changes.
 - Workspace edits are immediate view-model changes that are automatically evaluated as a
   fixed Workspace Lineup through existing calculation paths.
 - Decision Lab explanations are deterministic and rule-based; no AI service, LLM,

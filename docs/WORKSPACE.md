@@ -4,6 +4,10 @@ Alpha 0.4.5 turns the HT Coach Workspace into a one-click tactical lab: lineup e
 commit immediately, fixed-lineup analysis updates automatically, and Reset Workspace is
 the only global edit action.
 
+Alpha 0.5.6.2 adds Assisted Lineup behavior on top of that model. Manual lineup edits
+remain explicit user actions, while HT Coach can now recommend slot and individual-order
+adjustments for the already selected eleven.
+
 ## Concept
 
 The Match page now separates two lineups:
@@ -30,6 +34,9 @@ FormationBoard
 immediate replacement/swap operations and future undo/redo history shape. Widgets render
 this state and emit user intent; they do not mutate lineup slots directly.
 
+`WorkspaceService` is the single canonical editing boundary for click-to-click and
+drag-and-drop operations. Qt handlers translate UI gestures into service calls only.
+
 ## Workspace Model
 
 Workspace state contains:
@@ -42,6 +49,9 @@ Workspace state contains:
 - modification history;
 - redo stack reserved for future use.
 - evaluation state: original, updating, evaluated, or failed;
+- manual lineup state: optimized, manually modified, recommendations available or
+  recommendations applied;
+- structured assisted recommendations;
 - revision number used to reject stale clicks, drops and analysis results safely.
 
 The dirty flag is derived from history. Reset creates a fresh editable copy from the
@@ -61,6 +71,19 @@ original recommendation and clears selection, preview and pending modifications.
 No probability, xG, tactic, Decision Lab or comparison value changes until automatic
 fixed-lineup recalculation completes. Stale results are discarded if the Workspace
 revision has moved on.
+
+## Click-To-Click
+
+Click-to-click follows the same operation rules as drag-and-drop:
+
+- starter then starter: swap the two players' slots;
+- starter then Bench player: Bench player enters the selected starter slot;
+- Bench player then starter: Bench player enters the clicked starter slot;
+- same player twice: cancel selection;
+- empty pitch area or Escape: cancel selection.
+
+Goalkeepers can only move to goalkeeper slots. Invalid operations preserve the lineup
+and expose concise feedback through Workspace state.
 
 ## Bench
 
@@ -98,6 +121,33 @@ but the destination slot keeps its position, side, order and normalized pitch co
 For Bench exchanges, the Bench player enters the target slot and the displaced starter
 returns to the derived Bench immediately.
 
+Click and drag use the same `WorkspaceService` operations, so they produce the same
+lineup contents, slot assignments, dirty state and dependent refresh behavior.
+
+## Assisted Recommendations
+
+After a manual edit, the Workspace can analyze the current eleven inside the current
+formation.
+
+Position recommendations:
+
+- reorder only current starters;
+- preserve formation structure and goalkeeper constraints;
+- prevent duplicate player assignment;
+- compare internal contribution totals through existing contribution semantics;
+- never add or remove players.
+
+Order recommendations:
+
+- enumerate only orders supported by `OrderModifier`;
+- keep Normal when it is already best;
+- report affected sectors and internal contribution deltas;
+- never imply Hattrick decimal ratings.
+
+Recommendations are structured data, not translated prose. The UI localizes labels at
+render time. Applying recommendations is explicit and remains reversible through Reset
+Workspace.
+
 ## Keyboard Replacement
 
 Drag is not the only editing route. Select a lineup slot, focus or click a Bench card,
@@ -109,6 +159,9 @@ works: select a Bench player, then click a starter.
 The board shows a compact status indicator:
 
 - Original Recommendation: no workspace edits.
+- Lineup manually modified: the current Workspace differs from the optimizer snapshot.
+- Recommendations available: assisted recommendations exist for the current revision.
+- Recommendations applied: the user explicitly applied assisted recommendations.
 - Updating analysis...: a committed edit is waiting for or running fixed-lineup analysis.
 - Evaluated Workspace: current metrics were recalculated for the Workspace Lineup.
 - Analysis failed: the Workspace lineup is kept, but the latest recalculation failed.
@@ -122,6 +175,7 @@ Reset Workspace restores:
 - selected player;
 - transient selection;
 - dirty state.
+- recommendation state.
 
 Reset schedules automatic fixed-lineup recalculation when restoring a modified Workspace.
 
@@ -137,6 +191,13 @@ refreshes Decision Lab, Player Intelligence, comparison, Detailed XI and Formati
 Workspace recalculation deliberately bypasses lineup optimization. It does not invent
 metrics and does not change rating, probability, xG, tactic, order or Decision Lab
 formulas.
+
+Immediate refresh after edits is limited to presentation that truly consumes the edited
+Workspace lineup: pitch, Bench, selected player detail, sector totals after fixed-lineup
+recalculation, Player Intelligence context and assisted recommendations. Match-context
+modules such as Decision Lab, Match Intelligence and Tactical Advisor update after the
+fixed-lineup recalculation returns. Squad Evolution and Transfer Planner remain based on
+their own Squad analyses and are not claimed to describe the manual Workspace lineup.
 
 The debounce coalesces rapid edits. A returning result is applied only when its captured
 Workspace revision still matches the latest requested revision.
@@ -188,3 +249,8 @@ The workspace model reserves history and redo state so later milestones can add:
 
 Alpha 0.4.6 deliberately does not include a long history timeline, Undo/Redo or
 animated interactions.
+
+Constraint-Based Lineup Optimizer is explicitly deferred. Future support may include
+mandatory players, rest lists, training priorities, locked slots, locked orders and
+minimum win-confidence constraints. Alpha 0.5.6.2 only assists edits to the current
+lineup.

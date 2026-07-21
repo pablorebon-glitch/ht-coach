@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from ht_coach_app.core.position_formatting import format_position
+from ht_coach_app.core.side_formatting import format_side
 from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.widgets.formation_board.bench_panel import BenchPanel
@@ -92,6 +94,24 @@ class FormationBoard(QWidget):
         header_layout.addWidget(self.workspace_status_label)
 
         header_layout.addStretch(1)
+
+        self.apply_all_button = QPushButton(t("workspace.apply_all_recommendations"))
+        self.apply_all_button.setObjectName("workspaceAction")
+        self.apply_all_button.setToolTip(t("workspace.apply_recommendations_tip"))
+        self.apply_all_button.clicked.connect(self.apply_all_recommendations)
+        header_layout.addWidget(self.apply_all_button)
+
+        self.apply_position_button = QPushButton(
+            t("workspace.apply_position_recommendations")
+        )
+        self.apply_position_button.setObjectName("workspaceAction")
+        self.apply_position_button.clicked.connect(self.apply_position_recommendations)
+        header_layout.addWidget(self.apply_position_button)
+
+        self.apply_order_button = QPushButton(t("workspace.apply_order_recommendations"))
+        self.apply_order_button.setObjectName("workspaceAction")
+        self.apply_order_button.clicked.connect(self.apply_order_recommendations)
+        header_layout.addWidget(self.apply_order_button)
 
         self.reset_workspace_button = QPushButton(t("workspace.reset"))
         self.reset_workspace_button.setObjectName("workspaceAction")
@@ -265,13 +285,27 @@ class FormationBoard(QWidget):
             self.clear_selection()
             return
 
-        self._workspace_state = self._workspace_service.select_player(
+        before_revision = self._workspace_state.revision
+        self._workspace_state = self._workspace_service.click_player(
             self._workspace_state,
+            self._roster_players,
             player_id,
+            interaction_source="CLICK",
         )
+        changed = self._workspace_state.revision != before_revision
+        if changed and not self._workspace_state.last_error:
+            self._workspace_state = self._workspace_service.analyze_recommendations(
+                self._workspace_state,
+                self._roster_players,
+            )
+            self._workspace_state = self._workspace_service.mark_updating(
+                self._workspace_state
+            )
         self._selected_bench_player_id = ""
         self._sync_boards_cache()
         self._render_current_board()
+        if changed and not self._workspace_state.last_error:
+            self.workspace_modified.emit(self._workspace_state)
 
     def clear_selection(self):
         board = self.current_board()
@@ -393,6 +427,49 @@ class FormationBoard(QWidget):
         self._render_current_board()
         if was_dirty:
             self.workspace_modified.emit(self._workspace_state)
+
+    def apply_all_recommendations(self):
+        if self._workspace_state is None:
+            return
+        self._workspace_state = self._workspace_service.apply_all_recommendations(
+            self._workspace_state,
+            self._roster_players,
+        )
+        self._after_recommendation_apply()
+
+    def apply_position_recommendations(self):
+        if self._workspace_state is None:
+            return
+        self._workspace_state = self._workspace_service.apply_position_recommendations(
+            self._workspace_state
+        )
+        self._after_recommendation_apply()
+
+    def apply_order_recommendations(self):
+        if self._workspace_state is None:
+            return
+        self._workspace_state = self._workspace_service.apply_order_recommendations(
+            self._workspace_state
+        )
+        self._after_recommendation_apply()
+
+    def apply_position_recommendation(self, player_id):
+        if self._workspace_state is None:
+            return
+        self._workspace_state = self._workspace_service.apply_position_recommendation(
+            self._workspace_state,
+            player_id,
+        )
+        self._after_recommendation_apply()
+
+    def apply_order_recommendation(self, player_id):
+        if self._workspace_state is None:
+            return
+        self._workspace_state = self._workspace_service.apply_order_recommendation(
+            self._workspace_state,
+            player_id,
+        )
+        self._after_recommendation_apply()
 
     def _on_formation_changed(self):
         self._current_name = self.formation_combo.currentData() or ""
@@ -533,6 +610,7 @@ class FormationBoard(QWidget):
             self._add_alternatives(intelligence.alternatives)
 
         self._add_slot_score_comparison(board.selected_player)
+        self._add_recommendation_panel()
 
         if intelligence.technical_attributes:
             self._add_technical_details(intelligence.technical_attributes)
@@ -780,6 +858,16 @@ class FormationBoard(QWidget):
             self.workspace_status_label
         )
         self.reset_workspace_button.setEnabled(is_dirty)
+        recommendations = state.recommendations if state is not None else None
+        has_positions = bool(
+            recommendations and recommendations.position_recommendations
+        )
+        has_orders = bool(
+            recommendations and recommendations.order_recommendations
+        )
+        self.apply_all_button.setEnabled(has_positions or has_orders)
+        self.apply_position_button.setEnabled(has_positions)
+        self.apply_order_button.setEnabled(has_orders)
 
     def _emit_recalculate_requested(self):
         if self._workspace_state is not None:
@@ -806,6 +894,10 @@ class FormationBoard(QWidget):
                 )
                 self._selected_bench_player_id = ""
                 if not self._workspace_state.last_error:
+                    self._workspace_state = self._workspace_service.analyze_recommendations(
+                        self._workspace_state,
+                        self._roster_players,
+                    )
                     self._workspace_state = self._workspace_service.mark_updating(
                         self._workspace_state
                     )
@@ -911,6 +1003,10 @@ class FormationBoard(QWidget):
             self._workspace_state = self._workspace_service.clear_selection(
                 self._workspace_state
             )
+            self._workspace_state = self._workspace_service.analyze_recommendations(
+                self._workspace_state,
+                self._roster_players,
+            )
             self._workspace_state = self._workspace_service.mark_updating(
                 self._workspace_state
             )
@@ -918,6 +1014,92 @@ class FormationBoard(QWidget):
         self._render_current_board()
         if not self._workspace_state.last_error:
             self.workspace_modified.emit(self._workspace_state)
+
+    def _after_recommendation_apply(self):
+        if self._workspace_state is None:
+            return
+        if not self._workspace_state.last_error:
+            self._workspace_state = self._workspace_service.mark_updating(
+                self._workspace_state
+            )
+        self._selected_bench_player_id = ""
+        self._sync_boards_cache()
+        self._render_current_board()
+        if not self._workspace_state.last_error:
+            self.workspace_modified.emit(self._workspace_state)
+
+    def _add_recommendation_panel(self):
+        state = self._workspace_state
+        if state is None or not state.dirty:
+            return
+        recommendations = state.recommendations
+        panel = QFrame()
+        panel.setObjectName("coachNote")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
+
+        title = QLabel(t("workspace.recommended_adjustment"))
+        title.setObjectName("formationBoardTitle")
+        layout.addWidget(title)
+
+        if not recommendations.has_recommendations:
+            message = QLabel(t("workspace.current_arrangement_already_optimal"))
+            message.setWordWrap(True)
+            layout.addWidget(message)
+
+        for item in recommendations.position_recommendations:
+            line = QLabel(
+                f"{item.player_display_name}: "
+                f"{format_position(item.current_position)} {format_side(item.current_side)}"
+                f" -> {format_position(item.recommended_position)} "
+                f"{format_side(item.recommended_side)}"
+            )
+            line.setWordWrap(True)
+            layout.addWidget(line)
+            self._add_impact_rows(layout, item.impact.sector_deltas)
+            button = QPushButton(t("workspace.apply_this_recommendation"))
+            button.setObjectName("workspaceAction")
+            button.clicked.connect(
+                lambda checked=False, player_id=item.player_id: (
+                    self.apply_position_recommendation(player_id)
+                )
+            )
+            layout.addWidget(button)
+
+        for item in recommendations.order_recommendations:
+            line = QLabel(
+                f"{item.player_display_name}: "
+                f"{t('workspace.current_order')} {item.current_order} -> "
+                f"{t('workspace.recommended_order')} {item.recommended_order}"
+            )
+            line.setWordWrap(True)
+            layout.addWidget(line)
+            self._add_impact_rows(layout, item.impact.sector_deltas)
+            button = QPushButton(t("workspace.apply_this_recommendation"))
+            button.setObjectName("workspaceAction")
+            button.clicked.connect(
+                lambda checked=False, player_id=item.player_id: (
+                    self.apply_order_recommendation(player_id)
+                )
+            )
+            layout.addWidget(button)
+
+        self.inspector_layout.addWidget(panel)
+
+    def _add_impact_rows(self, layout, sector_deltas):
+        if not sector_deltas:
+            return
+        label = QLabel(t("workspace.expected_impact"))
+        label.setObjectName("playerInspectorMeta")
+        layout.addWidget(label)
+        for sector, delta in sector_deltas:
+            row = QLabel(
+                f"{sector.replace('_', ' ').title()}: {delta:+.2f} "
+                f"{t('workspace.internal_contribution')}"
+            )
+            row.setWordWrap(True)
+            layout.addWidget(row)
 
     @staticmethod
     def _section_label(text):

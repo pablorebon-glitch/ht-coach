@@ -2,11 +2,18 @@ from copy import deepcopy
 from dataclasses import replace
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
+from engine.calculators.contribution_calculator import ContributionCalculator
+from engine.orders.order_modifier import OrderModifier
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import format_position_abbreviation
 from ht_coach_app.core.position_formatting import normalize_position_key
 from ht_coach_app.core.side_formatting import format_side
 from ht_coach_app.workspace.workspace_models import (
+    LineupRecommendationSet,
+    ManualLineupState,
+    OrderRecommendation,
+    PositionRecommendation,
+    RecommendationImpact,
     WorkspaceBenchPlayer,
     WorkspaceModification,
     WorkspaceReplacementCandidate,
@@ -14,10 +21,22 @@ from ht_coach_app.workspace.workspace_models import (
     WorkspaceState,
     WorkspaceSwapPreview,
 )
+from models.order import Order
+from models.position import Position
 from models.side import Side
 
 
 MAX_REPLACEMENT_CANDIDATES = 5
+MIN_RECOMMENDATION_IMPROVEMENT = 0.01
+SECTORS = (
+    "left_defense",
+    "central_defense",
+    "right_defense",
+    "midfield",
+    "left_attack",
+    "central_attack",
+    "right_attack",
+)
 
 
 class WorkspaceService:
@@ -79,6 +98,37 @@ class WorkspaceService:
             swap_preview=None,
             last_error="",
         )
+
+    def click_player(self, state, roster_players, player_id, interaction_source="CLICK"):
+        board = state.current_board
+        if board is None:
+            return state
+
+        clicked_slot = self._slot_by_player_id(board, player_id)
+        if clicked_slot is None:
+            return self._error(self.clear_selection(state), "Invalid lineup operation.")
+
+        selected_slot = self._selected_slot(board)
+        if selected_slot is None:
+            return self.select_player(state, player_id)
+
+        if selected_slot.slot_id == clicked_slot.slot_id:
+            return self.clear_selection(state)
+
+        applied = self.swap_slots_immediately(
+            state,
+            board.formation_name,
+            selected_slot.slot_id,
+            clicked_slot.slot_id,
+            state.revision,
+            interaction_source=interaction_source,
+        )
+        if not applied.last_error:
+            applied = self.clear_selection(applied)
+        return applied
+
+    def cancel_selection(self, state):
+        return self.clear_selection(state)
 
     def clear_selection(self, state):
         board = state.current_board
@@ -434,6 +484,8 @@ class WorkspaceService:
                 return False, "The dragged player is no longer in this lineup."
             if source_slot_id == target_slot_id:
                 return False, "Drop onto a different slot to swap players."
+            if self._is_goalkeeper_slot(source_slot) != self._is_goalkeeper_slot(target_slot):
+                return False, "Goalkeepers can only move to goalkeeper slots."
             return True, ""
         if payload.get("source_type") in ("candidate", "bench"):
             if not payload.get("player_id"):
@@ -451,6 +503,8 @@ class WorkspaceService:
             return self._error(state, "Both lineup slots must be occupied.")
         if source_slot_id == target_slot_id:
             return self._error(state, "Choose a different slot to swap players.")
+        if self._is_goalkeeper_slot(source_slot) != self._is_goalkeeper_slot(target_slot):
+            return self._error(state, "Goalkeepers can only move to goalkeeper slots.")
 
         return replace(
             state,
@@ -580,6 +634,11 @@ class WorkspaceService:
             evaluation_state="pending",
             revision=state.revision + 1,
             last_error="",
+            manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.MANUALLY_MODIFIED,
+                stale_revision=state.revision + 1,
+            ),
         )
 
     def apply_swap(self, state, interaction_source=""):
@@ -650,6 +709,11 @@ class WorkspaceService:
             evaluation_state="pending",
             revision=state.revision + 1,
             last_error="",
+            manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.MANUALLY_MODIFIED,
+                stale_revision=state.revision + 1,
+            ),
         )
 
     def reset(self, state):
@@ -662,7 +726,202 @@ class WorkspaceService:
             workspace_boards=boards,
             current_formation_name=state.current_formation_name,
             revision=state.revision + 1,
+            manual_lineup_state=ManualLineupState.OPTIMIZED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.OPTIMIZED,
+                stale_revision=state.revision + 1,
+            ),
         )
+
+    def analyze_recommendations(self, state, roster_players):
+        board = state.current_board
+        if board is None:
+            return state
+
+        current_score, current_totals = self._board_score(board, roster_players)
+        positioned_board, position_recommendations, position_score, position_totals = (
+            self._position_recommendations(board, roster_players, current_score)
+        )
+        order_recommendations, order_score, _order_totals = self._order_recommendations(
+            positioned_board,
+            roster_players,
+            position_score,
+            position_totals,
+        )
+        recommendations = LineupRecommendationSet(
+            manual_state=(
+                ManualLineupState.RECOMMENDATIONS_AVAILABLE
+                if position_recommendations or order_recommendations
+                else state.manual_lineup_state
+            ),
+            position_recommendations=tuple(position_recommendations),
+            order_recommendations=tuple(order_recommendations),
+            objective="formation_score",
+            current_score=current_score,
+            recommended_score=max(position_score, order_score, current_score),
+            stale_revision=state.revision,
+            no_position_recommendation_reason=(
+                "" if position_recommendations else "current_arrangement_already_optimal"
+            ),
+            no_order_recommendation_reason=(
+                "" if order_recommendations else "current_order_already_recommended"
+            ),
+        )
+        return replace(
+            state,
+            manual_lineup_state=recommendations.manual_state,
+            recommendations=recommendations,
+            last_error="",
+        )
+
+    def apply_position_recommendations(self, state):
+        recommendations = state.recommendations
+        if recommendations.stale_revision != state.revision:
+            return self._error(state, "Recommendations are out of date.")
+        board = state.current_board
+        if board is None or not recommendations.position_recommendations:
+            return state
+
+        assignments = {
+            item.current_slot_id: item.recommended_slot_id
+            for item in recommendations.position_recommendations
+        }
+        source_by_slot = {
+            slot.slot_id: slot
+            for slot in board.slots
+            if slot.player is not None
+        }
+        player_for_target = {}
+        for source_slot_id, target_slot_id in assignments.items():
+            source_slot = source_by_slot.get(source_slot_id)
+            target_slot = source_by_slot.get(target_slot_id)
+            if source_slot is None or target_slot is None:
+                return self._error(state, "Recommendations are out of date.")
+            player_for_target[target_slot_id] = self._assign_player_to_slot(
+                source_slot.player,
+                target_slot,
+                selected=False,
+            )
+
+        updated_slots = []
+        for slot in board.slots:
+            if slot.slot_id in player_for_target:
+                updated_slots.append(replace(slot, player=player_for_target[slot.slot_id]))
+            else:
+                updated_slots.append(slot)
+
+        return self._apply_recommended_board(
+            state,
+            replace(board, slots=tuple(updated_slots), selected_player_id=""),
+            "position_recommendations",
+        )
+
+    def apply_order_recommendations(self, state):
+        recommendations = state.recommendations
+        if recommendations.stale_revision != state.revision:
+            return self._error(state, "Recommendations are out of date.")
+        board = state.current_board
+        if board is None or not recommendations.order_recommendations:
+            return state
+
+        by_player = {
+            item.player_id: item
+            for item in recommendations.order_recommendations
+        }
+        updated_slots = []
+        for slot in board.slots:
+            player = slot.player
+            if player is None or player.player_id not in by_player:
+                updated_slots.append(slot)
+                continue
+            recommendation = by_player[player.player_id]
+            updated_slots.append(
+                replace(
+                    slot,
+                    player=replace(
+                        player,
+                        individual_order=recommendation.recommended_order,
+                        order_label=recommendation.recommended_order,
+                        order_side=recommendation.recommended_order_side,
+                        order_side_label=format_side(
+                            recommendation.recommended_order_side
+                        ),
+                        is_modified=True,
+                    ),
+                )
+            )
+
+        return self._apply_recommended_board(
+            state,
+            replace(board, slots=tuple(updated_slots), selected_player_id=""),
+            "order_recommendations",
+        )
+
+    def apply_position_recommendation(self, state, player_id):
+        recommendations = state.recommendations
+        if recommendations.stale_revision != state.revision:
+            return self._error(state, "Recommendations are out of date.")
+        board = state.current_board
+        if board is None:
+            return state
+        recommendation = next(
+            (
+                item
+                for item in recommendations.position_recommendations
+                if item.player_id == player_id
+            ),
+            None,
+        )
+        if recommendation is None:
+            return self._error(state, "No recommendation available.")
+
+        updated_board = self._swapped_board(
+            board,
+            recommendation.current_slot_id,
+            recommendation.recommended_slot_id,
+        )
+        if updated_board == board:
+            return self._error(state, "No recommendation available.")
+        return self._apply_recommended_board(
+            state,
+            replace(updated_board, selected_player_id=""),
+            "position_recommendation",
+        )
+
+    def apply_order_recommendation(self, state, player_id):
+        recommendations = state.recommendations
+        if recommendations.stale_revision != state.revision:
+            return self._error(state, "Recommendations are out of date.")
+        board = state.current_board
+        if board is None:
+            return state
+        recommendation = next(
+            (
+                item
+                for item in recommendations.order_recommendations
+                if item.player_id == player_id
+            ),
+            None,
+        )
+        if recommendation is None:
+            return self._error(state, "No recommendation available.")
+        return self._apply_recommended_board(
+            state,
+            self._board_with_order(
+                board,
+                recommendation.player_id,
+                self._order(recommendation.recommended_order),
+            ),
+            "order_recommendation",
+        )
+
+    def apply_all_recommendations(self, state, roster_players=None):
+        state = self.apply_position_recommendations(state)
+        if state.last_error:
+            return state
+        if state.recommendations.stale_revision != state.revision:
+            state = self.analyze_recommendations(state, roster_players or [])
+        return self.apply_order_recommendations(state)
 
     def with_evaluated_boards(self, state, boards):
         selected_player_id = state.selected_player_id
@@ -708,6 +967,272 @@ class WorkspaceService:
             evaluation_state="failed",
             last_error=message,
         )
+
+    def _position_recommendations(self, board, roster_players, current_score):
+        working = board
+        recommendations = []
+        score = current_score
+        totals = self._empty_totals()
+        improved = True
+
+        while improved:
+            improved = False
+            best = None
+            slots = [slot for slot in working.slots if slot.player is not None]
+            for source in slots:
+                if source.position == Position.GOALKEEPER.value:
+                    continue
+                for target in slots:
+                    if source.slot_id >= target.slot_id:
+                        continue
+                    if target.position == Position.GOALKEEPER.value:
+                        continue
+                    candidate = self._swapped_board(working, source.slot_id, target.slot_id)
+                    candidate_score, candidate_totals = self._board_score(
+                        candidate,
+                        roster_players,
+                    )
+                    improvement = candidate_score - score
+                    if improvement <= MIN_RECOMMENDATION_IMPROVEMENT:
+                        continue
+                    if best is None or improvement > best[0]:
+                        best = (
+                            improvement,
+                            source,
+                            target,
+                            candidate,
+                            candidate_score,
+                            candidate_totals,
+                        )
+
+            if best is not None:
+                improvement, source, target, candidate, score, totals = best
+                deltas = self._sector_deltas(
+                    self._board_score(working, roster_players)[1],
+                    totals,
+                )
+                recommendations.extend(
+                    [
+                        PositionRecommendation(
+                            player_id=source.player.player_id,
+                            player_display_name=source.player.player_name,
+                            current_slot_id=source.slot_id,
+                            recommended_slot_id=target.slot_id,
+                            current_position=source.player.position,
+                            recommended_position=target.position,
+                            current_side=source.side,
+                            recommended_side=target.side,
+                            impact=RecommendationImpact(
+                                affected_sectors=tuple(sector for sector, _ in deltas),
+                                sector_deltas=deltas,
+                                aggregate_improvement=round(improvement, 4),
+                            ),
+                        ),
+                        PositionRecommendation(
+                            player_id=target.player.player_id,
+                            player_display_name=target.player.player_name,
+                            current_slot_id=target.slot_id,
+                            recommended_slot_id=source.slot_id,
+                            current_position=target.player.position,
+                            recommended_position=source.position,
+                            current_side=target.side,
+                            recommended_side=source.side,
+                            impact=RecommendationImpact(
+                                affected_sectors=tuple(sector for sector, _ in deltas),
+                                sector_deltas=deltas,
+                                aggregate_improvement=round(improvement, 4),
+                            ),
+                        ),
+                    ]
+                )
+                working = candidate
+                improved = True
+
+        if not recommendations:
+            score, totals = self._board_score(board, roster_players)
+        return working, tuple(recommendations), score, totals
+
+    def _order_recommendations(self, board, roster_players, current_score, current_totals):
+        recommendations = []
+        working = board
+        score = current_score
+        totals = current_totals
+        for slot in working.slots:
+            player_card = slot.player
+            if player_card is None:
+                continue
+            current_order = self._order(player_card.individual_order)
+            best_order = current_order
+            best_score = score
+            best_totals = totals
+            for order in self.valid_orders_for_position(player_card.position):
+                candidate = self._board_with_order(working, player_card.player_id, order)
+                candidate_score, candidate_totals = self._board_score(
+                    candidate,
+                    roster_players,
+                )
+                if candidate_score > best_score + MIN_RECOMMENDATION_IMPROVEMENT:
+                    best_order = order
+                    best_score = candidate_score
+                    best_totals = candidate_totals
+            if best_order == current_order:
+                continue
+            deltas = self._sector_deltas(totals, best_totals)
+            recommendations.append(
+                OrderRecommendation(
+                    player_id=player_card.player_id,
+                    player_display_name=player_card.player_name,
+                    slot_id=slot.slot_id,
+                    current_order=current_order.value,
+                    recommended_order=best_order.value,
+                    position=player_card.position,
+                    side=player_card.side,
+                    impact=RecommendationImpact(
+                        affected_sectors=tuple(sector for sector, _ in deltas),
+                        sector_deltas=deltas,
+                        aggregate_improvement=round(best_score - score, 4),
+                    ),
+                )
+            )
+            working = self._board_with_order(working, player_card.player_id, best_order)
+            score = best_score
+            totals = best_totals
+
+        return tuple(recommendations), score, totals
+
+    @staticmethod
+    def valid_orders_for_position(position):
+        normalized = WorkspaceService._position(position)
+        return (Order.NORMAL,) + tuple(
+            order
+            for order in OrderModifier.ORDER_FACTORS.get(normalized, {})
+        )
+
+    def _board_score(self, board, roster_players):
+        totals = self._empty_totals()
+        for slot in board.slots:
+            if slot.player is None:
+                continue
+            player = self._find_player(roster_players, slot.player.player_name)
+            if player is None:
+                continue
+            contribution = ContributionCalculator.calculate(
+                player,
+                self._position(slot.player.position).value,
+                self._side(slot.player.side),
+            )
+            contribution = OrderModifier.apply(
+                contribution,
+                self._position(slot.player.position),
+                self._side(slot.player.side),
+                self._order(slot.player.individual_order),
+                self._optional_side(slot.player.order_side),
+            )
+            for sector in SECTORS:
+                totals[sector] += float(getattr(contribution, sector))
+        return round(sum(totals.values()), 4), totals
+
+    def _swapped_board(self, board, source_slot_id, target_slot_id):
+        source_slot = self._slot_by_id(board, source_slot_id)
+        target_slot = self._slot_by_id(board, target_slot_id)
+        if source_slot is None or target_slot is None:
+            return board
+        source = source_slot.player
+        target = target_slot.player
+        if source is None or target is None:
+            return board
+        return replace(
+            board,
+            slots=tuple(
+                replace(slot, player=self._assign_player_to_slot(target, source_slot))
+                if slot.slot_id == source_slot_id
+                else (
+                    replace(slot, player=self._assign_player_to_slot(source, target_slot))
+                    if slot.slot_id == target_slot_id
+                    else slot
+                )
+                for slot in board.slots
+            ),
+        )
+
+    def _board_with_order(self, board, player_id, order):
+        return replace(
+            board,
+            slots=tuple(
+                replace(
+                    slot,
+                    player=(
+                        replace(
+                            slot.player,
+                            individual_order=order.value,
+                            order_label=order.value,
+                        )
+                        if slot.player is not None
+                        and slot.player.player_id == player_id
+                        else slot.player
+                    ),
+                )
+                for slot in board.slots
+            ),
+        )
+
+    def _apply_recommended_board(self, state, board, kind):
+        boards = dict(state.workspace_boards)
+        boards[board.formation_name] = self.clear_board_selection(board)
+        modification = WorkspaceModification(
+            formation_name=board.formation_name,
+            slot_id="",
+            role="",
+            original_player_name="",
+            replacement_player_name="",
+            score_difference=round(
+                state.recommendations.recommended_score
+                - state.recommendations.current_score,
+                4,
+            ),
+            kind=kind,
+            before_lineup_ids=self._lineup_ids(state.current_board),
+            after_lineup_ids=self._lineup_ids(board),
+            revision_before=state.revision,
+            revision_after=state.revision + 1,
+        )
+        return replace(
+            state,
+            workspace_boards=boards,
+            selected_player_id="",
+            replacement_preview=None,
+            swap_preview=None,
+            history=state.history + (modification,),
+            redo_stack=(),
+            evaluation_state="pending",
+            revision=state.revision + 1,
+            last_error="",
+            manual_lineup_state=ManualLineupState.RECOMMENDATIONS_APPLIED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.RECOMMENDATIONS_APPLIED,
+                stale_revision=state.revision + 1,
+                current_score=state.recommendations.current_score,
+                recommended_score=state.recommendations.recommended_score,
+            ),
+        )
+
+    @staticmethod
+    def _empty_totals():
+        return {sector: 0.0 for sector in SECTORS}
+
+    @staticmethod
+    def _sector_deltas(before, after):
+        deltas = []
+        for sector in SECTORS:
+            delta = round(after.get(sector, 0.0) - before.get(sector, 0.0), 4)
+            if abs(delta) > MIN_RECOMMENDATION_IMPROVEMENT:
+                deltas.append((sector, delta))
+        return tuple(deltas)
+
+    @staticmethod
+    def _is_goalkeeper_slot(slot):
+        position = getattr(slot, "position", "")
+        return normalize_position_key(position) == Position.GOALKEEPER.value
 
     def select_board_player(self, board, player_id):
         return replace(
@@ -887,6 +1412,15 @@ class WorkspaceService:
         return None
 
     @staticmethod
+    def _slot_by_player_id(board, player_id):
+        if board is None:
+            return None
+        for slot in board.slots:
+            if slot.player is not None and slot.player.player_id == player_id:
+                return slot
+        return None
+
+    @staticmethod
     def _slot_by_id(board, slot_id):
         if board is None:
             return None
@@ -917,6 +1451,33 @@ class WorkspaceService:
             return Side(str(value))
         except ValueError:
             return Side.CENTER
+
+    @staticmethod
+    def _optional_side(side):
+        value = getattr(side, "value", side)
+        if not value:
+            return None
+        try:
+            return Side(str(value))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _position(position):
+        value = normalize_position_key(position)
+        try:
+            return Position(str(value))
+        except ValueError:
+            return Position.GOALKEEPER
+
+    @staticmethod
+    def _order(order):
+        value = getattr(order, "value", order)
+        text = str(value or "").strip()
+        for candidate in Order:
+            if text in (candidate.name, candidate.value):
+                return candidate
+        return Order.NORMAL
 
     @staticmethod
     def _candidate_reason(difference):
@@ -960,17 +1521,30 @@ class WorkspaceService:
 
     @staticmethod
     def _assign_player_to_slot(player, slot_template, selected=False):
+        template_player = getattr(slot_template, "player", None) or slot_template
+        position = getattr(slot_template, "position", getattr(template_player, "position", ""))
+        position_label = getattr(
+            slot_template,
+            "position_label",
+            format_position(position),
+        )
+        side = getattr(slot_template, "side", getattr(template_player, "side", ""))
+        side_label = getattr(
+            slot_template,
+            "side_label",
+            format_side(side),
+        )
         return replace(
             player,
-            position=slot_template.position,
-            position_label=slot_template.position_label,
-            position_abbreviation=slot_template.position_abbreviation,
-            side=slot_template.side,
-            side_label=slot_template.side_label,
-            individual_order=slot_template.individual_order,
-            order_label=slot_template.order_label,
-            order_side=slot_template.order_side,
-            order_side_label=slot_template.order_side_label,
+            position=position,
+            position_label=position_label,
+            position_abbreviation=format_position_abbreviation(position),
+            side=side,
+            side_label=side_label,
+            individual_order=getattr(template_player, "individual_order", "Normal"),
+            order_label=getattr(template_player, "order_label", "Normal"),
+            order_side=getattr(template_player, "order_side", ""),
+            order_side_label=getattr(template_player, "order_side_label", ""),
             is_selected=selected,
             is_modified=True,
             is_replacement_preview=False,
