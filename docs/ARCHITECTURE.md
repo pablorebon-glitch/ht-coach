@@ -555,6 +555,9 @@ Workspace rules:
 - manual position choices are not contradicted by persistent position recommendations;
 - automatic orders enumerate existing `OrderOptimizer.ALLOWED_CONFIGURATIONS`, compare
   internal contribution totals and preserve the current valid order on ties;
+- Workspace creation applies the same automatic-order operation to every starter before
+  persisting the original optimized snapshot, so initial load, reload and Restore
+  Optimized Lineup show identical finalized orders;
 - the Formation Board pitch uses normalized coordinates in Hattrick visual order:
   goalkeeper, defenders, midfielders, forwards;
 - recalculation is automatic, debounced and routed back through `MatchController`;

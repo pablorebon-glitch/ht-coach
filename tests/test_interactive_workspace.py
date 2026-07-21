@@ -130,6 +130,20 @@ def roster_for_result(result):
     return players
 
 
+def roster_that_prefers_middle_orders(result):
+    return [
+        make_player(
+            player.player_name,
+            defending=1,
+            playmaking=20,
+            winger=1,
+            passing=1,
+            scoring=1,
+        )
+        for player in result.lineup
+    ]
+
+
 class FakeOpponentService:
     def __init__(self):
         self.opponent = Opponent(
@@ -187,6 +201,180 @@ class WorkspaceServiceTest(unittest.TestCase):
             state.status_label,
             "Lineup manually adjusted",
         )
+
+    def test_initial_lineup_optimizes_all_starting_orders_before_snapshot(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        roster = roster_that_prefers_middle_orders(result)
+        evaluated_slots = []
+        original_best_order = self.service._best_order_for_slot
+
+        def tracking_best_order(board_model, roster_players, slot_id):
+            evaluated_slots.append(slot_id)
+            return original_best_order(board_model, roster_players, slot_id)
+
+        self.service._best_order_for_slot = tracking_best_order
+        try:
+            state = self.service.create([board], "3-5-2", roster_players=roster)
+        finally:
+            self.service._best_order_for_slot = original_best_order
+
+        self.assertEqual(
+            set(evaluated_slots),
+            {
+                slot.slot_id
+                for slot in board.slots
+                if slot.player is not None
+            },
+        )
+        self.assertEqual(len(evaluated_slots), 11)
+        self.assertEqual(state.status_label, "Original Recommendation")
+        self.assertTrue(
+            any(
+                slot.player is not None
+                and slot.player.individual_order != "Normal"
+                for slot in state.current_board.slots
+            )
+        )
+        self.assertEqual(
+            [
+                slot.player.individual_order
+                for slot in state.original_boards["3-5-2"].slots
+                if slot.player is not None
+            ],
+            [
+                slot.player.individual_order
+                for slot in state.current_board.slots
+                if slot.player is not None
+            ],
+        )
+
+    def test_initial_sector_score_uses_finalized_orders(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        roster = roster_that_prefers_middle_orders(result)
+
+        state = self.service.create([board], "3-5-2", roster_players=roster)
+
+        baseline_score, _ = self.service._board_score(board, roster)
+        optimized_score, _ = self.service._board_score(state.current_board, roster)
+        self.assertGreater(optimized_score, baseline_score)
+
+    def test_reload_recomputes_same_initial_orders(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        roster = roster_that_prefers_middle_orders(result)
+
+        initial = self.service.create([board], "3-5-2", roster_players=roster)
+        reloaded = self.service.create([board], "3-5-2", roster_players=roster)
+
+        self.assertEqual(
+            [
+                (slot.slot_id, slot.player.player_name, slot.player.individual_order)
+                for slot in initial.current_board.slots
+                if slot.player is not None
+            ],
+            [
+                (slot.slot_id, slot.player.player_name, slot.player.individual_order)
+                for slot in reloaded.current_board.slots
+                if slot.player is not None
+            ],
+        )
+
+    def test_player_data_changes_regenerate_initial_orders(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        normal_roster = roster_for_result(result)
+        changed_roster = roster_that_prefers_middle_orders(result)
+
+        normal_state = self.service.create(
+            [board],
+            "3-5-2",
+            roster_players=normal_roster,
+        )
+        changed_state = self.service.create(
+            [board],
+            "3-5-2",
+            roster_players=changed_roster,
+        )
+
+        normal_orders = [
+            slot.player.individual_order
+            for slot in normal_state.current_board.slots
+            if slot.player is not None
+        ]
+        changed_orders = [
+            slot.player.individual_order
+            for slot in changed_state.current_board.slots
+            if slot.player is not None
+        ]
+        self.assertNotEqual(changed_orders, normal_orders)
+
+    def test_initial_and_slot_paths_share_canonical_order_selection(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        roster = roster_that_prefers_middle_orders(result)
+        initial = self.service.create([board], "3-5-2", roster_players=roster)
+        manual = self.service.create([board], "3-5-2")
+        manual = self.service.optimize_orders_for_slots(
+            manual,
+            roster,
+            tuple(
+                slot.slot_id
+                for slot in board.slots
+                if slot.player is not None
+            ),
+        )
+
+        self.assertEqual(
+            [
+                slot.player.individual_order
+                for slot in initial.current_board.slots
+                if slot.player is not None
+            ],
+            [
+                slot.player.individual_order
+                for slot in manual.current_board.slots
+                if slot.player is not None
+            ],
+        )
+
+    def test_reset_restores_initial_optimized_orders_without_reoptimizing(self):
+        result = formation_result()
+        board = board_with_selected_forward()
+        roster = roster_that_prefers_middle_orders(result)
+        state = self.service.create([board], "3-5-2", roster_players=roster)
+        original_orders = {
+            slot.slot_id: slot.player.individual_order
+            for slot in state.current_board.slots
+            if slot.player is not None
+        }
+        candidate = self.service.replacement_candidates(
+            state,
+            self.roster,
+        )[0]
+        state = self.service.preview_replacement(state, candidate)
+        state = self.service.apply_replacement(state, self.roster)
+        self.assertEqual(state.status_label, "Lineup manually adjusted")
+
+        original_best_order = self.service._best_order_for_slot
+
+        def fail_if_called(*_args, **_kwargs):
+            raise AssertionError("restore must not rerun order optimization")
+
+        self.service._best_order_for_slot = fail_if_called
+        try:
+            restored = self.service.reset(state)
+        finally:
+            self.service._best_order_for_slot = original_best_order
+
+        restored_orders = {
+            slot.slot_id: slot.player.individual_order
+            for slot in restored.current_board.slots
+            if slot.player is not None
+        }
+        self.assertEqual(restored_orders, original_orders)
+        self.assertEqual(restored.status_label, "Original Recommendation")
 
     def test_replacement_preview_apply_cancel_and_reset(self):
         state = self.service.create([self.board], "3-5-2")
@@ -1209,6 +1397,28 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+
+    def test_board_ui_shows_initial_optimized_orders_on_player_cards(self):
+        result = formation_result()
+        board_widget = FormationBoard()
+
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=roster_that_prefers_middle_orders(result),
+        )
+
+        self.assertEqual(
+            board_widget.workspace_status_label.text(),
+            "Original Recommendation",
+        )
+        self.assertTrue(
+            any(
+                slot.player is not None
+                and slot.player.individual_order != "Normal"
+                for slot in board_widget.current_board().slots
+            )
+        )
+        self.assertFalse(board_widget.workspace_state().dirty)
 
     def test_board_ui_replacement_commits_and_requests_recalculation_immediately(self):
         board_widget = FormationBoard()
