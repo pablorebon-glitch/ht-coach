@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -16,6 +17,12 @@ from ht_coach_app.widgets.formation_board.formation_layouts import (
     get_formation_layout,
 )
 from ht_coach_app.workspace.workspace_service import WorkspaceService
+from ht_coach_app.workspace.workspace_models import (
+    LineupRecommendationSet,
+    ManualLineupState,
+    OrderRecommendation,
+    RecommendationImpact,
+)
 from models.opponent import Opponent
 from models.player import Player
 from models.position import Position
@@ -178,7 +185,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         self.assertTrue(state.dirty)
         self.assertEqual(
             state.status_label,
-            "Modified Workspace - Pending Recalculation",
+            "Lineup manually modified",
         )
 
     def test_replacement_preview_apply_cancel_and_reset(self):
@@ -225,7 +232,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         state = self.service.apply_replacement(state, self.roster)
         self.assertEqual(
             state.status_label,
-            "Modified Workspace - Pending Recalculation",
+            "Lineup manually modified",
         )
 
         evaluated_board = FormationBoardMapper().to_board(
@@ -249,7 +256,7 @@ class WorkspaceServiceTest(unittest.TestCase):
         state = self.service.apply_replacement(state, self.roster)
         self.assertEqual(
             state.status_label,
-            "Modified Workspace - Pending Recalculation",
+            "Lineup manually modified",
         )
 
         state = self.service.reset(state)
@@ -290,7 +297,9 @@ class WorkspaceServiceTest(unittest.TestCase):
     def test_swap_preview_does_not_mutate_until_apply(self):
         state = self.service.create([self.board], "3-5-2")
         slots = [
-            slot for slot in state.current_board.slots if slot.player is not None
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
         ]
         source = slots[0]
         target = slots[1]
@@ -303,19 +312,29 @@ class WorkspaceServiceTest(unittest.TestCase):
 
         self.assertIsNotNone(previewed.swap_preview)
         self.assertEqual(previewed.status_label, "Swap Preview")
+        source_after_preview = next(
+            slot for slot in previewed.current_board.slots
+            if slot.slot_id == source.slot_id
+        )
+        target_after_preview = next(
+            slot for slot in previewed.current_board.slots
+            if slot.slot_id == target.slot_id
+        )
         self.assertEqual(
-            previewed.current_board.slots[0].player.player_name,
+            source_after_preview.player.player_name,
             source.player.player_name,
         )
         self.assertEqual(
-            previewed.current_board.slots[1].player.player_name,
+            target_after_preview.player.player_name,
             target.player.player_name,
         )
 
     def test_apply_swap_keeps_slot_tactics_attached_to_slots(self):
         state = self.service.create([self.board], "3-5-2")
         slots = [
-            slot for slot in state.current_board.slots if slot.player is not None
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
         ]
         source = slots[0]
         target = slots[1]
@@ -354,6 +373,354 @@ class WorkspaceServiceTest(unittest.TestCase):
         self.assertEqual(applied.revision, state.revision + 1)
         self.assertEqual(len(applied.history), 1)
         self.assertEqual(applied.history[0].kind, "swap")
+
+    def test_click_to_click_swaps_two_starters_through_canonical_service(self):
+        state = self.service.create([self.board], "3-5-2")
+        state = self.service.clear_selection(state)
+        slots = [
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
+        ]
+        first = slots[0]
+        second = slots[1]
+
+        state = self.service.click_player(
+            state,
+            self.roster,
+            first.player.player_id,
+        )
+        self.assertEqual(state.current_board.selected_player_id, first.player.player_id)
+        state = self.service.click_player(
+            state,
+            self.roster,
+            second.player.player_id,
+        )
+
+        updated_first = next(
+            slot for slot in state.current_board.slots
+            if slot.slot_id == first.slot_id
+        )
+        updated_second = next(
+            slot for slot in state.current_board.slots
+            if slot.slot_id == second.slot_id
+        )
+        lineup_ids = [
+            slot.player.player_id
+            for slot in state.current_board.slots
+            if slot.player is not None
+        ]
+
+        self.assertEqual(updated_first.player.player_name, second.player.player_name)
+        self.assertEqual(updated_second.player.player_name, first.player.player_name)
+        self.assertEqual(len(lineup_ids), 11)
+        self.assertEqual(len(lineup_ids), len(set(lineup_ids)))
+        self.assertEqual(state.current_board.selected_player_id, "")
+        self.assertEqual(state.history[-1].interaction_source, "CLICK")
+
+    def test_click_and_drag_starter_swaps_produce_equivalent_lineup_state(self):
+        state = self.service.create([self.board], "3-5-2")
+        state = self.service.clear_selection(state)
+        slots = [
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
+        ]
+        first = slots[0]
+        second = slots[1]
+
+        click = self.service.click_player(
+            state,
+            self.roster,
+            first.player.player_id,
+        )
+        click = self.service.click_player(
+            click,
+            self.roster,
+            second.player.player_id,
+        )
+        drag = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            first.slot_id,
+            second.slot_id,
+            state.revision,
+            interaction_source="DRAG",
+        )
+        drag = self.service.clear_selection(drag)
+
+        self.assertEqual(
+            [
+                slot.player.player_id
+                for slot in click.current_board.slots
+                if slot.player is not None
+            ],
+            [
+                slot.player.player_id
+                for slot in drag.current_board.slots
+                if slot.player is not None
+            ],
+        )
+        self.assertEqual(click.history[-1].kind, drag.history[-1].kind)
+
+    def test_same_player_click_cancels_without_modifying_lineup(self):
+        state = self.service.create([self.board], "3-5-2")
+        state = self.service.clear_selection(state)
+        player_id = next(
+            slot.player.player_id
+            for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
+        )
+
+        selected = self.service.click_player(state, self.roster, player_id)
+        cancelled = self.service.click_player(selected, self.roster, player_id)
+
+        self.assertEqual(cancelled.current_board.selected_player_id, "")
+        self.assertFalse(cancelled.dirty)
+        self.assertEqual(cancelled.revision, state.revision)
+
+    def test_position_recommendation_preserves_formation_and_current_starters(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        state = self.service.create([board], "3-5-2")
+        forward_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        defender_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and "Central Defender" in slot.player.player_name
+        )
+        roster = [
+            make_player(player.player_name)
+            for player in result.lineup
+        ]
+        roster = [
+            make_player("Rushton", scoring=15, defending=1, playmaking=2)
+            if player.name == "Rushton"
+            else (
+                make_player(player.name, scoring=1, defending=15, playmaking=2)
+                if player.name == defender_slot.player.player_name
+                else player
+            )
+            for player in roster
+        ]
+
+        state = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            forward_slot.slot_id,
+            defender_slot.slot_id,
+            state.revision,
+            interaction_source="TEST",
+        )
+        analyzed = self.service.analyze_recommendations(state, roster)
+
+        self.assertTrue(analyzed.recommendations.position_recommendations)
+        self.assertEqual(
+            {
+                slot.slot_id
+                for slot in analyzed.current_board.slots
+            },
+            {
+                slot.slot_id
+                for slot in board.slots
+            },
+        )
+        self.assertEqual(
+            {
+                slot.player.player_name
+                for slot in analyzed.current_board.slots
+                if slot.player is not None
+            },
+            {
+                player.player_name
+                for player in result.lineup
+            },
+        )
+        self.assertFalse(
+            any(
+                "Recommended" in recommendation.explanation_code
+                for recommendation in analyzed.recommendations.position_recommendations
+            )
+        )
+
+    def test_apply_position_recommendation_updates_lineup_without_optimizer_rerun(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        state = self.service.create([board], "3-5-2")
+        forward_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        defender_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and "Central Defender" in slot.player.player_name
+        )
+        roster = [
+            make_player(player.player_name)
+            for player in result.lineup
+        ]
+        roster = [
+            make_player("Rushton", scoring=15, defending=1, playmaking=2)
+            if player.name == "Rushton"
+            else (
+                make_player(player.name, scoring=1, defending=15, playmaking=2)
+                if player.name == defender_slot.player.player_name
+                else player
+            )
+            for player in roster
+        ]
+        state = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            forward_slot.slot_id,
+            defender_slot.slot_id,
+            state.revision,
+            interaction_source="TEST",
+        )
+        state = self.service.analyze_recommendations(state, roster)
+
+        applied = self.service.apply_position_recommendations(state)
+
+        restored_forward = next(
+            slot for slot in applied.current_board.slots
+            if slot.slot_id == forward_slot.slot_id
+        )
+        self.assertIn(
+            restored_forward.player.player_name,
+            {
+                recommendation.player_display_name
+                for recommendation in state.recommendations.position_recommendations
+            },
+        )
+        self.assertEqual(applied.history[-1].kind, "position_recommendations")
+
+    def test_apply_individual_position_recommendation_updates_only_requested_swap(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        state = self.service.create([board], "3-5-2")
+        forward_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        defender_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and "Central Defender" in slot.player.player_name
+        )
+        roster = [
+            make_player(player.player_name)
+            for player in result.lineup
+        ]
+        roster = [
+            make_player("Rushton", scoring=15, defending=1, playmaking=2)
+            if player.name == "Rushton"
+            else (
+                make_player(player.name, scoring=1, defending=15, playmaking=2)
+                if player.name == defender_slot.player.player_name
+                else player
+            )
+            for player in roster
+        ]
+        state = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            forward_slot.slot_id,
+            defender_slot.slot_id,
+            state.revision,
+            interaction_source="TEST",
+        )
+        state = self.service.analyze_recommendations(state, roster)
+        recommendation = state.recommendations.position_recommendations[0]
+
+        applied = self.service.apply_position_recommendation(
+            state,
+            recommendation.player_id,
+        )
+
+        target_slot = next(
+            slot for slot in applied.current_board.slots
+            if slot.slot_id == recommendation.recommended_slot_id
+        )
+        self.assertEqual(target_slot.player.player_id, recommendation.player_id)
+        self.assertEqual(applied.history[-1].kind, "position_recommendation")
+        self.assertEqual(
+            applied.manual_lineup_state,
+            ManualLineupState.RECOMMENDATIONS_APPLIED,
+        )
+
+    def test_apply_individual_order_recommendation_updates_only_requested_player(self):
+        state = self.service.create([self.board], "3-5-2")
+        slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.position == Position.WINGER.value
+        )
+        recommendation = OrderRecommendation(
+            player_id=slot.player.player_id,
+            player_display_name=slot.player.player_name,
+            slot_id=slot.slot_id,
+            current_order="Normal",
+            recommended_order="Towards Middle",
+            position=slot.player.position,
+            side=slot.player.side,
+            impact=RecommendationImpact(
+                affected_sectors=("midfield",),
+                sector_deltas=(("midfield", 0.2),),
+                aggregate_improvement=0.2,
+            ),
+        )
+        state = replace(
+            state,
+            manual_lineup_state=ManualLineupState.RECOMMENDATIONS_AVAILABLE,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.RECOMMENDATIONS_AVAILABLE,
+                order_recommendations=(recommendation,),
+                current_score=10.0,
+                recommended_score=10.2,
+                stale_revision=state.revision,
+            ),
+        )
+
+        applied = self.service.apply_order_recommendation(
+            state,
+            recommendation.player_id,
+        )
+
+        updated_slot = next(
+            slot for slot in applied.current_board.slots
+            if slot.slot_id == recommendation.slot_id
+        )
+        untouched_orders = [
+            slot.player.individual_order
+            for slot in applied.current_board.slots
+            if slot.player is not None
+            and slot.slot_id != recommendation.slot_id
+        ]
+        self.assertEqual(updated_slot.player.individual_order, "Towards Middle")
+        self.assertTrue(all(order == "Normal" for order in untouched_orders))
+        self.assertEqual(applied.history[-1].kind, "order_recommendation")
+
+    def test_valid_orders_are_enumerated_by_supported_domain_rules_only(self):
+        self.assertEqual(
+            [order.value for order in self.service.valid_orders_for_position("GOALKEEPER")],
+            ["Normal"],
+        )
+        self.assertIn(
+            "Defensive",
+            [order.value for order in self.service.valid_orders_for_position("WINGER")],
+        )
+        self.assertNotIn(
+            "Extra Forward",
+            [order.value for order in self.service.valid_orders_for_position("FORWARD")],
+        )
 
     def test_stale_replacement_preview_is_rejected_safely(self):
         state = self.service.create([self.board], "3-5-2")
@@ -847,6 +1214,7 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         slots = [
             slot for slot in board_widget.current_board().slots
             if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
         ]
         payload = {
             "source_type": "lineup",

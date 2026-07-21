@@ -46,6 +46,13 @@ ratings from supplied predictions, classifies fixture completeness, calculates e
 metrics and returns structured reports. It does not implement prediction, conversion,
 calibration, optimization or rating estimation.
 
+Alpha 0.5.6.2 extends `ht_coach_app/workspace` with assisted lineup editing for Squad
+Builder and Match Formation Board surfaces. `WorkspaceService` is the canonical
+presentation-independent boundary for starter swaps, Bench exchanges, click selection,
+manual state, optimized-lineup restore and assisted position/order recommendations.
+Qt widgets translate clicks and drops into service operations; they do not duplicate
+lineup business rules.
+
 ## Target Layers
 
 ```text
@@ -537,13 +544,25 @@ Workspace rules:
 - Bench is derived from loaded roster players minus the displayed Workspace Lineup and
   is never an independent source of truth;
 - valid click and drag edits commit immediately to the Workspace Lineup;
+- click-to-click and drag-and-drop starter swaps share the same service operation;
+- goalkeeper slots are protected from field-player swaps;
 - reset restores the original recommendation;
+- manual state is explicit: Optimized, Manually Modified, Recommendations Available and
+  Recommendations Applied;
+- assisted position recommendations reorder only the current eleven inside the current
+  formation;
+- assisted order recommendations enumerate only `OrderModifier`-supported orders and
+  compare internal contribution totals;
 - recalculation is automatic, debounced and routed back through `MatchController`;
 - Workspace recalculation evaluates the current fixed lineup through application-layer
   orchestration around existing `TeamRater` and `TacticOptimizer` calculations;
 - stale recalculation results are discarded when the Workspace revision has changed;
 - no engine formulas, probability calculations, Decision Lab rules or optimizer behavior
   are changed.
+
+Assisted Lineup deliberately defers constraint-based lineup optimization. It does not
+implement mandatory players, rest lists, training-priority players, locked positions,
+minimum win probability, automatic formation changes or new optimizer scoring.
 
 ### Player Intelligence
 

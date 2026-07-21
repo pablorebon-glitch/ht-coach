@@ -349,6 +349,10 @@ Acceptance criteria:
   versus predicted rating separation, completeness classification, JSON loading,
   validation metrics, structured reports, a CLI validator and a future prediction
   provider interface without implementing prediction or conversion.
+- Alpha 0.5.6.2 Squad Builder Assisted Lineup: unify click and drag lineup operations,
+  add starter-to-starter click swaps, manual lineup state, optimized restore, assisted
+  position/order recommendations and explicit apply actions without implementing the
+  future constraint-based lineup optimizer.
 - Alpha 0.5.7 Midfield Rating Engine v1: only after enough complete validation fixtures
   exist, investigate a measured midfield predictor against the validation framework.
 - Alpha 0.5.8 Defense Rating Engine v1: validate defensive sector prediction candidates

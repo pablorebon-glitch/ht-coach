@@ -96,6 +96,9 @@ Content:
 - Auto mode evaluates every supported formation and displays the best roster fit.
 - Formation Board reused from the Match workspace for the Ideal XI pitch; no second
   pitch widget is introduced.
+- Assisted Lineup controls on the Formation Board support click-to-click starter swaps,
+  Bench exchanges, explicit Apply Recommendation actions and Restore Optimized Lineup
+  without requiring drag-and-drop.
 - Best Formations side panel with sorted scores and deltas versus the best result.
 - Summary with best formation, overall score, confidence and reason.
 - Squad Identity panel that separates Identity, Strengths, Weaknesses, Tactical
@@ -248,6 +251,14 @@ Content:
 - Interactive Workspace editing where valid click and drag actions commit immediately
   to the Workspace Lineup and schedule automatic fixed-lineup recalculation. Reset
   Workspace remains the only global edit action.
+- Click-to-click starter swaps use the same canonical operation as drag-and-drop.
+  Selecting the same player cancels selection, Escape cancels selection, and invalid
+  destinations preserve the lineup.
+- Manual edits show `Lineup manually modified`; assisted recommendations can be applied
+  individually by category or all at once, and are never applied automatically.
+- Position recommendations preserve the current formation and current eleven. Order
+  recommendations use only supported domain orders and show internal contribution
+  impact without implying Hattrick decimal ratings.
 - Bench panel with compact focusable cards, deterministic roster-minus-lineup derivation
   and internal scrolling. Clicking a Bench player and then a starter, or selecting a
   starter and clicking a Bench player, performs the same immediate exchange.
@@ -438,6 +449,10 @@ Responsibilities:
 - Render compact player cards with user-facing position, side and order labels.
 - Support player selection, Player Intelligence updates and immediate workspace
   replacements.
+- Support starter-to-starter click swaps, Bench-to-starter click replacements,
+  starter-to-Bench drag exchanges and accessible non-drag editing paths.
+- Show assisted position/order recommendations with explicit apply buttons and internal
+  contribution impact.
 - Distinguish immutable Recommended Lineup state from editable Workspace Lineup state.
 - Show Original Recommendation, Updating Analysis, Evaluated Workspace and failed
   analysis states.
