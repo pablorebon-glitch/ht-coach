@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import t
 from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
+from ht_coach_app.ui.design_system.collapsible_side_panel import CollapsibleSidePanel
 from ht_coach_app.widgets.formation_board.bench_panel import BenchPanel
 from ht_coach_app.widgets.formation_board.formation_board_models import (
     PlayerCardViewModel,
@@ -57,6 +58,7 @@ class FormationBoard(QWidget):
         self._roster_players = []
         self._current_name = ""
         self._selected_bench_player_id = ""
+        self._state_namespace = "formation_board"
         self.setMinimumHeight(BOARD_MINIMUM_HEIGHT)
         self.setStyleSheet(formation_board_stylesheet())
         self._build()
@@ -139,7 +141,6 @@ class FormationBoard(QWidget):
 
         self.bench_panel = BenchPanel()
         self.bench_panel.setMinimumWidth(160)
-        self.bench_panel.setMaximumWidth(230)
         self.bench_panel.player_selected.connect(self.select_bench_player)
         self.bench_panel.preview_requested.connect(
             self.preview_bench_player_for_selected_slot
@@ -148,8 +149,16 @@ class FormationBoard(QWidget):
             self._handle_starter_dropped_on_bench
         )
 
+        self.bench_side_panel = CollapsibleSidePanel(
+            t("bench.title"),
+            f"{self._state_namespace}.bench",
+            self.bench_panel,
+        )
+        self.bench_side_panel.setMinimumWidth(170)
+        self.bench_side_panel.setMaximumWidth(260)
+
         board_bench_layout.addWidget(pitch_panel, 4)
-        board_bench_layout.addWidget(self.bench_panel, 1)
+        board_bench_layout.addWidget(self.bench_side_panel, 1)
         self.splitter.addWidget(board_bench_panel)
 
         self.inspector_scroll = QScrollArea()
@@ -171,7 +180,13 @@ class FormationBoard(QWidget):
         )
         self.inspector_layout.setSpacing(6)
         self.inspector_scroll.setWidget(self.inspector)
-        self.splitter.addWidget(self.inspector_scroll)
+        self.inspector_side_panel = CollapsibleSidePanel(
+            t("workspace.player_details"),
+            f"{self._state_namespace}.details",
+            self.inspector_scroll,
+        )
+        self.inspector_side_panel.setMinimumWidth(INSPECTOR_MINIMUM_WIDTH)
+        self.splitter.addWidget(self.inspector_side_panel)
 
         self.splitter.setStretchFactor(0, 2)
         self.splitter.setStretchFactor(1, 1)
@@ -182,6 +197,17 @@ class FormationBoard(QWidget):
             ]
         )
         layout.addWidget(self.splitter, 1)
+
+    def set_state_namespace(self, namespace):
+        self._state_namespace = str(namespace or "formation_board")
+        self.bench_side_panel.set_state_key(f"{self._state_namespace}.bench")
+        self.inspector_side_panel.set_state_key(f"{self._state_namespace}.details")
+
+    def side_panel_states(self):
+        return {
+            "bench": self.bench_side_panel.is_expanded(),
+            "details": self.inspector_side_panel.is_expanded(),
+        }
 
     def set_boards(
         self,

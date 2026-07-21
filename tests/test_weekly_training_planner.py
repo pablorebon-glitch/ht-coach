@@ -11,6 +11,7 @@ from engine.weekly_training.models import (
     PLAYMAKING,
     MatchRole,
     MatchStatus,
+    PlayerCoverage,
     PlannerState,
     TrainingPriority,
     TrainingPriorityRecord,
@@ -362,7 +363,47 @@ def test_squad_page_weekly_planner_tab_smoke():
     assert "Weekly Planner" in tab_labels
     assert page.weekly_training_type_combo.currentData() == PLAYMAKING
     assert page.weekly_generate_button.text() == "Generate Plan"
-    assert page.weekly_priority_table.columnCount() == 6
-    assert page.weekly_coverage_table.columnCount() == 8
+    assert page.weekly_player_table.columnCount() == 9
+    assert page.weekly_priority_table is page.weekly_player_table
+    assert page.weekly_coverage_table is page.weekly_player_table
     assert page.findChildren(QComboBox)
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_uses_unified_table_and_simplified_priorities(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    players = [player("Trainer One")]
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    priority_rows = service.priority_rows(players)
+    coverage_rows = [
+        PlayerCoverage(
+            player_id=player_training_id(players[0]),
+            player_name="Trainer One",
+            weekly_target=TrainingPriority.REQUIRED_100,
+            confirmed_exposure=Decimal("0"),
+            planned_exposure=Decimal("45"),
+            remaining_exposure=Decimal("45"),
+        )
+    ]
+
+    page.show_weekly_training(
+        service.load_state(),
+        priority_rows,
+        coverage_rows,
+        ["3-5-2"],
+    )
+
+    assert page.weekly_priority_table is page.weekly_player_table
+    assert page.weekly_coverage_table is page.weekly_player_table
+    combo = page.weekly_player_table.cellWidget(0, 3)
+    assert [combo.itemText(index) for index in range(combo.count())] == [
+        "100%",
+        "50%",
+        "No priority",
+    ]
+    assert page.weekly_player_table.item(0, 4).text() == "\u25cb"
     app.processEvents()

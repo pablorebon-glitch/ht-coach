@@ -1,9 +1,10 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -107,6 +108,15 @@ class CollapsibleSection(QFrame):
         changed = expanded != self._expanded
         self._expanded = expanded
         self.body_host.setVisible(expanded)
+        self.body_host.setSizePolicy(
+            self.body_host.sizePolicy().horizontalPolicy(),
+            QSizePolicy.Preferred if expanded else QSizePolicy.Ignored,
+        )
+        if not expanded:
+            self.body_host.setMinimumHeight(0)
+            self.body_host.setMaximumHeight(0)
+        else:
+            self.body_host.setMaximumHeight(16777215)
         self.arrow_label.setText("v" if expanded else ">")
         self.header_button.setAccessibleName(self._accessible_name())
         self.header_button.setToolTip(
@@ -117,6 +127,8 @@ class CollapsibleSection(QFrame):
         self.header_button.setProperty("expanded", expanded)
         self.header_button.style().unpolish(self.header_button)
         self.header_button.style().polish(self.header_button)
+        self.updateGeometry()
+        self._activate_parent_layouts()
         if emit and changed:
             self.toggled.emit(self.state_key, expanded)
 
@@ -149,6 +161,22 @@ class CollapsibleSection(QFrame):
     def summary(self):
         return self._summary
 
+    def sizeHint(self):
+        if self._expanded:
+            return super().sizeHint()
+        return QSize(
+            max(self.header_button.sizeHint().width(), self.minimumSizeHint().width()),
+            self.header_button.sizeHint().height(),
+        )
+
+    def minimumSizeHint(self):
+        if self._expanded:
+            return super().minimumSizeHint()
+        return QSize(
+            self.header_button.minimumSizeHint().width(),
+            self.header_button.minimumSizeHint().height(),
+        )
+
     def retranslate(self, title=None, summary=None):
         if title is not None:
             self.set_title(title)
@@ -164,3 +192,13 @@ class CollapsibleSection(QFrame):
         )
         summary = f" - {self._summary}" if self._summary else ""
         return f"{action}: {self._title}{summary}"
+
+    def _activate_parent_layouts(self):
+        widget = self
+        while widget is not None:
+            layout = widget.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+            widget.updateGeometry()
+            widget = widget.parentWidget()

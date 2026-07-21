@@ -305,6 +305,15 @@ The shared component lives in `ht_coach_app/ui/design_system/collapsible_section
 Headers are clickable across their full width and support Enter and Space. Header text,
 summary text and expand/collapse tooltips pass through the localization layer.
 
+Alpha 0.5.7.1.1 tightens the geometry contract: a collapsed section hides its body,
+removes the body from size hints, invalidates parent layouts and occupies only header
+height. Match restores the outer page scroll again after deferred Qt layout updates, so
+cross-line replacements do not jump the viewport upward.
+
+The shared Formation Board also supports collapsible bench and player-details side
+panels. Collapsing either panel preserves the underlying widget and current selection
+while releasing width back to the pitch workspace.
+
 ## Future Work
 
 The workspace model reserves history and redo state so later milestones can add:

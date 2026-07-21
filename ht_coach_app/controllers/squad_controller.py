@@ -111,6 +111,18 @@ class SquadController:
             self._view.record_first_match_requested.connect(
                 self._record_first_training_match
             )
+        if hasattr(self._view, "edit_first_match_requested"):
+            self._view.edit_first_match_requested.connect(
+                self._edit_first_training_match
+            )
+        if hasattr(self._view, "replace_first_match_requested"):
+            self._view.replace_first_match_requested.connect(
+                self._replace_first_training_match
+            )
+        if hasattr(self._view, "delete_first_match_requested"):
+            self._view.delete_first_match_requested.connect(
+                self._delete_first_training_match
+            )
         if hasattr(self._view, "use_training_plan_requested"):
             self._view.use_training_plan_requested.connect(
                 self._accept_training_plan
@@ -337,6 +349,34 @@ class SquadController:
             return
         self._show_weekly_training()
         self._view.show_status(t("planner.first_match_recorded"))
+
+    def _edit_first_training_match(self, opponent_name, minutes_known):
+        if self._roster is None:
+            return
+        self._weekly_training_service.update_first_match_metadata(
+            opponent_name,
+            minutes_known,
+        )
+        self._show_weekly_training()
+        self._view.show_status(t("planner.first_match_recorded"))
+
+    def _replace_first_training_match(self):
+        if self._roster is None:
+            return
+        board = self._view.weekly_training_current_board()
+        if board is None:
+            self._view.show_error(t("planner.no_plan_to_record"))
+            return
+        self._weekly_training_service.replace_first_match(board)
+        self._show_weekly_training()
+        self._view.show_status(t("planner.first_match_recorded"))
+
+    def _delete_first_training_match(self):
+        if self._roster is None:
+            return
+        self._weekly_training_service.delete_first_match()
+        self._show_weekly_training()
+        self._view.show_status(t("planner.no_first_match_record"))
 
     def _accept_training_plan(self):
         if hasattr(self._view, "accept_weekly_training_plan"):

@@ -40,7 +40,20 @@ The persisted week stores:
 
 ## Priority Model
 
-Each player can have one weekly priority:
+Each player can have one weekly priority. Alpha 0.5.7.1.1 simplifies the visible
+UI choices to:
+
+- 100%;
+- 50%;
+- No priority / Sin prioridad.
+
+Backward-compatible stored values are mapped explicitly:
+
+- Required 100% and High priority display as 100%;
+- Required 50% and Secondary priority display as 50%;
+- Rest and No priority display as No priority / Sin prioridad.
+
+The persistence model can still read the original values:
 
 - Required 100%;
 - Required 50%;
@@ -109,13 +122,25 @@ The Squad page adds a Weekly Planner tab with:
 - active training display;
 - fixed formation selector;
 - Generate Plan;
-- Record Played Lineup;
+- Record Played Lineup when no first-match record exists;
+- visible first-match record card with Edit, Replace and Delete when a record exists;
 - Use This Lineup;
-- training priority table;
-- weekly coverage table;
+- one unified weekly player table;
 - second-match Formation Board;
 - competitive cost summary;
 - explanations and warnings.
+
+The unified table replaces the older separate Training Priorities and Weekly Coverage
+tables. Its columns are Player, Age, Best Training Position, Priority, Training Status,
+Confirmed, Planned, Remaining and Availability. Training Status uses plain symbols:
+check mark for already trained, open circle for will train in the generated plan and
+dash for will not train in the generated plan. Confirmed and Planned percentages remain
+visible so the symbol is not the only source of information.
+
+The Weekly Planner result area is divided into a result header, Formation Board pitch
+workspace, competitive-cost text and explanations/warnings text. These are normal layout
+regions, not absolute overlays, so cost and explanations remain below the pitch at the
+supported desktop sizes.
 
 The planner never overwrites Squad Builder or Match Workspace output by itself. The user
 must explicitly choose `Use This Lineup` to copy the proposed lineup into the Squad

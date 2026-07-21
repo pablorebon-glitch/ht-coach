@@ -209,6 +209,89 @@ class WeeklyTrainingAppService:
         )
         return self._repository.add_match_record(state, record)
 
+    def first_match_record(self):
+        state = self.load_state()
+        return next(
+            (
+                record for record in state.match_records
+                if record.match_role == MatchRole.FIRST_WEEKLY_MATCH
+            ),
+            None,
+        )
+
+    def replace_first_match(self, board, opponent_name=""):
+        state = self.load_state()
+        record = self._first_match_record_for_board(state, board, opponent_name)
+        return self._repository.replace_match_record(state, record)
+
+    def update_first_match_metadata(self, opponent_name="", minutes_known=False):
+        state = self.load_state()
+        record = next(
+            (
+                item for item in state.match_records
+                if item.match_role == MatchRole.FIRST_WEEKLY_MATCH
+            ),
+            None,
+        )
+        if record is None:
+            return state
+        updated = replace(
+            record,
+            opponent_name=opponent_name,
+            minutes_known=bool(minutes_known),
+            notes=(
+                "Confirmed 90 minutes for starters."
+                if minutes_known
+                else "Assuming 90 minutes for starters."
+            ),
+        )
+        return self._repository.replace_match_record(state, updated)
+
+    def delete_first_match(self):
+        state = self.load_state()
+        record = next(
+            (
+                item for item in state.match_records
+                if item.match_role == MatchRole.FIRST_WEEKLY_MATCH
+            ),
+            None,
+        )
+        if record is None:
+            return state
+        return self._repository.delete_match_record(state, record.match_id)
+
+    def _first_match_record_for_board(self, state, board, opponent_name=""):
+        rules = rule_provider_for(state.active_training_type)
+        if rules is None:
+            raise ValueError("automatic_rules_unavailable")
+        entries = tuple(
+            self._entry_from_slot(slot)
+            for slot in board.slots
+            if slot.player is not None
+        )
+        match_id = f"{state.active_week.week_id}:first"
+        return WeeklyMatchRecord(
+            match_id=match_id,
+            match_date=state.active_week.first_match_date,
+            match_role=MatchRole.FIRST_WEEKLY_MATCH,
+            opponent_name=opponent_name,
+            formation=board.formation_name,
+            lineup=entries,
+            planned_or_played=MatchStatus.PLAYED,
+            source="squad_planner",
+            minutes_known=False,
+            notes="Assuming 90 minutes for starters.",
+            training_exposure_entries=tuple(
+                rules.exposure_for_entry(
+                    match_id,
+                    entry,
+                    "squad_planner",
+                    assumed_confidence(False),
+                )
+                for entry in entries
+            ),
+        )
+
     @staticmethod
     def _entry_from_slot(slot):
         from engine.weekly_training.models import WeeklyMatchLineupEntry
