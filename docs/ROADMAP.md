@@ -357,6 +357,9 @@ Acceptance criteria:
   player-slot decisions as authoritative, automatically choose best supported individual
   orders for affected slots, remove visible Apply recommendation controls, orient the
   pitch like the Hattrick lineup editor and remove primary Squad Export.
+- Alpha 0.5.6.2.2 Initial Lineup Automatic Orders: finalize every starter's supported
+  individual order before saving the optimized Workspace snapshot, so initial load,
+  reload and Restore Optimized Lineup reproduce the same complete recommendation.
 - Alpha 0.5.7 Midfield Rating Engine v1: only after enough complete validation fixtures
   exist, investigate a measured midfield predictor against the validation framework.
 - Alpha 0.5.8 Defense Rating Engine v1: validate defensive sector prediction candidates

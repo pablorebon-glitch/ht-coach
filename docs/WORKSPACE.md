@@ -10,6 +10,12 @@ assignment is authoritative. HT Coach does not recommend moving the player back;
 automatically chooses the best supported individual order for the player in the slot the
 user selected.
 
+Alpha 0.5.6.2.2 completes the initial recommendation transaction. When roster data is
+available, Workspace creation now optimizes supported individual orders for every
+starter before saving the immutable original snapshot. Initial load, reload and Restore
+Optimized Lineup therefore display the same complete recommendation without requiring a
+manual swap to reveal non-Normal orders.
+
 ## Concept
 
 The Match page now separates two lineups:
@@ -21,6 +27,11 @@ The Match page now separates two lineups:
 
 The original recommendation is never modified. Manual changes update Workspace state
 immediately and schedule automatic fixed-lineup recalculation.
+
+The original recommendation snapshot is captured only after formation selection,
+starting eleven selection, slot assignment and automatic order selection are finalized.
+Restore copies that snapshot back into the editable Workspace and does not rerun lineup
+or order optimization.
 
 ## Architecture
 
@@ -38,6 +49,8 @@ this state and emit user intent; they do not mutate lineup slots directly.
 
 `WorkspaceService` is the single canonical editing boundary for click-to-click and
 drag-and-drop operations. Qt handlers translate UI gestures into service calls only.
+The same `optimize_orders_for_lineup` operation is used for all initial starter slots
+and for the affected slots after manual replacements or swaps.
 
 ## Workspace Model
 
@@ -71,6 +84,22 @@ original recommendation and clears selection, preview and pending modifications.
 6. HT Coach recalculates the best valid individual order for affected slots.
 7. Dependent fixed-lineup analysis can refresh without leaving the board permanently
    busy.
+
+Initial and reload lifecycle:
+
+1. Receive optimized formation and lineup from the existing engine/service flow.
+2. Map players to Formation Board slots.
+3. Evaluate every supported order configuration for each starter through
+   `OrderOptimizer.ALLOWED_CONFIGURATIONS`.
+4. Select deterministic best orders using the Workspace contribution-total objective.
+5. Save the finalized board as both immutable original snapshot and editable Workspace
+   copy.
+6. Render the Formation Board in Original Recommendation state.
+
+Root cause of the Alpha 0.5.6.2.2 bug: Workspace creation previously deep-copied the
+original board before invoking automatic order optimization. The optimizer result and
+mapped board could therefore start with valid Normal defaults, while automatic order
+selection only ran after manual-edit events.
 
 No probability, xG, tactic, Decision Lab or comparison value changes until fixed-lineup
 recalculation completes. Stale results are discarded if the Workspace revision has moved

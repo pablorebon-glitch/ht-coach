@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added Alpha 0.5.6.2.2 Initial Lineup Automatic Orders: Workspace creation now applies
+  the canonical supported-order optimizer to all starters before saving the original
+  optimized snapshot, so initial load, reload and Restore Optimized Lineup preserve the
+  finalized non-Normal orders when they are optimal.
 - Added Alpha 0.5.6.2.1 Squad Builder Manual Intent and Automatic Orders: manual
   slot assignments are treated as authoritative, affected players receive automatic
   supported individual orders, the Formation Board uses a Hattrick-oriented pitch

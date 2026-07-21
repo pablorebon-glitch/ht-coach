@@ -198,6 +198,7 @@ class FormationBoard(QWidget):
             self._workspace_state = self._workspace_service.create(
                 list(boards),
                 selected_formation_name,
+                roster_players=self._roster_players,
             )
         else:
             self._workspace_state = (

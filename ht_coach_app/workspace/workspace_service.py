@@ -44,20 +44,24 @@ class WorkspaceService:
     def __init__(self, analyzer=PlayerAnalyzer):
         self._analyzer = analyzer
 
-    def create(self, boards, selected_formation_name=""):
+    def create(self, boards, selected_formation_name="", roster_players=()):
+        finalized_boards = [
+            self.optimize_orders_for_lineup(board, roster_players)[0]
+            for board in boards
+        ]
         original = {
             board.formation_name: deepcopy(board)
-            for board in boards
+            for board in finalized_boards
         }
         workspace = {
             board.formation_name: board
-            for board in boards
+            for board in finalized_boards
         }
         current = selected_formation_name or (
-            boards[0].formation_name if boards else ""
+            finalized_boards[0].formation_name if finalized_boards else ""
         )
         if current not in workspace:
-            current = boards[0].formation_name if boards else ""
+            current = finalized_boards[0].formation_name if finalized_boards else ""
 
         return WorkspaceState(
             original_boards=original,
@@ -790,7 +794,7 @@ class WorkspaceService:
         board = state.current_board
         if board is None:
             return state
-        updated_board, order_changes = self._apply_best_orders_to_slots(
+        updated_board, order_changes = self.optimize_orders_for_lineup(
             board,
             roster_players,
             slot_ids,
@@ -810,6 +814,21 @@ class WorkspaceService:
             history=history,
             evaluation_state="ready",
             last_error="",
+        )
+
+    def optimize_orders_for_lineup(self, board, roster_players, slot_ids=None):
+        if not roster_players:
+            return board, ()
+
+        target_slot_ids = tuple(
+            slot.slot_id
+            for slot in board.slots
+            if slot.player is not None
+        ) if slot_ids is None else tuple(slot_ids)
+        return self._apply_best_orders_to_slots(
+            board,
+            roster_players,
+            target_slot_ids,
         )
 
     def apply_position_recommendations(self, state):

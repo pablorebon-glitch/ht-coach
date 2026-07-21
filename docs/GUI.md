@@ -443,8 +443,8 @@ Responsibilities:
 Responsibilities:
 
 - Display the analyzed lineup on a vertical football pitch.
-- Keep goalkeeper at the bottom, defenders below midfielders, midfielders in the middle
-  and forwards at the top.
+- Keep goalkeeper at the top, then defenders, midfielders and forwards in Hattrick
+  lineup-editor order.
 - Preserve left, center and right semantics.
 - Render compact player cards with user-facing position, side and order labels.
 - Support player selection, Player Intelligence updates and immediate workspace
@@ -453,6 +453,9 @@ Responsibilities:
   starter-to-Bench drag exchanges and accessible non-drag editing paths.
 - Show assigned position, automatically selected order and concise order-change feedback
   without permanent Apply buttons.
+- Show the finalized optimized orders immediately on first render and after roster
+  reloads; do not show an intermediate all-Normal lineup when order evaluation has not
+  run yet.
 - Distinguish immutable Recommended Lineup state from editable Workspace Lineup state.
 - Show Original Recommendation, Lineup manually adjusted, Updating Analysis,
   Analysis updated and error states.
