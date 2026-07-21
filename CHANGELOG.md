@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added Alpha 0.5.6.2.4 Match UI Stability and Incremental Refresh: Match refresh now
+  reuses the result tab hierarchy, Formation Board, Pitch widget and player cards while
+  preserving scroll, splitter, active-tab and selection state during automatic analysis
+  updates.
 - Added Alpha 0.5.6.2.3 Match Manual Intent and Viewport Stability: Match Workspace
   refresh now preserves manual player-slot assignments, keeps automatic order
   optimization scoped to assigned slots, protects against stale revision results and

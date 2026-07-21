@@ -1649,6 +1649,130 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertEqual(horizontal.value(), captured_horizontal)
         self.assertIsNot(QApplication.focusWidget(), refreshed_board.formation_combo)
 
+    def test_match_refresh_reuses_result_tabs_board_and_pitch(self):
+        page = MatchPage()
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[formation_result()],
+            analyzed_formations=["3-5-2"],
+            players_csv_filename="players.csv",
+            completed_at="2026-07-17 12:00:00",
+        )
+        page.set_roster_players(roster_that_prefers_middle_orders(formation_result()))
+        page.show_results(result)
+        tabs = page.findChild(QTabWidget, "matchResultTabs")
+        board = page.findChild(FormationBoard)
+        pitch = board.pitch
+
+        page.show_results(
+            result,
+            workspace_state=board.workspace_state(),
+        )
+        refreshed_tabs = page.findChild(QTabWidget, "matchResultTabs")
+        refreshed_board = page.findChild(FormationBoard)
+
+        self.assertIs(refreshed_tabs, tabs)
+        self.assertIs(refreshed_board, board)
+        self.assertIs(refreshed_board.pitch, pitch)
+
+    def test_match_refresh_preserves_formation_board_splitter(self):
+        page = MatchPage()
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[formation_result()],
+            analyzed_formations=["3-5-2"],
+            players_csv_filename="players.csv",
+            completed_at="2026-07-17 12:00:00",
+        )
+        page.show_results(result)
+        board = page.findChild(FormationBoard)
+        board.splitter.setSizes([720, 280])
+        sizes = board.splitter.sizes()
+
+        page.show_results(
+            result,
+            workspace_state=board.workspace_state(),
+        )
+
+        self.assertEqual(board.splitter.sizes(), sizes)
+
+    def test_pitch_reuses_player_widgets_after_swap(self):
+        board_widget = FormationBoard()
+        board_widget.resize(900, 620)
+        result = formation_result()
+        roster = roster_that_prefers_middle_orders(result)
+        board_widget.set_boards(
+            [FormationBoardMapper().to_board(result)],
+            roster_players=roster,
+        )
+        before_widgets = {
+            slot.slot_id: widget
+            for slot, widget in board_widget.pitch._slot_widgets
+        }
+        slots = [
+            slot for slot in board_widget.current_board().slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
+        ]
+
+        board_widget._handle_player_dropped(
+            {
+                "source_type": "lineup",
+                "player_id": slots[0].player.player_id,
+                "source_slot_id": slots[0].slot_id,
+                "formation_name": board_widget.current_board().formation_name,
+                "revision": board_widget.workspace_state().revision,
+            },
+            slots[1].slot_id,
+        )
+        after_widgets = {
+            slot.slot_id: widget
+            for slot, widget in board_widget.pitch._slot_widgets
+        }
+
+        self.assertEqual(before_widgets, after_widgets)
+
+    def test_repeated_swaps_keep_pitch_geometry_stable(self):
+        board_widget = FormationBoard()
+        board_widget.resize(900, 620)
+        result = formation_result()
+        roster = roster_that_prefers_middle_orders(result)
+        board_widget.set_boards(
+            [FormationBoardMapper().to_board(result)],
+            roster_players=roster,
+        )
+        QApplication.processEvents()
+        pitch_size = board_widget.pitch.size()
+        splitter_sizes = board_widget.splitter.sizes()
+        slots = [
+            slot for slot in board_widget.current_board().slots
+            if slot.player is not None
+            and slot.position != Position.GOALKEEPER.value
+        ]
+
+        for _ in range(4):
+            current_revision = board_widget.workspace_state().revision
+            board_widget._handle_player_dropped(
+                {
+                    "source_type": "lineup",
+                    "player_id": slots[0].player.player_id,
+                    "source_slot_id": slots[0].slot_id,
+                    "formation_name": board_widget.current_board().formation_name,
+                    "revision": current_revision,
+                },
+                slots[1].slot_id,
+            )
+            QApplication.processEvents()
+            slots = [
+                slot for slot in board_widget.current_board().slots
+                if slot.slot_id in {slots[0].slot_id, slots[1].slot_id}
+            ]
+
+        self.assertEqual(board_widget.pitch.size(), pitch_size)
+        self.assertEqual(board_widget.splitter.sizes(), splitter_sizes)
+
     def test_board_routes_lineup_drop_to_swap_preview(self):
         board_widget = FormationBoard()
         board_widget.set_boards(

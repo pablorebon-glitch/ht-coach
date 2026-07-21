@@ -74,6 +74,8 @@ class MatchPage(BasePage):
         self._last_workspace_state = None
         self._advisor_verbosity = "detailed"
         self._analysis_inputs_collapsed = False
+        self._result_tabs = None
+        self._formation_board_widget = None
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
         self._build_scroll_content()
@@ -569,6 +571,11 @@ class MatchPage(BasePage):
         return {
             "vertical_scroll": self.scroll_area.verticalScrollBar().value(),
             "horizontal_scroll": self.scroll_area.horizontalScrollBar().value(),
+            "formation_splitter_sizes": (
+                current_board.splitter.sizes()
+                if current_board is not None
+                else []
+            ),
             "result_tab_index": (
                 result_tabs.currentIndex()
                 if result_tabs is not None
@@ -594,6 +601,10 @@ class MatchPage(BasePage):
                 max(result_tabs.count() - 1, 0),
             )
             result_tabs.setCurrentIndex(index)
+        current_board = self.findChild(FormationBoard)
+        splitter_sizes = viewport_state.get("formation_splitter_sizes") or []
+        if current_board is not None and splitter_sizes:
+            current_board.splitter.setSizes(list(splitter_sizes))
 
         def restore_scrollbars():
             self.scroll_area.verticalScrollBar().setValue(
@@ -602,6 +613,8 @@ class MatchPage(BasePage):
             self.scroll_area.horizontalScrollBar().setValue(
                 int(viewport_state.get("horizontal_scroll", 0))
             )
+            if current_board is not None and splitter_sizes:
+                current_board.splitter.setSizes(list(splitter_sizes))
 
         restore_scrollbars()
         QTimer.singleShot(0, restore_scrollbars)
@@ -634,12 +647,17 @@ class MatchPage(BasePage):
         return not self._analysis_inputs_collapsed
 
     def _build_result_tabs(self, result, restored=False, workspace_state=None):
-        tabs = QTabWidget()
-        tabs.setObjectName("matchResultTabs")
-        tabs.setDocumentMode(True)
-        tabs.setMinimumHeight(720)
+        tabs = self._result_tabs
+        if tabs is None:
+            tabs = QTabWidget()
+            tabs.setObjectName("matchResultTabs")
+            tabs.setDocumentMode(True)
+            tabs.setMinimumHeight(720)
+            self._result_tabs = tabs
 
-        tabs.addTab(
+        self._set_result_tab(
+            tabs,
+            0,
             self._build_formation_board_tab(
                 result,
                 restored,
@@ -647,19 +665,43 @@ class MatchPage(BasePage):
             ),
             t("match.formation_board"),
         )
-        tabs.addTab(
+        self._set_result_tab(
+            tabs,
+            1,
             self._build_comparison_table(result),
             t("match.comparison"),
         )
 
         recommended = result.recommended_formation
         if recommended is not None:
-            tabs.addTab(
+            self._set_result_tab(
+                tabs,
+                2,
                 self._build_lineup_table(recommended),
                 t("match.detailed_xi"),
             )
+        while tabs.count() > (3 if recommended is not None else 2):
+            widget = tabs.widget(tabs.count() - 1)
+            tabs.removeTab(tabs.count() - 1)
+            if widget is not None:
+                widget.setParent(None)
 
         return tabs
+
+    def _set_result_tab(self, tabs, index, widget, label):
+        if index < tabs.count() and tabs.widget(index) is widget:
+            tabs.setTabText(index, label)
+            return
+
+        if index < tabs.count():
+            old_widget = tabs.widget(index)
+            tabs.removeTab(index)
+            if old_widget is not None and old_widget is not widget:
+                old_widget.setParent(None)
+            tabs.insertTab(index, widget, label)
+            return
+
+        tabs.addTab(widget, label)
 
     def _build_formation_board_tab(
         self,
@@ -675,7 +717,16 @@ class MatchPage(BasePage):
                 )
                 for formation in result.formations
             ]
-            board = FormationBoard()
+            board = self._formation_board_widget
+            if board is None:
+                board = FormationBoard()
+                board.recalculate_requested.connect(
+                    self.workspace_recalculate_requested.emit
+                )
+                board.workspace_modified.connect(
+                    self.workspace_recalculate_requested.emit
+                )
+                self._formation_board_widget = board
             recommended = result.recommended_formation
             board.set_boards(
                 boards,
@@ -686,12 +737,6 @@ class MatchPage(BasePage):
                 ),
                 roster_players=self._roster_players,
                 workspace_state=workspace_state,
-            )
-            board.recalculate_requested.connect(
-                self.workspace_recalculate_requested.emit
-            )
-            board.workspace_modified.connect(
-                self.workspace_recalculate_requested.emit
             )
             return board
         except Exception as exc:

@@ -54,6 +54,7 @@ class PitchWidget(QWidget):
         super().__init__(parent)
         self._board = None
         self._slot_widgets = []
+        self._slot_widget_by_id = {}
         self._revision = 0
         self.setMinimumSize(320, 500)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -66,32 +67,28 @@ class PitchWidget(QWidget):
     def set_board(self, board, revision=0):
         self._board = board
         self._revision = revision
-        self._clear_slot_widgets()
 
         if board is None:
+            self._clear_slot_widgets()
             self.update()
             return
 
+        active_slot_ids = set()
+        slot_widgets = []
         for slot in board.slots:
-            if slot.player is None:
-                widget = QLabel(slot.position_label, self)
-                widget.setObjectName("emptySlot")
-                widget.setAlignment(Qt.AlignCenter)
-                widget.setToolTip(
-                    f"Empty {slot.side_label} {slot.position_label} slot"
-                )
-            else:
-                widget = PlayerCard(slot.player, self)
-                widget.set_drag_context(
-                    board.formation_name,
-                    slot.slot_id,
-                    revision,
-                )
-                widget.selected.connect(self.player_selected)
+            active_slot_ids.add(slot.slot_id)
+            widget = self._widget_for_slot(slot)
 
             widget.show()
-            self._slot_widgets.append((slot, widget))
+            slot_widgets.append((slot, widget))
 
+        for slot_id, widget in tuple(self._slot_widget_by_id.items()):
+            if slot_id not in active_slot_ids:
+                widget.setParent(None)
+                widget.deleteLater()
+                del self._slot_widget_by_id[slot_id]
+
+        self._slot_widgets = slot_widgets
         self._position_slot_widgets()
         self.update()
 
@@ -292,6 +289,41 @@ class PitchWidget(QWidget):
             widget.deleteLater()
 
         self._slot_widgets = []
+        self._slot_widget_by_id = {}
+
+    def _widget_for_slot(self, slot):
+        current = self._slot_widget_by_id.get(slot.slot_id)
+        if slot.player is None:
+            if current is None or isinstance(current, PlayerCard):
+                if current is not None:
+                    current.setParent(None)
+                    current.deleteLater()
+                current = QLabel(slot.position_label, self)
+                current.setObjectName("emptySlot")
+                current.setAlignment(Qt.AlignCenter)
+                self._slot_widget_by_id[slot.slot_id] = current
+            else:
+                current.setText(slot.position_label)
+            current.setToolTip(
+                f"Empty {slot.side_label} {slot.position_label} slot"
+            )
+            return current
+
+        if current is None or not isinstance(current, PlayerCard):
+            if current is not None:
+                current.setParent(None)
+                current.deleteLater()
+            current = PlayerCard(slot.player, self)
+            current.selected.connect(self.player_selected)
+            self._slot_widget_by_id[slot.slot_id] = current
+        else:
+            current.update_player(slot.player)
+        current.set_drag_context(
+            self._board.formation_name,
+            slot.slot_id,
+            self._revision,
+        )
+        return current
 
     def _slot_id_at(self, point):
         child = self.childAt(point)

@@ -34,6 +34,11 @@ class PlayerCard(QPushButton):
             "revision": revision,
         }
 
+    def update_player(self, player):
+        self.player = player
+        self.setToolTip(self._tooltip_text())
+        self.refresh()
+
     def refresh(self):
         self.setProperty(
             "selected",
