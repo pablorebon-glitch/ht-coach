@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added Alpha 0.5.6.2.3 Match Manual Intent and Viewport Stability: Match Workspace
+  refresh now preserves manual player-slot assignments, keeps automatic order
+  optimization scoped to assigned slots, protects against stale revision results and
+  restores scroll/result-tab state after automatic refresh.
 - Added Alpha 0.5.6.2.2 Initial Lineup Automatic Orders: Workspace creation now applies
   the canonical supported-order optimizer to all starters before saving the original
   optimized snapshot, so initial load, reload and Restore Optimized Lineup preserve the

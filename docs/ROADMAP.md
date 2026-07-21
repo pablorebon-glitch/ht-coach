@@ -360,6 +360,9 @@ Acceptance criteria:
 - Alpha 0.5.6.2.2 Initial Lineup Automatic Orders: finalize every starter's supported
   individual order before saving the optimized Workspace snapshot, so initial load,
   reload and Restore Optimized Lineup reproduce the same complete recommendation.
+- Alpha 0.5.6.2.3 Match Manual Intent and Viewport Stability: preserve manual
+  player-slot assignments through Match refresh, keep order optimization scoped to the
+  chosen slots, discard stale revision results and restore scroll/tab/selection state.
 - Alpha 0.5.7 Midfield Rating Engine v1: only after enough complete validation fixtures
   exist, investigate a measured midfield predictor against the validation framework.
 - Alpha 0.5.8 Defense Rating Engine v1: validate defensive sector prediction candidates

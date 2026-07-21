@@ -982,9 +982,30 @@ class WorkspaceService:
 
     def with_evaluated_boards(self, state, boards):
         selected_player_id = state.selected_player_id
+        evaluated_by_name = {
+            board.formation_name: board
+            for board in boards
+        }
         workspace_boards = {}
 
-        for board in boards:
+        board_names = tuple(
+            dict.fromkeys(
+                tuple(state.workspace_boards.keys())
+                + tuple(evaluated_by_name.keys())
+            )
+        )
+        for formation_name in board_names:
+            board = evaluated_by_name.get(
+                formation_name,
+                state.workspace_boards.get(formation_name),
+            )
+            if board is None:
+                continue
+            if state.dirty and formation_name in state.workspace_boards:
+                board = self._merge_evaluated_board_metadata(
+                    state.workspace_boards[formation_name],
+                    board,
+                )
             updated = self._restore_workspace_markers(
                 board,
                 state,
@@ -1003,7 +1024,6 @@ class WorkspaceService:
             replacement_preview=None,
             swap_preview=None,
             evaluation_state="ready",
-            revision=state.revision + 1,
             last_error="",
         )
 
@@ -1451,6 +1471,16 @@ class WorkspaceService:
                 )
                 for slot in board.slots
             ),
+        )
+
+    @staticmethod
+    def _merge_evaluated_board_metadata(current_board, evaluated_board):
+        return replace(
+            current_board,
+            tactic_name=evaluated_board.tactic_name,
+            tactic_level=evaluated_board.tactic_level,
+            recommendation_label=evaluated_board.recommendation_label,
+            restored=evaluated_board.restored,
         )
 
     def _restore_selection(self, board, selected_player_id, selected_player_name):

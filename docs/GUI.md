@@ -456,11 +456,16 @@ Responsibilities:
 - Show the finalized optimized orders immediately on first render and after roster
   reloads; do not show an intermediate all-Normal lineup when order evaluation has not
   run yet.
+- Preserve manual player-slot assignments after Match recalculation. Refreshes may update
+  tactic metadata, sector totals and analysis panels, but they must not move players back
+  to the original recommendation.
 - Distinguish immutable Recommended Lineup state from editable Workspace Lineup state.
 - Show Original Recommendation, Lineup manually adjusted, Updating Analysis,
   Analysis updated and error states.
 - Emit workspace-modified intent for the controller to debounce and recalculate without
   calling the engine directly.
+- Preserve Match viewport state during automatic refresh, including scroll position,
+  active result tab and selected player where the player is still present.
 - Own Hattrick-oriented full-pitch scaling, normalized slot coordinates, card
   containment and the compact formation/tactic footer.
 - Keep reusable pitch and inspector layout behavior outside `MatchPage`.
