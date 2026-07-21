@@ -405,7 +405,10 @@ class FormationBoardQtSmokeTest(unittest.TestCase):
             if page.results_layout.itemAt(index).widget() is not None
         ]
         tabs = page.findChild(QTabWidget, "matchResultTabs")
-        tabs_index = widgets.index(tabs)
+        tabs_index = next(
+            index for index, widget in enumerate(widgets)
+            if widget.isAncestorOf(tabs)
+        )
         labels_before_tabs = [
             label.text()
             for widget in widgets[:tabs_index]

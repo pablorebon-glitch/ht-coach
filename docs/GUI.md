@@ -91,7 +91,7 @@ Content:
 - Load and reload buttons.
 - No primary Export button; export service remains available outside the main Squad
   Builder workflow.
-- Four tabs: Ideal XI, Players, Evolution and Transfer Planner.
+- Five tabs: Ideal XI, Players, Evolution, Weekly Planner and Transfer Planner.
 - Ideal XI tab with a top formation selector containing Auto and every supported
   formation from the centralized catalog.
 - Auto mode evaluates every supported formation and displays the best roster fit.
@@ -133,6 +133,17 @@ Content:
   Player Evolution Details sections.
 - Evolution filters for at-risk positions, no successor, development candidates,
   veterans, training-aligned players and key dependencies.
+- Weekly Planner tab for Playmaking training priorities, current-week coverage and a
+  second-match lineup plan.
+- Weekly Planner controls include active training, fixed formation, Generate Plan,
+  Record Played Lineup and Use This Lineup.
+- Weekly Planner tables show per-player priority, availability, remaining exposure,
+  confirmed exposure, assumed exposure, planned exposure, status and source matches.
+- Weekly Planner second-match output uses the shared Formation Board and requires an
+  explicit Use This Lineup action before copying the proposal into the Squad Ideal XI
+  board.
+- Weekly Planner warnings explain assumed 90-minute exposure, hard conflicts and
+  internal competitive cost without presenting it as a Hattrick rating projection.
 - Transfer Planner tab that turns Squad Evolution outputs into abstract player-profile
   recommendations for recruitment planning.
 - Transfer Planner constraints for planning objective, budget tier, age strategy,
@@ -281,6 +292,9 @@ Content:
   Hattrick decimal ratings by source scale and only shows direct advantages when the
   compared values share the same scale. If scales differ, the difference column is not
   shown.
+- Decision Lab, Match Intelligence, Opponent Rating Calibration and Match Analysis use
+  shared collapsible sections with independent persisted state, brief summaries,
+  keyboard-accessible headers and localized expand/collapse labels.
 - Rating Engine Alignment diagnostics classify current TeamRater values as internal
   contribution totals. The normal Match UI must not display own-team Hattrick decimal
   ratings unless a future evidence-backed conversion is introduced.

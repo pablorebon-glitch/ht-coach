@@ -54,6 +54,13 @@ optimized-lineup restore and automatic affected-slot order selection. Qt widgets
 translate clicks and drops into service operations; they do not duplicate lineup
 business rules.
 
+Alpha 0.5.7 adds `engine/weekly_training` as a planning layer for training exposure.
+It owns training-week dates, Playmaking slot rules, persisted priorities, match records,
+coverage aggregation and constrained second-match lineup planning. It reuses the
+existing player analyzer, formation catalog, Formation Board mapper and automatic order
+optimization, and it must not retune ratings, probabilities, tactics, orders or
+optimizer formulas.
+
 ## Target Layers
 
 ```text
@@ -79,6 +86,7 @@ engine/
   rating_validation/
   squad_evolution/
   squad_health/
+  weekly_training/
 models/
 importers/
 database/

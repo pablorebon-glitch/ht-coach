@@ -139,6 +139,9 @@ Deliverables:
 - UX Consistency and Product Polish with shared PySide6 design tokens, semantic badges,
   card and empty-state patterns, standardized tables, localized main-screen copy,
   preserved Squad presentation state and documented accessibility/responsive guidance.
+- Weekly Training Lineup Planner with Playmaking priorities, Sunday-Wednesday-Thursday
+  week handling, minute-aware coverage, first-match records, second-match lineup
+  planning, competitive-cost reporting and JSON persistence.
 
 Acceptance criteria:
 
@@ -161,6 +164,9 @@ Acceptance criteria:
   must not change planner ranking, generated profiles or analytical formulas.
 - UX polish does not introduce a new analytical engine and does not change analytical
   meaning, thresholds, rankings, formulas or optimizer scoring.
+- Weekly Training planning must reuse existing formation, ranking, lineup and order
+  behavior, and must not alter engine formulas, rating calculations or probability
+  calculations.
 
 ### Epic 5: Opponent Manager
 

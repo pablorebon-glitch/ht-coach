@@ -11,6 +11,8 @@ from ht_coach_app.services.squad_builder_service import (
 from ht_coach_app.services.squad_evolution_service import SquadEvolutionService
 from ht_coach_app.services.squad_service import SquadValidationError
 from ht_coach_app.services.transfer_planner_service import TransferPlannerService
+from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
+from engine.weekly_training.player_identity import player_training_id
 from engine.transfer_planner.models import TransferConstraints
 
 
@@ -24,6 +26,7 @@ class SquadController:
         builder_service=None,
         evolution_service=None,
         transfer_planner_service=None,
+        weekly_training_service=None,
     ):
         self._view = view
         self._service = service
@@ -33,6 +36,9 @@ class SquadController:
         )
         self._transfer_planner_service = (
             transfer_planner_service or TransferPlannerService()
+        )
+        self._weekly_training_service = (
+            weekly_training_service or WeeklyTrainingAppService()
         )
         self._settings_repository = settings_repository
         self._app_events = app_events
@@ -92,6 +98,22 @@ class SquadController:
         if hasattr(self._view, "squad_tab_changed"):
             self._view.squad_tab_changed.connect(
                 self._change_squad_tab
+            )
+        if hasattr(self._view, "training_priority_changed"):
+            self._view.training_priority_changed.connect(
+                self._change_training_priority
+            )
+        if hasattr(self._view, "generate_training_plan_requested"):
+            self._view.generate_training_plan_requested.connect(
+                self._generate_training_plan
+            )
+        if hasattr(self._view, "record_first_match_requested"):
+            self._view.record_first_match_requested.connect(
+                self._record_first_training_match
+            )
+        if hasattr(self._view, "use_training_plan_requested"):
+            self._view.use_training_plan_requested.connect(
+                self._accept_training_plan
             )
 
     def refresh(self):
@@ -187,7 +209,6 @@ class SquadController:
         self._show_ideal_xi(
             self._ideal_selection
         )
-        self._show_evolution()
 
         if self._app_events is not None:
             self._app_events.roster_changed.emit(
@@ -259,6 +280,68 @@ class SquadController:
             roster_players=roster_players,
         )
         self._show_evolution()
+        self._show_weekly_training()
+
+    def _show_weekly_training(self):
+        if not hasattr(self._view, "show_weekly_training"):
+            return
+        if self._roster is None:
+            self._view.show_weekly_training_empty()
+            return
+        state = self._weekly_training_service.load_state()
+        self._view.show_weekly_training(
+            state,
+            self._weekly_training_service.priority_rows(self._roster.players),
+            self._weekly_training_service.coverage(self._roster.players),
+            self._builder_service.supported_formations(),
+        )
+
+    def _change_training_priority(self, player_id, priority):
+        if self._roster is None:
+            return
+        player = next(
+            (
+                player for player in self._roster.players
+                if player_training_id(player) == player_id
+            ),
+            None,
+        )
+        if player is None:
+            return
+        self._weekly_training_service.save_priority(player, priority)
+        self._show_weekly_training()
+
+    def _generate_training_plan(self, formation_name):
+        if self._roster is None:
+            self._view.show_error(t("planner.load_roster_first"))
+            return
+        plan = self._weekly_training_service.generate_plan(
+            self._roster.players,
+            formation_name,
+        )
+        board = self._weekly_training_service.board_for_plan(plan)
+        self._view.show_weekly_training_plan(plan, board, self._roster.players)
+
+    def _record_first_training_match(self):
+        if self._roster is None:
+            self._view.show_error(t("planner.load_roster_first"))
+            return
+        board = self._view.weekly_training_current_board()
+        if board is None:
+            self._view.show_error(t("planner.no_plan_to_record"))
+            return
+        try:
+            self._weekly_training_service.record_first_match(board)
+        except ValueError:
+            self._view.show_error(t("planner.duplicate_first_match"))
+            return
+        self._show_weekly_training()
+        self._view.show_status(t("planner.first_match_recorded"))
+
+    def _accept_training_plan(self):
+        if hasattr(self._view, "accept_weekly_training_plan"):
+            self._view.accept_weekly_training_plan()
+            self._view.show_status(t("planner.plan_accepted"))
 
     def _change_availability_mode(self, mode):
         self._availability_mode = (

@@ -25,6 +25,7 @@ class MatchWorkspaceSettings:
     transfer_training_preference: str = "any"
     transfer_specialty_preference: str = "no_preference"
     squad_selected_tab: str = "ideal"
+    match_section_states: dict[str, bool] = field(default_factory=dict)
 
 
 class MatchWorkspaceRepository:
@@ -92,6 +93,12 @@ class MatchWorkspaceRepository:
                 "squad_selected_tab",
                 "ideal",
             ),
+            match_section_states={
+                str(key): bool(value)
+                for key, value in dict(
+                    data.get("match_section_states", {})
+                ).items()
+            },
         )
 
     def save(self, settings):
