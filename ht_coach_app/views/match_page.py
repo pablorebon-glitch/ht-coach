@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -479,7 +479,7 @@ class MatchPage(BasePage):
         )
 
     def show_results(self, result, restored=False, workspace_state=None):
-        scroll_value = self.scroll_area.verticalScrollBar().value()
+        viewport_state = self._capture_viewport_state()
         self._state = "success"
         self._last_result = result
         self._last_restored = restored
@@ -548,15 +548,63 @@ class MatchPage(BasePage):
                 )
             )
 
+        result_tabs = self._build_result_tabs(
+            result,
+            restored=restored,
+            workspace_state=workspace_state,
+        )
         self.results_layout.addWidget(
-            self._build_result_tabs(
-                result,
-                restored=restored,
-                workspace_state=workspace_state,
-            ),
+            result_tabs,
             1,
         )
-        self.scroll_area.verticalScrollBar().setValue(scroll_value)
+        self._restore_viewport_state(
+            viewport_state,
+            result_tabs,
+        )
+
+    def _capture_viewport_state(self):
+        result_tabs = self.findChild(QTabWidget, "matchResultTabs")
+        current_board = self.findChild(FormationBoard)
+        focus_widget = QApplication.focusWidget()
+        return {
+            "vertical_scroll": self.scroll_area.verticalScrollBar().value(),
+            "horizontal_scroll": self.scroll_area.horizontalScrollBar().value(),
+            "result_tab_index": (
+                result_tabs.currentIndex()
+                if result_tabs is not None
+                else 0
+            ),
+            "selected_player_id": (
+                current_board.current_board().selected_player_id
+                if current_board is not None
+                and current_board.current_board() is not None
+                else ""
+            ),
+            "focused_object_name": (
+                focus_widget.objectName()
+                if focus_widget is not None
+                else ""
+            ),
+        }
+
+    def _restore_viewport_state(self, viewport_state, result_tabs):
+        if result_tabs is not None:
+            index = min(
+                max(int(viewport_state.get("result_tab_index", 0)), 0),
+                max(result_tabs.count() - 1, 0),
+            )
+            result_tabs.setCurrentIndex(index)
+
+        def restore_scrollbars():
+            self.scroll_area.verticalScrollBar().setValue(
+                int(viewport_state.get("vertical_scroll", 0))
+            )
+            self.scroll_area.horizontalScrollBar().setValue(
+                int(viewport_state.get("horizontal_scroll", 0))
+            )
+
+        restore_scrollbars()
+        QTimer.singleShot(0, restore_scrollbars)
 
     def show_workspace_updating(self):
         self.show_status(t("match.updating_workspace"))

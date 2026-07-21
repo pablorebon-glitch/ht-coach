@@ -969,6 +969,108 @@ class WorkspaceServiceTest(unittest.TestCase):
         )
         self.assertEqual(len(state.history[-1].order_changes), 2)
 
+    def test_match_evaluation_refresh_preserves_manual_slot_assignments(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        roster = roster_that_prefers_middle_orders(result)
+        state = self.service.create([board], "3-5-2", roster_players=roster)
+        forward_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        midfielder_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.INNER_MIDFIELDER.value
+        )
+        midfielder_name = midfielder_slot.player.player_name
+
+        swapped = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            forward_slot.slot_id,
+            midfielder_slot.slot_id,
+            state.revision,
+            roster_players=roster,
+            interaction_source="TEST",
+        )
+        stale_recommended_board = FormationBoardMapper().to_board(result)
+        refreshed = self.service.with_evaluated_boards(
+            swapped,
+            [stale_recommended_board],
+        )
+
+        forward_target = next(
+            slot for slot in refreshed.current_board.slots
+            if slot.slot_id == midfielder_slot.slot_id
+        )
+        midfielder_target = next(
+            slot for slot in refreshed.current_board.slots
+            if slot.slot_id == forward_slot.slot_id
+        )
+        self.assertEqual(forward_target.player.player_name, "Rushton")
+        self.assertEqual(midfielder_target.player.player_name, midfielder_name)
+        self.assertEqual(forward_target.player.position, Position.INNER_MIDFIELDER.value)
+        self.assertEqual(midfielder_target.player.position, Position.FORWARD.value)
+        self.assertEqual(refreshed.current_formation_name, "3-5-2")
+        self.assertEqual(refreshed.revision, swapped.revision)
+        self.assertEqual(refreshed.status_label, "Lineup manually adjusted")
+
+    def test_order_optimization_never_changes_manual_slots_after_match_swap(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        roster = roster_that_prefers_middle_orders(result)
+        state = self.service.create([board], "3-5-2", roster_players=roster)
+        source_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.FORWARD.value
+        )
+        target_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.INNER_MIDFIELDER.value
+        )
+
+        swapped = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            source_slot.slot_id,
+            target_slot.slot_id,
+            state.revision,
+            roster_players=roster,
+            interaction_source="TEST",
+        )
+        optimized = self.service.optimize_orders_for_slots(
+            swapped,
+            roster,
+            (source_slot.slot_id, target_slot.slot_id),
+        )
+
+        self.assertEqual(
+            [
+                (slot.slot_id, slot.player.player_name, slot.player.position)
+                for slot in swapped.current_board.slots
+                if slot.slot_id in {source_slot.slot_id, target_slot.slot_id}
+            ],
+            [
+                (slot.slot_id, slot.player.player_name, slot.player.position)
+                for slot in optimized.current_board.slots
+                if slot.slot_id in {source_slot.slot_id, target_slot.slot_id}
+            ],
+        )
+        for slot in optimized.current_board.slots:
+            if slot.slot_id not in {source_slot.slot_id, target_slot.slot_id}:
+                continue
+            valid_orders = {
+                configuration.order.value
+                for configuration in self.service.valid_order_configurations_for_position(
+                    slot.player.position
+                )
+            }
+            self.assertIn(slot.player.individual_order, valid_orders)
+
     def test_normal_order_remains_when_best_or_tied(self):
         state = self.service.create([self.board], "3-5-2")
         goalkeeper_slot = next(
@@ -1365,7 +1467,7 @@ class WorkspaceServiceTest(unittest.TestCase):
 
 
 try:
-    from PySide6.QtWidgets import QApplication, QLabel, QPushButton
+    from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QTabWidget
 
     from ht_coach_app.views.match_page import MatchPage
     from ht_coach_app.views.squad_page import SquadPage
@@ -1390,6 +1492,7 @@ except ModuleNotFoundError as exc:
     PitchWidget = None
     QLabel = None
     QPushButton = None
+    QTabWidget = None
 
 
 @unittest.skipIf(QApplication is None, "PySide6 is not installed")
@@ -1494,6 +1597,57 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(calls, [])
         self.assertEqual(len(workspace_calls), 1)
+
+    def test_match_refresh_preserves_viewport_tab_and_selected_player(self):
+        page = MatchPage()
+        page.resize(720, 360)
+        page.show()
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[formation_result()],
+            analyzed_formations=["3-5-2"],
+            players_csv_filename="players.csv",
+            completed_at="2026-07-17 12:00:00",
+        )
+        roster = roster_that_prefers_middle_orders(formation_result())
+        page.set_roster_players(roster)
+        page.show_results(result)
+        QApplication.processEvents()
+
+        tabs = page.findChild(QTabWidget, "matchResultTabs")
+        tabs.setCurrentIndex(1)
+        board = page.findChild(FormationBoard)
+        player_id = next(
+            slot.player.player_id
+            for slot in board.current_board().slots
+            if slot.player.player_name == "Rushton"
+        )
+        board.select_player(player_id)
+        vertical = page.scroll_area.verticalScrollBar()
+        horizontal = page.scroll_area.horizontalScrollBar()
+        vertical.setValue(max(1, vertical.maximum()))
+        horizontal.setValue(horizontal.maximum())
+        captured_vertical = vertical.value()
+        captured_horizontal = horizontal.value()
+
+        page.show_results(
+            result,
+            workspace_state=board.workspace_state(),
+        )
+        QApplication.processEvents()
+        QApplication.processEvents()
+
+        refreshed_tabs = page.findChild(QTabWidget, "matchResultTabs")
+        refreshed_board = page.findChild(FormationBoard)
+        self.assertEqual(refreshed_tabs.currentIndex(), 1)
+        self.assertEqual(
+            refreshed_board.current_board().selected_player_id,
+            player_id,
+        )
+        self.assertEqual(vertical.value(), captured_vertical)
+        self.assertEqual(horizontal.value(), captured_horizontal)
+        self.assertIsNot(QApplication.focusWidget(), refreshed_board.formation_combo)
 
     def test_board_routes_lineup_drop_to_swap_preview(self):
         board_widget = FormationBoard()
@@ -1950,6 +2104,62 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
         self.assertIn("A Replacement", names)
         self.assertIn("Defender Replacement", names)
         self.assertNotIn("Rushton", names)
+
+    def test_recalculated_workspace_preserves_manual_swap_slots(self):
+        result = formation_result()
+        board = FormationBoardMapper().to_board(result)
+        service = WorkspaceService()
+        roster = roster_that_prefers_middle_orders(result)
+        state = service.create([board], "3-5-2", roster_players=roster)
+        forward_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Rushton"
+        )
+        midfielder_slot = next(
+            slot for slot in state.current_board.slots
+            if slot.player is not None
+            and slot.position == Position.INNER_MIDFIELDER.value
+        )
+        midfielder_name = midfielder_slot.player.player_name
+        state = service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            forward_slot.slot_id,
+            midfielder_slot.slot_id,
+            state.revision,
+            roster_players=roster,
+            interaction_source="TEST",
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "players.csv"
+            path.write_text("placeholder", encoding="utf-8")
+            match_service = MatchWorkspaceService(
+                FakeOpponentService(),
+                importer=lambda _path: roster,
+                optimizer=lambda *_args, **_kwargs: self.fail(
+                    "lineup optimizer should not run for workspace recalculation"
+                ),
+            )
+            recalculated = match_service.analyze_workspace(
+                path,
+                "Rival FC",
+                state,
+            )
+
+        rushton = next(
+            player
+            for player in recalculated.recommended_formation.lineup
+            if player.player_name == "Rushton"
+        )
+        midfielder = next(
+            player
+            for player in recalculated.recommended_formation.lineup
+            if player.player_name == midfielder_name
+        )
+        self.assertEqual(rushton.position, "Inner Midfielder (IM)")
+        self.assertEqual(midfielder.position, "Forward (F)")
 
     @staticmethod
     def _board_model():

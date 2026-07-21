@@ -547,6 +547,11 @@ Workspace rules:
   is never an independent source of truth;
 - valid click and drag edits commit immediately to the Workspace Lineup;
 - click-to-click and drag-and-drop starter swaps share the same service operation;
+- Match manual edits are slot-authoritative: evaluated refreshes preserve the current
+  player-slot assignment and merge only evaluated metadata into the board;
+- applying an evaluated Workspace result does not increment the manual lineup revision;
+  revisions advance only for user-intent changes, and stale analysis results are
+  discarded before they can repaint the pitch;
 - goalkeeper slots are protected from field-player swaps;
 - Restore Optimized Lineup restores the original recommendation without rerunning the
   optimizer;
@@ -563,6 +568,9 @@ Workspace rules:
 - recalculation is automatic, debounced and routed back through `MatchController`;
 - Workspace recalculation evaluates the current fixed lineup through application-layer
   orchestration around existing `TeamRater` and `TacticOptimizer` calculations;
+- Match recalculation consumes the assigned `WorkspaceState` lineup directly, including
+  player ids, slot ids, formation, individual orders and order sides. It does not rerun
+  starting-XI, lineup or player-slot optimizers after a manual edit;
 - stale recalculation results are discarded when the Workspace revision has changed;
 - no engine formulas, probability calculations, Decision Lab rules or optimizer behavior
   are changed.

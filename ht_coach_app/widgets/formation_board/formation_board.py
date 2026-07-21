@@ -226,7 +226,13 @@ class FormationBoard(QWidget):
         self.formation_combo.setCurrentIndex(index if index >= 0 else 0)
         self.formation_combo.blockSignals(False)
         self._current_name = self.formation_combo.currentData() or ""
-        if self._workspace_state is not None:
+        if (
+            self._workspace_state is not None
+            and (
+                workspace_state is None
+                or self._current_name != self._workspace_state.current_formation_name
+            )
+        ):
             self._workspace_state = self._workspace_service.set_formation(
                 self._workspace_state,
                 self._current_name,

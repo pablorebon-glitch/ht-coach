@@ -16,6 +16,12 @@ starter before saving the immutable original snapshot. Initial load, reload and 
 Optimized Lineup therefore display the same complete recommendation without requiring a
 manual swap to reveal non-Normal orders.
 
+Alpha 0.5.6.2.3 applies the same manual-intent rule inside Match refresh. After a
+manual swap or replacement, the current player-slot assignment is authoritative. The
+refresh path evaluates the assigned lineup, merges evaluated metadata back into the
+board and preserves viewport state; it does not rebuild the pitch from the original
+recommendation unless the user explicitly restores it.
+
 ## Concept
 
 The Match page now separates two lineups:
@@ -84,6 +90,12 @@ original recommendation and clears selection, preview and pending modifications.
 6. HT Coach recalculates the best valid individual order for affected slots.
 7. Dependent fixed-lineup analysis can refresh without leaving the board permanently
    busy.
+
+During Match refresh, evaluated boards are reconciled into the existing Workspace by
+formation name. If the Workspace is dirty, player cards remain in their current slots
+and only evaluated metadata such as tactic labels and levels is merged. The lineup
+revision is not incremented by a completed analysis result; revisions represent user
+lineup intent and protect the pitch from stale asynchronous results.
 
 Initial and reload lifecycle:
 
