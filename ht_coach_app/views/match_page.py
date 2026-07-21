@@ -61,7 +61,7 @@ class MatchPage(BasePage):
 
     MATCH_SECTION_DEFAULTS = {
         "decision_lab": False,
-        "match_intelligence": True,
+        "match_intelligence": False,
         "rating_calibration": False,
         "match_analysis": True,
     }
@@ -278,6 +278,7 @@ class MatchPage(BasePage):
         )
         self.results_layout.setContentsMargins(0, 0, 0, 0)
         self.results_layout.setSpacing(6)
+        self.results_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._show_empty_results()
         self.match_content_layout.addWidget(self.results_host, 1)
 

@@ -306,6 +306,19 @@ Content:
 - Decision Lab, Match Intelligence, Opponent Rating Calibration and Match Analysis use
   shared collapsible sections with independent persisted state, brief summaries,
   keyboard-accessible headers and localized expand/collapse labels.
+- Alpha 0.5.7.1a rebuilds the collapsible section as a simple Qt header/body
+  component. The header is the only visible element when collapsed, the existing body
+  widget is hidden but not destroyed, expanded sections use natural body `sizeHint`,
+  and individual sections do not receive vertical stretch. The Match parent layout keeps
+  analysis sections in order and reserves any leftover space for the page/scroll area
+  rather than for collapsed cards.
+- First-launch Match section defaults are: Decision Lab collapsed, Match Intelligence
+  collapsed, Opponent Rating Calibration collapsed and Match Analysis expanded.
+  Previously saved `match_section_states` values continue to override those defaults.
+- This rebuilt component is applied only to the four Match analysis sections in
+  0.5.7.1a. Player details, bench and planner-specific panel integrations remain
+  separate work and should not be coupled to this component until the Match section
+  behavior is stable.
 - Rating Engine Alignment diagnostics classify current TeamRater values as internal
   contribution totals. The normal Match UI must not display own-team Hattrick decimal
   ratings unless a future evidence-backed conversion is introduced.

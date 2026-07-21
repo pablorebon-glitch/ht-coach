@@ -1,4 +1,4 @@
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -25,6 +25,18 @@ class CollapsibleHeaderButton(QPushButton):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def sizeHint(self):
+        layout = self.layout()
+        return layout.sizeHint() if layout is not None else super().sizeHint()
+
+    def minimumSizeHint(self):
+        layout = self.layout()
+        return (
+            layout.minimumSize()
+            if layout is not None
+            else super().minimumSizeHint()
+        )
 
 
 class CollapsibleArrowLabel(QLabel):
@@ -58,6 +70,10 @@ class CollapsibleSection(QFrame):
         self._summary = summary
         self._expanded = bool(expanded)
         self._body_widget = None
+        self.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Maximum,
+        )
         self._build()
         self.set_body_widget(body_widget or QWidget())
         self.set_expanded(self._expanded, emit=False)
@@ -92,6 +108,7 @@ class CollapsibleSection(QFrame):
         root.addWidget(self.header_button)
 
         self.body_host = QWidget()
+        self.body_host.setObjectName("collapsibleSectionBody")
         self.body_layout = QVBoxLayout(self.body_host)
         self.body_layout.setContentsMargins(10, 0, 10, 10)
         self.body_layout.setSpacing(6)
@@ -111,17 +128,13 @@ class CollapsibleSection(QFrame):
         policy = self.body_host.sizePolicy()
         policy.setVerticalPolicy(
             QSizePolicy.Policy.Preferred
-            if expanded
-            else QSizePolicy.Policy.Ignored
         )
         self.body_host.setSizePolicy(policy)
-        if not expanded:
-            self.body_host.setMinimumHeight(0)
-            self.body_host.setMaximumHeight(0)
-        else:
-            self.body_host.setMaximumHeight(16777215)
-        self.arrow_label.setText("v" if expanded else ">")
+        self.arrow_label.setText("▼" if expanded else "▶")
         self.header_button.setAccessibleName(self._accessible_name())
+        self.header_button.setAccessibleDescription(
+            "expanded" if expanded else "collapsed"
+        )
         self.header_button.setToolTip(
             t("common.collapse_section")
             if expanded
@@ -163,22 +176,6 @@ class CollapsibleSection(QFrame):
 
     def summary(self):
         return self._summary
-
-    def sizeHint(self):
-        if self._expanded:
-            return super().sizeHint()
-        return QSize(
-            max(self.header_button.sizeHint().width(), self.minimumSizeHint().width()),
-            self.header_button.sizeHint().height(),
-        )
-
-    def minimumSizeHint(self):
-        if self._expanded:
-            return super().minimumSizeHint()
-        return QSize(
-            self.header_button.minimumSizeHint().width(),
-            self.header_button.minimumSizeHint().height(),
-        )
 
     def retranslate(self, title=None, summary=None):
         if title is not None:

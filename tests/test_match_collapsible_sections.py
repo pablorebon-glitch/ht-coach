@@ -7,7 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QScrollArea
+from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.persistence.match_workspace_repository import (
@@ -130,7 +130,7 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         )
         self.assertFalse(sections["decision_lab"].is_expanded())
         self.assertFalse(sections["rating_calibration"].is_expanded())
-        self.assertTrue(sections["match_intelligence"].is_expanded())
+        self.assertFalse(sections["match_intelligence"].is_expanded())
         self.assertTrue(sections["match_analysis"].is_expanded())
 
     def test_header_arrow_enter_and_space_toggle_body_visibility(self):
@@ -155,7 +155,9 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         self.assertTrue(section.is_expanded())
 
     def test_collapsed_size_hint_uses_header_height_only(self):
-        body = QLabel("Tall body\n" * 40)
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.addWidget(QLabel("Tall body\n" * 40))
         section = CollapsibleSection(
             "Section",
             body,
@@ -176,12 +178,64 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
             ),
             6,
         )
-        self.assertEqual(section.body_host.maximumHeight(), 0)
+        self.assertTrue(section.body_host.isHidden())
+        self.assertFalse(section.body_widget().isVisible())
 
         section.set_expanded(True)
         QApplication.processEvents()
 
         self.assertGreater(section.sizeHint().height(), section.header_button.sizeHint().height())
+
+    def test_dynamic_body_size_changes_are_reflected_when_expanded(self):
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        dynamic = QLabel("Short body")
+        layout.addWidget(dynamic)
+        section = CollapsibleSection("Section", body, state_key="dynamic")
+        section.show()
+        QApplication.processEvents()
+        before = section.sizeHint().height()
+
+        dynamic.setMinimumHeight(dynamic.minimumHeight() + 120)
+        layout.invalidate()
+        section.layout().invalidate()
+        body.updateGeometry()
+        section.updateGeometry()
+        QApplication.processEvents()
+
+        self.assertGreater(section.sizeHint().height(), before)
+
+    def test_repeated_toggles_are_stable_and_keep_body_instance(self):
+        body = QLabel("Persistent body\n" * 8)
+        section = CollapsibleSection("Section", body, state_key="repeat")
+
+        for _ in range(5):
+            section.set_expanded(False)
+            QApplication.processEvents()
+            self.assertIs(section.body_widget(), body)
+            self.assertTrue(section.body_host.isHidden())
+            self.assertEqual(section.header_button.accessibleDescription(), "collapsed")
+            section.set_expanded(True)
+            QApplication.processEvents()
+            self.assertIs(section.body_widget(), body)
+            self.assertFalse(section.body_host.isHidden())
+            self.assertEqual(section.header_button.accessibleDescription(), "expanded")
+
+        self.assertGreater(
+            section.sizeHint().height(),
+            section.header_button.sizeHint().height(),
+        )
+
+    def test_toggle_does_not_emit_match_recalculate_signal(self):
+        page = MatchPage()
+        page.show_results(match_result())
+        calls = []
+        page.workspace_recalculate_requested.connect(calls.append)
+
+        self.sections(page)["match_analysis"].toggle()
+        QApplication.processEvents()
+
+        self.assertEqual(calls, [])
 
     def test_section_state_is_independent_and_survives_refresh(self):
         page = MatchPage()
