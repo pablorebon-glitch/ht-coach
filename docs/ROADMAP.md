@@ -353,6 +353,10 @@ Acceptance criteria:
   add starter-to-starter click swaps, manual lineup state, optimized restore, assisted
   position/order recommendations and explicit apply actions without implementing the
   future constraint-based lineup optimizer.
+- Alpha 0.5.6.2.1 Squad Builder Manual Intent and Automatic Orders: treat manual
+  player-slot decisions as authoritative, automatically choose best supported individual
+  orders for affected slots, remove visible Apply recommendation controls, orient the
+  pitch like the Hattrick lineup editor and remove primary Squad Export.
 - Alpha 0.5.7 Midfield Rating Engine v1: only after enough complete validation fixtures
   exist, investigate a measured midfield predictor against the validation framework.
 - Alpha 0.5.8 Defense Rating Engine v1: validate defensive sector prediction candidates

@@ -46,12 +46,13 @@ ratings from supplied predictions, classifies fixture completeness, calculates e
 metrics and returns structured reports. It does not implement prediction, conversion,
 calibration, optimization or rating estimation.
 
-Alpha 0.5.6.2 extends `ht_coach_app/workspace` with assisted lineup editing for Squad
-Builder and Match Formation Board surfaces. `WorkspaceService` is the canonical
-presentation-independent boundary for starter swaps, Bench exchanges, click selection,
-manual state, optimized-lineup restore and assisted position/order recommendations.
-Qt widgets translate clicks and drops into service operations; they do not duplicate
-lineup business rules.
+Alpha 0.5.6.2.1 refines `ht_coach_app/workspace` around manual intent. The initial
+optimizer result remains the global recommendation, but later valid manual slot
+assignments are authoritative. `WorkspaceService` is the canonical presentation-
+independent boundary for starter swaps, Bench exchanges, click selection, manual state,
+optimized-lineup restore and automatic affected-slot order selection. Qt widgets
+translate clicks and drops into service operations; they do not duplicate lineup
+business rules.
 
 ## Target Layers
 
@@ -539,20 +540,23 @@ Modules:
 Workspace rules:
 
 - the original recommendation is immutable;
-- slots own tactical position, side, order and pitch coordinates; players move between
-  slots without carrying the old slot's tactical assignment;
+- slots own tactical position, side and pitch coordinates; players move between slots
+  without carrying the old slot's tactical assignment, then receive an automatic valid
+  order for the assigned slot;
 - Bench is derived from loaded roster players minus the displayed Workspace Lineup and
   is never an independent source of truth;
 - valid click and drag edits commit immediately to the Workspace Lineup;
 - click-to-click and drag-and-drop starter swaps share the same service operation;
 - goalkeeper slots are protected from field-player swaps;
-- reset restores the original recommendation;
-- manual state is explicit: Optimized, Manually Modified, Recommendations Available and
-  Recommendations Applied;
-- assisted position recommendations reorder only the current eleven inside the current
-  formation;
-- assisted order recommendations enumerate only `OrderModifier`-supported orders and
-  compare internal contribution totals;
+- Restore Optimized Lineup restores the original recommendation without rerunning the
+  optimizer;
+- manual state uses neutral manual-adjusted language and does not imply the lineup is
+  wrong;
+- manual position choices are not contradicted by persistent position recommendations;
+- automatic orders enumerate existing `OrderOptimizer.ALLOWED_CONFIGURATIONS`, compare
+  internal contribution totals and preserve the current valid order on ties;
+- the Formation Board pitch uses normalized coordinates in Hattrick visual order:
+  goalkeeper, defenders, midfielders, forwards;
 - recalculation is automatic, debounced and routed back through `MatchController`;
 - Workspace recalculation evaluates the current fixed lineup through application-layer
   orchestration around existing `TeamRater` and `TacticOptimizer` calculations;

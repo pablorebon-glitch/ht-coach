@@ -89,7 +89,8 @@ Content:
 
 - CSV path selector.
 - Load and reload buttons.
-- Export visible rows button.
+- No primary Export button; export service remains available outside the main Squad
+  Builder workflow.
 - Four tabs: Ideal XI, Players, Evolution and Transfer Planner.
 - Ideal XI tab with a top formation selector containing Auto and every supported
   formation from the centralized catalog.
@@ -97,8 +98,8 @@ Content:
 - Formation Board reused from the Match workspace for the Ideal XI pitch; no second
   pitch widget is introduced.
 - Assisted Lineup controls on the Formation Board support click-to-click starter swaps,
-  Bench exchanges, explicit Apply Recommendation actions and Restore Optimized Lineup
-  without requiring drag-and-drop.
+  Bench exchanges, automatic order selection and Restore Optimized Lineup without
+  requiring drag-and-drop.
 - Best Formations side panel with sorted scores and deltas versus the best result.
 - Summary with best formation, overall score, confidence and reason.
 - Squad Identity panel that separates Identity, Strengths, Weaknesses, Tactical
@@ -249,16 +250,15 @@ Content:
   formation switching across analyzed alternatives, click-to-inspect behavior,
   one-click workspace replacement actions, and original HT Coach styling.
 - Interactive Workspace editing where valid click and drag actions commit immediately
-  to the Workspace Lineup and schedule automatic fixed-lineup recalculation. Reset
-  Workspace remains the only global edit action.
+  to the Workspace Lineup, optimize affected individual orders and schedule bounded
+  fixed-lineup refresh. Restore Optimized Lineup remains the only global edit action.
 - Click-to-click starter swaps use the same canonical operation as drag-and-drop.
   Selecting the same player cancels selection, Escape cancels selection, and invalid
   destinations preserve the lineup.
-- Manual edits show `Lineup manually modified`; assisted recommendations can be applied
-  individually by category or all at once, and are never applied automatically.
-- Position recommendations preserve the current formation and current eleven. Order
-  recommendations use only supported domain orders and show internal contribution
-  impact without implying Hattrick decimal ratings.
+- Manual edits show `Lineup manually adjusted`; manual slot choices are treated as
+  intentional and are not contradicted by visible position recommendations.
+- Automatic order selection uses only supported domain order configurations, preserves
+  current valid orders on ties and does not imply Hattrick decimal ratings.
 - Bench panel with compact focusable cards, deterministic roster-minus-lineup derivation
   and internal scrolling. Clicking a Bench player and then a starter, or selecting a
   starter and clicking a Bench player, performs the same immediate exchange.
@@ -451,14 +451,15 @@ Responsibilities:
   replacements.
 - Support starter-to-starter click swaps, Bench-to-starter click replacements,
   starter-to-Bench drag exchanges and accessible non-drag editing paths.
-- Show assisted position/order recommendations with explicit apply buttons and internal
-  contribution impact.
+- Show assigned position, automatically selected order and concise order-change feedback
+  without permanent Apply buttons.
 - Distinguish immutable Recommended Lineup state from editable Workspace Lineup state.
-- Show Original Recommendation, Updating Analysis, Evaluated Workspace and failed
-  analysis states.
+- Show Original Recommendation, Lineup manually adjusted, Updating Analysis,
+  Analysis updated and error states.
 - Emit workspace-modified intent for the controller to debounce and recalculate without
   calling the engine directly.
-- Own full-pitch scaling, card containment and the compact formation/tactic footer.
+- Own Hattrick-oriented full-pitch scaling, normalized slot coordinates, card
+  containment and the compact formation/tactic footer.
 - Keep reusable pitch and inspector layout behavior outside `MatchPage`.
 - Avoid engine, optimizer and persistence dependencies.
 

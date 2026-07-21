@@ -82,6 +82,7 @@ class WorkspaceModification:
     interaction_source: str = ""
     previous_slot_score: float | None = None
     current_slot_score: float | None = None
+    order_changes: tuple[tuple[str, str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -170,38 +171,38 @@ class WorkspaceState:
 
     @property
     def status_label(self):
-        if self.evaluation_state == "updating":
+        if self.evaluation_state in ("updating", "analyzing"):
             return t("workspace.updating")
-        if self.evaluation_state == "failed":
-            return t("workspace.failed")
+        if self.evaluation_state in ("failed", "error"):
+            return t("workspace.analysis_failed")
         if self.swap_preview is not None:
             return t("workspace.swap_preview")
         if self.replacement_preview is not None:
             return t("workspace.replacement_preview")
-        if self.evaluation_state == "evaluated":
-            return t("workspace.evaluated")
         if self.manual_lineup_state == ManualLineupState.RECOMMENDATIONS_APPLIED:
             return t("workspace.recommendations_applied")
         if self.manual_lineup_state == ManualLineupState.RECOMMENDATIONS_AVAILABLE:
             return t("workspace.recommendations_available")
         if self.dirty or self.evaluation_state == "pending":
-            return t("workspace.manual_modified")
+            return t("workspace.manual_adjusted")
+        if self.evaluation_state in ("evaluated", "ready"):
+            return t("workspace.analysis_updated")
         return t("workspace.original")
 
     @property
     def status_state(self):
-        if self.evaluation_state == "updating":
+        if self.evaluation_state in ("updating", "analyzing"):
             return "updating"
-        if self.evaluation_state == "failed":
+        if self.evaluation_state in ("failed", "error"):
             return "failed"
         if self.replacement_preview is not None or self.swap_preview is not None:
             return "preview"
-        if self.evaluation_state == "evaluated":
-            return "evaluated"
+        if self.evaluation_state in ("evaluated", "ready"):
+            return "pending" if self.dirty else "evaluated"
         if self.manual_lineup_state == ManualLineupState.RECOMMENDATIONS_APPLIED:
             return "evaluated"
         if self.manual_lineup_state == ManualLineupState.RECOMMENDATIONS_AVAILABLE:
-            return "preview"
+            return "pending"
         if self.dirty or self.evaluation_state == "pending":
             return "pending"
         return "clean"
