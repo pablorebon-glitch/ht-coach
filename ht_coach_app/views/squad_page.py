@@ -50,6 +50,10 @@ class SquadPage(BasePage):
     training_focus_changed = Signal(str)
     transfer_constraints_changed = Signal(object)
     squad_tab_changed = Signal(str)
+    training_priority_changed = Signal(str, str)
+    generate_training_plan_requested = Signal(str)
+    record_first_match_requested = Signal()
+    use_training_plan_requested = Signal()
 
     HEADERS = [
         "Name",
@@ -85,6 +89,8 @@ class SquadPage(BasePage):
         self._readiness_rows = []
         self._evolution_details = []
         self._transfer_needs = []
+        self._weekly_priority_rows = []
+        self._weekly_plan_board = None
         self._tab_keys = []
         self._last_transfer_result = None
         self._transfer_presenter = current_transfer_presenter()
@@ -181,6 +187,7 @@ class SquadPage(BasePage):
         self._build_ideal_tab()
         self._build_players_tab()
         self._build_evolution_tab()
+        self._build_weekly_planner_tab()
         self._build_transfer_tab()
         self.body_layout.addWidget(self.tabs, 1)
 
@@ -675,6 +682,111 @@ class SquadPage(BasePage):
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
         self._add_squad_tab(tab, t("evolution.tab"), "evolution")
+
+    def _build_weekly_planner_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        controls = QFrame()
+        controls.setObjectName("workspacePanel")
+        controls_layout = QGridLayout(controls)
+        controls_layout.setContentsMargins(12, 10, 12, 10)
+        controls_layout.setHorizontalSpacing(8)
+        controls_layout.setVerticalSpacing(8)
+
+        self.weekly_training_type_combo = QComboBox()
+        self.weekly_training_type_combo.addItem(t("planner.playmaking"), "PLAYMAKING")
+        self.weekly_formation_combo = QComboBox()
+        self.weekly_generate_button = QPushButton(t("planner.generate_plan"))
+        self.weekly_generate_button.setObjectName("primaryAction")
+        self.weekly_generate_button.clicked.connect(
+            lambda: self.generate_training_plan_requested.emit(
+                self.weekly_formation_combo.currentText()
+            )
+        )
+        self.weekly_record_button = QPushButton(t("planner.record_played_lineup"))
+        self.weekly_record_button.clicked.connect(self.record_first_match_requested)
+        self.weekly_use_button = QPushButton(t("planner.use_this_lineup"))
+        self.weekly_use_button.clicked.connect(self.use_training_plan_requested)
+        self.weekly_week_label = QLabel(t("planner.no_active_week"))
+        self.weekly_week_label.setWordWrap(True)
+
+        controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
+        controls_layout.addWidget(self.weekly_training_type_combo, 0, 1)
+        controls_layout.addWidget(QLabel(t("planner.fixed_formation")), 0, 2)
+        controls_layout.addWidget(self.weekly_formation_combo, 0, 3)
+        controls_layout.addWidget(self.weekly_generate_button, 0, 4)
+        controls_layout.addWidget(self.weekly_record_button, 0, 5)
+        controls_layout.addWidget(self.weekly_use_button, 0, 6)
+        controls_layout.addWidget(self.weekly_week_label, 1, 0, 1, 7)
+        controls_layout.setColumnStretch(3, 1)
+        layout.addWidget(controls)
+
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setChildrenCollapsible(False)
+
+        left = QFrame()
+        left.setObjectName("workspacePanel")
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(12, 12, 12, 12)
+        left_layout.setSpacing(8)
+        self.weekly_priority_table = QTableWidget(0, 6)
+        self.weekly_priority_table.setHorizontalHeaderLabels(
+            [
+                t("planner.player"),
+                t("planner.age"),
+                t("planner.best_positions"),
+                t("planner.weekly_goal"),
+                t("availability.status"),
+                t("planner.remaining_exposure"),
+            ]
+        )
+        self.weekly_coverage_table = QTableWidget(0, 8)
+        self.weekly_coverage_table.setHorizontalHeaderLabels(
+            [
+                t("planner.player"),
+                t("planner.weekly_goal"),
+                t("planner.confirmed_exposure"),
+                t("planner.assumed_exposure"),
+                t("planner.planned_exposure"),
+                t("planner.remaining_exposure"),
+                t("planner.status"),
+                t("planner.source_matches"),
+            ]
+        )
+        left_layout.addWidget(self._mini_heading(t("planner.training_priorities")))
+        left_layout.addWidget(self.weekly_priority_table, 1)
+        left_layout.addWidget(self._mini_heading(t("planner.weekly_coverage")))
+        left_layout.addWidget(self.weekly_coverage_table, 1)
+        splitter.addWidget(left)
+
+        right = QFrame()
+        right.setObjectName("workspacePanel")
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(12, 12, 12, 12)
+        right_layout.setSpacing(8)
+        self.weekly_plan_summary_label = QLabel(t("planner.empty_plan"))
+        self.weekly_plan_summary_label.setWordWrap(True)
+        self.weekly_plan_board = FormationBoard()
+        self.weekly_plan_board.formation_combo.setVisible(False)
+        self.weekly_plan_board.reset_workspace_button.setVisible(False)
+        self.weekly_cost_label = QLabel("")
+        self.weekly_cost_label.setWordWrap(True)
+        self.weekly_explanations_label = QLabel("")
+        self.weekly_explanations_label.setWordWrap(True)
+        right_layout.addWidget(self._mini_heading(t("planner.second_match_plan")))
+        right_layout.addWidget(self.weekly_plan_summary_label)
+        right_layout.addWidget(self.weekly_plan_board, 1)
+        right_layout.addWidget(self._mini_heading(t("planner.competitive_cost")))
+        right_layout.addWidget(self.weekly_cost_label)
+        right_layout.addWidget(self._mini_heading(t("planner.explanations_warnings")))
+        right_layout.addWidget(self.weekly_explanations_label)
+        splitter.addWidget(right)
+        splitter.setSizes([520, 680])
+        layout.addWidget(splitter, 1)
+        self._add_squad_tab(tab, t("planner.weekly_planner"), "weekly_planner")
 
     def _build_transfer_tab(self):
         tab = QWidget()
@@ -1212,6 +1324,201 @@ class SquadPage(BasePage):
             player_details_by_name=player_details_by_name,
             roster_players=roster_players,
         )
+
+    def show_weekly_training_empty(self):
+        self.weekly_week_label.setText(t("planner.load_roster_first"))
+        self.weekly_priority_table.setRowCount(0)
+        self.weekly_coverage_table.setRowCount(0)
+        self.weekly_plan_summary_label.setText(t("planner.empty_plan"))
+        self.weekly_cost_label.setText("")
+        self.weekly_explanations_label.setText("")
+        self._weekly_plan_board = None
+
+    def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
+        self._weekly_priority_rows = list(priority_rows)
+        current_formation = self.weekly_formation_combo.currentText()
+        self.weekly_formation_combo.blockSignals(True)
+        self.weekly_formation_combo.clear()
+        for formation in formations:
+            self.weekly_formation_combo.addItem(formation)
+        if current_formation:
+            index = self.weekly_formation_combo.findText(current_formation)
+            self.weekly_formation_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.weekly_formation_combo.blockSignals(False)
+
+        week = state.active_week
+        if week is None:
+            self.weekly_week_label.setText(t("planner.no_active_week"))
+        else:
+            self.weekly_week_label.setText(
+                t(
+                    "planner.week_summary",
+                    start=week.start_date.isoformat(),
+                    second=week.second_match_date.isoformat(),
+                    update=week.training_update_date.isoformat(),
+                )
+            )
+        self._set_weekly_priorities(priority_rows, coverage_rows)
+        self._set_weekly_coverage(coverage_rows)
+
+    def show_weekly_training_plan(self, plan, board, roster_players=None):
+        if plan.conflicts:
+            self.weekly_plan_summary_label.setText(
+                t("planner.conflict_state")
+            )
+            self.weekly_cost_label.setText("")
+            self.weekly_explanations_label.setText(
+                "\n".join(self._planner_conflict_text(conflict) for conflict in plan.conflicts)
+            )
+            return
+        self.weekly_plan_summary_label.setText(
+            t(
+                "planner.plan_ready",
+                formation=plan.formation,
+                selected=len(plan.lineup),
+            )
+        )
+        if board is not None:
+            self._weekly_plan_board = board
+            self.weekly_plan_board.set_boards(
+                [board],
+                selected_formation_name=board.formation_name,
+                roster_players=roster_players or [],
+            )
+        cost = plan.competitive_cost
+        self.weekly_cost_label.setText(
+            t(
+                "planner.cost_value",
+                delta=f"{cost.score_delta:.2f}",
+                percent=f"{cost.percentage_delta:.1f}",
+            )
+        )
+        lines = [self._planner_explanation_text(item) for item in plan.explanations]
+        lines.extend(plan.warnings)
+        self.weekly_explanations_label.setText("\n".join(lines))
+        self._set_weekly_coverage(plan.coverage)
+
+    def weekly_training_current_board(self):
+        current = self.weekly_plan_board.current_board()
+        if current is not None:
+            return current
+        if self._weekly_plan_board is not None:
+            return self._weekly_plan_board
+        return None
+
+    def accept_weekly_training_plan(self):
+        board = self.weekly_training_current_board()
+        if board is not None:
+            self.ideal_board.set_boards([board], selected_formation_name=board.formation_name)
+
+    def _set_weekly_priorities(self, priority_rows, coverage_rows):
+        remaining_by_id = {
+            row.player_id: row.remaining_exposure
+            for row in coverage_rows
+        }
+        self.weekly_priority_table.setRowCount(len(priority_rows))
+        for row_index, row in enumerate(priority_rows):
+            values = [
+                row.player_name,
+                row.age,
+                row.best_position,
+                "",
+                row.availability,
+                self._percent_label(remaining_by_id.get(row.player_id, 0)),
+            ]
+            for column, value in enumerate(values):
+                if column == 3:
+                    combo = QComboBox()
+                    for label, key in self._training_priority_options():
+                        combo.addItem(label, key)
+                    index = combo.findData(row.priority.value)
+                    combo.setCurrentIndex(index if index >= 0 else 0)
+                    combo.currentIndexChanged.connect(
+                        lambda _index, player_id=row.player_id, widget=combo:
+                        self.training_priority_changed.emit(
+                            player_id,
+                            widget.currentData(),
+                        )
+                    )
+                    self.weekly_priority_table.setCellWidget(row_index, column, combo)
+                    continue
+                self.weekly_priority_table.setItem(
+                    row_index,
+                    column,
+                    SortableTableItem(
+                        value,
+                        value if isinstance(value, (int, float)) else str(value).casefold(),
+                    ),
+                )
+
+    def _set_weekly_coverage(self, rows):
+        self.weekly_coverage_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = [
+                row.player_name,
+                self._priority_label(row.weekly_target.value),
+                self._percent_label(row.confirmed_exposure),
+                self._percent_label(row.assumed_exposure),
+                self._percent_label(row.planned_exposure),
+                self._percent_label(row.remaining_exposure),
+                self._coverage_status_label(row.target_status.value),
+                ", ".join(row.source_matches),
+            ]
+            for column, value in enumerate(values):
+                self.weekly_coverage_table.setItem(
+                    row_index,
+                    column,
+                    SortableTableItem(
+                        value,
+                        float(str(value).replace("%", "") or 0)
+                        if column in {2, 3, 4, 5}
+                        else str(value).casefold(),
+                    ),
+                )
+
+    def _training_priority_options(self):
+        return [
+            (t("planner.priority.required_100"), "REQUIRED_100"),
+            (t("planner.priority.required_50"), "REQUIRED_50"),
+            (t("planner.priority.high"), "HIGH_PRIORITY"),
+            (t("planner.priority.secondary"), "SECONDARY_PRIORITY"),
+            (t("planner.priority.none"), "NO_PRIORITY"),
+            (t("planner.priority.rest"), "REST"),
+        ]
+
+    def _priority_label(self, key):
+        lookup = {
+            "REQUIRED_100": t("planner.priority.required_100"),
+            "REQUIRED_50": t("planner.priority.required_50"),
+            "HIGH_PRIORITY": t("planner.priority.high"),
+            "SECONDARY_PRIORITY": t("planner.priority.secondary"),
+            "NO_PRIORITY": t("planner.priority.none"),
+            "REST": t("planner.priority.rest"),
+        }
+        return lookup.get(key, str(key).replace("_", " ").title())
+
+    def _coverage_status_label(self, key):
+        value = t(f"planner.coverage.{str(key).lower()}")
+        return value if value != f"planner.coverage.{str(key).lower()}" else str(key).replace("_", " ").title()
+
+    def _planner_conflict_text(self, conflict):
+        return t(f"planner.conflict.{conflict.code.lower()}")
+
+    def _planner_explanation_text(self, explanation):
+        return t(
+            f"planner.explanation.{explanation.code.lower()}",
+            player=explanation.player_name,
+        )
+
+    @staticmethod
+    def _percent_label(value):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            number = 0.0
+        if number.is_integer():
+            return f"{int(number)}%"
+        return f"{number:.1f}%"
 
     def _set_ideal_rankings(self, rankings):
         self.ideal_ranking_table.setRowCount(len(rankings))
@@ -1969,6 +2276,8 @@ class SquadPage(BasePage):
             (self.succession_table, {7}),
             (self.development_table, set()),
             (self.priority_risk_table, {0}),
+            (self.weekly_priority_table, {1, 5}),
+            (self.weekly_coverage_table, {2, 3, 4, 5}),
             (self.transfer_priority_table, {0}),
         ]
         for table, numeric_columns in table_configs:

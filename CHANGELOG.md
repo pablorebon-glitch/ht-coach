@@ -4,6 +4,10 @@
 
 ### Added
 
+- Added Alpha 0.5.7 Weekly Training Lineup Planner with Playmaking priorities,
+  Sunday-Wednesday-Thursday week handling, minute-aware exposure coverage, second-match
+  lineup planning, assumed-versus-confirmed match records, competitive-cost reporting,
+  persistent JSON state and EN/ES Squad-tab UI.
 - Added Alpha 0.5.6.2.4 Match UI Stability and Incremental Refresh: Match refresh now
   reuses the result tab hierarchy, Formation Board, Pitch widget and player cards while
   preserving scroll, splitter, active-tab and selection state during automatic analysis
