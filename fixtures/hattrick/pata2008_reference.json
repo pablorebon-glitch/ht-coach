@@ -1,0 +1,32 @@
+{
+  "fixture_name": "pata2008_reference_opponent",
+  "match_id": "764960153",
+  "team_name": "pata2008",
+  "metadata_complete": false,
+  "official_hattrick_ratings": {
+    "midfield": 5.25,
+    "right_defense": 6.75,
+    "central_defense": 7.0,
+    "left_defense": 5.5,
+    "right_attack": 5.25,
+    "central_attack": 4.5,
+    "left_attack": 4.0,
+    "indirect_defense": 7.0,
+    "indirect_attack": 6.5
+  },
+  "notes": "Reference opponent ratings imported from the Alpha 0.5.6 pata2008 example. Lineup, player form, stamina, orders, attitude, coach and weather context are not known.",
+  "additional_context": {
+    "source": "Alpha 0.5.6 rating alignment audit",
+    "known_missing_context": [
+      "lineup",
+      "players",
+      "orders",
+      "home_or_away",
+      "attitude",
+      "confidence",
+      "coach",
+      "weather"
+    ]
+  },
+  "completeness": "minimal"
+}
