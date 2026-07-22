@@ -364,6 +364,18 @@ Content:
   the separate Lineup Workspace. Nested scrollable widgets must be bounded to their
   content area rather than placed as full-page expanding scroll areas inside the
   accordion.
+- Alpha 0.5.7.4.1 tightens body integration ownership for Decision Lab, Match
+  Intelligence and Opponent Rating Calibration. Each section keeps a persistent body
+  root owned by `CollapsibleSection`; refresh replaces only the root's internal
+  content, never the body root itself. `CollapsibleSection` is the single owner of
+  expanded/collapsed visibility, body-host maximum height and zero-height collapse.
+  Expanded body hosts derive their minimum height from the current child
+  `minimumSizeHint`, so restored windows scroll instead of compressing a visible body
+  below its useful height.
+- Decision Lab remains a compact natural-height body. Match Intelligence uses a
+  bounded internal scroll body for the matrix and wrapped summaries. Opponent Rating
+  Calibration uses a bounded internal scroll body for the comparison table so headers
+  and at least one data row remain visible when data exists.
 - First-launch Match section defaults are: Decision Lab collapsed, Match Intelligence
   collapsed, Opponent Rating Calibration collapsed and Match Analysis expanded.
   Previously saved `match_section_states` values continue to override those defaults.

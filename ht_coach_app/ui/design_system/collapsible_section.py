@@ -132,7 +132,11 @@ class CollapsibleSection(QFrame):
             else QSizePolicy.Policy.Ignored
         )
         self.body_host.setSizePolicy(policy)
-        self.body_host.setMinimumHeight(0)
+        self.body_host.setMinimumHeight(
+            self._expanded_body_minimum_height()
+            if expanded
+            else 0
+        )
         self.body_host.setMaximumHeight(16777215 if expanded else 0)
         self.arrow_label.setText("▼" if expanded else "▶")
         self.header_button.setAccessibleName(self._accessible_name())
@@ -205,6 +209,11 @@ class CollapsibleSection(QFrame):
             self.header_button.sizeHint().height()
         )
         self.header_button.updateGeometry()
+
+    def _expanded_body_minimum_height(self):
+        if self._body_widget is None:
+            return 0
+        return max(0, self._body_widget.minimumSizeHint().height())
 
     def _activate_parent_layouts(self):
         widget = self

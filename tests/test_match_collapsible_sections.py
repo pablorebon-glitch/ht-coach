@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QTabWidget,
+    QTableWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -228,6 +229,120 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
             QApplication.processEvents()
             self.assertTrue(section.body_host.isHidden(), key)
             self.assertEqual(section.body_host.maximumHeight(), 0, key)
+            self.assertEqual(section.body_host.minimumHeight(), 0, key)
+
+    def test_compact_match_sections_keep_body_instances_during_refresh(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page, 1280, 720)
+        sections = self.sections(page)
+
+        for key in (
+            "decision_lab",
+            "match_intelligence",
+            "rating_calibration",
+        ):
+            section = sections[key]
+            section.set_expanded(True)
+            QApplication.processEvents()
+            body = section.body_widget()
+            self.assertFalse(section.body_host.isHidden(), key)
+
+            page.show_results(rich_match_result())
+            QApplication.processEvents()
+            refreshed = self.sections(page)[key]
+
+            self.assertIs(refreshed.body_widget(), body, key)
+            self.assertTrue(refreshed.is_expanded(), key)
+            self.assertFalse(refreshed.body_host.isHidden(), key)
+            self.assertGreater(refreshed.body_host.minimumHeight(), 0, key)
+            self.assertGreaterEqual(
+                refreshed.body_host.height(),
+                refreshed.body_host.minimumHeight(),
+                key,
+            )
+
+    def test_compact_match_sections_refresh_while_collapsed_preserves_hidden_body(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page, 1280, 720)
+
+        for key in (
+            "decision_lab",
+            "match_intelligence",
+            "rating_calibration",
+        ):
+            section = self.sections(page)[key]
+            section.set_expanded(False)
+            QApplication.processEvents()
+            body = section.body_widget()
+
+            page.show_results(rich_match_result())
+            QApplication.processEvents()
+            refreshed = self.sections(page)[key]
+
+            self.assertIs(refreshed.body_widget(), body, key)
+            self.assertFalse(refreshed.is_expanded(), key)
+            self.assertTrue(refreshed.body_host.isHidden(), key)
+            self.assertEqual(refreshed.body_host.minimumHeight(), 0, key)
+            self.assertEqual(refreshed.body_host.maximumHeight(), 0, key)
+
+            refreshed.set_expanded(True)
+            QApplication.processEvents()
+            self.assertFalse(refreshed.body_host.isHidden(), key)
+            self.assertGreater(refreshed.body_host.minimumHeight(), 0, key)
+
+    def test_rating_calibration_table_visible_in_restored_window(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page, 1280, 720)
+        section = self.sections(page)["rating_calibration"]
+
+        section.set_expanded(True)
+        QApplication.processEvents()
+        tables = section.body_widget().findChildren(QTableWidget)
+
+        self.assertTrue(tables)
+        table = tables[0]
+        self.assertTrue(table.isVisible())
+        self.assertGreaterEqual(table.rowCount(), 1)
+        self.assertGreater(table.height(), 0)
+        self.assertEqual(table.horizontalHeaderItem(0).text(), "Matchup")
+
+    def test_restored_window_repeated_toggles_for_compact_sections(self):
+        for width, height in (
+            (1280, 720),
+            (1366, 768),
+            (1440, 900),
+            (1600, 900),
+        ):
+            with self.subTest(size=(width, height)):
+                page = MatchPage()
+                page.show_results(rich_match_result())
+                self.show_page(page, width, height)
+                for key in (
+                    "decision_lab",
+                    "match_intelligence",
+                    "rating_calibration",
+                ):
+                    section = self.sections(page)[key]
+                    for _ in range(5):
+                        section.set_expanded(True)
+                        QApplication.processEvents()
+                        self.assertFalse(section.body_host.isHidden(), key)
+                        self.assertGreater(section.body_host.height(), 0, key)
+                        section.set_expanded(False)
+                        QApplication.processEvents()
+                        self.assertTrue(section.body_host.isHidden(), key)
+                        self.assertEqual(section.body_host.maximumHeight(), 0, key)
+                    section.set_expanded(True)
+                    QApplication.processEvents()
+                    self.assertFalse(section.body_host.isHidden(), key)
+                    self.assertGreaterEqual(
+                        section.body_host.height(),
+                        section.body_host.minimumHeight(),
+                        key,
+                    )
 
     def test_match_accordion_stack_order_places_workspace_after_sections(self):
         page = MatchPage()
