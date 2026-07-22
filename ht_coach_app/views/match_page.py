@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -85,6 +86,7 @@ class MatchPage(BasePage):
         self._analysis_inputs_collapsed = False
         self._match_section_states = dict(self.MATCH_SECTION_DEFAULTS)
         self._match_sections = {}
+        self._match_section_body_roots = {}
         self._result_tabs = None
         self._formation_board_widget = None
         self.body_layout.setContentsMargins(16, 12, 16, 12)
@@ -569,6 +571,14 @@ class MatchPage(BasePage):
             )
             section.toggled.connect(self._match_section_toggled)
             self._match_sections[key] = section
+            if key in {
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+            }:
+                section.set_body_widget(
+                    self._section_body_root(key)
+                )
         return self._match_sections
 
     def _match_section_toggled(self, key, expanded):
@@ -597,7 +607,8 @@ class MatchPage(BasePage):
     ):
         sections = self._ensure_match_sections()
 
-        sections["decision_lab"].set_body_widget(
+        self._set_section_body_content(
+            "decision_lab",
             self._build_decision_lab_panel(
                 result.decision_lab,
                 recommended,
@@ -612,29 +623,41 @@ class MatchPage(BasePage):
         )
 
         intelligence = getattr(result, "match_intelligence", None)
-        sections["match_intelligence"].set_body_widget(
-            self._build_match_intelligence_panel(
-                intelligence,
-                recommended,
-            )
-            if intelligence is not None
-            else self._build_unavailable_panel(
-                t("common.not_available")
+        self._set_section_body_content(
+            "match_intelligence",
+            self._bounded_section_scroll(
+                self._build_match_intelligence_panel(
+                    intelligence,
+                    recommended,
+                )
+                if intelligence is not None
+                else self._build_unavailable_panel(
+                    t("common.not_available")
+                ),
+                "matchIntelligenceBodyScroll",
+                minimum_height=220,
+                maximum_height=380,
             )
         )
         sections["match_intelligence"].set_summary(
             self._match_intelligence_summary(result)
         )
 
-        sections["rating_calibration"].set_body_widget(
-            self._build_sector_rating_panel(recommended)
-            if recommended is not None and getattr(
-                recommended,
-                "sector_rating_comparisons",
-                None,
-            )
-            else self._build_unavailable_panel(
-                t("sector_rating.not_available")
+        self._set_section_body_content(
+            "rating_calibration",
+            self._bounded_section_scroll(
+                self._build_sector_rating_panel(recommended)
+                if recommended is not None and getattr(
+                    recommended,
+                    "sector_rating_comparisons",
+                    None,
+                )
+                else self._build_unavailable_panel(
+                    t("sector_rating.not_available")
+                ),
+                "ratingCalibrationBodyScroll",
+                minimum_height=170,
+                maximum_height=340,
             )
         )
         sections["rating_calibration"].set_summary(
@@ -652,6 +675,53 @@ class MatchPage(BasePage):
         sections["match_analysis"].set_summary(
             self._match_analysis_summary(result)
         )
+
+    def _section_body_root(self, key):
+        if key in self._match_section_body_roots:
+            return self._match_section_body_roots[key]
+        root = QWidget()
+        root.setObjectName(f"{key}BodyRoot")
+        root.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Preferred,
+        )
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self._match_section_body_roots[key] = root
+        return root
+
+    def _set_section_body_content(self, key, content):
+        root = self._section_body_root(key)
+        layout = root.layout()
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None and widget is not content:
+                widget.setParent(None)
+                widget.deleteLater()
+        layout.addWidget(content)
+        content.show()
+        root.show()
+        layout.invalidate()
+        root.updateGeometry()
+
+    def _bounded_section_scroll(
+        self,
+        content,
+        object_name,
+        minimum_height,
+        maximum_height,
+    ):
+        scroll = QScrollArea()
+        scroll.setObjectName(object_name)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setMinimumHeight(minimum_height)
+        scroll.setMaximumHeight(maximum_height)
+        scroll.setWidget(content)
+        return scroll
 
     def _build_match_analysis_body(
         self,

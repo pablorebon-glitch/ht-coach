@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.5.7.4.1 Match Section Body Integration Fix: Decision Lab,
+  Match Intelligence and Opponent Rating Calibration now use persistent body roots
+  owned by the Match accordion, refresh updates their internal content without
+  replacing the collapsible body, bounded internal scroll areas keep Intelligence and
+  Calibration visible in restored windows, and expanded body hosts derive their
+  minimum height from current content while collapsed hosts return to zero height.
 - Added Alpha 0.5.7.4 Responsive Layout System Audit: Squad, Match and Weekly
   Planner now share a documented responsive workspace contract, splitters initialize
   from logical proportions instead of hardcoded pixel sizes, Formation Board minimums
