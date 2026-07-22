@@ -150,6 +150,11 @@ Content:
 - Weekly Planner second-match output uses the shared Formation Board and requires an
   explicit Use This Lineup action before copying the proposal into the Squad Ideal XI
   board.
+- Weekly Planner Generate Plan now uses the Planner Execution Engine: ordinary 100%/50%
+  priority conflicts still produce a best-effort lineup, populated bench, automatic
+  orders, coverage updates, internal competitive cost and conflict explanations. Only
+  truly impossible cases such as no available players, unsupported formation or no
+  valid goalkeeper leave the proposal empty.
 - Formation Board bench and player-details side panels can be collapsed in Match,
   Squad and Weekly Planner. Collapsing releases real width while preserving selection
   and the existing detail widgets.

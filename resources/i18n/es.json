@@ -1169,6 +1169,8 @@
     "plan_ready": "{formation} planificada con {selected} titulares.",
     "conflict_state": "Conflicto del planner. Revisá las advertencias antes de generar una alineación.",
     "cost_value": "Delta de fuerza interna de alineación: {delta} ({percent}%).",
+    "changed_starters": "Titulares cambiados contra la alineación sin restricciones: {count}.",
+    "sector_deltas": "Deltas por sector: {sectors}.",
     "explanations_warnings": "Explicaciones y advertencias",
     "coverage": {
       "not_started": "Objetivo pendiente",
@@ -1183,11 +1185,17 @@
       "automatic_rules_unavailable": "Las reglas automáticas de entrenamiento no están disponibles para este tipo de entrenamiento.",
       "invalid_fixed_formation": "La formación fija no está soportada.",
       "unavailable_required_player": "Un jugador obligatorio no está disponible o está marcado para descansar.",
-      "insufficient_training_slots": "Hay más jugadores obligatorios 100% que slots de entrenamiento 100%.",
-      "insufficient_eligible_players": "No hay suficientes jugadores elegibles para construir una alineación válida."
+      "insufficient_training_slots": "Solo hay {available} slots completos para {required} objetivos obligatorios 100%.",
+      "insufficient_eligible_players": "No hay suficientes jugadores elegibles para construir una alineación válida.",
+      "no_available_players": "No quedan jugadores disponibles después de aplicar disponibilidad y descanso.",
+      "no_valid_goalkeeper": "No hay un arquero válido disponible."
     },
     "explanation": {
       "required_target_selected": "{player} fue seleccionado para cubrir un objetivo semanal obligatorio.",
+      "required_target_partial": "{player} fue seleccionado, pero puede cubrir solo parcialmente el objetivo semanal pedido.",
+      "required_target_omitted": "{player} no fue asignado a un slot de entrenamiento porque las restricciones de alineación legal y fuerza tuvieron prioridad.",
+      "required_target_unavailable": "{player} no fue asignado porque no está disponible o está marcado para descansar.",
+      "target_already_completed": "{player} ya completó el objetivo de esta semana.",
       "high_priority_selected": "{player} fue seleccionado como jugador de prioridad alta."
     }
   },

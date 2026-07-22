@@ -1169,6 +1169,8 @@
     "plan_ready": "{formation} planned with {selected} starters.",
     "conflict_state": "Planner conflict. Review the warnings before generating a lineup.",
     "cost_value": "Internal lineup strength delta: {delta} ({percent}%).",
+    "changed_starters": "Changed starters versus unconstrained lineup: {count}.",
+    "sector_deltas": "Sector deltas: {sectors}.",
     "explanations_warnings": "Explanations and Warnings",
     "coverage": {
       "not_started": "Target Incomplete",
@@ -1183,11 +1185,17 @@
       "automatic_rules_unavailable": "Automatic training rules unavailable for this training type.",
       "invalid_fixed_formation": "The fixed formation is not supported.",
       "unavailable_required_player": "A required player is unavailable or marked Rest.",
-      "insufficient_training_slots": "There are more Required 100% players than 100% training slots.",
-      "insufficient_eligible_players": "There are not enough eligible players to build a valid lineup."
+      "insufficient_training_slots": "Only {available} full-training slots are available for {required} Required 100% targets.",
+      "insufficient_eligible_players": "There are not enough eligible players to build a valid lineup.",
+      "no_available_players": "No available players remain after availability and rest constraints.",
+      "no_valid_goalkeeper": "No valid goalkeeper is available."
     },
     "explanation": {
       "required_target_selected": "{player} was selected to cover a required weekly training target.",
+      "required_target_partial": "{player} was selected but may only partially cover the requested weekly training target.",
+      "required_target_omitted": "{player} was not assigned a training slot because stronger legal lineup constraints took precedence.",
+      "required_target_unavailable": "{player} was not assigned because the player is unavailable or marked Rest.",
+      "target_already_completed": "{player} already completed this week's target.",
       "high_priority_selected": "{player} was selected as a high-priority training player."
     }
   },

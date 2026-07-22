@@ -707,6 +707,9 @@ class SquadPage(BasePage):
         self.weekly_training_type_combo = QComboBox()
         self.weekly_training_type_combo.addItem(t("planner.playmaking"), "PLAYMAKING")
         self.weekly_formation_combo = QComboBox()
+        self.weekly_formation_combo.currentIndexChanged.connect(
+            self._clear_weekly_training_plan
+        )
         self.weekly_generate_button = QPushButton(t("planner.generate_plan"))
         self.weekly_generate_button.setObjectName("primaryAction")
         self.weekly_generate_button.clicked.connect(
@@ -1376,6 +1379,7 @@ class SquadPage(BasePage):
         self._weekly_plan_board = None
 
     def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
+        self._clear_weekly_training_plan()
         self._weekly_priority_rows = list(priority_rows)
         self._weekly_coverage_rows = list(coverage_rows)
         current_formation = self.weekly_formation_combo.currentText()
@@ -1412,7 +1416,7 @@ class SquadPage(BasePage):
         self._set_weekly_players(priority_rows, coverage_rows)
 
     def show_weekly_training_plan(self, plan, board, roster_players=None):
-        if plan.conflicts:
+        if plan.conflicts and not plan.lineup:
             self.weekly_plan_summary_label.setText(
                 t("planner.conflict_state")
             )
@@ -1436,14 +1440,30 @@ class SquadPage(BasePage):
                 roster_players=roster_players or [],
             )
         cost = plan.competitive_cost
-        self.weekly_cost_label.setText(
+        cost_lines = [
             t(
                 "planner.cost_value",
                 delta=f"{cost.score_delta:.2f}",
                 percent=f"{cost.percentage_delta:.1f}",
             )
-        )
+        ]
+        if cost.changed_starters:
+            cost_lines.append(
+                t(
+                    "planner.changed_starters",
+                    count=len(cost.changed_starters),
+                )
+            )
+        if cost.sector_deltas:
+            sector_text = ", ".join(
+                f"{key.replace('_', ' ').title()} {value:+.2f}"
+                for key, value in sorted(cost.sector_deltas.items())
+            )
+            cost_lines.append(t("planner.sector_deltas", sectors=sector_text))
+        self.weekly_cost_label.setText("\n".join(cost_lines))
         lines = [self._planner_explanation_text(item) for item in plan.explanations]
+        if plan.conflicts:
+            lines.extend(self._planner_conflict_text(conflict) for conflict in plan.conflicts)
         lines.extend(plan.warnings)
         self.weekly_explanations_label.setText("\n".join(lines))
         self._weekly_coverage_rows = list(plan.coverage)
@@ -1464,6 +1484,14 @@ class SquadPage(BasePage):
         board = self.weekly_training_current_board()
         if board is not None:
             self.ideal_board.set_boards([board], selected_formation_name=board.formation_name)
+
+    def _clear_weekly_training_plan(self):
+        self.weekly_plan_summary_label.setText(t("planner.empty_plan"))
+        self.weekly_cost_label.setText("")
+        self.weekly_explanations_label.setText("")
+        self._weekly_plan_board = None
+        if hasattr(self, "weekly_plan_board"):
+            self.weekly_plan_board.set_boards([])
 
     def _set_first_match_record_card(self, record):
         has_record = record is not None
@@ -1672,12 +1700,16 @@ class SquadPage(BasePage):
         return value if value != f"planner.coverage.{str(key).lower()}" else str(key).replace("_", " ").title()
 
     def _planner_conflict_text(self, conflict):
-        return t(f"planner.conflict.{conflict.code.lower()}")
+        return t(
+            f"planner.conflict.{conflict.code.lower()}",
+            **dict(getattr(conflict, "explanation_parameters", {}) or {}),
+        )
 
     def _planner_explanation_text(self, explanation):
         return t(
             f"planner.explanation.{explanation.code.lower()}",
             player=explanation.player_name,
+            **dict(getattr(explanation, "parameters", {}) or {}),
         )
 
     @staticmethod

@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.5.7.2 Planner Execution Engine: Weekly Planner `Generate Plan`
+  now builds a complete best-effort second-match lineup whenever a legal lineup
+  exists, keeps ordinary priority conflicts as warnings/explanations instead of
+  empty results, populates pitch, bench, orders, coverage and competitive cost, and
+  lets `Use This Lineup` transfer the generated team into the editable Squad board.
 - Added Alpha 0.5.7.1a Rebuild Collapsible Workspace Component: the Match analysis
   sections now use a simple header/body Qt layout with natural `sizeHint` behavior,
   no vertical expansion policy, no manual height animation or stale height clamps, and
