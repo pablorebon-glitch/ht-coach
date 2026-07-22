@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -12,10 +13,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QScrollArea,
     QSizePolicy,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from engine.match_intelligence import MatchIntelligenceEngine
 from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceRepository,
@@ -32,6 +35,8 @@ from ht_coach_app.services.match_workspace_service import (
     FormationAnalysisResult,
     LineupPlayerResult,
     MatchAnalysisResult,
+    SectorRatingComparisonResult,
+    TeamRatingsResult,
 )
 from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
 from ht_coach_app.views.match_page import MatchPage
@@ -50,6 +55,38 @@ def formation_result(name="3-5-2", recommended=True):
         possession=0.61,
         expected_goals=2.1,
         opponent_expected_goals=1.2,
+        team_ratings=TeamRatingsResult(
+            left_defense=35,
+            central_defense=40,
+            right_defense=45,
+            midfield=42,
+            left_attack=34,
+            central_attack=39,
+            right_attack=31,
+        ),
+        opponent_ratings=TeamRatingsResult(
+            left_defense=31,
+            central_defense=35,
+            right_defense=29,
+            midfield=38,
+            left_attack=41,
+            central_attack=33,
+            right_attack=28,
+        ),
+        sector_rating_comparisons=[
+            SectorRatingComparisonResult(
+                matchup_key="midfield",
+                our_sector="midfield",
+                opponent_sector="midfield",
+                our_value=42,
+                opponent_value=38,
+                our_scale="ht_coach_internal_contribution",
+                opponent_scale="ht_coach_internal_contribution",
+                difference=4,
+                advantage="ours",
+                comparable=True,
+            )
+        ],
         lineup=[
             LineupPlayerResult(
                 number=index + 1,
@@ -107,6 +144,14 @@ def match_result(with_decision_lab=True):
     )
 
 
+def rich_match_result():
+    result = match_result(with_decision_lab=True)
+    return replace(
+        result,
+        match_intelligence=MatchIntelligenceEngine().analyze(result),
+    )
+
+
 class MatchCollapsibleSectionsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -120,6 +165,18 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
             section.state_key: section
             for section in page.findChildren(CollapsibleSection)
         }
+
+    def show_page(self, page, width=1366, height=900):
+        page.resize(width, height)
+        page.show()
+        QApplication.processEvents()
+
+    def layout_widgets(self, page):
+        return [
+            page.results_layout.itemAt(index).widget()
+            for index in range(page.results_layout.count())
+            if page.results_layout.itemAt(index).widget() is not None
+        ]
 
     def test_all_match_sections_use_shared_collapsible_component(self):
         page = MatchPage()
@@ -139,6 +196,232 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         self.assertFalse(sections["rating_calibration"].is_expanded())
         self.assertFalse(sections["match_intelligence"].is_expanded())
         self.assertTrue(sections["match_analysis"].is_expanded())
+
+    def test_expanded_match_section_bodies_are_visible_and_populated(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page)
+        sections = self.sections(page)
+
+        expected_text = {
+            "decision_lab": "Recommendation confidence",
+            "match_intelligence": "Tactical Focus",
+            "rating_calibration": "Opponent Rating Calibration",
+            "match_analysis": "Recommended",
+        }
+        for key, text in expected_text.items():
+            section = sections[key]
+            section.set_expanded(True)
+            QApplication.processEvents()
+
+            labels = [
+                label.text()
+                for label in section.body_widget().findChildren(QLabel)
+            ]
+            self.assertFalse(section.body_host.isHidden(), key)
+            self.assertFalse(section.body_widget().isHidden(), key)
+            self.assertGreater(section.body_host.height(), 0, key)
+            self.assertGreater(section.body_widget().sizeHint().height(), 0, key)
+            self.assertTrue(any(text in label for label in labels), key)
+
+            section.set_expanded(False)
+            QApplication.processEvents()
+            self.assertTrue(section.body_host.isHidden(), key)
+            self.assertEqual(section.body_host.maximumHeight(), 0, key)
+
+    def test_match_accordion_stack_order_places_workspace_after_sections(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        sections = self.sections(page)
+        for section in sections.values():
+            section.set_expanded(False)
+        self.show_page(page)
+
+        widgets = self.layout_widgets(page)
+        self.assertEqual(
+            [widget.state_key for widget in widgets[:4]],
+            [
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+                "match_analysis",
+            ],
+        )
+        self.assertIsInstance(widgets[4], QTabWidget)
+        self.assertEqual(widgets[4].objectName(), "matchResultTabs")
+        self.assertTrue(page.results_layout.itemAt(5).spacerItem() is not None)
+
+    def test_collapsed_headers_are_consecutive_and_workspace_follows(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        sections_by_key = self.sections(page)
+        sections = [
+            sections_by_key[key]
+            for key in (
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+                "match_analysis",
+            )
+        ]
+        for section in sections:
+            section.set_expanded(False)
+        self.show_page(page)
+
+        for index in range(len(sections) - 1):
+            bottom = sections[index].mapTo(
+                page,
+                sections[index].rect().bottomLeft(),
+            ).y()
+            next_top = sections[index + 1].mapTo(
+                page,
+                sections[index + 1].rect().topLeft(),
+            ).y()
+            self.assertLessEqual(next_top - bottom, 12)
+
+        workspace = page.findChild(QTabWidget, "matchResultTabs")
+        analysis_bottom = sections[-1].mapTo(
+            page,
+            sections[-1].rect().bottomLeft(),
+        ).y()
+        workspace_top = workspace.mapTo(page, workspace.rect().topLeft()).y()
+        self.assertLessEqual(workspace_top - analysis_bottom, 12)
+
+    def test_match_analysis_returns_below_calibration_after_collapse(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page)
+        sections = self.sections(page)
+        analysis = sections["match_analysis"]
+        calibration = sections["rating_calibration"]
+
+        analysis.set_expanded(True)
+        QApplication.processEvents()
+        analysis.set_expanded(False)
+        QApplication.processEvents()
+
+        calibration_bottom = calibration.mapTo(
+            page,
+            calibration.rect().bottomLeft(),
+        ).y()
+        analysis_top = analysis.mapTo(page, analysis.rect().topLeft()).y()
+        self.assertLessEqual(analysis_top - calibration_bottom, 12)
+        self.assertTrue(analysis.body_host.isHidden())
+
+    def test_one_expanded_section_inserts_only_its_body_height(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        sections = self.sections(page)
+        for section in sections.values():
+            section.set_expanded(False)
+        self.show_page(page)
+        workspace = page.findChild(QTabWidget, "matchResultTabs")
+        collapsed_top = workspace.mapTo(page, workspace.rect().topLeft()).y()
+
+        decision = sections["decision_lab"]
+        decision.set_expanded(True)
+        QApplication.processEvents()
+        expanded_top = workspace.mapTo(page, workspace.rect().topLeft()).y()
+
+        inserted = expanded_top - collapsed_top
+        self.assertGreater(inserted, decision.body_widget().sizeHint().height() - 12)
+        self.assertLess(inserted, decision.body_widget().sizeHint().height() + 36)
+
+    def test_each_section_survives_ten_toggle_cycles_without_height_growth(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page)
+        sections = self.sections(page)
+
+        for key, section in sections.items():
+            collapsed_heights = []
+            for _ in range(10):
+                section.set_expanded(False)
+                QApplication.processEvents()
+                collapsed_heights.append(section.sizeHint().height())
+                section.set_expanded(True)
+                QApplication.processEvents()
+            self.assertTrue(section.is_expanded(), key)
+            self.assertFalse(section.body_host.isHidden(), key)
+            self.assertGreater(section.body_host.height(), 0, key)
+            self.assertLessEqual(
+                max(collapsed_heights) - min(collapsed_heights),
+                2,
+                key,
+            )
+
+    def test_mixed_section_cycles_keep_stack_compact(self):
+        page = MatchPage()
+        page.show_results(rich_match_result())
+        self.show_page(page)
+        sections = self.sections(page)
+
+        sections["decision_lab"].set_expanded(True)
+        sections["match_intelligence"].set_expanded(True)
+        sections["decision_lab"].set_expanded(False)
+        sections["rating_calibration"].set_expanded(True)
+        sections["match_intelligence"].set_expanded(False)
+        sections["match_analysis"].set_expanded(True)
+        for section in sections.values():
+            section.set_expanded(False)
+        QApplication.processEvents()
+
+        ordered = [
+            sections[key]
+            for key in (
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+                "match_analysis",
+            )
+        ]
+        for index in range(len(ordered) - 1):
+            bottom = ordered[index].mapTo(
+                page,
+                ordered[index].rect().bottomLeft(),
+            ).y()
+            next_top = ordered[index + 1].mapTo(
+                page,
+                ordered[index + 1].rect().topLeft(),
+            ).y()
+            self.assertLessEqual(next_top - bottom, 12)
+
+        for section in ordered:
+            section.set_expanded(True)
+            QApplication.processEvents()
+            self.assertFalse(section.body_host.isHidden(), section.state_key)
+            self.assertGreater(section.body_host.height(), 0, section.state_key)
+            section.set_expanded(False)
+
+    def test_refresh_while_each_section_collapsed_preserves_position_and_updates_body(self):
+        for key in (
+            "decision_lab",
+            "match_intelligence",
+            "rating_calibration",
+            "match_analysis",
+        ):
+            page = MatchPage()
+            page.show_results(rich_match_result())
+            self.show_page(page)
+            sections = self.sections(page)
+            section = sections[key]
+            section.set_expanded(False)
+            QApplication.processEvents()
+            before_top = section.mapTo(page, section.rect().topLeft()).y()
+
+            page.show_results(rich_match_result())
+            QApplication.processEvents()
+
+            refreshed = self.sections(page)[key]
+            after_top = refreshed.mapTo(page, refreshed.rect().topLeft()).y()
+            self.assertFalse(refreshed.is_expanded(), key)
+            self.assertTrue(refreshed.body_host.isHidden(), key)
+            self.assertLessEqual(abs(after_top - before_top), 8, key)
+
+            refreshed.set_expanded(True)
+            QApplication.processEvents()
+            self.assertFalse(refreshed.body_host.isHidden(), key)
+            self.assertGreater(refreshed.body_host.height(), 0, key)
 
     def test_header_arrow_enter_and_space_toggle_body_visibility(self):
         page = MatchPage()
@@ -292,10 +575,12 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
                 "match_analysis",
             ],
         )
-        self.assertTrue(layout.itemAt(4).spacerItem() is not None)
+        self.assertIsInstance(layout.itemAt(4).widget(), QTabWidget)
+        self.assertTrue(layout.itemAt(5).spacerItem() is not None)
         for index in range(4):
             self.assertEqual(layout.stretch(index), 0)
             self.assertIsNotNone(layout.itemAt(index).widget())
+        self.assertEqual(layout.stretch(4), 0)
 
     def test_collapsed_match_sections_stack_with_natural_height(self):
         page = MatchPage()

@@ -280,7 +280,7 @@ class MatchPage(BasePage):
         self.results_layout.setSpacing(6)
         self.results_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._show_empty_results()
-        self.match_content_layout.addWidget(self.results_host, 1)
+        self.match_content_layout.addWidget(self.results_host, 0)
 
     def set_opponents(self, opponent_names, selected_name=None):
         current = (
@@ -518,6 +518,13 @@ class MatchPage(BasePage):
             "match_analysis",
         ):
             self.results_layout.addWidget(sections[key])
+        self.results_layout.addWidget(
+            self._build_result_tabs(
+                result,
+                restored=restored,
+                workspace_state=workspace_state,
+            )
+        )
         self.results_layout.addStretch(1)
         self._restore_viewport_state(
             viewport_state,
@@ -565,8 +572,21 @@ class MatchPage(BasePage):
         return self._match_sections
 
     def _match_section_toggled(self, key, expanded):
+        viewport_state = self._capture_viewport_state()
         self._match_section_states[key] = expanded
         self.match_section_toggled.emit(key, expanded)
+        self._stabilize_match_results_layout(viewport_state)
+
+    def _stabilize_match_results_layout(self, viewport_state=None):
+        self.results_layout.invalidate()
+        self.match_content_layout.invalidate()
+        self.results_host.updateGeometry()
+        self.match_content.updateGeometry()
+        if viewport_state is not None:
+            self._restore_viewport_state(
+                viewport_state,
+                self._result_tabs,
+            )
 
     def _update_match_sections(
         self,
@@ -665,14 +685,6 @@ class MatchPage(BasePage):
                 self._build_tactical_advisor_panel(result.tactical_advisor)
             )
 
-        layout.addWidget(
-            self._build_result_tabs(
-                result,
-                restored=restored,
-                workspace_state=workspace_state,
-            ),
-            1,
-        )
         return body
 
     def _build_unavailable_panel(self, message):
