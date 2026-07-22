@@ -337,6 +337,39 @@ class FormationBoardQtSmokeTest(unittest.TestCase):
             "",
         )
 
+    def test_bench_and_details_side_panels_collapse_without_destroying_content(self):
+        from ht_coach_app.ui.design_system.collapsible_side_panel import (
+            CollapsibleSidePanel,
+        )
+
+        board_widget = FormationBoard()
+        panels = board_widget.findChildren(CollapsibleSidePanel)
+        by_key = {panel.state_key: panel for panel in panels}
+
+        self.assertIn("formation_board.bench", by_key)
+        self.assertIn("formation_board.details", by_key)
+
+        bench_panel = by_key["formation_board.bench"]
+        details_panel = by_key["formation_board.details"]
+        bench_content = bench_panel.content_widget()
+        details_content = details_panel.content_widget()
+
+        bench_panel.set_expanded(False)
+        details_panel.set_expanded(False)
+        QApplication.processEvents()
+
+        self.assertLessEqual(bench_panel.maximumWidth(), 40)
+        self.assertLessEqual(details_panel.maximumWidth(), 40)
+        self.assertIs(bench_panel.content_widget(), bench_content)
+        self.assertIs(details_panel.content_widget(), details_content)
+
+        bench_panel.set_expanded(True)
+        details_panel.set_expanded(True)
+        QApplication.processEvents()
+
+        self.assertFalse(bench_panel.content_host.isHidden())
+        self.assertFalse(details_panel.content_host.isHidden())
+
     def test_match_page_uses_board_comparison_and_detailed_xi_tabs(self):
         page = MatchPage()
         result = MatchAnalysisResult(

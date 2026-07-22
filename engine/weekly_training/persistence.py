@@ -122,6 +122,40 @@ class WeeklyTrainingRepository:
             )
         )
 
+    def replace_match_record(self, state, record):
+        records = tuple(
+            record if existing.match_id == record.match_id else existing
+            for existing in state.match_records
+        )
+        if records == state.match_records and not any(
+            existing.match_id == record.match_id for existing in state.match_records
+        ):
+            records = state.match_records + (record,)
+        return self.save(
+            WeeklyTrainingState(
+                active_training_type=state.active_training_type,
+                active_week=state.active_week,
+                priorities=state.priorities,
+                match_records=records,
+                archived_weeks=state.archived_weeks,
+            )
+        )
+
+    def delete_match_record(self, state, match_id):
+        return self.save(
+            WeeklyTrainingState(
+                active_training_type=state.active_training_type,
+                active_week=state.active_week,
+                priorities=state.priorities,
+                match_records=tuple(
+                    record
+                    for record in state.match_records
+                    if record.match_id != match_id
+                ),
+                archived_weeks=state.archived_weeks,
+            )
+        )
+
     def rollover(self, state, today=None):
         archived, active = rollover_week(state.active_week, today)
         archives = state.archived_weeks + ((archived,) if archived is not None else ())

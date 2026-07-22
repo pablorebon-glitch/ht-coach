@@ -137,11 +137,22 @@ Content:
   second-match lineup plan.
 - Weekly Planner controls include active training, fixed formation, Generate Plan,
   Record Played Lineup and Use This Lineup.
-- Weekly Planner tables show per-player priority, availability, remaining exposure,
-  confirmed exposure, assumed exposure, planned exposure, status and source matches.
+- Weekly Planner uses one unified weekly-player table with player, age, best training
+  position, simplified priority, training status, confirmed, planned, remaining and
+  availability columns.
+- Weekly Planner priority choices are intentionally compact: 100%, 50% and No priority
+  in English, or 100%, 50% and Sin prioridad in Spanish. Older saved priority values
+  are mapped into those three UI choices.
+- Weekly Planner training status uses accessible symbols: check mark for already
+  trained, open circle for will train in the generated plan and dash for will not train.
+- Weekly Planner shows a visible first-match record card after recording, with Edit,
+  Replace and Delete actions.
 - Weekly Planner second-match output uses the shared Formation Board and requires an
   explicit Use This Lineup action before copying the proposal into the Squad Ideal XI
   board.
+- Formation Board bench and player-details side panels can be collapsed in Match,
+  Squad and Weekly Planner. Collapsing releases real width while preserving selection
+  and the existing detail widgets.
 - Weekly Planner warnings explain assumed 90-minute exposure, hard conflicts and
   internal competitive cost without presenting it as a Hattrick rating projection.
 - Transfer Planner tab that turns Squad Evolution outputs into abstract player-profile

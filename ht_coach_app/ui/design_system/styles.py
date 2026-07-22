@@ -78,6 +78,23 @@ def application_stylesheet():
             min-width: 14px;
         }}
 
+        QFrame#collapsibleSidePanel {{
+            background: {colors.SURFACE};
+            border: 1px solid {colors.BORDER};
+            border-radius: {metrics.CARD_RADIUS}px;
+        }}
+
+        QFrame#collapsibleSidePanelHeader {{
+            background: #f8fafc;
+            border-bottom: 1px solid {colors.BORDER};
+        }}
+
+        QToolButton#collapsibleSidePanelToggle {{
+            min-width: 22px;
+            min-height: 22px;
+            padding: 0;
+        }}
+
         QLabel#emptyStateTitle {{
             color: {colors.TEXT_PRIMARY};
             font-size: {typography.SECTION_TITLE_SIZE}px;

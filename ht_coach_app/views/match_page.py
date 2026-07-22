@@ -786,6 +786,7 @@ class MatchPage(BasePage):
 
         restore_scrollbars()
         QTimer.singleShot(0, restore_scrollbars)
+        QTimer.singleShot(25, restore_scrollbars)
 
     def show_workspace_updating(self):
         self.show_status(t("match.updating_workspace"))
@@ -820,7 +821,7 @@ class MatchPage(BasePage):
             tabs = QTabWidget()
             tabs.setObjectName("matchResultTabs")
             tabs.setDocumentMode(True)
-            tabs.setMinimumHeight(720)
+            tabs.setMinimumHeight(420)
             self._result_tabs = tabs
 
         self._set_result_tab(
@@ -888,6 +889,7 @@ class MatchPage(BasePage):
             board = self._formation_board_widget
             if board is None:
                 board = FormationBoard()
+                board.set_state_namespace("match")
                 board.recalculate_requested.connect(
                     self.workspace_recalculate_requested.emit
                 )

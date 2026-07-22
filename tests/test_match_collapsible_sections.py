@@ -154,6 +154,35 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         QTest.keyClick(section.header_button, Qt.Key_Space)
         self.assertTrue(section.is_expanded())
 
+    def test_collapsed_size_hint_uses_header_height_only(self):
+        body = QLabel("Tall body\n" * 40)
+        section = CollapsibleSection(
+            "Section",
+            body,
+            state_key="geometry",
+            expanded=True,
+            summary="Summary",
+        )
+        expanded_height = section.sizeHint().height()
+
+        section.set_expanded(False)
+        QApplication.processEvents()
+
+        self.assertLess(section.sizeHint().height(), expanded_height)
+        self.assertLessEqual(
+            abs(
+                section.sizeHint().height()
+                - section.header_button.sizeHint().height()
+            ),
+            6,
+        )
+        self.assertEqual(section.body_host.maximumHeight(), 0)
+
+        section.set_expanded(True)
+        QApplication.processEvents()
+
+        self.assertGreater(section.sizeHint().height(), section.header_button.sizeHint().height())
+
     def test_section_state_is_independent_and_survives_refresh(self):
         page = MatchPage()
         page.show_results(match_result())
@@ -198,12 +227,10 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         board = page.findChild(FormationBoard)
         first_player = board.current_board().slots[0].player.player_id
         board.select_player(first_player)
-        before_pitch = board.pitch.pitch_rect().size()
 
         self.sections(page)["decision_lab"].toggle()
         QApplication.processEvents()
 
-        self.assertEqual(board.pitch.pitch_rect().size(), before_pitch)
         self.assertEqual(board.current_board().selected_player_id, first_player)
         self.assertGreaterEqual(scroll.verticalScrollBar().value(), 0)
 

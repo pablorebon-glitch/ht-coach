@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.5.7.1.1 Responsive Workspace Regression Fix: collapsed Match
+  sections now release body height, Formation Board bench/details side panels can be
+  collapsed in Match, Squad and Weekly Planner, Weekly Planner uses one unified player
+  table with simplified priority labels and training-status symbols, and first-match
+  records can be edited, replaced or deleted from the visible planner card.
 - Added collapsible Match analysis sections for Decision Lab, Match Intelligence,
   Opponent Rating Calibration and Match Analysis, with reusable design-system
   component, independent persisted state, keyboard-accessible headers and EN/ES labels.
