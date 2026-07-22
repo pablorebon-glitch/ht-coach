@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -24,6 +25,9 @@ from models.lineup import Lineup
 from models.lineup_player import LineupPlayer
 from models.position import Position
 from models.side import Side
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class WeeklyTrainingPlanner:
@@ -106,15 +110,40 @@ class WeeklyTrainingPlanner:
                 unavailable,
             )
         )
-        if conflicts:
+        capacity = rules.capacity_for_formation(formation)
+
+        if not eligible:
             return WeeklyPlanResult(
                 state=PlannerState.PLAN_CONFLICTED,
                 training_week=training_week,
                 active_training_type=training_type,
                 formation=formation_name,
                 coverage=coverage,
-                conflicts=tuple(conflicts),
-                capacity=rules.capacity_for_formation(formation),
+                conflicts=(
+                    PlannerConflict(
+                        code="NO_AVAILABLE_PLAYERS",
+                        affected_constraints=("availability",),
+                        possible_resolutions=("Load available players or clear unavailable/rest constraints.",),
+                    ),
+                ),
+                capacity=capacity,
+            )
+
+        if not self._has_valid_goalkeeper(eligible):
+            return WeeklyPlanResult(
+                state=PlannerState.PLAN_CONFLICTED,
+                training_week=training_week,
+                active_training_type=training_type,
+                formation=formation_name,
+                coverage=coverage,
+                conflicts=(
+                    PlannerConflict(
+                        code="NO_VALID_GOALKEEPER",
+                        affected_constraints=("goalkeeper",),
+                        possible_resolutions=("Make at least one goalkeeper available.",),
+                    ),
+                ),
+                capacity=capacity,
             )
 
         lineup = self._constrained_lineup(
@@ -124,7 +153,7 @@ class WeeklyTrainingPlanner:
             coverage_by_id,
             rules,
         )
-        if len(lineup.players) != 11:
+        if len(lineup.players) != 11 or not self._lineup_has_goalkeeper(lineup):
             return WeeklyPlanResult(
                 state=PlannerState.PLAN_CONFLICTED,
                 training_week=training_week,
@@ -137,7 +166,7 @@ class WeeklyTrainingPlanner:
                         possible_resolutions=("Clear Rest targets or load more available players.",),
                     ),
                 ),
-                capacity=rules.capacity_for_formation(formation),
+                capacity=capacity,
             )
 
         entries = self._entries_from_lineup(lineup)
@@ -160,6 +189,20 @@ class WeeklyTrainingPlanner:
             priorities,
             tuple(match_records) + (planned_record,),
         )
+        planned_coverage_by_id = {
+            row.player_id: row
+            for row in planned_coverage
+        }
+        if conflicts:
+            LOGGER.info(
+                "Weekly planner produced a best-effort lineup with unmet constraints: %s",
+                ", ".join(conflict.code for conflict in conflicts),
+            )
+        warnings = ["Assuming 90 minutes for starters."]
+        if conflicts:
+            warnings.append(
+                "Best-effort lineup generated; review unmet training targets."
+            )
         return WeeklyPlanResult(
             state=PlannerState.PLAN_READY,
             training_week=training_week,
@@ -167,9 +210,16 @@ class WeeklyTrainingPlanner:
             formation=formation_name,
             lineup=entries,
             coverage=planned_coverage,
-            explanations=self._explanations(entries, priorities, coverage_by_id),
-            warnings=("Assuming 90 minutes for starters.",),
-            capacity=rules.capacity_for_formation(formation),
+            conflicts=tuple(conflicts),
+            explanations=self._explanations(
+                entries,
+                priorities,
+                coverage_by_id,
+                planned_coverage_by_id,
+                unavailable,
+            ),
+            warnings=tuple(warnings),
+            capacity=capacity,
             competitive_cost=self._competitive_cost(players, formation, lineup, priorities),
         )
 
@@ -252,6 +302,7 @@ class WeeklyTrainingPlanner:
         candidates = [
             score for score in ranking
             if player_training_id(score.player) not in used_ids
+            and self._is_valid_for_position(score.player, position)
         ]
         if not candidates:
             return None
@@ -280,9 +331,11 @@ class WeeklyTrainingPlanner:
             return 0
         if self._remaining_minutes(priority, coverage) <= 0:
             return 0
+        if priority == TrainingPriority.REQUIRED_100:
+            return 600 if factor >= Decimal("1") else 260
+        if priority == TrainingPriority.REQUIRED_50:
+            return 500
         weights = {
-            TrainingPriority.REQUIRED_100: 500,
-            TrainingPriority.REQUIRED_50: 400,
             TrainingPriority.HIGH_PRIORITY: 250,
             TrainingPriority.SECONDARY_PRIORITY: 100,
         }
@@ -342,14 +395,29 @@ class WeeklyTrainingPlanner:
         )
 
     @staticmethod
-    def _explanations(entries, priorities, coverage_by_id):
+    def _explanations(
+        entries,
+        priorities,
+        coverage_by_id,
+        planned_coverage_by_id,
+        unavailable,
+    ):
         explanations = []
+        selected_ids = {entry.player_id for entry in entries}
         for entry in entries:
             priority = priorities.get(entry.player_id, TrainingPriority.NO_PRIORITY)
             if priority in {TrainingPriority.REQUIRED_100, TrainingPriority.REQUIRED_50}:
+                coverage = planned_coverage_by_id.get(entry.player_id)
+                code = (
+                    "REQUIRED_TARGET_SELECTED"
+                    if coverage is not None
+                    and str(getattr(coverage.target_status, "value", coverage.target_status))
+                    in {"TARGET_MET", "TARGET_EXCEEDED"}
+                    else "REQUIRED_TARGET_PARTIAL"
+                )
                 explanations.append(
                     PlannerExplanation(
-                        code="REQUIRED_TARGET_SELECTED",
+                        code=code,
                         player_id=entry.player_id,
                         player_name=entry.player_name,
                         parameters={"priority": priority.value, "position": entry.position},
@@ -363,18 +431,65 @@ class WeeklyTrainingPlanner:
                         player_name=entry.player_name,
                     )
                 )
+        for player_id, priority in priorities.items():
+            if priority not in {
+                TrainingPriority.REQUIRED_100,
+                TrainingPriority.REQUIRED_50,
+                TrainingPriority.HIGH_PRIORITY,
+                TrainingPriority.SECONDARY_PRIORITY,
+            }:
+                continue
+            if player_id in selected_ids:
+                continue
+            coverage = coverage_by_id.get(player_id)
+            player_name = getattr(coverage, "player_name", player_id)
+            if WeeklyTrainingPlanner._remaining_minutes(priority, coverage) <= 0:
+                explanations.append(
+                    PlannerExplanation(
+                        code="TARGET_ALREADY_COMPLETED",
+                        player_id=player_id,
+                        player_name=player_name,
+                        parameters={"priority": priority.value},
+                    )
+                )
+            elif player_id in unavailable:
+                explanations.append(
+                    PlannerExplanation(
+                        code="REQUIRED_TARGET_UNAVAILABLE",
+                        player_id=player_id,
+                        player_name=player_name,
+                        parameters={"priority": priority.value},
+                    )
+                )
+            else:
+                explanations.append(
+                    PlannerExplanation(
+                        code="REQUIRED_TARGET_OMITTED",
+                        player_id=player_id,
+                        player_name=player_name,
+                        parameters={"priority": priority.value},
+                    )
+                )
         return tuple(explanations)
 
     def _competitive_cost(self, players, formation, lineup, priorities):
         try:
             baseline = self._optimizer(players, [formation])[0]
             baseline_score = float(baseline[3])
+            baseline_ratings = baseline[2]
         except Exception:
             baseline_score = 0.0
+            baseline_ratings = None
         try:
-            planned_score = float(sum(TeamRater.calculate(lineup).__dict__.values()))
+            planned_ratings = TeamRater.calculate(lineup)
+            planned_score = float(sum(
+                value
+                for value in planned_ratings.__dict__.values()
+                if value is not None
+            ))
         except Exception:
             planned_score = 0.0
+            planned_ratings = None
         baseline_names = set()
         try:
             baseline_names = {lineup_player.player.name for lineup_player in baseline[1].players}
@@ -396,4 +511,43 @@ class WeeklyTrainingPlanner:
             percentage_delta=(delta / baseline_score * 100.0 if baseline_score else 0.0),
             changed_starters=tuple(sorted(baseline_names ^ planned_names)),
             rested_players=rested,
+            sector_deltas=self._sector_deltas(baseline_ratings, planned_ratings),
         )
+
+    @staticmethod
+    def _has_valid_goalkeeper(players):
+        return any(
+            WeeklyTrainingPlanner._is_valid_for_position(
+                player,
+                Position.GOALKEEPER,
+            )
+            for player in players
+        )
+
+    @staticmethod
+    def _lineup_has_goalkeeper(lineup):
+        return any(
+            lineup_player.position == Position.GOALKEEPER
+            for lineup_player in lineup.players
+        )
+
+    @staticmethod
+    def _is_valid_for_position(player, position):
+        if position != Position.GOALKEEPER:
+            return True
+        try:
+            return float(getattr(player, "goalkeeper", 0) or 0) > 0
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _sector_deltas(baseline_ratings, planned_ratings):
+        if baseline_ratings is None or planned_ratings is None:
+            return {}
+        deltas = {}
+        for key, baseline_value in baseline_ratings.__dict__.items():
+            planned_value = getattr(planned_ratings, key, None)
+            if baseline_value is None or planned_value is None:
+                continue
+            deltas[key] = float(planned_value) - float(baseline_value)
+        return deltas

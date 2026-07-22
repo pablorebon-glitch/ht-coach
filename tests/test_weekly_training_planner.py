@@ -24,6 +24,7 @@ from engine.weekly_training.planner import WeeklyTrainingPlanner
 from engine.weekly_training.training_rules import PlaymakingTrainingRules, assumed_confidence
 from engine.weekly_training.training_week import active_training_week, rollover_week
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
+from ht_coach_app.workspace.workspace_service import WorkspaceService
 from models.formations import FORMATION_BY_NAME
 from models.player import Player
 from models.position import Position
@@ -294,8 +295,10 @@ def test_planner_returns_structured_conflict_for_too_many_required_full_targets(
         formation_name="3-5-2",
     )
 
-    assert plan.state == PlannerState.PLAN_CONFLICTED
+    assert plan.state == PlannerState.PLAN_READY
+    assert len(plan.lineup) == 11
     assert plan.conflicts[0].code == "INSUFFICIENT_TRAINING_SLOTS"
+    assert plan.warnings
 
 
 def test_planner_excludes_unavailable_required_player_with_conflict():
@@ -312,8 +315,57 @@ def test_planner_excludes_unavailable_required_player_with_conflict():
         unavailable_player_ids=(player_training_id(players[1]),),
     )
 
-    assert plan.state == PlannerState.PLAN_CONFLICTED
+    assert plan.state == PlannerState.PLAN_READY
+    assert len(plan.lineup) == 11
     assert plan.conflicts[0].code == "UNAVAILABLE_REQUIRED_PLAYER"
+    assert players[1].name not in {entry.player_name for entry in plan.lineup}
+
+
+def test_generate_plan_returns_complete_lineup_with_conflict_and_coverage():
+    players = roster()
+    priorities = {
+        player_training_id(item): TrainingPriority.REQUIRED_100
+        for item in players[1:7]
+    }
+
+    plan = WeeklyTrainingPlanner().plan(
+        players,
+        active_training_week(date(2026, 7, 19)),
+        priorities,
+        formation_name="3-5-2",
+    )
+
+    assert plan.state == PlannerState.PLAN_READY
+    assert len(plan.lineup) == 11
+    assert len({entry.player_id for entry in plan.lineup}) == 11
+    assert any(entry.position == Position.GOALKEEPER.value for entry in plan.lineup)
+    assert all(entry.order for entry in plan.lineup)
+    assert plan.coverage
+    assert plan.conflicts
+    assert plan.warnings
+    assert plan.competitive_cost.sector_deltas
+    assert any(
+        item.code in {"REQUIRED_TARGET_PARTIAL", "REQUIRED_TARGET_OMITTED"}
+        for item in plan.explanations
+    )
+
+
+def test_planner_returns_no_lineup_only_without_valid_goalkeeper():
+    players = [
+        player(f"Player {index}", goalkeeper=0, playmaking=10, defending=10)
+        for index in range(12)
+    ]
+
+    plan = WeeklyTrainingPlanner().plan(
+        players,
+        active_training_week(date(2026, 7, 19)),
+        {},
+        formation_name="3-5-2",
+    )
+
+    assert plan.state == PlannerState.PLAN_CONFLICTED
+    assert plan.lineup == ()
+    assert plan.conflicts[0].code == "NO_VALID_GOALKEEPER"
 
 
 def test_app_service_persists_priority_and_records_first_match(tmp_path):
@@ -334,6 +386,68 @@ def test_app_service_persists_priority_and_records_first_match(tmp_path):
     assert loaded.priorities[player_training_id(players[1])].priority == TrainingPriority.REQUIRED_100
     assert len(loaded.match_records) == 1
     assert loaded.match_records[0].planned_or_played == MatchStatus.PLAYED
+
+
+def test_app_service_populates_pitch_bench_orders_and_acceptance_board(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+
+    plan = service.generate_plan(players, "3-5-2")
+    board = service.board_for_plan(plan)
+    workspace = WorkspaceService().create([board], board.formation_name, players)
+    bench = WorkspaceService().derive_bench(workspace, players)
+
+    assert board is not None
+    assert len([slot for slot in board.slots if slot.player is not None]) == 11
+    assert bench
+    assert all(entry.order for entry in plan.lineup)
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_use_this_lineup_transfers_weekly_plan_to_squad_board(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+    board = service.board_for_plan(plan)
+
+    page.show_weekly_training_plan(plan, board, players)
+    page.accept_weekly_training_plan()
+    accepted = page.ideal_board.current_board()
+
+    assert accepted is not None
+    assert accepted.formation_name == "3-5-2"
+    assert len([slot for slot in accepted.slots if slot.player is not None]) == 11
+    app.processEvents()
+
+
+def test_planner_regenerates_after_priority_formation_and_first_match_update(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    initial = service.generate_plan(players, "3-5-2")
+
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    prioritized = service.generate_plan(players, "3-5-2")
+    changed_formation = service.generate_plan(players, "4-5-1")
+    service.record_first_match(service.board_for_plan(prioritized))
+    after_first_match = service.generate_plan(players, "3-5-2")
+
+    assert initial.formation == "3-5-2"
+    assert prioritized.lineup
+    assert any(
+        item.player_name == players[1].name
+        for item in prioritized.explanations
+    )
+    assert changed_formation.formation == "4-5-1"
+    assert after_first_match.lineup
+    assert any(row.source_matches for row in after_first_match.coverage)
 
 
 def test_app_service_uses_weekly_training_identity_for_duplicate_names(tmp_path):

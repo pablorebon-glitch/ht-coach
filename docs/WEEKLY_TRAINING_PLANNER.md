@@ -1,7 +1,9 @@
 # Weekly Training Lineup Planner
 
-Alpha 0.5.7 adds a weekly training planner to the Squad page. The first supported
-training type is Playmaking.
+Alpha 0.5.7 adds a weekly training planner to the Squad page. Alpha 0.5.7.2 adds
+the Planner Execution Engine, so the planner now generates an actual second-match
+lineup instead of behaving only as a validator. The first supported training type is
+Playmaking.
 
 The planner helps answer a practical Hattrick question: after the first match of the
 training week, which second-match lineup covers the training priorities while keeping
@@ -103,8 +105,8 @@ Hard constraints:
 
 - unsupported training types are rejected;
 - unsupported formations are rejected;
-- unavailable or Rest players cannot satisfy required targets;
-- required 100% targets cannot exceed available full Playmaking slots;
+- unavailable or Rest players cannot be selected;
+- a legal lineup requires at least one valid goalkeeper;
 - every generated lineup must contain eleven unique starters.
 
 Soft objectives:
@@ -114,6 +116,31 @@ Soft objectives:
 - complete the lineup using the existing player ranking engine;
 - apply the existing automatic order optimizer to selected starters;
 - report internal competitive cost versus the unconstrained optimizer result.
+
+The 0.5.7.2 execution engine uses a best-effort strategy:
+
+1. Calculate the strongest unconstrained fixed-formation baseline with the existing
+   optimizer.
+2. Enforce hard availability, Rest, formation and goalkeeper constraints.
+3. Fill full-training slots with the highest-value remaining 100% targets where
+   possible.
+4. Fill 50% training slots and non-training slots with the strongest legal remaining
+   players, giving training priorities extra weight without making them fatal.
+5. Optimize individual orders through the existing workspace/order behavior.
+6. Recalculate planned coverage by adding the proposed lineup as assumed 90-minute
+   second-match exposure.
+7. Compare the proposed lineup against the unconstrained baseline to produce internal
+   score, changed-starter and sector deltas.
+8. Generate explanations for selected, partially covered, omitted, unavailable or
+   already-completed priorities.
+
+Ordinary priority conflicts are not terminal. For example, if six players are marked
+100% but the chosen formation has only three full Playmaking slots, the planner still
+returns the strongest legal lineup it can find, marks the full-slot capacity conflict,
+and explains which targets were covered, partially covered or omitted.
+
+The planner returns no lineup only when a legal lineup cannot exist, such as no
+available players, no supported formation or no valid available goalkeeper.
 
 ## UI Workflow
 
@@ -145,6 +172,10 @@ supported desktop sizes.
 The planner never overwrites Squad Builder or Match Workspace output by itself. The user
 must explicitly choose `Use This Lineup` to copy the proposed lineup into the Squad
 Ideal XI board.
+
+Changing priority, formation or first-match data invalidates the current proposal. The
+next `Generate Plan` action builds a fresh recommendation from the current planner
+state.
 
 ## Persistence
 
@@ -178,3 +209,5 @@ actions and summaries.
 - The competitive cost is an internal planning delta, not a Hattrick rating projection.
 - The planner is fixed-formation first; best-allowed-formation planning remains a later
   extension.
+- Best-effort priority selection is intentionally heuristic. It reuses the existing
+  ranking and order behavior rather than introducing a new exhaustive training optimizer.

@@ -142,6 +142,10 @@ Deliverables:
 - Weekly Training Lineup Planner with Playmaking priorities, Sunday-Wednesday-Thursday
   week handling, minute-aware coverage, first-match records, second-match lineup
   planning, competitive-cost reporting and JSON persistence.
+- Planner Execution Engine for Alpha 0.5.7.2: Generate Plan now acts as a solver,
+  producing the strongest legal best-effort lineup when ordinary training-priority
+  conflicts exist, then reporting unmet targets, coverage, bench, orders and internal
+  competitive cost for review and explicit acceptance into Squad.
 
 Acceptance criteria:
 
@@ -167,6 +171,8 @@ Acceptance criteria:
 - Weekly Training planning must reuse existing formation, ranking, lineup and order
   behavior, and must not alter engine formulas, rating calculations or probability
   calculations.
+- Weekly Training priority conflicts must not empty the workspace when a legal lineup
+  exists; they should be shown as warnings and explanations beside the generated team.
 
 ### Epic 5: Opponent Manager
 
