@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.5.7.3 Workspace Layout Hardening: the Weekly Planner result now
+  keeps the shared Formation Board as a dedicated lineup workspace, moves competitive
+  cost, warnings and explanations into external cards below the pitch, bounds
+  explanation text with internal scrolling, removes raw Python position tuple labels
+  from the weekly table, and makes the Match analysis stack use only a final stretch
+  after all collapsible sections.
 - Added Alpha 0.5.7.2 Planner Execution Engine: Weekly Planner `Generate Plan`
   now builds a complete best-effort second-match lineup whenever a legal lineup
   exists, keeps ordinary priority conflicts as warnings/explanations instead of

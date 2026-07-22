@@ -1172,6 +1172,8 @@
     "changed_starters": "Titulares cambiados contra la alineación sin restricciones: {count}.",
     "sector_deltas": "Deltas por sector: {sectors}.",
     "explanations_warnings": "Explicaciones y advertencias",
+    "warnings": "Advertencias",
+    "explanations": "Explicaciones",
     "coverage": {
       "not_started": "Objetivo pendiente",
       "partially_covered": "Parcialmente cubierto",

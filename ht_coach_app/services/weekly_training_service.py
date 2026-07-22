@@ -15,7 +15,10 @@ from engine.weekly_training.planner import WeeklyTrainingPlanner
 from engine.weekly_training.training_rules import assumed_confidence, rule_provider_for
 from engine.weekly_training.training_week import active_training_week
 from ht_coach_app.core.paths import user_data_dir
-from ht_coach_app.core.position_formatting import format_position
+from ht_coach_app.core.position_formatting import (
+    format_position,
+    format_position_abbreviation,
+)
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.services.match_workspace_service import FormationAnalysisResult, LineupPlayerResult
 from ht_coach_app.workspace.workspace_service import WorkspaceService
@@ -77,10 +80,7 @@ class WeeklyTrainingAppService:
                     player_id=player_id,
                     player_name=player.name,
                     age=int(getattr(player, "age", 0) or 0),
-                    best_position=format_position(
-                        getattr(player, "best_position", "")
-                        or self._best_position(player)
-                    ),
+                    best_position=self._best_position_label(player),
                     priority=(
                         record.priority
                         if record is not None
@@ -326,3 +326,17 @@ class WeeklyTrainingAppService:
 
         best = PlayerAnalyzer.best_position(player)
         return getattr(best, "position", best)
+
+    @staticmethod
+    def _best_position_label(player):
+        raw = getattr(player, "best_position", "")
+        if raw:
+            return format_position(raw)
+
+        from engine.analyzers.player_analyzer import PlayerAnalyzer
+
+        best = PlayerAnalyzer.best_position(player)
+        if isinstance(best, tuple):
+            position, score = best
+            return f"{format_position_abbreviation(position)} {float(score):.2f}"
+        return format_position(getattr(best, "position", best))

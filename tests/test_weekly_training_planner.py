@@ -1,6 +1,7 @@
 import os
 import unittest
 from datetime import date, datetime
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from engine.weekly_training.models import (
     MatchRole,
     MatchStatus,
     PlayerCoverage,
+    PlannerExplanation,
     PlannerState,
     TrainingPriority,
     TrainingPriorityRecord,
@@ -30,11 +32,14 @@ from models.player import Player
 from models.position import Position
 
 try:
-    from PySide6.QtWidgets import QApplication, QComboBox
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication, QComboBox, QTextBrowser
     from ht_coach_app.views.squad_page import SquadPage
 except Exception:  # pragma: no cover - PySide6 may be unavailable in headless CI
+    Qt = None
     QApplication = None
     QComboBox = None
+    QTextBrowser = None
     SquadPage = None
 
 
@@ -122,6 +127,14 @@ def played_record(entries, match_id="m1", minutes_known=False):
             for entry in entries
         ),
     )
+
+
+def show_weekly_tab(page):
+    for index in range(page.tabs.count()):
+        if page.tabs.tabText(index) in {"Weekly Planner", "Planificador semanal"}:
+            page.tabs.setCurrentIndex(index)
+            return
+    raise AssertionError("Weekly Planner tab not found")
 
 
 def test_training_week_uses_sunday_to_wednesday_window_and_thursday_rollover():
@@ -424,6 +437,111 @@ def test_use_this_lineup_transfers_weekly_plan_to_squad_board(tmp_path):
     assert accepted.formation_name == "3-5-2"
     assert len([slot for slot in accepted.slots if slot.player is not None]) == 11
     app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_information_cards_are_outside_pitch(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    show_weekly_tab(page)
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+
+    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
+    app.processEvents()
+
+    pitch = page.weekly_plan_board.pitch
+    for widget in (
+        page.weekly_cost_card,
+        page.weekly_warnings_card,
+        page.weekly_explanations_card,
+    ):
+        current = widget.parentWidget()
+        while current is not None:
+            assert current is not pitch
+            current = current.parentWidget()
+
+    assert page.weekly_cost_card.parentWidget() is not page.weekly_plan_board
+    assert page.weekly_explanations_card.parentWidget() is not page.weekly_plan_board
+    assert page.weekly_lineup_workspace.findChild(QTextBrowser) is None
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_long_explanations_scroll_in_card(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    show_weekly_tab(page)
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+    long_plan = replace(
+        plan,
+        explanations=tuple(
+            PlannerExplanation(
+                code="REQUIRED_TARGET_OMITTED",
+                player_id=f"p{index}",
+                player_name=(
+                    "Very Long Player Name With A Verbose Planner Explanation "
+                    f"{index}"
+                ),
+            )
+            for index in range(40)
+        ),
+    )
+
+    page.resize(1366, 768)
+    page.show_weekly_training_plan(long_plan, service.board_for_plan(plan), players)
+    page.show()
+    app.processEvents()
+
+    browser = page.weekly_explanations_browser
+    assert browser.lineWrapMode() == QTextBrowser.WidgetWidth
+    assert browser.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
+    assert browser.maximumHeight() <= 180
+    assert browser.verticalScrollBar().maximum() > 0
+    assert page.weekly_plan_board.isVisible()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_side_panel_collapse_keeps_info_cards_below_pitch(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    show_weekly_tab(page)
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
+    page.resize(1366, 768)
+    page.show()
+    app.processEvents()
+
+    before_y = page.weekly_cost_card.mapTo(page, page.weekly_cost_card.rect().topLeft()).y()
+    page.weekly_plan_board.bench_side_panel.set_expanded(False)
+    page.weekly_plan_board.inspector_side_panel.set_expanded(False)
+    app.processEvents()
+    after_y = page.weekly_cost_card.mapTo(page, page.weekly_cost_card.rect().topLeft()).y()
+
+    assert abs(after_y - before_y) < 30
+    assert page.weekly_cost_card.parentWidget() is not page.weekly_plan_board
+
+
+def test_weekly_priority_rows_use_human_position_score_labels(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    rows = service.priority_rows(roster())
+
+    labels = [row.best_position for row in rows]
+    assert any(label.startswith(("GK ", "IM ", "W ", "CD ", "WB ", "F ")) for label in labels)
+    assert not any(label.startswith("(") for label in labels)
+    assert not any("INNER_MIDFIELDER" in label for label in labels)
 
 
 def test_planner_regenerates_after_priority_formation_and_first_match_update(tmp_path):

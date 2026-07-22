@@ -1172,6 +1172,8 @@
     "changed_starters": "Changed starters versus unconstrained lineup: {count}.",
     "sector_deltas": "Sector deltas: {sectors}.",
     "explanations_warnings": "Explanations and Warnings",
+    "warnings": "Warnings",
+    "explanations": "Explanations",
     "coverage": {
       "not_started": "Target Incomplete",
       "partially_covered": "Partially Covered",
