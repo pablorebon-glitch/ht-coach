@@ -58,6 +58,7 @@ class SquadPage(BasePage):
     generate_training_plan_requested = Signal(str)
     record_first_match_requested = Signal()
     edit_first_match_requested = Signal(str, bool)
+    cancel_first_match_edit_requested = Signal()
     replace_first_match_requested = Signal()
     delete_first_match_requested = Signal()
     use_training_plan_requested = Signal()
@@ -88,6 +89,9 @@ class SquadPage(BasePage):
     PRIORITY_ROLE = Qt.UserRole + 2
     TRAINING_STATUS_ROLE = Qt.UserRole + 3
     AVAILABILITY_ROLE = Qt.UserRole + 4
+    WEEKLY_MODE_NORMAL = "NORMAL_PLANNING"
+    WEEKLY_MODE_EDITING_RECORDED = "EDITING_RECORDED_FIRST_MATCH"
+    WEEKLY_MODE_SECOND_PLAN_READY = "SECOND_MATCH_PLAN_READY"
 
     def __init__(self, parent=None):
         super().__init__(
@@ -104,6 +108,7 @@ class SquadPage(BasePage):
         self._weekly_coverage_rows = []
         self._weekly_filter_key = "all"
         self._weekly_priority_by_player_id = {}
+        self._weekly_mode = self.WEEKLY_MODE_NORMAL
         self._weekly_plan_board = None
         self._tab_keys = []
         self._last_transfer_result = None
@@ -726,8 +731,12 @@ class SquadPage(BasePage):
         )
         self.weekly_record_button = QPushButton(t("planner.record_played_lineup"))
         self.weekly_record_button.clicked.connect(self.record_first_match_requested)
-        self.weekly_edit_record_button = QPushButton("Edit")
+        self.weekly_edit_record_button = QPushButton(t("planner.edit_first_match"))
         self.weekly_edit_record_button.clicked.connect(self._edit_first_match_record)
+        self.weekly_cancel_edit_button = QPushButton(t("planner.cancel_editing"))
+        self.weekly_cancel_edit_button.clicked.connect(
+            self.cancel_first_match_edit_requested
+        )
         self.weekly_replace_record_button = QPushButton("Replace")
         self.weekly_replace_record_button.clicked.connect(
             self._confirm_replace_first_match_record
@@ -747,8 +756,9 @@ class SquadPage(BasePage):
         controls_layout.addWidget(self.weekly_formation_combo, 0, 3)
         controls_layout.addWidget(self.weekly_generate_button, 0, 4)
         controls_layout.addWidget(self.weekly_record_button, 0, 5)
-        controls_layout.addWidget(self.weekly_use_button, 0, 6)
-        controls_layout.addWidget(self.weekly_week_label, 1, 0, 1, 7)
+        controls_layout.addWidget(self.weekly_cancel_edit_button, 0, 6)
+        controls_layout.addWidget(self.weekly_use_button, 0, 7)
+        controls_layout.addWidget(self.weekly_week_label, 1, 0, 1, 8)
         controls_layout.setColumnStretch(3, 1)
         layout.addWidget(controls)
 
@@ -804,19 +814,13 @@ class SquadPage(BasePage):
         record_layout.addWidget(self.weekly_delete_record_button, 1, 3)
         record_layout.setColumnStretch(0, 1)
 
-        self.weekly_player_table = QTableWidget(0, 9)
+        self.weekly_player_table = QTableWidget(0, 3)
         self.weekly_player_table.setObjectName("weeklyPlayerTable")
         self.weekly_player_table.setHorizontalHeaderLabels(
             [
                 t("planner.player"),
-                t("planner.age"),
-                t("planner.best_training_position"),
                 t("planner.priority_header"),
                 t("planner.training_status"),
-                t("planner.confirmed"),
-                t("planner.planned"),
-                t("planner.remaining"),
-                t("planner.availability"),
             ]
         )
         self.weekly_player_table.setSortingEnabled(True)
@@ -836,6 +840,10 @@ class SquadPage(BasePage):
         self.weekly_plan_summary_label = QLabel(t("planner.empty_plan"))
         self.weekly_plan_summary_label.setObjectName("weeklyPlanSummary")
         self.weekly_plan_summary_label.setWordWrap(True)
+        self.weekly_edit_mode_label = QLabel("")
+        self.weekly_edit_mode_label.setObjectName("weeklyEditModeBanner")
+        self.weekly_edit_mode_label.setWordWrap(True)
+        self.weekly_edit_mode_label.setVisible(False)
 
         self.weekly_lineup_workspace = QFrame()
         self.weekly_lineup_workspace.setObjectName("weeklyLineupWorkspace")
@@ -899,6 +907,7 @@ class SquadPage(BasePage):
         self.weekly_explanations_card.setVisible(False)
 
         right_layout.addWidget(self._mini_heading(t("planner.second_match_plan")))
+        right_layout.addWidget(self.weekly_edit_mode_label)
         right_layout.addWidget(self.weekly_plan_summary_label)
         right_layout.addWidget(self.weekly_lineup_workspace, 1)
         right_layout.addWidget(self.weekly_cost_card, 0)
@@ -909,6 +918,7 @@ class SquadPage(BasePage):
         weekly_content_layout.addWidget(splitter)
         weekly_scroll.setWidget(weekly_content)
         layout.addWidget(weekly_scroll, 1)
+        self._set_weekly_mode(self.WEEKLY_MODE_NORMAL)
         self._add_squad_tab(tab, t("planner.weekly_planner"), "weekly_planner")
 
     def _build_transfer_tab(self):
@@ -1449,6 +1459,7 @@ class SquadPage(BasePage):
         )
 
     def show_weekly_training_empty(self):
+        self._set_weekly_mode(self.WEEKLY_MODE_NORMAL)
         self.weekly_week_label.setText(t("planner.load_roster_first"))
         self.weekly_player_table.setRowCount(0)
         self._set_first_match_record_card(None)
@@ -1499,6 +1510,7 @@ class SquadPage(BasePage):
         self._set_weekly_players(priority_rows, coverage_rows)
 
     def show_weekly_training_plan(self, plan, board, roster_players=None):
+        self._set_weekly_mode(self.WEEKLY_MODE_SECOND_PLAN_READY)
         if plan.conflicts and not plan.lineup:
             self.weekly_plan_summary_label.setText(
                 t("planner.conflict_state")
@@ -1554,6 +1566,28 @@ class SquadPage(BasePage):
             self._weekly_coverage_rows,
         )
 
+    def show_weekly_record_edit_mode(self, record, board, roster_players=None):
+        self._set_weekly_mode(self.WEEKLY_MODE_EDITING_RECORDED)
+        self._clear_weekly_training_plan()
+        self._set_first_match_record_card(record)
+        self.weekly_plan_summary_label.setText(
+            t("planner.editing_recorded_lineup")
+        )
+        if board is not None:
+            self._weekly_plan_board = board
+            self.weekly_plan_board.set_boards(
+                [board],
+                selected_formation_name=board.formation_name,
+                roster_players=roster_players or [],
+            )
+
+    def exit_weekly_record_edit_mode(self):
+        self._set_weekly_mode(self.WEEKLY_MODE_NORMAL)
+        self._clear_weekly_training_plan()
+
+    def is_weekly_record_editing(self):
+        return self._weekly_mode == self.WEEKLY_MODE_EDITING_RECORDED
+
     def weekly_training_current_board(self):
         current = self.weekly_plan_board.current_board()
         if current is not None:
@@ -1566,6 +1600,23 @@ class SquadPage(BasePage):
         board = self.weekly_training_current_board()
         if board is not None:
             self.ideal_board.set_boards([board], selected_formation_name=board.formation_name)
+
+    def _set_weekly_mode(self, mode):
+        self._weekly_mode = mode or self.WEEKLY_MODE_NORMAL
+        editing = self._weekly_mode == self.WEEKLY_MODE_EDITING_RECORDED
+        self.weekly_edit_mode_label.setVisible(editing)
+        self.weekly_edit_mode_label.setText(
+            t("planner.editing_recorded_lineup") if editing else ""
+        )
+        self.weekly_record_button.setText(
+            t("planner.save_lineup_changes")
+            if editing
+            else t("planner.record_played_lineup")
+        )
+        self.weekly_cancel_edit_button.setVisible(editing)
+        self.weekly_generate_button.setEnabled(not editing)
+        self.weekly_formation_combo.setEnabled(not editing)
+        self.weekly_use_button.setEnabled(not editing)
 
     def _clear_weekly_training_plan(self):
         self.weekly_plan_summary_label.setText(t("planner.empty_plan"))
@@ -1584,10 +1635,11 @@ class SquadPage(BasePage):
 
     def _set_first_match_record_card(self, record):
         has_record = record is not None
-        self.weekly_record_button.setVisible(not has_record)
-        self.weekly_edit_record_button.setVisible(has_record)
-        self.weekly_replace_record_button.setVisible(has_record)
-        self.weekly_delete_record_button.setVisible(has_record)
+        editing = self.is_weekly_record_editing()
+        self.weekly_record_button.setVisible((not has_record) or editing)
+        self.weekly_edit_record_button.setVisible(has_record and not editing)
+        self.weekly_replace_record_button.setVisible(has_record and not editing)
+        self.weekly_delete_record_button.setVisible(has_record and not editing)
         if not has_record:
             self.weekly_record_status_label.setText(t("planner.no_first_match_record"))
             return
@@ -1615,15 +1667,7 @@ class SquadPage(BasePage):
         )
 
     def _edit_first_match_record(self):
-        current = ""
-        text, ok = QInputDialog.getText(
-            self,
-            t("planner.edit_first_match"),
-            t("planner.opponent_name"),
-            text=current,
-        )
-        if ok:
-            self.edit_first_match_requested.emit(text, True)
+        self.edit_first_match_requested.emit("", False)
 
     def confirm_today_first_match_played(self):
         return QMessageBox.question(
@@ -1667,28 +1711,16 @@ class SquadPage(BasePage):
             status, status_tip = self._training_status(confirmed_total, planned)
             values = [
                 row.player_name,
-                row.age,
-                row.best_position,
                 "",
                 status,
-                self._percent_label(confirmed_total),
-                self._percent_label(planned),
-                self._percent_label(remaining),
-                row.availability,
             ]
             sort_values = [
                 row.player_name.casefold(),
-                row.age,
-                row.best_position.casefold(),
                 self._priority_sort(priority_key),
                 status,
-                confirmed_total,
-                self._numeric(planned),
-                self._numeric(remaining),
-                row.availability.casefold(),
             ]
             for column, value in enumerate(values):
-                if column == 3:
+                if column == 1:
                     combo = QComboBox()
                     for label, key in self._training_priority_options():
                         combo.addItem(label, key)
@@ -1707,7 +1739,7 @@ class SquadPage(BasePage):
                 item.setData(self.PRIORITY_ROLE, priority_key)
                 item.setData(self.TRAINING_STATUS_ROLE, status)
                 item.setData(self.AVAILABILITY_ROLE, row.availability)
-                if column == 4:
+                if column == 2:
                     item.setToolTip(status_tip)
                     item.setData(Qt.AccessibleTextRole, status_tip)
                 self.weekly_player_table.setItem(
@@ -1729,11 +1761,10 @@ class SquadPage(BasePage):
             (t("planner.filter_all"), "all"),
             (t("planner.filter_100"), "100"),
             (t("planner.filter_50"), "50"),
-            (t("planner.filter_needs_training"), "needs_training"),
+            (t("planner.filter_no_priority"), "no_priority"),
             (t("planner.filter_already_trained"), "already_trained"),
             (t("planner.filter_will_train"), "will_train"),
-            (t("planner.filter_unavailable"), "unavailable"),
-            (t("planner.filter_no_priority"), "no_priority"),
+            (t("planner.filter_not_training"), "not_training"),
         ]
 
     def _apply_weekly_filter(self):
@@ -1748,6 +1779,7 @@ class SquadPage(BasePage):
         widget.setProperty("priority_key", priority)
         self._weekly_priority_by_player_id[player_id] = priority
         self.training_priority_changed.emit(player_id, priority)
+        self._clear_weekly_training_plan()
         if self._weekly_filter_key in {"100", "50", "no_priority"}:
             QTimer.singleShot(0, self._apply_weekly_filter)
 
@@ -1759,20 +1791,20 @@ class SquadPage(BasePage):
         planned = self._numeric(getattr(coverage, "planned_exposure", 0))
         remaining = self._numeric(getattr(coverage, "remaining_exposure", 0))
         already = confirmed + assumed > 0
+        will_train = planned > 0 and not already
+        not_training = confirmed + assumed + planned == 0
         if key == "100":
             return priority == "REQUIRED_100"
         if key == "50":
             return priority == "REQUIRED_50"
-        if key == "needs_training":
-            return remaining > 0
+        if key == "no_priority":
+            return priority == "NO_PRIORITY"
         if key == "already_trained":
             return already
         if key == "will_train":
-            return planned > 0 and not already
-        if key == "unavailable":
-            return str(row.availability).casefold() != "available"
-        if key == "no_priority":
-            return priority == "NO_PRIORITY"
+            return will_train
+        if key == "not_training":
+            return not_training
         return True
 
     def _visible_weekly_priority(self, row):
@@ -2695,7 +2727,7 @@ class SquadPage(BasePage):
             (self.succession_table, {7}),
             (self.development_table, set()),
             (self.priority_risk_table, {0}),
-            (self.weekly_player_table, {1, 5, 6, 7}),
+            (self.weekly_player_table, set()),
             (self.transfer_priority_table, {0}),
         ]
         for table, numeric_columns in table_configs:

@@ -69,11 +69,11 @@ TSI and salary. This avoids collapsing duplicated names while preserving importe
 compatibility.
 
 Alpha 0.5.7.3.1 fixes the weekly-player filter so it uses stable UI data roles instead
-of translated display text or stale persistence labels. The All, 100%, 50%, No
-priority, Needs training, Already trained, Will train and Unavailable filters are based
-on player id, visible priority key, training status and availability. Changing a
-priority immediately updates filter eligibility, and the selected filter survives
-sorting and plan regeneration.
+of translated display text or stale persistence labels. Alpha 0.5.7.3.2 simplifies the
+visible filter set to All, 100%, 50%, No priority, Already trained, Will train and Not
+training. Filters are based on player id, visible priority key and training status.
+Changing a priority immediately updates filter eligibility, and the selected filter
+survives sorting and plan regeneration.
 
 ## Playmaking Rules
 
@@ -115,6 +115,15 @@ coverage:
   count as already trained.
 - Editing, replacing or deleting the first-match record recalculates coverage from the
   current date/status combination.
+
+Alpha 0.5.7.3.2 changes Edit into a lineup-editing workflow. The saved first-match
+lineup is restored into the interactive Formation Board, including formation, starters,
+slot ids, individual orders and order sides. `Record Played Lineup` becomes `Save
+Lineup Changes` while editing. Saving replaces the existing first-match record in
+place, preserves its metadata and reruns the same temporal validation before exposure
+is recalculated. Cancel Editing exits without changing persistence. Any saved lineup
+edit invalidates the generated second-match proposal, so the next recommendation must
+be generated from the updated first-match record.
 
 ## Planner Algorithm
 
@@ -179,11 +188,11 @@ The Squad page adds a Weekly Planner tab with:
 - explanations and warnings.
 
 The unified table replaces the older separate Training Priorities and Weekly Coverage
-tables. Its columns are Player, Age, Best Training Position, Priority, Training Status,
-Confirmed, Planned, Remaining and Availability. Training Status uses plain symbols:
-check mark for already trained, open circle for will train in the generated plan and
-dash for will not train in the generated plan. Confirmed and Planned percentages remain
-visible so the symbol is not the only source of information.
+tables. Alpha 0.5.7.3.2 keeps the table intentionally compact with exactly three
+visible columns: Player, Priority and Training Status. Training Status uses plain
+symbols: check mark for already trained, open circle for will train in the generated
+plan and dash for not training in the generated plan. Detailed exposure remains in the
+training summary and saved planner state rather than expanding the main table.
 
 Alpha 0.5.7.3 hardens the result layout around a strict ownership contract:
 

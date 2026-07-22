@@ -137,9 +137,8 @@ Content:
   second-match lineup plan.
 - Weekly Planner controls include active training, fixed formation, Generate Plan,
   Record Played Lineup and Use This Lineup.
-- Weekly Planner uses one unified weekly-player table with player, age, best training
-  position, simplified priority, training status, confirmed, planned, remaining and
-  availability columns.
+- Weekly Planner uses one unified weekly-player table with exactly three visible
+  columns: Player, Priority and Training Status.
 - Weekly Planner priority choices are intentionally compact: 100%, 50% and No priority
   in English, or 100%, 50% and Sin prioridad in Spanish. Older saved priority values
   are mapped into those three UI choices. Priority filters use stable data roles for
@@ -148,9 +147,12 @@ Content:
 - Weekly Planner training status uses accessible symbols: check mark for already
   trained, open circle for will train in the generated plan and dash for will not train.
 - Weekly Planner shows a visible first-match record card after recording, with Edit,
-  Replace and Delete actions. Past played records count as trained exposure, today
-  played records require confirmation, and future records are treated as planned
-  exposure rather than already trained.
+  Replace and Delete actions. Edit restores the saved lineup into the interactive
+  Formation Board, switches Record Played Lineup into Save Lineup Changes, supports
+  Cancel Editing, preserves match metadata and replaces the existing record without
+  creating duplicates. Past played records count as trained exposure, today played
+  records require confirmation, and future records are treated as planned exposure
+  rather than already trained.
 - Weekly Planner second-match output uses the shared Formation Board and requires an
   explicit Use This Lineup action before copying the proposal into the Squad Ideal XI
   board.
@@ -333,6 +335,9 @@ Content:
   top to bottom and remaining vertical space stays below the content stack. Alpha
   0.5.7.3.1 additionally sets collapsed body height to zero and uses an ignored
   vertical body policy to prevent stale geometry from returning after repeated toggles.
+  Alpha 0.5.7.3.2 verifies repeated collapse/expand cycles and result refreshes while
+  collapsed keep the same header-only footprint and restore natural content height
+  when expanded.
 - First-launch Match section defaults are: Decision Lab collapsed, Match Intelligence
   collapsed, Opponent Rating Calibration collapsed and Match Analysis expanded.
   Previously saved `match_section_states` values continue to override those defaults.
