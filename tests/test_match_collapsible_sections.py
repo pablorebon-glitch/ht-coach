@@ -7,7 +7,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.persistence.match_workspace_repository import (
@@ -180,11 +187,21 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         )
         self.assertTrue(section.body_host.isHidden())
         self.assertFalse(section.body_widget().isVisible())
+        self.assertEqual(
+            section.body_host.sizePolicy().verticalPolicy(),
+            QSizePolicy.Policy.Ignored,
+        )
+        self.assertEqual(section.body_host.maximumHeight(), 0)
 
         section.set_expanded(True)
         QApplication.processEvents()
 
         self.assertGreater(section.sizeHint().height(), section.header_button.sizeHint().height())
+        self.assertEqual(
+            section.body_host.sizePolicy().verticalPolicy(),
+            QSizePolicy.Policy.Preferred,
+        )
+        self.assertGreater(section.body_host.maximumHeight(), 0)
 
     def test_dynamic_body_size_changes_are_reflected_when_expanded(self):
         body = QWidget()

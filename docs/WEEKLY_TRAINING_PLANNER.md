@@ -68,6 +68,13 @@ Priorities persist by a deterministic roster identity based on player name, age,
 TSI and salary. This avoids collapsing duplicated names while preserving importer
 compatibility.
 
+Alpha 0.5.7.3.1 fixes the weekly-player filter so it uses stable UI data roles instead
+of translated display text or stale persistence labels. The All, 100%, 50%, No
+priority, Needs training, Already trained, Will train and Unavailable filters are based
+on player id, visible priority key, training status and availability. Changing a
+priority immediately updates filter eligibility, and the selected filter survives
+sorting and plan regeneration.
+
 ## Playmaking Rules
 
 Playmaking exposure is minute-aware:
@@ -197,6 +204,12 @@ The result area is therefore:
 4. Warnings card;
 5. Explanations card.
 
+Alpha 0.5.7.3.1 further hardens this flow by placing the Weekly Planner split content
+inside a normal vertical scroll area. The result area is no longer forced into one fixed
+tab-height viewport: the pitch keeps its natural Formation Board height, and the page
+scrolls down to Training Summary, Warnings and Explanations. The lineup workspace must
+finish before any result card is laid out.
+
 Long explanation text wraps inside its card. The visible explanation area is capped so
 verbose plans do not make the whole page thousands of pixels tall or cover player cards.
 At supported desktop sizes, the lineup workspace keeps the primary vertical allocation,
@@ -238,6 +251,10 @@ Malformed or unreadable files return a safe default state with diagnostics.
 All visible planner strings pass through the existing localization catalog. English and
 Spanish strings are provided for tab labels, priorities, coverage statuses, conflicts,
 actions and summaries.
+
+Planner warnings that originate as engine diagnostics are translated by the PySide6
+presentation layer before reaching the label. This keeps engine behavior stable while
+avoiding mixed English/Spanish UI text.
 
 The weekly player table uses concise user-facing training-position labels such as
 `GK 15.15`, `IM 25.59` and `W 24.28`. Internal Python tuples and raw enum names are not

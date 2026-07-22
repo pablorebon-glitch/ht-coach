@@ -1188,8 +1188,14 @@
     "summary_already_trained": "Already trained: {count}",
     "summary_will_train": "Will train: {count}",
     "summary_missing": "Still missing: {count}",
-    "summary_unavailable": "Unavailable priority players: {count}",
-    "coverage": {
+        "summary_unavailable": "Unavailable priority players: {count}",
+        "warning": {
+            "assuming_90_minutes": "Assuming 90 minutes for starters.",
+            "best_effort": "Best-effort lineup generated; review unmet training targets.",
+            "one_required_unavailable": "One required player is unavailable or marked to rest.",
+            "full_training_slots": "Only {available} full-training slots exist for {requested} 100% targets."
+        },
+        "coverage": {
       "not_started": "Target Incomplete",
       "partially_covered": "Partially Covered",
       "target_met": "Target Completed",

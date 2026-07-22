@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.5.7.3.1 Planner Flow and Collapse Fixes: the Weekly Planner now lets
+  the generated lineup area grow inside a natural vertical scroll flow, keeps Training
+  Summary, Warnings and Explanations strictly below the pitch, filters the weekly table
+  by stable visible priority roles, localizes planner warnings in EN/ES, and tightens
+  the shared collapsible-section contract so collapsed bodies contribute zero height.
 - Added Alpha 0.5.7.3 Workspace Layout Hardening and Training-Date Validation: the
   Weekly Planner result now keeps the shared Formation Board as a dedicated lineup
   workspace, shows a compact training summary instead of prominent sector deltas,

@@ -1188,8 +1188,14 @@
     "summary_already_trained": "Ya entrenaron: {count}",
     "summary_will_train": "Van a entrenar: {count}",
     "summary_missing": "Todavía faltan: {count}",
-    "summary_unavailable": "Prioritarios no disponibles: {count}",
-    "coverage": {
+        "summary_unavailable": "Prioritarios no disponibles: {count}",
+        "warning": {
+            "assuming_90_minutes": "Se asumen 90 minutos para los titulares.",
+            "best_effort": "Se generó la mejor alineación posible; revisá los objetivos de entrenamiento pendientes.",
+            "one_required_unavailable": "Un jugador prioritario no está disponible o está marcado para descansar.",
+            "full_training_slots": "Solo hay {available} plazas de entrenamiento completo para {requested} objetivos del 100%."
+        },
+        "coverage": {
       "not_started": "Objetivo pendiente",
       "partially_covered": "Parcialmente cubierto",
       "target_met": "Objetivo cumplido",
