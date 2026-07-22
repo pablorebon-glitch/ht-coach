@@ -252,6 +252,78 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         self.assertFalse(refreshed["rating_calibration"].is_expanded())
         self.assertTrue(refreshed["match_analysis"].is_expanded())
 
+    def test_match_sections_have_no_stretch_between_headers(self):
+        page = MatchPage()
+        page.show_results(match_result())
+        sections = self.sections(page)
+        for section in sections.values():
+            section.set_expanded(False)
+        QApplication.processEvents()
+
+        layout = page.results_layout
+        section_items = [layout.itemAt(index) for index in range(4)]
+
+        self.assertEqual(
+            [
+                item.widget().state_key
+                for item in section_items
+            ],
+            [
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+                "match_analysis",
+            ],
+        )
+        self.assertTrue(layout.itemAt(4).spacerItem() is not None)
+        for index in range(4):
+            self.assertEqual(layout.stretch(index), 0)
+            self.assertIsNotNone(layout.itemAt(index).widget())
+
+    def test_collapsed_match_sections_stack_with_natural_height(self):
+        page = MatchPage()
+        page.show_results(match_result())
+        page.resize(1366, 768)
+        page.show()
+        sections = [
+            self.sections(page)[key]
+            for key in (
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+                "match_analysis",
+            )
+        ]
+        for section in sections:
+            section.set_expanded(False)
+        QApplication.processEvents()
+
+        bottoms_and_tops = [
+            (
+                sections[index].mapTo(page, sections[index].rect().bottomLeft()).y(),
+                sections[index + 1].mapTo(page, sections[index + 1].rect().topLeft()).y(),
+            )
+            for index in range(len(sections) - 1)
+        ]
+
+        for bottom, next_top in bottoms_and_tops:
+            self.assertLessEqual(next_top - bottom, 12)
+
+    def test_expanding_small_section_grows_only_by_body_height(self):
+        page = MatchPage()
+        page.show_results(match_result(with_decision_lab=False))
+        section = self.sections(page)["decision_lab"]
+        section.set_expanded(False)
+        QApplication.processEvents()
+        collapsed = section.sizeHint().height()
+
+        section.set_expanded(True)
+        QApplication.processEvents()
+        expanded = section.sizeHint().height()
+
+        self.assertGreater(expanded, collapsed)
+        self.assertLess(expanded - collapsed, 180)
+
     def test_collapsed_section_updates_without_auto_expanding(self):
         page = MatchPage()
         page.show_results(match_result(with_decision_lab=False))

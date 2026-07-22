@@ -13,6 +13,7 @@ from ht_coach_app.services.squad_service import SquadValidationError
 from ht_coach_app.services.transfer_planner_service import TransferPlannerService
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from engine.weekly_training.player_identity import player_training_id
+from engine.weekly_training.models import MatchStatus
 from engine.transfer_planner.models import TransferConstraints
 
 
@@ -342,23 +343,49 @@ class SquadController:
         if board is None:
             self._view.show_error(t("planner.no_plan_to_record"))
             return
+        state = self._weekly_training_service.load_state()
+        requested_status, confirmed = self._first_match_requested_status(
+            state.active_week.first_match_date
+        )
         try:
-            self._weekly_training_service.record_first_match(board)
-        except ValueError:
+            saved = self._weekly_training_service.record_first_match(
+                board,
+                roster_players=self._roster.players,
+                requested_status=requested_status,
+                played_confirmed=confirmed,
+            )
+        except ValueError as exc:
+            self._view.show_error(self._planner_validation_message(exc))
+            return
+        except Exception:
             self._view.show_error(t("planner.duplicate_first_match"))
             return
         self._show_weekly_training()
-        self._view.show_status(t("planner.first_match_recorded"))
+        self._view.show_status(self._first_match_save_message(saved))
 
     def _edit_first_training_match(self, opponent_name, minutes_known):
         if self._roster is None:
             return
-        self._weekly_training_service.update_first_match_metadata(
-            opponent_name,
-            minutes_known,
+        record = self._weekly_training_service.first_match_record()
+        if record is None:
+            return
+        requested_status, confirmed = self._first_match_requested_status(
+            record.match_date,
+            requested_status=record.planned_or_played,
+            minutes_known=minutes_known,
         )
+        try:
+            saved = self._weekly_training_service.update_first_match_metadata(
+                opponent_name,
+                minutes_known,
+                requested_status=requested_status,
+                played_confirmed=confirmed,
+            )
+        except ValueError as exc:
+            self._view.show_error(self._planner_validation_message(exc))
+            return
         self._show_weekly_training()
-        self._view.show_status(t("planner.first_match_recorded"))
+        self._view.show_status(self._first_match_save_message(saved))
 
     def _replace_first_training_match(self):
         if self._roster is None:
@@ -367,9 +394,22 @@ class SquadController:
         if board is None:
             self._view.show_error(t("planner.no_plan_to_record"))
             return
-        self._weekly_training_service.replace_first_match(board)
+        state = self._weekly_training_service.load_state()
+        requested_status, confirmed = self._first_match_requested_status(
+            state.active_week.first_match_date
+        )
+        try:
+            saved = self._weekly_training_service.replace_first_match(
+                board,
+                roster_players=self._roster.players,
+                requested_status=requested_status,
+                played_confirmed=confirmed,
+            )
+        except ValueError as exc:
+            self._view.show_error(self._planner_validation_message(exc))
+            return
         self._show_weekly_training()
-        self._view.show_status(t("planner.first_match_recorded"))
+        self._view.show_status(self._first_match_save_message(saved))
 
     def _delete_first_training_match(self):
         if self._roster is None:
@@ -377,6 +417,53 @@ class SquadController:
         self._weekly_training_service.delete_first_match()
         self._show_weekly_training()
         self._view.show_status(t("planner.no_first_match_record"))
+
+    def _first_match_requested_status(
+        self,
+        match_date,
+        requested_status=MatchStatus.PLAYED,
+        minutes_known=False,
+    ):
+        temporal = self._weekly_training_service.temporal_status(match_date)
+        if temporal == "FUTURE":
+            if hasattr(self._view, "show_status"):
+                self._view.show_status(t("planner.future_match_planned"))
+            return MatchStatus.PLANNED, False
+        if temporal == "TODAY" and requested_status == MatchStatus.PLAYED:
+            confirmed = (
+                self._view.confirm_today_first_match_played()
+                if hasattr(self._view, "confirm_today_first_match_played")
+                else bool(minutes_known)
+            )
+            return (
+                MatchStatus.PLAYED if confirmed else MatchStatus.PLANNED,
+                confirmed,
+            )
+        return requested_status, bool(minutes_known)
+
+    def _planner_validation_message(self, exc):
+        code = str(exc)
+        return {
+            "future_match_cannot_be_played": t("planner.future_match_planned"),
+            "today_match_requires_played_confirmation": t(
+                "planner.today_match_confirmation_required"
+            ),
+            "duplicate_match_id": t("planner.duplicate_first_match"),
+            "automatic_rules_unavailable": t("planner.automatic_rules_unavailable"),
+        }.get(code, t("planner.validation_error"))
+
+    def _first_match_save_message(self, state):
+        record = next(
+            (
+                item for item in state.match_records
+                if getattr(item.match_role, "value", item.match_role)
+                == "FIRST_WEEKLY_MATCH"
+            ),
+            None,
+        )
+        if record is not None and record.planned_or_played == MatchStatus.PLANNED:
+            return t("planner.first_match_planned")
+        return t("planner.first_match_recorded")
 
     def _accept_training_plan(self):
         if hasattr(self._view, "accept_weekly_training_plan"):

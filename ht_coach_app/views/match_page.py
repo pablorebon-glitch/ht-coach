@@ -518,6 +518,7 @@ class MatchPage(BasePage):
             "match_analysis",
         ):
             self.results_layout.addWidget(sections[key])
+        self.results_layout.addStretch(1)
         self._restore_viewport_state(
             viewport_state,
             self._result_tabs,
