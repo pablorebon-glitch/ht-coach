@@ -146,24 +146,27 @@ Content:
 - Weekly Planner training status uses accessible symbols: check mark for already
   trained, open circle for will train in the generated plan and dash for will not train.
 - Weekly Planner shows a visible first-match record card after recording, with Edit,
-  Replace and Delete actions.
+  Replace and Delete actions. Past played records count as trained exposure, today
+  played records require confirmation, and future records are treated as planned
+  exposure rather than already trained.
 - Weekly Planner second-match output uses the shared Formation Board and requires an
   explicit Use This Lineup action before copying the proposal into the Squad Ideal XI
   board.
 - Weekly Planner Generate Plan now uses the Planner Execution Engine: ordinary 100%/50%
   priority conflicts still produce a best-effort lineup, populated bench, automatic
-  orders, coverage updates, internal competitive cost and conflict explanations. Only
+  orders, coverage updates, compact training summary and conflict explanations. Only
   truly impossible cases such as no available players, unsupported formation or no
   valid goalkeeper leave the proposal empty.
 - Weekly Planner result layout uses the shared Formation Board as the lineup workspace
-  only. Competitive Cost, Warnings and Explanations are external cards below the
+  only. Training Summary, Warnings and Explanations are external cards below the
   workspace, so they cannot overlap the pitch, bench, player details or player-card
   layer. The Explanations card uses bounded internal scrolling for long text.
 - Formation Board bench and player-details side panels can be collapsed in Match,
   Squad and Weekly Planner. Collapsing releases real width while preserving selection
   and the existing detail widgets.
-- Weekly Planner warnings explain assumed 90-minute exposure, hard conflicts and
-  internal competitive cost without presenting it as a Hattrick rating projection.
+- Weekly Planner warnings explain assumed 90-minute exposure, date/status corrections
+  and hard conflicts without presenting internal competitive cost as a Hattrick rating
+  projection.
 - Transfer Planner tab that turns Squad Evolution outputs into abstract player-profile
   recommendations for recruitment planning.
 - Transfer Planner constraints for planning objective, budget tier, age strategy,

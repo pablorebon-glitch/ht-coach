@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from datetime import date
 
 from engine.weekly_training.coverage import WeeklyTrainingCoverageService
 from engine.weekly_training.models import (
@@ -32,6 +33,12 @@ class TrainingPriorityRow:
     best_position: str
     priority: TrainingPriority
     availability: str
+
+
+class TemporalStatus:
+    PAST = "PAST"
+    TODAY = "TODAY"
+    FUTURE = "FUTURE"
 
 
 class WeeklyTrainingAppService:
@@ -169,43 +176,32 @@ class WeeklyTrainingAppService:
         return replace(
             plan,
             lineup=tuple(
-                self._entry_from_slot(slot)
+                self._entry_from_slot(slot, players)
                 for slot in optimized_board.slots
                 if slot.player is not None
             ),
         )
 
-    def record_first_match(self, board, opponent_name=""):
+    def record_first_match(
+        self,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+    ):
         state = self.load_state()
-        rules = rule_provider_for(state.active_training_type)
-        if rules is None:
-            raise ValueError("automatic_rules_unavailable")
-        entries = tuple(
-            self._entry_from_slot(slot)
-            for slot in board.slots
-            if slot.player is not None
-        )
-        match_id = f"{state.active_week.week_id}:first"
-        record = WeeklyMatchRecord(
-            match_id=match_id,
-            match_date=state.active_week.first_match_date,
-            match_role=MatchRole.FIRST_WEEKLY_MATCH,
-            opponent_name=opponent_name,
-            formation=board.formation_name,
-            lineup=entries,
-            planned_or_played=MatchStatus.PLAYED,
-            source="squad_planner",
-            minutes_known=False,
-            notes="Assuming 90 minutes for starters.",
-            training_exposure_entries=tuple(
-                rules.exposure_for_entry(
-                    match_id,
-                    entry,
-                    "squad_planner",
-                    assumed_confidence(False),
-                )
-                for entry in entries
-            ),
+        record = self._first_match_record_for_board(
+            state,
+            board,
+            opponent_name,
+            roster_players=roster_players,
+            match_date=match_date,
+            requested_status=requested_status,
+            played_confirmed=played_confirmed,
+            today=today,
         )
         return self._repository.add_match_record(state, record)
 
@@ -219,12 +215,38 @@ class WeeklyTrainingAppService:
             None,
         )
 
-    def replace_first_match(self, board, opponent_name=""):
+    def replace_first_match(
+        self,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+    ):
         state = self.load_state()
-        record = self._first_match_record_for_board(state, board, opponent_name)
+        record = self._first_match_record_for_board(
+            state,
+            board,
+            opponent_name,
+            roster_players=roster_players,
+            match_date=match_date,
+            requested_status=requested_status,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
         return self._repository.replace_match_record(state, record)
 
-    def update_first_match_metadata(self, opponent_name="", minutes_known=False):
+    def update_first_match_metadata(
+        self,
+        opponent_name="",
+        minutes_known=False,
+        match_date=None,
+        requested_status=None,
+        played_confirmed=False,
+        today=None,
+    ):
         state = self.load_state()
         record = next(
             (
@@ -235,14 +257,33 @@ class WeeklyTrainingAppService:
         )
         if record is None:
             return state
+        target_date = match_date or record.match_date
+        status = requested_status or record.planned_or_played
+        status, temporal, warning = self.validate_match_status(
+            target_date,
+            status,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
+        rules = rule_provider_for(state.active_training_type)
+        if rules is None:
+            raise ValueError("automatic_rules_unavailable")
+        notes = self._record_notes(status, bool(minutes_known), temporal, warning)
         updated = replace(
             record,
             opponent_name=opponent_name,
+            match_date=target_date,
+            planned_or_played=status,
             minutes_known=bool(minutes_known),
-            notes=(
-                "Confirmed 90 minutes for starters."
-                if minutes_known
-                else "Assuming 90 minutes for starters."
+            notes=notes,
+            training_exposure_entries=tuple(
+                rules.exposure_for_entry(
+                    record.match_id,
+                    entry,
+                    "squad_planner",
+                    assumed_confidence(bool(minutes_known)),
+                )
+                for entry in record.lineup
             ),
         )
         return self._repository.replace_match_record(state, updated)
@@ -260,27 +301,44 @@ class WeeklyTrainingAppService:
             return state
         return self._repository.delete_match_record(state, record.match_id)
 
-    def _first_match_record_for_board(self, state, board, opponent_name=""):
+    def _first_match_record_for_board(
+        self,
+        state,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+    ):
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
             raise ValueError("automatic_rules_unavailable")
         entries = tuple(
-            self._entry_from_slot(slot)
+            self._entry_from_slot(slot, roster_players)
             for slot in board.slots
             if slot.player is not None
         )
         match_id = f"{state.active_week.week_id}:first"
+        target_date = match_date or state.active_week.first_match_date
+        status, temporal, warning = self.validate_match_status(
+            target_date,
+            requested_status,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
         return WeeklyMatchRecord(
             match_id=match_id,
-            match_date=state.active_week.first_match_date,
+            match_date=target_date,
             match_role=MatchRole.FIRST_WEEKLY_MATCH,
             opponent_name=opponent_name,
             formation=board.formation_name,
             lineup=entries,
-            planned_or_played=MatchStatus.PLAYED,
+            planned_or_played=status,
             source="squad_planner",
             minutes_known=False,
-            notes="Assuming 90 minutes for starters.",
+            notes=self._record_notes(status, False, temporal, warning),
             training_exposure_entries=tuple(
                 rules.exposure_for_entry(
                     match_id,
@@ -292,12 +350,70 @@ class WeeklyTrainingAppService:
             ),
         )
 
+    def validate_match_status(
+        self,
+        match_date,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+        strict=False,
+    ):
+        target_date = self._date(match_date)
+        temporal = self.temporal_status(target_date, today)
+        status = self._match_status(requested_status)
+        if status == MatchStatus.PLAYED and temporal == TemporalStatus.FUTURE:
+            if strict:
+                raise ValueError("future_match_cannot_be_played")
+            return (
+                MatchStatus.PLANNED,
+                temporal,
+                "First-match date is in the future and therefore counts as planned, not played.",
+            )
+        if (
+            status == MatchStatus.PLAYED
+            and temporal == TemporalStatus.TODAY
+            and not played_confirmed
+        ):
+            if strict:
+                raise ValueError("today_match_requires_played_confirmation")
+            return (
+                MatchStatus.PLANNED,
+                temporal,
+                "Today's match has not been confirmed as played and therefore counts as planned.",
+            )
+        return status, temporal, ""
+
     @staticmethod
-    def _entry_from_slot(slot):
+    def temporal_status(match_date, today=None):
+        current = WeeklyTrainingAppService._date(today or date.today())
+        target = WeeklyTrainingAppService._date(match_date)
+        if target < current:
+            return TemporalStatus.PAST
+        if target > current:
+            return TemporalStatus.FUTURE
+        return TemporalStatus.TODAY
+
+    @staticmethod
+    def _record_notes(status, minutes_known, temporal, warning=""):
+        if status == MatchStatus.PLANNED:
+            minutes = "Planned exposure only; match is not counted as played."
+        elif minutes_known:
+            minutes = "Confirmed 90 minutes for starters."
+        else:
+            minutes = "Assuming 90 minutes for starters."
+        state = f"Status: {status.value.title()}."
+        temporal_note = f"Temporal status: {temporal.title()}."
+        return " ".join(part for part in (minutes, state, temporal_note, warning) if part)
+
+    @staticmethod
+    def _entry_from_slot(slot, roster_players=()):
         from engine.weekly_training.models import WeeklyMatchLineupEntry
 
         return WeeklyMatchLineupEntry(
-            player_id=slot.player.player_id,
+            player_id=WeeklyTrainingAppService._player_id_for_slot(
+                slot,
+                roster_players,
+            ),
             player_name=slot.player.player_name,
             slot_id=slot.slot_id,
             position=slot.player.position,
@@ -307,11 +423,36 @@ class WeeklyTrainingAppService:
         )
 
     @staticmethod
+    def _player_id_for_slot(slot, roster_players=()):
+        player_name = getattr(slot.player, "player_name", "")
+        for player in roster_players or ():
+            if getattr(player, "name", "") == player_name:
+                return player_training_id(player)
+        return slot.player.player_id
+
+    @staticmethod
     def _priority(value):
         try:
             return TrainingPriority(str(value))
         except ValueError:
             return TrainingPriority.NO_PRIORITY
+
+    @staticmethod
+    def _match_status(value):
+        try:
+            return MatchStatus(getattr(value, "value", value))
+        except (TypeError, ValueError):
+            return MatchStatus.PLANNED
+
+    @staticmethod
+    def _date(value):
+        if value is None:
+            return date.today()
+        if hasattr(value, "date") and type(value) is not date:
+            return value.date()
+        if isinstance(value, date):
+            return value
+        return date.fromisoformat(str(value))
 
     @staticmethod
     def _availability(player):

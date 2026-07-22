@@ -838,7 +838,7 @@ class SquadPage(BasePage):
 
         self.weekly_cost_card = self._weekly_info_card(
             "weeklyCostCard",
-            t("planner.competitive_cost"),
+            t("planner.training_summary"),
         )
         self.weekly_cost_label = QLabel("")
         self.weekly_cost_label.setObjectName("weeklyCostText")
@@ -1500,28 +1500,9 @@ class SquadPage(BasePage):
                 selected_formation_name=board.formation_name,
                 roster_players=roster_players or [],
             )
-        cost = plan.competitive_cost
-        cost_lines = [
-            t(
-                "planner.cost_value",
-                delta=f"{cost.score_delta:.2f}",
-                percent=f"{cost.percentage_delta:.1f}",
-            )
-        ]
-        if cost.changed_starters:
-            cost_lines.append(
-                t(
-                    "planner.changed_starters",
-                    count=len(cost.changed_starters),
-                )
-            )
-        if cost.sector_deltas:
-            sector_text = ", ".join(
-                f"{key.replace('_', ' ').title()} {value:+.2f}"
-                for key, value in sorted(cost.sector_deltas.items())
-            )
-            cost_lines.append(t("planner.sector_deltas", sectors=sector_text))
-        self.weekly_cost_label.setText("\n".join(cost_lines))
+        self.weekly_cost_label.setText(
+            "\n".join(self._planner_training_summary_lines(plan))
+        )
         explanation_lines = [
             self._planner_explanation_text(item)
             for item in plan.explanations
@@ -1582,18 +1563,26 @@ class SquadPage(BasePage):
         if not has_record:
             self.weekly_record_status_label.setText(t("planner.no_first_match_record"))
             return
-        minutes = (
-            t("planner.confirmed_minutes")
-            if record.minutes_known
-            else t("planner.assuming_90_minutes")
-        )
+        status = getattr(record.planned_or_played, "value", record.planned_or_played)
+        if status == "PLANNED":
+            minutes = t("planner.planned_exposure_note")
+        elif record.minutes_known:
+            minutes = t("planner.confirmed_minutes")
+        else:
+            minutes = t("planner.assuming_90_minutes")
+        temporal_warning = ""
+        if "future" in str(record.notes).casefold():
+            temporal_warning = t("planner.future_match_planned")
+        elif "today" in str(record.notes).casefold():
+            temporal_warning = t("planner.today_match_planned")
         self.weekly_record_status_label.setText(
             "\n".join(
                 [
                     t("planner.first_match_recorded"),
                     f"{record.match_date.isoformat()} | {record.source}",
-                    f"{record.formation} | {record.planned_or_played.value.title()} | {minutes}",
+                    f"{record.formation} | {str(status).title()} | {minutes}",
                 ]
+                + ([temporal_warning] if temporal_warning else [])
             )
         )
 
@@ -1607,6 +1596,13 @@ class SquadPage(BasePage):
         )
         if ok:
             self.edit_first_match_requested.emit(text, True)
+
+    def confirm_today_first_match_played(self):
+        return QMessageBox.question(
+            self,
+            t("planner.today_match_confirmation_title"),
+            t("planner.today_match_played_confirm"),
+        ) == QMessageBox.Yes
 
     def _confirm_replace_first_match_record(self):
         if QMessageBox.question(
@@ -1791,6 +1787,78 @@ class SquadPage(BasePage):
             player=explanation.player_name,
             **dict(getattr(explanation, "parameters", {}) or {}),
         )
+
+    def _planner_training_summary_lines(self, plan):
+        coverage = list(getattr(plan, "coverage", ()) or ())
+        priority_rows = {
+            row.player_id: row
+            for row in getattr(self, "_weekly_priority_rows", [])
+        }
+
+        def priority_value(row):
+            return getattr(getattr(row, "weekly_target", ""), "value", row.weekly_target)
+
+        def satisfied(row):
+            return str(getattr(row.target_status, "value", row.target_status)) in {
+                "TARGET_MET",
+                "TARGET_EXCEEDED",
+            }
+
+        required_100 = [
+            row for row in coverage
+            if priority_value(row) == "REQUIRED_100"
+        ]
+        required_50 = [
+            row for row in coverage
+            if priority_value(row) == "REQUIRED_50"
+        ]
+        already_trained = sum(
+            1
+            for row in coverage
+            if self._numeric(getattr(row, "confirmed_exposure", 0))
+            + self._numeric(getattr(row, "assumed_exposure", 0)) > 0
+        )
+        will_train = sum(
+            1
+            for row in coverage
+            if self._numeric(getattr(row, "planned_exposure", 0)) > 0
+        )
+        missing = sum(
+            1
+            for row in coverage
+            if self._numeric(getattr(row, "remaining_exposure", 0)) > 0
+            and priority_value(row) in {
+                "REQUIRED_100",
+                "REQUIRED_50",
+                "HIGH_PRIORITY",
+                "SECONDARY_PRIORITY",
+            }
+        )
+        unavailable_priority = sum(
+            1
+            for row in priority_rows.values()
+            if self._ui_priority(row.priority.value) in {
+                "REQUIRED_100",
+                "REQUIRED_50",
+            }
+            and str(row.availability).casefold() != "available"
+        )
+        return [
+            t(
+                "planner.summary_required_100",
+                achieved=sum(1 for row in required_100 if satisfied(row)),
+                total=len(required_100),
+            ),
+            t(
+                "planner.summary_required_50",
+                achieved=sum(1 for row in required_50 if satisfied(row)),
+                total=len(required_50),
+            ),
+            t("planner.summary_already_trained", count=already_trained),
+            t("planner.summary_will_train", count=will_train),
+            t("planner.summary_missing", count=missing),
+            t("planner.summary_unavailable", count=unavailable_priority),
+        ]
 
     @staticmethod
     def _percent_label(value):

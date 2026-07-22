@@ -96,6 +96,19 @@ Confirmed played records, assumed played records and planned records remain dist
 coverage output. Rollover archives the week marker while retaining match records for
 history and diagnostics.
 
+Alpha 0.5.7.3 validates first-match dates before a record can affect training
+coverage:
+
+- Past + Played counts as already played exposure. If exact minutes are unknown, the
+  exposure is marked as assumed.
+- Past + Planned remains planned exposure only.
+- Today + Played requires explicit user confirmation before it counts as played.
+  Without confirmation, it is stored as planned exposure.
+- Future + Played is converted to Planned with a clear warning. Future matches never
+  count as already trained.
+- Editing, replacing or deleting the first-match record recalculates coverage from the
+  current date/status combination.
+
 ## Planner Algorithm
 
 The planner currently supports fixed-formation planning. The Squad UI lets the user
@@ -115,7 +128,8 @@ Soft objectives:
 - prefer High and Secondary targets in trainable slots;
 - complete the lineup using the existing player ranking engine;
 - apply the existing automatic order optimizer to selected starters;
-- report internal competitive cost versus the unconstrained optimizer result.
+- calculate internal competitive cost versus the unconstrained optimizer result for
+  diagnostics.
 
 The 0.5.7.2 execution engine uses a best-effort strategy:
 
@@ -154,7 +168,7 @@ The Squad page adds a Weekly Planner tab with:
 - Use This Lineup;
 - one unified weekly player table;
 - second-match Formation Board;
-- competitive cost summary;
+- compact training summary;
 - explanations and warnings.
 
 The unified table replaces the older separate Training Priorities and Weekly Coverage
@@ -168,8 +182,8 @@ Alpha 0.5.7.3 hardens the result layout around a strict ownership contract:
 
 - the shared Formation Board owns only the lineup workspace: pitch drawing, player
   cards, bench side panel, player-details side panel and lineup-editing overlays;
-- Competitive Cost is an external card below the lineup workspace;
-- Warnings are an external warning card below Competitive Cost;
+- Training Summary is an external compact card below the lineup workspace;
+- Warnings are an external warning card below Training Summary;
 - Explanations are an external card with a bounded read-only text area and internal
   vertical scrolling;
 - no planner cost, warning or explanation text is placed inside the pitch widget, pitch
@@ -179,7 +193,7 @@ The result area is therefore:
 
 1. result header;
 2. lineup workspace with pitch, bench and player details;
-3. Competitive Cost card;
+3. Training Summary card;
 4. Warnings card;
 5. Explanations card.
 
@@ -187,6 +201,12 @@ Long explanation text wraps inside its card. The visible explanation area is cap
 verbose plans do not make the whole page thousands of pixels tall or cover player cards.
 At supported desktop sizes, the lineup workspace keeps the primary vertical allocation,
 while cost, warnings and explanations stay compact below it.
+
+The primary visible summary is training-focused: required 100% targets covered,
+required 50% targets covered, already-trained players, planned-to-train players,
+missing priority targets and unavailable priority targets. Sector deltas and competitive
+cost remain implementation diagnostics rather than prominent content over or beside the
+pitch.
 
 The planner never overwrites Squad Builder or Match Workspace output by itself. The user
 must explicitly choose `Use This Lineup` to copy the proposed lineup into the Squad
@@ -229,7 +249,8 @@ shown to the user.
 - Exact substitutions and partial minutes are not imported from Hattrick yet.
 - First-match recording currently stores the visible planned board with assumed
   90-minute starter exposure.
-- The competitive cost is an internal planning delta, not a Hattrick rating projection.
+- Competitive cost is an internal planning delta, not a Hattrick rating projection, and
+  is not the primary visible Weekly Planner result.
 - The planner is fixed-formation first; best-allowed-formation planning remains a later
   extension.
 - Best-effort priority selection is intentionally heuristic. It reuses the existing

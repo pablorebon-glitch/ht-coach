@@ -1,4 +1,5 @@
 import os
+import pytest
 import unittest
 from datetime import date, datetime
 from dataclasses import replace
@@ -137,6 +138,20 @@ def show_weekly_tab(page):
     raise AssertionError("Weekly Planner tab not found")
 
 
+def trainable_lineup_player_id(record):
+    return next(
+        entry.player_id for entry in record.lineup
+        if entry.position in {
+            Position.INNER_MIDFIELDER.value,
+            Position.WINGER.value,
+        }
+    )
+
+
+def coverage_row_for_player(rows, player_id):
+    return next(item for item in rows if item.player_id == player_id)
+
+
 def test_training_week_uses_sunday_to_wednesday_window_and_thursday_rollover():
     week = active_training_week(date(2026, 7, 19))
     assert week.start_date == date(2026, 7, 19)
@@ -227,6 +242,228 @@ def test_coverage_separates_confirmed_assumed_and_planned_exposure():
     assert row.confirmed_exposure == Decimal("50.0")
     assert row.planned_exposure == Decimal("50.0")
     assert row.remaining_exposure == Decimal("0")
+
+
+def test_first_match_past_played_counts_as_already_trained(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+    board = service.board_for_plan(plan)
+
+    service.record_first_match(
+        board,
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    row = coverage_row_for_player(
+        service.coverage(players),
+        trainable_lineup_player_id(service.first_match_record()),
+    )
+
+    assert row.assumed_exposure > 0
+    assert row.planned_exposure == 0
+
+
+def test_first_match_past_planned_counts_only_as_planned(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+
+    service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLANNED,
+        today=date(2026, 7, 22),
+    )
+    row = coverage_row_for_player(
+        service.coverage(players),
+        trainable_lineup_player_id(service.first_match_record()),
+    )
+
+    assert row.assumed_exposure == 0
+    assert row.planned_exposure > 0
+
+
+def test_first_match_today_played_requires_confirmation(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 22),
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=date(2026, 7, 22),
+    )
+    record = saved.match_records[0]
+
+    assert record.planned_or_played == MatchStatus.PLANNED
+    assert "not been confirmed" in record.notes
+
+
+def test_first_match_today_played_with_confirmation_counts_as_played(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 22),
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=True,
+        today=date(2026, 7, 22),
+    )
+
+    assert saved.match_records[0].planned_or_played == MatchStatus.PLAYED
+    row = coverage_row_for_player(
+        service.coverage(players),
+        trainable_lineup_player_id(service.first_match_record()),
+    )
+    assert row.assumed_exposure > 0
+
+
+def test_first_match_future_played_becomes_planned_and_never_already_trained(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 23),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    record = saved.match_records[0]
+    row = coverage_row_for_player(
+        service.coverage(players),
+        trainable_lineup_player_id(record),
+    )
+
+    assert record.planned_or_played == MatchStatus.PLANNED
+    assert "future" in record.notes
+    assert row.assumed_exposure == 0
+    assert row.planned_exposure > 0
+
+
+def test_future_played_strict_validation_returns_clear_error(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+
+    with pytest.raises(ValueError, match="future_match_cannot_be_played"):
+        service.validate_match_status(
+            date(2026, 7, 23),
+            MatchStatus.PLAYED,
+            today=date(2026, 7, 22),
+            strict=True,
+        )
+
+
+def test_edit_past_played_record_to_future_invalidates_played_status(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+    service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+
+    saved = service.update_first_match_metadata(
+        match_date=date(2026, 7, 23),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+
+    assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
+    row = coverage_row_for_player(
+        service.coverage(players),
+        trainable_lineup_player_id(saved.match_records[0]),
+    )
+    assert row.assumed_exposure == 0
+    assert row.planned_exposure > 0
+
+
+def test_delete_first_match_removes_confirmed_exposure(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+    service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+
+    service.delete_first_match()
+    row = next(
+        item for item in service.coverage(players)
+        if item.player_id == player_training_id(players[1])
+    )
+
+    assert row.confirmed_exposure == 0
+    assert row.assumed_exposure == 0
+    assert row.planned_exposure == 0
+
+
+def test_replace_first_match_recalculates_temporal_status(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+    board = service.board_for_plan(plan)
+    service.record_first_match(
+        board,
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    changed = service.generate_plan(players, "4-5-1")
+
+    saved = service.replace_first_match(
+        service.board_for_plan(changed),
+        roster_players=players,
+        match_date=date(2026, 7, 23),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+
+    assert saved.match_records[0].formation == "4-5-1"
+    assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
 
 
 def test_priorities_persist_duplicate_names_and_rollover_resets_records(tmp_path):
@@ -393,7 +630,7 @@ def test_app_service_persists_priority_and_records_first_match(tmp_path):
 
     plan = service.generate_plan(players, "3-5-2")
     board = service.board_for_plan(plan)
-    service.record_first_match(board)
+    service.record_first_match(board, roster_players=players)
     loaded = repository.load()
 
     assert loaded.priorities[player_training_id(players[1])].priority == TrainingPriority.REQUIRED_100
@@ -554,7 +791,10 @@ def test_planner_regenerates_after_priority_formation_and_first_match_update(tmp
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     prioritized = service.generate_plan(players, "3-5-2")
     changed_formation = service.generate_plan(players, "4-5-1")
-    service.record_first_match(service.board_for_plan(prioritized))
+    service.record_first_match(
+        service.board_for_plan(prioritized),
+        roster_players=players,
+    )
     after_first_match = service.generate_plan(players, "3-5-2")
 
     assert initial.formation == "3-5-2"
@@ -638,4 +878,45 @@ def test_weekly_planner_uses_unified_table_and_simplified_priorities(tmp_path):
         "No priority",
     ]
     assert page.weekly_player_table.item(0, 4).text() == "\u25cb"
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    plan = service.generate_plan(players, "3-5-2")
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 23),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    trained_id = trainable_lineup_player_id(saved.match_records[0])
+    trained_name = next(
+        player_obj.name for player_obj in players
+        if player_training_id(player_obj) == trained_id
+    )
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2"],
+    )
+
+    status_by_name = {
+        page.weekly_player_table.item(row, 0).text():
+        page.weekly_player_table.item(row, 4).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
+    assert status_by_name[trained_name] == "\u25cb"
+    assert "\u2713" not in status_by_name.values()
     app.processEvents()
