@@ -327,6 +327,11 @@ Content:
 - Decision Lab, Match Intelligence, Opponent Rating Calibration and Match Analysis use
   shared collapsible sections with independent persisted state, brief summaries,
   keyboard-accessible headers and localized expand/collapse labels.
+- Alpha 0.5.7.3.3 resets the Match accordion stack architecture to:
+  Analysis Setup, Decision Lab, Match Intelligence, Opponent Rating Calibration,
+  Match Analysis, Lineup Workspace, then one final stretch. The Formation Board result
+  tabs are no longer children of the Match Analysis collapsible body, so the lineup
+  workspace remains directly below the four headers when every section is collapsed.
 - Alpha 0.5.7.1a rebuilds the collapsible section as a simple Qt header/body
   component. The header is the only visible element when collapsed, the existing body
   widget is hidden but not destroyed, expanded sections use natural body `sizeHint`,
@@ -337,7 +342,17 @@ Content:
   vertical body policy to prevent stale geometry from returning after repeated toggles.
   Alpha 0.5.7.3.2 verifies repeated collapse/expand cycles and result refreshes while
   collapsed keep the same header-only footprint and restore natural content height
-  when expanded.
+  when expanded. Alpha 0.5.7.3.3 adds a canonical Match toggle transaction: logical
+  state is updated, the body host is hidden or shown, body and parent layouts are
+  invalidated, and the outer Match scroll position is restored after deferred layout
+  processing. Refresh while collapsed updates the hidden body widget without inserting
+  its height into the parent stack.
+- Match section body sizing is section-specific. Decision Lab and Match Intelligence
+  use compact natural bodies; Opponent Rating Calibration uses a bounded table body;
+  Match Analysis keeps only compact analysis cards. Large lineup interaction lives in
+  the separate Lineup Workspace. Nested scrollable widgets must be bounded to their
+  content area rather than placed as full-page expanding scroll areas inside the
+  accordion.
 - First-launch Match section defaults are: Decision Lab collapsed, Match Intelligence
   collapsed, Opponent Rating Calibration collapsed and Match Analysis expanded.
   Previously saved `match_section_states` values continue to override those defaults.

@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.5.7.3.3 Match Accordion Layout Reset: Match analysis sections now
+  render as a strict accordion stack followed by the lineup workspace and one final
+  stretch, expanded Decision Lab/Match Intelligence/Opponent Rating Calibration bodies
+  use their natural content height, collapsed headers keep a clipped-free one-line
+  summary, refresh while collapsed preserves section state, and repeated accordion
+  cycles no longer leave stale blank space or push Match Analysis down the page.
 - Added Alpha 0.5.7.3.2 Recorded Lineup Editing and Training Table Simplification:
   the Weekly Planner can reopen the recorded first-match lineup in the interactive
   Formation Board, save lineup changes back into the same match record without

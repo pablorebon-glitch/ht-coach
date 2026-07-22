@@ -101,7 +101,7 @@ class CollapsibleSection(QFrame):
 
         self.summary_label = QLabel(self._summary)
         self.summary_label.setObjectName("sectionSubtitle")
-        self.summary_label.setWordWrap(True)
+        self.summary_label.setWordWrap(False)
         text_layout.addWidget(self.summary_label)
 
         header_layout.addLayout(text_layout, 1)
@@ -147,6 +147,7 @@ class CollapsibleSection(QFrame):
         self.header_button.setProperty("expanded", expanded)
         self.header_button.style().unpolish(self.header_button)
         self.header_button.style().polish(self.header_button)
+        self._sync_header_geometry()
         self.updateGeometry()
         self._activate_parent_layouts()
         if emit and changed:
@@ -156,12 +157,14 @@ class CollapsibleSection(QFrame):
         self._title = str(title or "")
         self.title_label.setText(self._title)
         self.header_button.setAccessibleName(self._accessible_name())
+        self._sync_header_geometry()
 
     def set_summary(self, summary):
         self._summary = str(summary or "")
         self.summary_label.setText(self._summary)
         self.summary_label.setVisible(bool(self._summary))
         self.header_button.setAccessibleName(self._accessible_name())
+        self._sync_header_geometry()
 
     def set_body_widget(self, widget):
         if widget is self._body_widget:
@@ -196,6 +199,12 @@ class CollapsibleSection(QFrame):
         )
         summary = f" - {self._summary}" if self._summary else ""
         return f"{action}: {self._title}{summary}"
+
+    def _sync_header_geometry(self):
+        self.header_button.setMinimumHeight(
+            self.header_button.sizeHint().height()
+        )
+        self.header_button.updateGeometry()
 
     def _activate_parent_layouts(self):
         widget = self
