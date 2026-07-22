@@ -56,8 +56,8 @@ class PitchWidget(QWidget):
         self._slot_widgets = []
         self._slot_widget_by_id = {}
         self._revision = 0
-        self.setMinimumSize(320, 500)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumSize(280, 430)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setAcceptDrops(True)
 
