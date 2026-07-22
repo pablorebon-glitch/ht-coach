@@ -60,6 +60,17 @@ Alpha 0.5.5 introduces a lightweight design system under
 - Page headers can show a compact current-source indicator so loaded CSV paths remain
   visible without dominating the workspace.
 - Squad preserves the selected tab as presentation state without rerunning analysis.
+- Alpha 0.5.7.4 adds the shared responsive workspace contract documented in
+  `docs/RESPONSIVE_LAYOUT.md`: Header, Toolbar, Workspace, Pitch, Bench, Player
+  Details, Supplementary Cards and Bottom Spacer.
+- Squad, Match and Weekly Planner initialize splitters from logical proportions rather
+  than hardcoded pixel sizes. Live refreshes may preserve user-resized splitters, but
+  no page should depend on one maximized desktop size.
+- The shared Formation Board uses readable minimum dimensions, preferred vertical
+  sizing and pitch aspect-ratio preservation. When vertical space is insufficient, the
+  page scrolls instead of clipping the pitch or overlapping supplementary cards.
+- Responsive validation covers restored and maximized windows at 1280x720, 1366x768,
+  1440x900, 1600x900 and 1920x1080.
 
 ## Views
 
@@ -393,8 +404,8 @@ Expected controls:
 - Empty, loading, success, and error states.
 
 After analysis, the Match view prioritizes a growing horizontal tactical workspace.
-Formation Board starts at approximately 65% width and Player Intelligence at 35%; the
-user can resize both panes. The pitch maintains its 68:105 field ratio and never scrolls
+Formation Board starts from the shared board/player-details ratio, and the user can
+resize both panes. The pitch maintains its 68:105 field ratio and never scrolls
 internally. The Match page scrolls vertically when content is taller than the window,
 letting the board keep a useful minimum height. The practical minimum supported
 application size is 1280x720. Below this size, cards continue to scale and elide text

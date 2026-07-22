@@ -21,6 +21,7 @@ from ht_coach_app.core.localization import t
 from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.ui.design_system.collapsible_side_panel import CollapsibleSidePanel
+from ht_coach_app.ui.responsive import set_splitter_proportions
 from ht_coach_app.widgets.formation_board.bench_panel import BenchPanel
 from ht_coach_app.widgets.formation_board.formation_board_models import (
     PlayerCardViewModel,
@@ -29,6 +30,7 @@ from ht_coach_app.widgets.formation_board.formation_board_styles import (
     formation_board_stylesheet,
 )
 from ht_coach_app.widgets.formation_board.layout_metrics import (
+    BENCH_MINIMUM_WIDTH,
     BOARD_MINIMUM_WIDTH,
     BOARD_MINIMUM_HEIGHT,
     COMPACT_PANEL_PADDING,
@@ -37,6 +39,7 @@ from ht_coach_app.widgets.formation_board.layout_metrics import (
     SPLITTER_BOARD_RATIO,
     SPLITTER_HANDLE_WIDTH,
     SPLITTER_INSPECTOR_RATIO,
+    SIDE_PANEL_MAXIMUM_WIDTH,
 )
 from ht_coach_app.widgets.formation_board.pitch_widget import PitchWidget
 from ht_coach_app.workspace.workspace_service import WorkspaceService
@@ -60,6 +63,7 @@ class FormationBoard(QWidget):
         self._selected_bench_player_id = ""
         self._state_namespace = "formation_board"
         self.setMinimumHeight(BOARD_MINIMUM_HEIGHT)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setStyleSheet(formation_board_stylesheet())
         self._build()
 
@@ -118,6 +122,7 @@ class FormationBoard(QWidget):
 
         pitch_panel = QWidget()
         pitch_panel.setObjectName("pitchPanel")
+        pitch_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         pitch_layout = QVBoxLayout(pitch_panel)
         pitch_layout.setContentsMargins(0, 0, 0, 0)
         pitch_layout.setSpacing(6)
@@ -140,7 +145,7 @@ class FormationBoard(QWidget):
         pitch_layout.addWidget(footer)
 
         self.bench_panel = BenchPanel()
-        self.bench_panel.setMinimumWidth(160)
+        self.bench_panel.setMinimumWidth(BENCH_MINIMUM_WIDTH)
         self.bench_panel.player_selected.connect(self.select_bench_player)
         self.bench_panel.preview_requested.connect(
             self.preview_bench_player_for_selected_slot
@@ -154,8 +159,8 @@ class FormationBoard(QWidget):
             f"{self._state_namespace}.bench",
             self.bench_panel,
         )
-        self.bench_side_panel.setMinimumWidth(170)
-        self.bench_side_panel.setMaximumWidth(260)
+        self.bench_side_panel.setMinimumWidth(BENCH_MINIMUM_WIDTH)
+        self.bench_side_panel.setMaximumWidth(SIDE_PANEL_MAXIMUM_WIDTH)
 
         board_bench_layout.addWidget(pitch_panel, 4)
         board_bench_layout.addWidget(self.bench_side_panel, 1)
@@ -167,7 +172,10 @@ class FormationBoard(QWidget):
         self.inspector_scroll.setFrameShape(QFrame.NoFrame)
         self.inspector_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.inspector_scroll.setMinimumWidth(INSPECTOR_MINIMUM_WIDTH)
-        self.inspector_scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.inspector_scroll.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Preferred,
+        )
 
         self.inspector = QFrame()
         self.inspector.setObjectName("playerInspectorPanel")
@@ -190,11 +198,9 @@ class FormationBoard(QWidget):
 
         self.splitter.setStretchFactor(0, 2)
         self.splitter.setStretchFactor(1, 1)
-        self.splitter.setSizes(
-            [
-                int(1000 * SPLITTER_BOARD_RATIO),
-                int(1000 * SPLITTER_INSPECTOR_RATIO),
-            ]
+        set_splitter_proportions(
+            self.splitter,
+            [SPLITTER_BOARD_RATIO, SPLITTER_INSPECTOR_RATIO],
         )
         layout.addWidget(self.splitter, 1)
 

@@ -4,6 +4,13 @@
 
 ### Added
 
+- Added Alpha 0.5.7.4 Responsive Layout System Audit: Squad, Match and Weekly
+  Planner now share a documented responsive workspace contract, splitters initialize
+  from logical proportions instead of hardcoded pixel sizes, Formation Board minimums
+  are less rigid for restored desktop windows, Weekly Planner explanations use bounded
+  height instead of a fixed height, and responsive tests cover supported desktop
+  resolutions, resize cycles, maximize/restore, pitch visibility and Match accordion
+  stability.
 - Added Alpha 0.5.7.3.3 Match Accordion Layout Reset: Match analysis sections now
   render as a strict accordion stack followed by the lineup workspace and one final
   stretch, expanded Decision Lab/Match Intelligence/Opponent Rating Calibration bodies

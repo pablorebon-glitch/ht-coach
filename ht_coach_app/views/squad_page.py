@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import t
 from ht_coach_app.ui.design_system.badges import StatusBadge
 from ht_coach_app.ui.design_system.tables import configure_table
+from ht_coach_app.ui.responsive import set_splitter_proportions
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.services.squad_builder_service import (
     AVAILABILITY_CURRENT,
@@ -436,7 +437,7 @@ class SquadPage(BasePage):
         side_layout.addStretch(1)
         side_scroll.setWidget(side_panel)
         splitter.addWidget(side_scroll)
-        splitter.setSizes([820, 320])
+        set_splitter_proportions(splitter, [0.72, 0.28])
         layout.addWidget(splitter, 1)
 
         self._add_squad_tab(tab, t("squad_builder.ideal_xi"), "ideal")
@@ -506,7 +507,7 @@ class SquadPage(BasePage):
 
         splitter.addWidget(table_panel)
         splitter.addWidget(detail_panel)
-        splitter.setSizes([760, 280])
+        set_splitter_proportions(splitter, [0.73, 0.27])
         tab_layout.addWidget(splitter, 1)
         self._add_squad_tab(tab, t("squad_builder.players"), "players")
 
@@ -857,7 +858,6 @@ class SquadPage(BasePage):
 
         self.weekly_plan_board = FormationBoard()
         self.weekly_plan_board.setObjectName("weeklyPlanBoard")
-        self.weekly_plan_board.pitch.setMinimumSize(280, 340)
         self.weekly_plan_board.set_state_namespace("weekly_planner")
         self.weekly_plan_board.formation_combo.setVisible(False)
         self.weekly_plan_board.reset_workspace_button.setVisible(False)
@@ -895,10 +895,11 @@ class SquadPage(BasePage):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.weekly_explanations_browser.setLineWrapMode(QTextBrowser.WidgetWidth)
-        self.weekly_explanations_browser.setFixedHeight(128)
+        self.weekly_explanations_browser.setMinimumHeight(96)
+        self.weekly_explanations_browser.setMaximumHeight(160)
         self.weekly_explanations_browser.setSizePolicy(
             QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Preferred,
         )
         self.weekly_explanations_label = self.weekly_explanations_browser
         self.weekly_explanations_card.layout().addWidget(
@@ -914,7 +915,7 @@ class SquadPage(BasePage):
         right_layout.addWidget(self.weekly_warnings_card, 0)
         right_layout.addWidget(self.weekly_explanations_card, 0)
         splitter.addWidget(right)
-        splitter.setSizes([520, 680])
+        set_splitter_proportions(splitter, [0.43, 0.57])
         weekly_content_layout.addWidget(splitter)
         weekly_scroll.setWidget(weekly_content)
         layout.addWidget(weekly_scroll, 1)
@@ -1083,7 +1084,7 @@ class SquadPage(BasePage):
 
         splitter.addWidget(left)
         splitter.addWidget(right_scroll)
-        splitter.setSizes([560, 520])
+        set_splitter_proportions(splitter, [0.52, 0.48])
         layout.addWidget(splitter, 1)
         self._add_squad_tab(tab, t("transfer.tab"), "transfer")
 
