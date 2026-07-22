@@ -84,6 +84,10 @@ class SquadPage(BasePage):
         "Best Position",
         "Availability",
     ]
+    PLAYER_ID_ROLE = Qt.UserRole + 1
+    PRIORITY_ROLE = Qt.UserRole + 2
+    TRAINING_STATUS_ROLE = Qt.UserRole + 3
+    AVAILABILITY_ROLE = Qt.UserRole + 4
 
     def __init__(self, parent=None):
         super().__init__(
@@ -99,6 +103,7 @@ class SquadPage(BasePage):
         self._weekly_priority_rows = []
         self._weekly_coverage_rows = []
         self._weekly_filter_key = "all"
+        self._weekly_priority_by_player_id = {}
         self._weekly_plan_board = None
         self._tab_keys = []
         self._last_transfer_result = None
@@ -747,8 +752,24 @@ class SquadPage(BasePage):
         controls_layout.setColumnStretch(3, 1)
         layout.addWidget(controls)
 
+        weekly_scroll = QScrollArea()
+        weekly_scroll.setObjectName("weeklyPlannerScroll")
+        weekly_scroll.setWidgetResizable(True)
+        weekly_scroll.setFrameShape(QFrame.NoFrame)
+        weekly_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        weekly_content = QWidget()
+        weekly_content_layout = QVBoxLayout(weekly_content)
+        weekly_content_layout.setContentsMargins(0, 0, 0, 0)
+        weekly_content_layout.setSpacing(0)
+
         splitter = QSplitter(Qt.Horizontal)
+        splitter.setObjectName("weeklyPlannerSplitter")
         splitter.setChildrenCollapsible(False)
+        splitter.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
+        )
 
         left = QFrame()
         left.setObjectName("workspacePanel")
@@ -821,15 +842,13 @@ class SquadPage(BasePage):
         weekly_workspace_layout = QVBoxLayout(self.weekly_lineup_workspace)
         weekly_workspace_layout.setContentsMargins(0, 0, 0, 0)
         weekly_workspace_layout.setSpacing(0)
-        self.weekly_lineup_workspace.setMinimumHeight(390)
         self.weekly_lineup_workspace.setSizePolicy(
             QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Preferred,
         )
 
         self.weekly_plan_board = FormationBoard()
         self.weekly_plan_board.setObjectName("weeklyPlanBoard")
-        self.weekly_plan_board.setMinimumHeight(390)
         self.weekly_plan_board.pitch.setMinimumSize(280, 340)
         self.weekly_plan_board.set_state_namespace("weekly_planner")
         self.weekly_plan_board.formation_combo.setVisible(False)
@@ -887,7 +906,9 @@ class SquadPage(BasePage):
         right_layout.addWidget(self.weekly_explanations_card, 0)
         splitter.addWidget(right)
         splitter.setSizes([520, 680])
-        layout.addWidget(splitter, 1)
+        weekly_content_layout.addWidget(splitter)
+        weekly_scroll.setWidget(weekly_content)
+        layout.addWidget(weekly_scroll, 1)
         self._add_squad_tab(tab, t("planner.weekly_planner"), "weekly_planner")
 
     def _build_transfer_tab(self):
@@ -1440,6 +1461,10 @@ class SquadPage(BasePage):
         self._clear_weekly_training_plan()
         self._weekly_priority_rows = list(priority_rows)
         self._weekly_coverage_rows = list(coverage_rows)
+        self._weekly_priority_by_player_id = {
+            row.player_id: self._ui_priority(row.priority.value)
+            for row in self._weekly_priority_rows
+        }
         current_formation = self.weekly_formation_combo.currentText()
         self.weekly_formation_combo.blockSignals(True)
         self.weekly_formation_combo.clear()
@@ -1513,7 +1538,10 @@ class SquadPage(BasePage):
                 self._planner_conflict_text(conflict)
                 for conflict in plan.conflicts
             )
-        warning_lines.extend(plan.warnings)
+        warning_lines.extend(
+            self._planner_warning_text(warning)
+            for warning in plan.warnings
+        )
         self.weekly_warnings_label.setText("\n".join(warning_lines))
         self.weekly_warnings_card.setVisible(bool(warning_lines))
         self.weekly_explanations_browser.setPlainText(
@@ -1630,6 +1658,7 @@ class SquadPage(BasePage):
         self.weekly_player_table.setRowCount(len(filtered_rows))
         for row_index, row in enumerate(filtered_rows):
             coverage = coverage_by_id.get(row.player_id)
+            priority_key = self._visible_weekly_priority(row)
             confirmed = getattr(coverage, "confirmed_exposure", 0) if coverage else 0
             assumed = getattr(coverage, "assumed_exposure", 0) if coverage else 0
             planned = getattr(coverage, "planned_exposure", 0) if coverage else 0
@@ -1651,7 +1680,7 @@ class SquadPage(BasePage):
                 row.player_name.casefold(),
                 row.age,
                 row.best_position.casefold(),
-                self._priority_sort(row.priority.value),
+                self._priority_sort(priority_key),
                 status,
                 confirmed_total,
                 self._numeric(planned),
@@ -1663,18 +1692,21 @@ class SquadPage(BasePage):
                     combo = QComboBox()
                     for label, key in self._training_priority_options():
                         combo.addItem(label, key)
-                    index = combo.findData(self._ui_priority(row.priority.value))
+                    index = combo.findData(priority_key)
                     combo.setCurrentIndex(index if index >= 0 else 0)
+                    combo.setProperty("player_id", row.player_id)
+                    combo.setProperty("priority_key", combo.currentData())
                     combo.currentIndexChanged.connect(
                         lambda _index, player_id=row.player_id, widget=combo:
-                        self.training_priority_changed.emit(
-                            player_id,
-                            widget.currentData(),
-                        )
+                        self._emit_weekly_priority_changed(player_id, widget)
                     )
                     self.weekly_priority_table.setCellWidget(row_index, column, combo)
                     continue
                 item = SortableTableItem(value, sort_values[column])
+                item.setData(self.PLAYER_ID_ROLE, row.player_id)
+                item.setData(self.PRIORITY_ROLE, priority_key)
+                item.setData(self.TRAINING_STATUS_ROLE, status)
+                item.setData(self.AVAILABILITY_ROLE, row.availability)
                 if column == 4:
                     item.setToolTip(status_tip)
                     item.setData(Qt.AccessibleTextRole, status_tip)
@@ -1711,9 +1743,17 @@ class SquadPage(BasePage):
             self._weekly_coverage_rows,
         )
 
+    def _emit_weekly_priority_changed(self, player_id, widget):
+        priority = widget.currentData() or "NO_PRIORITY"
+        widget.setProperty("priority_key", priority)
+        self._weekly_priority_by_player_id[player_id] = priority
+        self.training_priority_changed.emit(player_id, priority)
+        if self._weekly_filter_key in {"100", "50", "no_priority"}:
+            QTimer.singleShot(0, self._apply_weekly_filter)
+
     def _weekly_row_matches_filter(self, row, coverage):
         key = self._weekly_filter_key
-        priority = self._ui_priority(row.priority.value)
+        priority = self._visible_weekly_priority(row)
         confirmed = self._numeric(getattr(coverage, "confirmed_exposure", 0))
         assumed = self._numeric(getattr(coverage, "assumed_exposure", 0))
         planned = self._numeric(getattr(coverage, "planned_exposure", 0))
@@ -1734,6 +1774,14 @@ class SquadPage(BasePage):
         if key == "no_priority":
             return priority == "NO_PRIORITY"
         return True
+
+    def _visible_weekly_priority(self, row):
+        return self._ui_priority(
+            self._weekly_priority_by_player_id.get(
+                row.player_id,
+                row.priority.value,
+            )
+        )
 
     def _training_status(self, confirmed_total, planned):
         if self._numeric(confirmed_total) > 0:
@@ -1787,6 +1835,20 @@ class SquadPage(BasePage):
             player=explanation.player_name,
             **dict(getattr(explanation, "parameters", {}) or {}),
         )
+
+    def _planner_warning_text(self, warning):
+        key = {
+            "Assuming 90 minutes for starters.": "planner.warning.assuming_90_minutes",
+            (
+                "Best-effort lineup generated; review unmet training targets."
+            ): "planner.warning.best_effort",
+            (
+                "Automatic training rules unavailable for this training type."
+            ): "planner.conflict.automatic_rules_unavailable",
+        }.get(str(warning))
+        if key is not None:
+            return t(key)
+        return str(warning)
 
     def _planner_training_summary_lines(self, plan):
         coverage = list(getattr(plan, "coverage", ()) or ())

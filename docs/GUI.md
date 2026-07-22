@@ -142,7 +142,9 @@ Content:
   availability columns.
 - Weekly Planner priority choices are intentionally compact: 100%, 50% and No priority
   in English, or 100%, 50% and Sin prioridad in Spanish. Older saved priority values
-  are mapped into those three UI choices.
+  are mapped into those three UI choices. Priority filters use stable data roles for
+  the visible priority key, so filtering is not affected by localization and updates
+  immediately after an editable priority change.
 - Weekly Planner training status uses accessible symbols: check mark for already
   trained, open circle for will train in the generated plan and dash for will not train.
 - Weekly Planner shows a visible first-match record card after recording, with Edit,
@@ -160,10 +162,15 @@ Content:
 - Weekly Planner result layout uses the shared Formation Board as the lineup workspace
   only. Training Summary, Warnings and Explanations are external cards below the
   workspace, so they cannot overlap the pitch, bench, player details or player-card
-  layer. The Explanations card uses bounded internal scrolling for long text.
+  layer. The Explanations card uses bounded internal scrolling for long text. The
+  Planner split content grows inside a vertical scroll area instead of forcing the
+  generated lineup and result cards into a fixed-height viewport.
 - Formation Board bench and player-details side panels can be collapsed in Match,
   Squad and Weekly Planner. Collapsing releases real width while preserving selection
   and the existing detail widgets.
+- Shared collapsible sections in Match use a header-only collapsed contract: the body
+  is hidden, its vertical policy is ignored, maximum body height is zero, state is
+  preserved and toggling does not trigger analytical recalculation.
 - Weekly Planner warnings explain assumed 90-minute exposure, date/status corrections
   and hard conflicts without presenting internal competitive cost as a Hattrick rating
   projection.
@@ -323,7 +330,9 @@ Content:
   widget is hidden but not destroyed, expanded sections use natural body `sizeHint`,
   and individual sections do not receive vertical stretch. Alpha 0.5.7.3 keeps only
   one final stretch after all content, so collapsed headers stack consecutively from
-  top to bottom and remaining vertical space stays below the content stack.
+  top to bottom and remaining vertical space stays below the content stack. Alpha
+  0.5.7.3.1 additionally sets collapsed body height to zero and uses an ignored
+  vertical body policy to prevent stale geometry from returning after repeated toggles.
 - First-launch Match section defaults are: Decision Lab collapsed, Match Intelligence
   collapsed, Opponent Rating Calibration collapsed and Match Analysis expanded.
   Previously saved `match_section_states` values continue to override those defaults.
@@ -331,10 +340,11 @@ Content:
   0.5.7.1a. Player details, bench and planner-specific panel integrations remain
   separate work and should not be coupled to this component until the Match section
   behavior is stable.
-- Responsive validation for Alpha 0.5.7.3 covers restored and maximized windows at
-  1280x720, 1366x768, 1600x900 and 1920x1080. At these sizes the pitch remains usable,
-  planner text wraps inside external cards, side panels stay aligned with the pitch,
-  and Match accordion sections do not distribute blank space between headers.
+- Responsive validation for Alpha 0.5.7.3 and 0.5.7.3.1 covers restored and maximized
+  windows at 1280x720, 1366x768, 1600x900 and 1920x1080. At these sizes the pitch
+  remains usable, planner text wraps inside external cards, Training Summary, Warnings
+  and Explanations stack below the lineup workspace, side panels stay aligned with the
+  pitch, and Match accordion sections do not distribute blank space between headers.
 - Rating Engine Alignment diagnostics classify current TeamRater values as internal
   contribution totals. The normal Match UI must not display own-team Hattrick decimal
   ratings unless a future evidence-backed conversion is introduced.

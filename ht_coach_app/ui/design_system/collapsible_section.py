@@ -128,8 +128,12 @@ class CollapsibleSection(QFrame):
         policy = self.body_host.sizePolicy()
         policy.setVerticalPolicy(
             QSizePolicy.Policy.Preferred
+            if expanded
+            else QSizePolicy.Policy.Ignored
         )
         self.body_host.setSizePolicy(policy)
+        self.body_host.setMinimumHeight(0)
+        self.body_host.setMaximumHeight(16777215 if expanded else 0)
         self.arrow_label.setText("▼" if expanded else "▶")
         self.header_button.setAccessibleName(self._accessible_name())
         self.header_button.setAccessibleDescription(

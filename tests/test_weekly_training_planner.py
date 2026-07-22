@@ -26,6 +26,7 @@ from engine.weekly_training.player_identity import player_training_id
 from engine.weekly_training.planner import WeeklyTrainingPlanner
 from engine.weekly_training.training_rules import PlaymakingTrainingRules, assumed_confidence
 from engine.weekly_training.training_week import active_training_week, rollover_week
+from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from ht_coach_app.workspace.workspace_service import WorkspaceService
 from models.formations import FORMATION_BY_NAME
@@ -33,13 +34,15 @@ from models.player import Player
 from models.position import Position
 
 try:
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication, QComboBox, QTextBrowser
+    from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtWidgets import QApplication, QComboBox, QScrollArea, QTextBrowser
     from ht_coach_app.views.squad_page import SquadPage
 except Exception:  # pragma: no cover - PySide6 may be unavailable in headless CI
     Qt = None
+    QTimer = None
     QApplication = None
     QComboBox = None
+    QScrollArea = None
     QTextBrowser = None
     SquadPage = None
 
@@ -150,6 +153,11 @@ def trainable_lineup_player_id(record):
 
 def coverage_row_for_player(rows, player_id):
     return next(item for item in rows if item.player_id == player_id)
+
+
+def widget_rect_in(widget, ancestor):
+    top_left = widget.mapTo(ancestor, widget.rect().topLeft())
+    return widget.rect().translated(top_left)
 
 
 def test_training_week_uses_sunday_to_wednesday_window_and_thursday_rollover():
@@ -919,4 +927,156 @@ def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
     assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
     assert status_by_name[trained_name] == "\u25cb"
     assert "\u2713" not in status_by_name.values()
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_result_cards_stack_below_pitch(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    show_weekly_tab(page)
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    service.save_priority(players[2], TrainingPriority.REQUIRED_50.value)
+    plan = service.generate_plan(players, "3-5-2")
+
+    page.resize(1366, 768)
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2", "4-5-1"],
+    )
+    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
+    page.show()
+    app.processEvents()
+
+    pitch_rect = widget_rect_in(page.weekly_plan_board.pitch, page)
+    board_rect = widget_rect_in(page.weekly_lineup_workspace, page)
+    summary_rect = widget_rect_in(page.weekly_cost_card, page)
+    warnings_rect = widget_rect_in(page.weekly_warnings_card, page)
+    explanations_rect = widget_rect_in(page.weekly_explanations_card, page)
+
+    assert page.weekly_cost_card.isVisible()
+    assert summary_rect.top() >= board_rect.bottom()
+    assert warnings_rect.top() >= summary_rect.bottom()
+    assert explanations_rect.top() >= warnings_rect.bottom()
+    assert not summary_rect.intersects(pitch_rect)
+    assert not warnings_rect.intersects(pitch_rect)
+    assert not explanations_rect.intersects(pitch_rect)
+    assert page.weekly_plan_board.current_board() is not None
+    assert len(page.weekly_plan_board.pitch.card_geometries()) == 11
+    assert page.findChild(QScrollArea, "weeklyPlannerScroll") is not None
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_pitch_remains_interactive_after_plan_generation(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2"],
+    )
+    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
+    app.processEvents()
+    first_player = page.weekly_plan_board.current_board().slots[0].player.player_id
+
+    page.weekly_plan_board.select_player(first_player)
+
+    assert page.weekly_plan_board.current_board().selected_player_id == first_player
+    assert page.weekly_training_current_board() is not None
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_priority_filter_uses_visible_priority_and_updates_on_edit(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    service.save_priority(players[2], TrainingPriority.REQUIRED_50.value)
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2"],
+    )
+
+    page.weekly_filter_combo.setCurrentIndex(
+        page.weekly_filter_combo.findData("100")
+    )
+    assert page.weekly_player_table.rowCount() == 1
+    assert page.weekly_player_table.item(0, 0).text() == players[1].name
+
+    combo = page.weekly_player_table.cellWidget(0, 3)
+    combo.setCurrentIndex(combo.findData("NO_PRIORITY"))
+    app.processEvents()
+    QTimer.singleShot(0, lambda: None)
+    app.processEvents()
+
+    assert page.weekly_player_table.rowCount() == 0
+
+    page.weekly_filter_combo.setCurrentIndex(
+        page.weekly_filter_combo.findData("no_priority")
+    )
+    names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name in names
+    assert players[2].name not in names
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_priority_filter_survives_sorting_plan_and_localization(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    configure_localization("es")
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    service.save_priority(players[2], TrainingPriority.REQUIRED_50.value)
+    plan = service.generate_plan(players, "3-5-2")
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2"],
+    )
+    page.weekly_filter_combo.setCurrentIndex(
+        page.weekly_filter_combo.findData("50")
+    )
+    page.weekly_player_table.sortItems(0, Qt.DescendingOrder)
+    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
+
+    assert page.weekly_filter_combo.currentData() == "50"
+    assert page.weekly_player_table.rowCount() == 1
+    assert page.weekly_player_table.item(0, 0).text() == players[2].name
+    assert (
+        page.weekly_player_table.item(0, 0).data(SquadPage.PRIORITY_ROLE)
+        == "REQUIRED_50"
+    )
+    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
+    assert "Se asumen 90 minutos" in page.weekly_warnings_label.text()
+    configure_localization("en")
     app.processEvents()
