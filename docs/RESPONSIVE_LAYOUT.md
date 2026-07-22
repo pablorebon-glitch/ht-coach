@@ -46,6 +46,12 @@ Splitters start from logical proportions, not hardcoded pixel widths. Use
 User resizing remains allowed. Refresh logic may preserve the user's current splitter
 sizes inside a live workspace, but startup defaults should remain ratio-based.
 
+When restoring from a different window width, raw splitter pixel sizes must not be
+reapplied. Capture both sizes and ratios; reuse exact sizes only when the source and
+target viewport widths are effectively unchanged, otherwise restore the same logical
+proportions. This prevents maximized-window widths from becoming oversized restored
+layouts.
+
 ## Size Policy Conventions
 
 - Page shells use expanding policies.
@@ -81,6 +87,24 @@ Match result sections use a strict stack:
 The Lineup Workspace is not inside the Match Analysis accordion body. Collapsing Match
 Analysis therefore cannot hide the pitch or leave stale workspace height inside the
 accordion stack.
+
+## Restored Window Geometry
+
+Alpha 0.5.7.4.2 hardens Match restored-window behavior:
+
+- resize, show and window-state changes schedule one deferred geometry refresh;
+- stale deferred refreshes are ignored by a revision token;
+- expanded Match section body layouts are invalidated before restoring viewport state;
+- the outer Match scroll area remains the owner of vertical overflow;
+- scroll restoration uses an absolute value for unchanged widths and a ratio when the
+  restored viewport width changes;
+- Formation Board splitters restore by ratio after maximize/restore or manual resize;
+- maximized pixel geometry is not cached as restored layout state.
+
+The supported restored validation sizes remain 1280x720, 1366x768, 1440x900 and
+1600x900. Expanded bodies should remain visible at each size, collapsed bodies should
+contribute zero height, and the Lineup Workspace should remain reachable by normal
+page scrolling.
 
 ## Audit Notes
 

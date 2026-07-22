@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -25,6 +25,10 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import t
 from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
 from ht_coach_app.ui.design_system.empty_state import EmptyState
+from ht_coach_app.ui.responsive import (
+    restore_splitter_geometry,
+    splitter_ratios_from_sizes,
+)
 from ht_coach_app.ui.design_system.tables import configure_table
 from engine.squad_health.availability_service import (
     CURRENT_AVAILABLE,
@@ -89,11 +93,30 @@ class MatchPage(BasePage):
         self._match_section_body_roots = {}
         self._result_tabs = None
         self._formation_board_widget = None
+        self._geometry_refresh_revision = 0
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
         self._build_scroll_content()
         self._build_inputs()
         self._build_results()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "scroll_area"):
+            self._schedule_deferred_geometry_refresh()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if (
+            event.type() == QEvent.Type.WindowStateChange
+            and hasattr(self, "scroll_area")
+        ):
+            self._schedule_deferred_geometry_refresh()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "scroll_area"):
+            self._schedule_deferred_geometry_refresh()
 
     def _build_scroll_content(self):
         self.scroll_area = QScrollArea()
@@ -820,14 +843,22 @@ class MatchPage(BasePage):
         result_tabs = self.findChild(QTabWidget, "matchResultTabs")
         current_board = self.findChild(FormationBoard)
         focus_widget = QApplication.focusWidget()
+        splitter_sizes = (
+            current_board.splitter.sizes()
+            if current_board is not None
+            else []
+        )
         return {
             "vertical_scroll": self.scroll_area.verticalScrollBar().value(),
-            "horizontal_scroll": self.scroll_area.horizontalScrollBar().value(),
-            "formation_splitter_sizes": (
-                current_board.splitter.sizes()
-                if current_board is not None
-                else []
+            "vertical_scroll_ratio": self._scroll_ratio(
+                self.scroll_area.verticalScrollBar()
             ),
+            "horizontal_scroll": self.scroll_area.horizontalScrollBar().value(),
+            "formation_splitter_sizes": splitter_sizes,
+            "formation_splitter_ratios": splitter_ratios_from_sizes(
+                splitter_sizes
+            ),
+            "viewport_width": self.scroll_area.viewport().width(),
             "result_tab_index": (
                 result_tabs.currentIndex()
                 if result_tabs is not None
@@ -855,22 +886,80 @@ class MatchPage(BasePage):
             result_tabs.setCurrentIndex(index)
         current_board = self.findChild(FormationBoard)
         splitter_sizes = viewport_state.get("formation_splitter_sizes") or []
+        splitter_ratios = viewport_state.get("formation_splitter_ratios") or []
+        source_width = int(viewport_state.get("viewport_width", 0) or 0)
+        target_width = self.scroll_area.viewport().width()
         if current_board is not None and splitter_sizes:
-            current_board.splitter.setSizes(list(splitter_sizes))
+            restore_splitter_geometry(
+                current_board.splitter,
+                splitter_sizes,
+                splitter_ratios,
+                source_width,
+                target_width,
+            )
 
         def restore_scrollbars():
-            self.scroll_area.verticalScrollBar().setValue(
-                int(viewport_state.get("vertical_scroll", 0))
-            )
+            vertical = self.scroll_area.verticalScrollBar()
+            current_target_width = self.scroll_area.viewport().width()
+            target = int(viewport_state.get("vertical_scroll", 0))
+            if abs(current_target_width - source_width) > 8:
+                target = int(
+                    vertical.maximum()
+                    * float(viewport_state.get("vertical_scroll_ratio", 0.0))
+                )
+            vertical.setValue(max(0, min(target, vertical.maximum())))
             self.scroll_area.horizontalScrollBar().setValue(
                 int(viewport_state.get("horizontal_scroll", 0))
             )
             if current_board is not None and splitter_sizes:
-                current_board.splitter.setSizes(list(splitter_sizes))
+                restore_splitter_geometry(
+                    current_board.splitter,
+                    splitter_sizes,
+                    splitter_ratios,
+                    source_width,
+                    self.scroll_area.viewport().width(),
+                )
 
         restore_scrollbars()
         QTimer.singleShot(0, restore_scrollbars)
         QTimer.singleShot(25, restore_scrollbars)
+
+    def _schedule_deferred_geometry_refresh(self):
+        self._geometry_refresh_revision += 1
+        revision = self._geometry_refresh_revision
+        viewport_state = self._capture_viewport_state()
+
+        def refresh():
+            if revision != self._geometry_refresh_revision:
+                return
+            self._refresh_current_geometry(viewport_state)
+
+        QTimer.singleShot(0, refresh)
+
+    def _refresh_current_geometry(self, viewport_state):
+        if self._state != "success":
+            return
+        self.results_layout.invalidate()
+        for section in self._match_sections.values():
+            if section.is_expanded():
+                body = section.body_widget()
+                if body is not None and body.layout() is not None:
+                    body.layout().invalidate()
+                section.updateGeometry()
+        self.match_content_layout.invalidate()
+        self.results_host.updateGeometry()
+        self.match_content.updateGeometry()
+        self._restore_viewport_state(
+            viewport_state,
+            self._result_tabs,
+        )
+
+    @staticmethod
+    def _scroll_ratio(scrollbar):
+        maximum = scrollbar.maximum()
+        if maximum <= 0:
+            return 0.0
+        return scrollbar.value() / maximum
 
     def show_workspace_updating(self):
         self.show_status(t("match.updating_workspace"))

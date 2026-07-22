@@ -372,6 +372,11 @@ Content:
   Expanded body hosts derive their minimum height from the current child
   `minimumSizeHint`, so restored windows scroll instead of compressing a visible body
   below its useful height.
+- Alpha 0.5.7.4.2 hardens restored-window geometry for Match. The page schedules a
+  deferred layout refresh after resize, show and window-state changes, invalidates
+  expanded section bodies, restores outer scroll by ratio when the restored viewport
+  width changes, and restores the Formation Board splitter from logical proportions
+  instead of cached maximized pixel sizes.
 - Decision Lab remains a compact natural-height body. Match Intelligence uses a
   bounded internal scroll body for the matrix and wrapped summaries. Opponent Rating
   Calibration uses a bounded internal scroll body for the comparison table so headers

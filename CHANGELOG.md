@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.5.7.4.2 Restored Window Geometry Fix: Match now refreshes
+  geometry after resize and window-state changes, preserves the outer scroll
+  position by ratio when restored dimensions change, restores Formation Board
+  splitters proportionally instead of reusing maximized pixel widths, and keeps
+  expanded accordion bodies visible after maximize/restore cycles.
 - Added Alpha 0.5.7.4.1 Match Section Body Integration Fix: Decision Lab,
   Match Intelligence and Opponent Rating Calibration now use persistent body roots
   owned by the Match accordion, refresh updates their internal content without
