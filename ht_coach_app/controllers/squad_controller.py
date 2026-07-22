@@ -116,6 +116,10 @@ class SquadController:
             self._view.edit_first_match_requested.connect(
                 self._edit_first_training_match
             )
+        if hasattr(self._view, "cancel_first_match_edit_requested"):
+            self._view.cancel_first_match_edit_requested.connect(
+                self._cancel_first_training_match_edit
+            )
         if hasattr(self._view, "replace_first_match_requested"):
             self._view.replace_first_match_requested.connect(
                 self._replace_first_training_match
@@ -339,6 +343,12 @@ class SquadController:
         if self._roster is None:
             self._view.show_error(t("planner.load_roster_first"))
             return
+        if (
+            hasattr(self._view, "is_weekly_record_editing")
+            and self._view.is_weekly_record_editing()
+        ):
+            self._save_first_training_match_lineup_changes()
+            return
         board = self._view.weekly_training_current_board()
         if board is None:
             self._view.show_error(t("planner.no_plan_to_record"))
@@ -369,6 +379,16 @@ class SquadController:
         record = self._weekly_training_service.first_match_record()
         if record is None:
             return
+        if not opponent_name and not minutes_known:
+            board = self._weekly_training_service.board_for_record(record)
+            if hasattr(self._view, "show_weekly_record_edit_mode"):
+                self._view.show_weekly_record_edit_mode(
+                    record,
+                    board,
+                    self._roster.players,
+                )
+                self._view.show_status(t("planner.editing_recorded_lineup"))
+            return
         requested_status, confirmed = self._first_match_requested_status(
             record.match_date,
             requested_status=record.planned_or_played,
@@ -386,6 +406,41 @@ class SquadController:
             return
         self._show_weekly_training()
         self._view.show_status(self._first_match_save_message(saved))
+
+    def _save_first_training_match_lineup_changes(self):
+        board = self._view.weekly_training_current_board()
+        if board is None:
+            self._view.show_error(t("planner.no_plan_to_record"))
+            return
+        record = self._weekly_training_service.first_match_record()
+        if record is None:
+            self._view.show_error(t("planner.no_first_match_record"))
+            return
+        requested_status, confirmed = self._first_match_requested_status(
+            record.match_date,
+            requested_status=record.planned_or_played,
+            minutes_known=record.minutes_known,
+        )
+        try:
+            self._weekly_training_service.update_first_match_lineup(
+                board,
+                roster_players=self._roster.players,
+                requested_status=requested_status,
+                played_confirmed=confirmed,
+            )
+        except ValueError as exc:
+            self._view.show_error(self._planner_validation_message(exc))
+            return
+        if hasattr(self._view, "exit_weekly_record_edit_mode"):
+            self._view.exit_weekly_record_edit_mode()
+        self._show_weekly_training()
+        self._view.show_status(t("planner.first_match_lineup_changed"))
+
+    def _cancel_first_training_match_edit(self):
+        if hasattr(self._view, "exit_weekly_record_edit_mode"):
+            self._view.exit_weekly_record_edit_mode()
+        self._show_weekly_training()
+        self._view.show_status(t("planner.editing_cancelled"))
 
     def _replace_first_training_match(self):
         if self._roster is None:

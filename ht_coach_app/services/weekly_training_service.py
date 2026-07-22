@@ -19,9 +19,18 @@ from ht_coach_app.core.paths import user_data_dir
 from ht_coach_app.core.position_formatting import (
     format_position,
     format_position_abbreviation,
+    normalize_position_key,
 )
+from ht_coach_app.core.order_formatting import format_order
+from ht_coach_app.core.side_formatting import format_side, normalize_side_value
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.services.match_workspace_service import FormationAnalysisResult, LineupPlayerResult
+from ht_coach_app.widgets.formation_board.formation_board_models import (
+    FormationBoardViewModel,
+    FormationSlotViewModel,
+    PlayerCardViewModel,
+)
+from ht_coach_app.widgets.formation_board.formation_layouts import get_formation_layout
 from ht_coach_app.workspace.workspace_service import WorkspaceService
 
 
@@ -163,6 +172,43 @@ class WeeklyTrainingAppService:
         )
         return self._mapper.to_board(result)
 
+    def board_for_record(self, record):
+        if record is None or not record.lineup:
+            return None
+        entries_by_slot = {
+            entry.slot_id: entry
+            for entry in record.lineup
+        }
+        slots = []
+        for index, layout in enumerate(get_formation_layout(record.formation)):
+            entry = entries_by_slot.get(layout.slot_id)
+            player = (
+                self._card_from_record_entry(entry, index)
+                if entry is not None
+                else None
+            )
+            slots.append(
+                FormationSlotViewModel(
+                    slot_id=layout.slot_id,
+                    line=layout.line,
+                    side=layout.side,
+                    side_label=layout.side_label,
+                    position=layout.position,
+                    position_label=layout.position_label,
+                    normalized_x=layout.normalized_x,
+                    normalized_y=layout.normalized_y,
+                    player=player,
+                )
+            )
+        return FormationBoardViewModel(
+            formation_name=record.formation,
+            tactic_name="Recorded first match",
+            tactic_level=0.0,
+            slots=tuple(slots),
+            recommendation_label="Recorded",
+            restored=True,
+        )
+
     def _with_optimized_orders(self, plan, players):
         if not plan.lineup:
             return plan
@@ -284,6 +330,57 @@ class WeeklyTrainingAppService:
                     assumed_confidence(bool(minutes_known)),
                 )
                 for entry in record.lineup
+            ),
+        )
+        return self._repository.replace_match_record(state, updated)
+
+    def update_first_match_lineup(
+        self,
+        board,
+        roster_players=(),
+        requested_status=None,
+        played_confirmed=False,
+        today=None,
+    ):
+        state = self.load_state()
+        record = next(
+            (
+                item for item in state.match_records
+                if item.match_role == MatchRole.FIRST_WEEKLY_MATCH
+            ),
+            None,
+        )
+        if record is None:
+            return state
+        rules = rule_provider_for(state.active_training_type)
+        if rules is None:
+            raise ValueError("automatic_rules_unavailable")
+        status, temporal, warning = self.validate_match_status(
+            record.match_date,
+            requested_status or record.planned_or_played,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
+        entries = tuple(
+            self._entry_from_slot(slot, roster_players)
+            for slot in board.slots
+            if slot.player is not None
+        )
+        notes = self._record_notes(status, record.minutes_known, temporal, warning)
+        updated = replace(
+            record,
+            formation=board.formation_name,
+            lineup=entries,
+            planned_or_played=status,
+            notes=notes,
+            training_exposure_entries=tuple(
+                rules.exposure_for_entry(
+                    record.match_id,
+                    entry,
+                    record.source,
+                    assumed_confidence(record.minutes_known),
+                )
+                for entry in entries
             ),
         )
         return self._repository.replace_match_record(state, updated)
@@ -429,6 +526,33 @@ class WeeklyTrainingAppService:
             if getattr(player, "name", "") == player_name:
                 return player_training_id(player)
         return slot.player.player_id
+
+    @staticmethod
+    def _card_from_record_entry(entry, index):
+        return PlayerCardViewModel(
+            player_id=entry.player_id,
+            player_name=entry.player_name,
+            display_name=WeeklyTrainingAppService._display_name(entry.player_name),
+            position=normalize_position_key(entry.position),
+            position_label=format_position(entry.position),
+            position_abbreviation=format_position_abbreviation(entry.position),
+            side=normalize_side_value(entry.side),
+            side_label=format_side(entry.side),
+            individual_order=entry.order,
+            order_label=format_order(entry.order),
+            order_side=normalize_side_value(entry.order_side),
+            order_side_label=format_side(entry.order_side),
+            shirt_number=index + 1,
+            is_recommended=False,
+            is_modified=False,
+        )
+
+    @staticmethod
+    def _display_name(player_name):
+        name = str(player_name or "").strip()
+        if len(name) <= 18:
+            return name
+        return f"{name[:15].rstrip()}..."
 
     @staticmethod
     def _priority(value):

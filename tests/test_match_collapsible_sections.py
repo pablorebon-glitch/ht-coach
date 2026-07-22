@@ -358,6 +358,39 @@ class MatchCollapsibleSectionsTest(unittest.TestCase):
         ]
         self.assertIn("Recommendation confidence: High", labels)
 
+    def test_repeated_toggle_and_refresh_preserves_collapsed_geometry(self):
+        page = MatchPage()
+        page.show_results(match_result())
+        page.resize(1366, 768)
+        page.show()
+        QApplication.processEvents()
+        sections = self.sections(page)
+        section = sections["match_analysis"]
+        collapsed_heights = []
+
+        for _ in range(4):
+            section.set_expanded(False)
+            QApplication.processEvents()
+            collapsed_heights.append(section.sizeHint().height())
+            page.show_results(match_result())
+            section = self.sections(page)["match_analysis"]
+            self.assertFalse(section.is_expanded())
+            self.assertTrue(section.body_host.isHidden())
+            self.assertEqual(section.body_host.maximumHeight(), 0)
+            self.assertEqual(
+                section.body_host.sizePolicy().verticalPolicy(),
+                QSizePolicy.Policy.Ignored,
+            )
+            section.set_expanded(True)
+            QApplication.processEvents()
+            self.assertFalse(section.body_host.isHidden())
+            self.assertGreater(section.body_host.maximumHeight(), 0)
+
+        section.set_expanded(False)
+        QApplication.processEvents()
+        collapsed_heights.append(section.sizeHint().height())
+        self.assertLessEqual(max(collapsed_heights) - min(collapsed_heights), 2)
+
     def test_viewport_pitch_and_selection_survive_info_section_toggle(self):
         page = MatchPage()
         page.show_results(match_result())

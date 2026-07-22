@@ -474,6 +474,88 @@ def test_replace_first_match_recalculates_temporal_status(tmp_path):
     assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
 
 
+def test_recorded_first_match_board_restores_slots_and_orders(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        opponent_name="Rival FC",
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    record = saved.match_records[0]
+
+    board = service.board_for_record(record)
+
+    assert board.formation_name == record.formation
+    restored = {
+        slot.slot_id: slot.player
+        for slot in board.slots
+        if slot.player is not None
+    }
+    assert set(restored) == {entry.slot_id for entry in record.lineup}
+    for entry in record.lineup:
+        player = restored[entry.slot_id]
+        assert player.player_name == entry.player_name
+        assert player.individual_order == entry.order
+        assert player.order_side == entry.order_side
+
+
+def test_updating_recorded_lineup_replaces_same_record_and_preserves_metadata(tmp_path):
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        opponent_name="Rival FC",
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    original = saved.match_records[0]
+    board = service.board_for_record(original)
+    first_slot = next(slot for slot in board.slots if slot.player is not None)
+    second_slot = next(
+        slot for slot in board.slots
+        if slot.player is not None and slot.slot_id != first_slot.slot_id
+    )
+    swapped_slots = tuple(
+        replace(slot, player=second_slot.player)
+        if slot.slot_id == first_slot.slot_id
+        else replace(slot, player=first_slot.player)
+        if slot.slot_id == second_slot.slot_id
+        else slot
+        for slot in board.slots
+    )
+    changed_board = replace(board, slots=swapped_slots)
+
+    updated = service.update_first_match_lineup(
+        changed_board,
+        roster_players=players,
+        requested_status=original.planned_or_played,
+        played_confirmed=True,
+        today=date(2026, 7, 22),
+    )
+
+    assert len(updated.match_records) == 1
+    record = updated.match_records[0]
+    assert record.match_id == original.match_id
+    assert record.opponent_name == "Rival FC"
+    assert record.match_date == original.match_date
+    assert record.source == original.source
+    assert record.planned_or_played == original.planned_or_played
+    assert record.lineup != original.lineup
+    assert len(record.training_exposure_entries) == len(record.lineup)
+
+
 def test_priorities_persist_duplicate_names_and_rollover_resets_records(tmp_path):
     repository = WeeklyTrainingRepository(tmp_path / "planner.json")
     state = repository.load()
@@ -843,7 +925,11 @@ def test_squad_page_weekly_planner_tab_smoke():
     assert "Weekly Planner" in tab_labels
     assert page.weekly_training_type_combo.currentData() == PLAYMAKING
     assert page.weekly_generate_button.text() == "Generate Plan"
-    assert page.weekly_player_table.columnCount() == 9
+    assert page.weekly_player_table.columnCount() == 3
+    assert [
+        page.weekly_player_table.horizontalHeaderItem(index).text()
+        for index in range(page.weekly_player_table.columnCount())
+    ] == ["Player", "Priority", "Training Status"]
     assert page.weekly_priority_table is page.weekly_player_table
     assert page.weekly_coverage_table is page.weekly_player_table
     assert page.findChildren(QComboBox)
@@ -879,13 +965,100 @@ def test_weekly_planner_uses_unified_table_and_simplified_priorities(tmp_path):
 
     assert page.weekly_priority_table is page.weekly_player_table
     assert page.weekly_coverage_table is page.weekly_player_table
-    combo = page.weekly_player_table.cellWidget(0, 3)
+    combo = page.weekly_player_table.cellWidget(0, 1)
     assert [combo.itemText(index) for index in range(combo.count())] == [
         "100%",
         "50%",
         "No priority",
     ]
-    assert page.weekly_player_table.item(0, 4).text() == "\u25cb"
+    assert page.weekly_player_table.item(0, 2).text() == "\u25cb"
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_planner_table_has_only_three_visible_columns(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2"],
+    )
+
+    assert page.weekly_player_table.columnCount() == 3
+    headers = [
+        page.weekly_player_table.horizontalHeaderItem(index).text()
+        for index in range(page.weekly_player_table.columnCount())
+    ]
+    assert headers == ["Player", "Priority", "Training Status"]
+    assert all(not page.weekly_player_table.isColumnHidden(index) for index in range(3))
+    visible_text = " ".join(
+        page.weekly_player_table.item(row, column).text()
+        for row in range(page.weekly_player_table.rowCount())
+        for column in (0, 2)
+        if page.weekly_player_table.item(row, column) is not None
+    )
+    assert "INNER_MIDFIELDER" not in visible_text
+    assert "(" not in visible_text
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_weekly_status_filters_use_simplified_status_roles(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    players = [player("Done"), player("Planned"), player("Idle")]
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    coverage_rows = [
+        PlayerCoverage(
+            player_id=player_training_id(players[0]),
+            player_name="Done",
+            weekly_target=TrainingPriority.REQUIRED_100,
+            confirmed_exposure=Decimal("100"),
+        ),
+        PlayerCoverage(
+            player_id=player_training_id(players[1]),
+            player_name="Planned",
+            weekly_target=TrainingPriority.REQUIRED_50,
+            planned_exposure=Decimal("50"),
+        ),
+    ]
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        coverage_rows,
+        ["3-5-2"],
+    )
+
+    page.weekly_filter_combo.setCurrentIndex(
+        page.weekly_filter_combo.findData("already_trained")
+    )
+    assert page.weekly_player_table.rowCount() == 1
+    assert page.weekly_player_table.item(0, 0).text() == "Done"
+    assert page.weekly_player_table.item(0, 2).text() == "\u2713"
+
+    page.weekly_filter_combo.setCurrentIndex(
+        page.weekly_filter_combo.findData("will_train")
+    )
+    assert page.weekly_player_table.rowCount() == 1
+    assert page.weekly_player_table.item(0, 0).text() == "Planned"
+    assert page.weekly_player_table.item(0, 2).text() == "\u25cb"
+
+    page.weekly_filter_combo.setCurrentIndex(
+        page.weekly_filter_combo.findData("not_training")
+    )
+    assert page.weekly_player_table.rowCount() == 1
+    assert page.weekly_player_table.item(0, 0).text() == "Idle"
+    assert page.weekly_player_table.item(0, 2).text() == "\u2014"
     app.processEvents()
 
 
@@ -921,12 +1094,58 @@ def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
 
     status_by_name = {
         page.weekly_player_table.item(row, 0).text():
-        page.weekly_player_table.item(row, 4).text()
+        page.weekly_player_table.item(row, 2).text()
         for row in range(page.weekly_player_table.rowCount())
     }
     assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
     assert status_by_name[trained_name] == "\u25cb"
     assert "\u2713" not in status_by_name.values()
+    app.processEvents()
+
+
+@unittest.skipIf(QApplication is None, "PySide6 is not installed")
+def test_recorded_lineup_edit_mode_restores_interactive_board(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    page = SquadPage()
+    service = WeeklyTrainingAppService(
+        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    )
+    players = roster()
+    plan = service.generate_plan(players, "3-5-2")
+    saved = service.record_first_match(
+        service.board_for_plan(plan),
+        roster_players=players,
+        match_date=date(2026, 7, 21),
+        requested_status=MatchStatus.PLAYED,
+        today=date(2026, 7, 22),
+    )
+    record = saved.match_records[0]
+
+    page.show_weekly_training(
+        service.load_state(),
+        service.priority_rows(players),
+        service.coverage(players),
+        ["3-5-2"],
+    )
+    page.show_weekly_record_edit_mode(
+        record,
+        service.board_for_record(record),
+        players,
+    )
+    first_player = record.lineup[0].player_id
+    page.weekly_plan_board.select_player(first_player)
+
+    assert page.is_weekly_record_editing()
+    assert page.weekly_record_button.text() == "Save Lineup Changes"
+    assert not page.weekly_cancel_edit_button.isHidden()
+    assert not page.weekly_edit_mode_label.isHidden()
+    assert page.weekly_plan_board.current_board().formation_name == record.formation
+    assert page.weekly_plan_board.current_board().selected_player_id == first_player
+
+    page.exit_weekly_record_edit_mode()
+    assert not page.is_weekly_record_editing()
+    assert page.weekly_record_button.text() == "Record Played Lineup"
+    assert page.weekly_cancel_edit_button.isHidden()
     app.processEvents()
 
 
@@ -1024,7 +1243,7 @@ def test_weekly_priority_filter_uses_visible_priority_and_updates_on_edit(tmp_pa
     assert page.weekly_player_table.rowCount() == 1
     assert page.weekly_player_table.item(0, 0).text() == players[1].name
 
-    combo = page.weekly_player_table.cellWidget(0, 3)
+    combo = page.weekly_player_table.cellWidget(0, 1)
     combo.setCurrentIndex(combo.findData("NO_PRIORITY"))
     app.processEvents()
     QTimer.singleShot(0, lambda: None)

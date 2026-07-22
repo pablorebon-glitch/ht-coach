@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.5.7.3.2 Recorded Lineup Editing and Training Table Simplification:
+  the Weekly Planner can reopen the recorded first-match lineup in the interactive
+  Formation Board, save lineup changes back into the same match record without
+  duplicating it, invalidate the generated second-match plan after edits, reduce the
+  weekly player table to Player, Priority and Training Status, and keep Match
+  collapsible sections stable through repeated toggles and result refreshes.
 - Added Alpha 0.5.7.3.1 Planner Flow and Collapse Fixes: the Weekly Planner now lets
   the generated lineup area grow inside a natural vertical scroll flow, keeps Training
   Summary, Warnings and Explanations strictly below the pitch, filters the weekly table
