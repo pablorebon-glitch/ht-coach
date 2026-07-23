@@ -13,6 +13,50 @@
     "list_two": "{first} and {second}",
     "list_many": "{items} and {last}"
   },
+  "calibration": {
+    "title": "Real Match Calibration",
+    "subtitle": "Record played matches and compare official Hattrick ratings against midfield-v1 predictions.",
+    "record_real_match": "Record real match",
+    "add_record": "Add record",
+    "finalize_record": "Finalize record",
+    "recalculate": "Recalculate dataset",
+    "export_dataset": "Export validation dataset",
+    "import_dataset": "Import validation dataset",
+    "record_status": {
+      "draft": "Draft",
+      "complete": "Complete",
+      "invalid": "Invalid",
+      "archived": "Archived"
+    },
+    "quality": {
+      "complete": "Complete",
+      "usable_with_assumptions": "Usable with assumptions",
+      "incomplete": "Incomplete",
+      "invalid": "Invalid"
+    },
+    "validation": {
+      "missing_record_id": "Record ID is required.",
+      "match_not_played": "Only played matches can be finalized.",
+      "future_match_cannot_be_finalized": "Future matches cannot be finalized.",
+      "invalid_match_date": "Match date is invalid.",
+      "missing_formation": "Formation is required.",
+      "missing_lineup_snapshot": "Lineup snapshot is required.",
+      "duplicate_starter": "The lineup contains the same player more than once.",
+      "missing_player_fields": "Some player fields are missing and assumptions may be used.",
+      "missing_official_midfield_rating": "Official midfield rating is required."
+    },
+    "metrics": {
+      "sample_count": "Sample count",
+      "exact_accuracy": "Exact accuracy",
+      "within_0_25_accuracy": "Accuracy within 0.25",
+      "within_0_50_accuracy": "Accuracy within 0.50",
+      "mean_absolute_error": "Mean absolute error",
+      "median_absolute_error": "Median absolute error",
+      "signed_bias": "Signed bias",
+      "maximum_error": "Maximum error",
+      "minimum_error": "Minimum error"
+    }
+  },
   "nav": {
     "dashboard": "Dashboard",
     "squad": "Squad",

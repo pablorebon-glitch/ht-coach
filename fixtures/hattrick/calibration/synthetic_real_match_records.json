@@ -1,0 +1,66 @@
+{
+  "records": [
+    {
+      "competition_type": "synthetic_test",
+      "created_at": "2026-07-22T00:00:00+00:00",
+      "formation": "3-5-2",
+      "lineup_snapshot": {
+        "formation": "3-5-2",
+        "snapshot_timestamp": "2026-07-22T00:00:00+00:00",
+        "source": "synthetic_test",
+        "starters": [
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-1", "player_name": "Synthetic Player 1", "playmaking": 8, "position_group": "GOALKEEPER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_1", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-2", "player_name": "Synthetic Player 2", "playmaking": 9, "position_group": "CENTRAL_DEFENDER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_2", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-3", "player_name": "Synthetic Player 3", "playmaking": 10, "position_group": "CENTRAL_DEFENDER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_3", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-4", "player_name": "Synthetic Player 4", "playmaking": 11, "position_group": "WING_BACK", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_4", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-5", "player_name": "Synthetic Player 5", "playmaking": 12, "position_group": "WING_BACK", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_5", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-6", "player_name": "Synthetic Player 6", "playmaking": 8, "position_group": "INNER_MIDFIELDER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_6", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-7", "player_name": "Synthetic Player 7", "playmaking": 9, "position_group": "INNER_MIDFIELDER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_7", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-8", "player_name": "Synthetic Player 8", "playmaking": 10, "position_group": "INNER_MIDFIELDER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_8", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Towards Middle", "order_side": "", "passing": 5, "player_id": "synthetic-9", "player_name": "Synthetic Player 9", "playmaking": 11, "position_group": "WINGER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_9", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-10", "player_name": "Synthetic Player 10", "playmaking": 12, "position_group": "WINGER", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_10", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5},
+          {"defending": 5, "experience": 5, "form": 7, "goalkeeping": 1, "missing_fields": [], "order": "Normal", "order_side": "", "passing": 5, "player_id": "synthetic-11", "player_name": "Synthetic Player 11", "playmaking": 8, "position_group": "FORWARD", "scoring": 5, "set_pieces": 5, "side": "CENTER", "slot": "starter_11", "snapshot_source": "synthetic_test", "specialty": "", "stamina": 7, "winger": 5}
+        ]
+      },
+      "match_context": {
+        "coach_leadership": "",
+        "coach_type": "",
+        "data_complete": true,
+        "home_or_away": "home",
+        "match_period": "start",
+        "stamina_assumption": "start",
+        "tactic": "",
+        "tactic_level": null,
+        "team_attitude": "normal",
+        "team_spirit": 5,
+        "unsupported_context": {},
+        "venue": "",
+        "weather": ""
+      },
+      "match_date": "2026-07-22",
+      "match_id": "synthetic-match-1",
+      "notes": "Synthetic calibration sample for schema and workflow tests. Not real Hattrick evidence.",
+      "observations_by_model_version": {},
+      "official_ratings": {
+        "attack_center": null,
+        "attack_left": null,
+        "attack_right": null,
+        "defense_center": null,
+        "defense_left": null,
+        "defense_right": null,
+        "midfield": {"decimal": "5.25", "display": "5.25 HT", "level": "inadequate", "quarter_steps": 21, "sublevel": "low"}
+      },
+      "official_result": {"goals_against": null, "goals_for": null, "match_id": "synthetic-match-1", "possession": null, "report_url": ""},
+      "opponent_name": "Synthetic Opponent",
+      "played": true,
+      "record_id": "synthetic-real-match-1",
+      "record_status": "draft",
+      "schema_version": 1,
+      "source": "synthetic_test",
+      "synthetic": true,
+      "updated_at": "2026-07-22T00:00:00+00:00",
+      "venue": "home"
+    }
+  ],
+  "schema_version": 1
+}

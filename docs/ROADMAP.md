@@ -89,6 +89,32 @@ Acceptance criteria:
 - No optimizer, probability, expected-goals, Squad, Planner or Match layout behavior is
   changed.
 
+### Alpha 0.5.8.1: Real Match Calibration Dataset
+
+Goal: create the evidence workflow needed to evaluate `midfield-v1` against played
+Hattrick matches without tuning the model.
+
+Deliverables:
+
+- Real-match calibration record model.
+- Frozen lineup and context snapshots.
+- Official midfield rating input parser.
+- Record validation and data quality classification.
+- Model-versioned observations.
+- Aggregate and segmented metrics.
+- JSON repository.
+- CLI workflow for add, validate, finalize, recalculate, report, export and import.
+- Synthetic schema fixture and documentation.
+
+Acceptance criteria:
+
+- Future matches cannot be finalized.
+- Official midfield ratings must be exact Hattrick quarter steps.
+- Metrics are calculated in Hattrick rating units.
+- Exported records integrate with the Rating Validation Framework.
+- `midfield-v1` parameters, optimizers, probabilities and desktop workspace layout are
+  unchanged.
+
 ### Epic 2: State And Services
 
 Goal: introduce application state and use-case services.
