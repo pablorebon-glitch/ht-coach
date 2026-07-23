@@ -106,28 +106,6 @@ The supported restored validation sizes remain 1280x720, 1366x768, 1440x900 and
 contribute zero height, and the Lineup Workspace should remain reachable by normal
 page scrolling.
 
-Alpha 0.5.7.4.3 adds initial restored-window stabilization for Match. Match may be
-constructed while hidden inside the application `QStackedWidget`, so constructor-time
-layout sizes are not authoritative. Stabilization runs only after the page is shown or
-activated with a real scroll viewport. It performs at least two and at most three
-queued event-loop passes, guarded by a generation token so older resize or activation
-callbacks cannot apply stale geometry.
-
-The stabilization pass may invalidate and activate the existing Match content,
-results-stack and section layouts, refresh header height-for-width data, recompute
-expanded body minimums, update the scroll content widget and clamp the outer scroll
-position. It must not recreate widgets, toggle sections, recalculate analysis, change
-formation, reset player selection or rebuild the page.
-
-Startup geometry is considered valid when:
-
-- collapsed sections show only their header and contribute no body height;
-- expanded sections show a positive body height and content geometry;
-- title and summary labels do not overlap;
-- sections remain ordered without large gaps;
-- the Lineup Workspace follows Match Analysis;
-- the outer scrollbar range remains valid.
-
 ## Audit Notes
 
 Alpha 0.5.7.4 removed the main responsive anti-patterns found during the audit:
