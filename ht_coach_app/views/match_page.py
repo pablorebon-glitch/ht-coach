@@ -1080,6 +1080,7 @@ class MatchPage(BasePage):
                 ),
                 roster_players=self._roster_players,
                 workspace_state=workspace_state,
+                preserve_input_orders=True,
             )
             return board
         except Exception as exc:
