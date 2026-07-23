@@ -306,7 +306,7 @@ def test_cli_smoke_test_prints_concise_report():
         [
             sys.executable,
             "tools/validate_ratings.py",
-            "fixtures/hattrick",
+            "fixtures/hattrick/pata2008_reference.json",
         ],
         check=True,
         capture_output=True,

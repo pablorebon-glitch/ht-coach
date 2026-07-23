@@ -320,3 +320,15 @@ Collect fixtures containing:
 
 Separate representation equivalence from historical match reproduction. Missing match
 context must not be treated as a formula defect.
+
+## Alpha 0.5.8 Midfield Estimator
+
+Alpha 0.5.8 introduces `engine/hattrick_ratings/midfield` as a separate estimator for
+own-team midfield. This does not change the final classification above. TeamRater and
+optimizer values remain Classification C internal additive contribution totals.
+
+The midfield estimator predicts Hattrick quarter-step units directly from lineup
+players, position, order, form, stamina and optional team context. It does not derive
+its output from TeamRater midfield by applying a coefficient or offset. Its output is
+therefore an independent prediction with explicit confidence and warnings, not proof
+that existing internal values are Hattrick decimal ratings.

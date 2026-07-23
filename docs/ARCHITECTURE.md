@@ -46,6 +46,14 @@ ratings from supplied predictions, classifies fixture completeness, calculates e
 metrics and returns structured reports. It does not implement prediction, conversion,
 calibration, optimization or rating estimation.
 
+Alpha 0.5.8 adds `engine/hattrick_ratings` as the first independent Hattrick-oriented
+rating estimator. `engine/hattrick_ratings/midfield` predicts only own-team midfield in
+Hattrick quarter-step units and remains separate from TeamRater internal contribution
+totals, optimizers, Decision Lab, Match Intelligence, probabilities and expected-goals
+calculations. Predictions include model version `midfield-v1`, confidence,
+assumptions, warnings and a structured breakdown. The model is explicitly
+uncalibrated until enough complete official match fixtures exist.
+
 Alpha 0.5.6.2.1 refines `ht_coach_app/workspace` around manual intent. The initial
 optimizer result remains the global recommendation, but later valid manual slot
 assignments are authoritative. `WorkspaceService` is the canonical presentation-
@@ -83,6 +91,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  hattrick_ratings/
   rating_validation/
   squad_evolution/
   squad_health/

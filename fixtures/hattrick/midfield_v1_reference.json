@@ -1,0 +1,116 @@
+{
+  "fixtures": [
+    {
+      "fixture_name": "midfield_v1_three_normal_inner_midfielders",
+      "match_id": "midfield-v1-001",
+      "team_name": "HT Coach Reference",
+      "formation": "3-5-2",
+      "attitude": "normal",
+      "coach": "unknown",
+      "metadata_complete": false,
+      "official_hattrick_ratings": {
+        "midfield": 5.25
+      },
+      "additional_context": {
+        "midfield_context": {
+          "team_spirit": 5,
+          "attitude": "normal",
+          "period": "start"
+        },
+        "lineup_players": [
+          {
+            "name": "Inner A",
+            "position": "INNER_MIDFIELDER",
+            "order": "Normal",
+            "playmaking": 12,
+            "form": 7,
+            "stamina": 8
+          },
+          {
+            "name": "Inner B",
+            "position": "INNER_MIDFIELDER",
+            "order": "Normal",
+            "playmaking": 11,
+            "form": 7,
+            "stamina": 8
+          },
+          {
+            "name": "Inner C",
+            "position": "INNER_MIDFIELDER",
+            "order": "Normal",
+            "playmaking": 10,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Winger A",
+            "position": "WINGER",
+            "side": "LEFT",
+            "order": "Towards Middle",
+            "playmaking": 8,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Winger B",
+            "position": "WINGER",
+            "side": "RIGHT",
+            "order": "Normal",
+            "playmaking": 7,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Forward A",
+            "position": "FORWARD",
+            "order": "Defensive",
+            "playmaking": 6,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Forward B",
+            "position": "FORWARD",
+            "order": "Normal",
+            "playmaking": 4,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Defender A",
+            "position": "CENTRAL_DEFENDER",
+            "order": "Offensive",
+            "playmaking": 6,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Defender B",
+            "position": "CENTRAL_DEFENDER",
+            "order": "Normal",
+            "playmaking": 4,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Wing Back",
+            "position": "WING_BACK",
+            "order": "Towards Middle",
+            "playmaking": 5,
+            "form": 7,
+            "stamina": 7
+          },
+          {
+            "name": "Keeper",
+            "position": "GOALKEEPER",
+            "order": "Normal",
+            "playmaking": 3,
+            "form": 7,
+            "stamina": 7
+          }
+        ]
+      },
+      "notes": "Synthetic deterministic reference fixture for Midfield Rating Engine v1 architecture tests."
+    }
+  ]
+}

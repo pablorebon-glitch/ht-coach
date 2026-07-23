@@ -11,6 +11,7 @@ The roadmap protects the engine and moves product work into the application laye
 ## Guiding Principles
 
 - Preserve engine behavior unless a confirmed bug is found.
+- Keep internal optimizer strength separate from predicted Hattrick rating estimates.
 - Build the desktop app around clear controllers, services, views, widgets, state, and
   persistence.
 - Keep each milestone shippable.
@@ -63,6 +64,30 @@ Acceptance criteria:
 - Each page is its own `QWidget` class.
 - Business workflows stay out of widgets.
 - No engine behavior is changed.
+
+### Alpha 0.5.8: Hattrick Midfield Rating Engine v1
+
+Goal: introduce the first independent Hattrick-oriented own-team rating estimator
+without changing optimizer behavior.
+
+Deliverables:
+
+- `engine/hattrick_ratings` package.
+- Midfield-only prediction calculator.
+- Quarter-step Hattrick rating representation.
+- Form, stamina and team-context support points.
+- Structured breakdowns and confidence warnings.
+- Rating Validation Framework provider integration.
+- Synthetic reference midfield fixtures.
+- Non-destructive validation CLI.
+
+Acceptance criteria:
+
+- Predictions are Hattrick rating estimates, not converted internal contribution totals.
+- Model version `midfield-v1` is included in every prediction.
+- Validation metrics use Hattrick rating units.
+- No optimizer, probability, expected-goals, Squad, Planner or Match layout behavior is
+  changed.
 
 ### Epic 2: State And Services
 
