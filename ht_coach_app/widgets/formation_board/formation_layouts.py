@@ -5,6 +5,9 @@ from ht_coach_app.core.position_formatting import (
     normalize_position_key,
 )
 from ht_coach_app.core.side_formatting import format_side
+from ht_coach_app.widgets.formation_board.orientation import (
+    screen_x_for_tactical_side,
+)
 from models.formations import FORMATIONS
 from models.position import Position
 from models.side import Side
@@ -178,7 +181,7 @@ def _slots(formation_name, line, position, sides, xs):
             side_label=format_side(side),
             position=normalize_position_key(position),
             position_label=format_position(position),
-            normalized_x=xs[index],
+            normalized_x=screen_x_for_tactical_side(xs[index]),
             normalized_y=_LINE_Y[line],
         )
         for index, side in enumerate(sides)

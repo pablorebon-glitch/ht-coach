@@ -26,3 +26,7 @@ def user_data_dir():
         return Path(base_path) / "HT Coach" / "Alpha"
 
     return Path.home() / ".ht-coach" / "alpha"
+
+
+def historical_match_snapshots_path():
+    return user_data_dir() / "historical_matches.json"

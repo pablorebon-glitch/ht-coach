@@ -4,6 +4,15 @@
 
 ### Added
 
+- Added Alpha 0.5.8.2 Historical Match Intelligence Foundation: a Qt-independent
+  `engine/history` package now stores typed historical match snapshots with explicit
+  schema versioning, planned-versus-played stages, canonical lineup orders and order
+  sides, predicted and official ratings kept separate, deterministic JSON persistence,
+  query/repository services, cohort classification, previous-match selection, a small
+  developer CLI and an application service for creating snapshots from Match analysis
+  without rerunning optimizers. Formation Board tactical left/right mirroring is now
+  centralized so directional orders such as Michael Rushton's `Towards Wing / LEFT`
+  are displayed consistently with Detailed XI and persisted snapshot semantics.
 - Added Alpha 0.5.8.1 Real Match Calibration Dataset: a Qt-independent
   `engine/hattrick_ratings/calibration` workflow records played-match lineup
   snapshots, official Hattrick midfield ratings, validation quality, model-versioned

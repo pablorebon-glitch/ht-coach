@@ -174,7 +174,12 @@ class FormationBoardMapper:
         available_slots = list(layouts)
         assigned = {}
 
-        for index, lineup_player in enumerate(formation_result.lineup):
+        indexed_lineup = list(enumerate(formation_result.lineup))
+        indexed_lineup.sort(
+            key=lambda item: 0 if self._uses_directional_wing_sector(item[1]) else 1
+        )
+
+        for index, lineup_player in indexed_lineup:
             slot = self._pop_slot_for_player(
                 available_slots,
                 lineup_player
@@ -228,9 +233,25 @@ class FormationBoardMapper:
 
         return assigned
 
+    def _uses_directional_wing_sector(self, lineup_player):
+        order_side = normalize_side_value(
+            getattr(lineup_player, "order_side", "")
+        )
+        order = str(getattr(lineup_player, "order", "") or "")
+        return bool(order_side and order.lower().replace("_", " ") == "towards wing")
+
     def _pop_slot_for_player(self, available_slots, lineup_player):
         position = normalize_position_key(lineup_player.position)
         side = normalize_side_value(lineup_player.side)
+        order_side = normalize_side_value(
+            getattr(lineup_player, "order_side", "")
+        )
+
+        if self._uses_directional_wing_sector(lineup_player):
+            for slot in available_slots:
+                if slot.position == position and slot.side == order_side:
+                    available_slots.remove(slot)
+                    return slot
 
         for slot in available_slots:
             if slot.position == position and slot.side == side:

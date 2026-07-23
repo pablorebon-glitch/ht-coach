@@ -115,6 +115,51 @@ Acceptance criteria:
 - `midfield-v1` parameters, optimizers, probabilities and desktop workspace layout are
   unchanged.
 
+### Alpha 0.5.8.2: Historical Match Intelligence Foundation
+
+Goal: create the canonical club-history data foundation without implementing comparison,
+insight or validation engines ahead of schedule.
+
+Deliverables:
+
+- `engine/history` package with typed historical match snapshots.
+- Explicit schema version `1` and schema-aware loading.
+- Snapshot identity independent from opponent name, date or official match ID.
+- Match context, opponent metadata, tactical setup, canonical lineup, predictions,
+  official result data, prediction-error extension point and provenance.
+- Deterministic cohort classification.
+- Previous-equivalent match selector for future comparison work.
+- JSON repository with deterministic serialization, atomic writes and typed queries.
+- Developer CLI for listing, inspecting, validating, importing, exporting and selecting
+  previous snapshots.
+- Small application service capable of creating snapshots from existing Match analysis
+  results without rerunning optimizers.
+- Centralized Formation Board tactical-left/right visual mirroring.
+
+Acceptance criteria:
+
+- Planned and played snapshots load safely.
+- Predicted ratings and official ratings remain separate.
+- Complete lineup orders and order sides are preserved.
+- Snapshot creation never reoptimizes the authoritative Match Workspace lineup.
+- Formation Board and Detailed XI share the same Hattrick tactical left/right semantics.
+- No optimizer formulas, rating formulas, probabilities, expected-goals calculations,
+  Weekly Planner behavior or layout-stabilization logic are changed.
+
+### Alpha 0.5.8.3: Historical Match Comparison Engine
+
+Future sprint. Compare selected historical snapshots and calculate deterministic rating,
+lineup, formation, order and player deltas.
+
+### Alpha 0.5.8.4: Historical Match Insights and Executive Summary
+
+Future sprint. Convert comparison results into deterministic coaching insights and
+executive summaries.
+
+### Alpha 0.5.8.5: Decision Validation
+
+Future sprint. Evaluate recommendation and prediction accuracy over historical records.
+
 ### Epic 2: State And Services
 
 Goal: introduce application state and use-case services.

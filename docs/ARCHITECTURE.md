@@ -61,6 +61,14 @@ reports aggregate/segmented error metrics. It may export/import Rating Validatio
 Framework fixtures, but it must not tune `midfield-v1`, convert internal contribution
 totals, change optimizers, change probabilities or alter desktop workspace layout.
 
+Alpha 0.5.8.2 adds `engine/history` as the canonical historical match foundation. It
+stores durable match snapshots with explicit schema versioning, stable snapshot IDs,
+match context, opponent metadata, tactical setup, authoritative lineup orders, predicted
+ratings, official played-match ratings and provenance. It also owns cohort
+classification, previous-equivalent snapshot selection, deterministic JSON persistence
+and a small developer CLI. It does not compare ratings, generate insights, validate
+decisions, tune rating engines, call optimizers or modify any analytical formula.
+
 Alpha 0.5.6.2.1 refines `ht_coach_app/workspace` around manual intent. The initial
 optimizer result remains the global recommendation, but later valid manual slot
 assignments are authoritative. `WorkspaceService` is the canonical presentation-
@@ -98,6 +106,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  history/
   hattrick_ratings/
     calibration/
     midfield/
@@ -386,6 +395,72 @@ opponent JSON compatibility remains unchanged.
     and opponent ratings from the recommended or current Workspace result.
   - Runs Tactical Advisor recommendations over already evaluated results and persists
     serializable recommendation view models.
+
+- `HistoricalMatchAppService`
+  - Builds and persists historical snapshots from existing `MatchAnalysisResult` view
+    models through `engine.history.HistoricalSnapshotFactory`.
+  - Stores snapshots under the application data directory in `historical_matches.json`.
+  - Does not run Qt code, call optimizers, create comparison insights or silently
+    reinterpret missing official match data.
+  - Uses explicit snapshot IDs; when callers supply the same ID, repository `save`
+    replaces that snapshot instead of creating uncontrolled duplicates.
+
+### Historical Match Intelligence
+
+`engine/history/`
+
+The historical layer is Qt-independent and acts as the canonical long-term match record.
+
+Modules:
+
+- `models.py`: immutable snapshot, context, opponent, tactical setup, lineup, rating,
+  prediction, official-result, cohort and provenance dataclasses with explicit
+  `to_dict` and `from_dict` contracts.
+- `enums.py`: stable persisted values for competition type, team type, stage, home/away,
+  schedule group, selector type, rating source and snapshot source.
+- `serialization.py`: deterministic UTF-8 JSON, repository payloads and atomic writes.
+- `repository.py`: JSON-backed save, replace, get, list, delete, import and query
+  operations.
+- `query_service.py`: typed filtering by date, competition, team type, stage, opponent,
+  home/away, season, cohort and rating/prediction presence. Default sorting is
+  chronological ascending by match date, kickoff time, creation time and snapshot ID.
+- `cohort_classifier.py`: deterministic schedule grouping for weekend competitive,
+  midweek competitive, friendly/training, other and unknown contexts.
+- `previous_match_selector.py`: previous-match, previous-league, previous-cup,
+  previous-friendly, previous-first-team, previous-same-cohort and custom selection.
+- `snapshot_factory.py`: maps existing Match analysis view models into planned
+  snapshots while preserving the authoritative lineup, individual orders and order
+  sides.
+- `validation.py`: explicit validation for snapshot identity, schema, probability
+  bounds, starter uniqueness, tactical enum values, rating values and played-match
+  official-data rules.
+- `cli.py`: developer commands for list, inspect, validate, export, import and previous.
+
+Schema policy:
+
+- Persisted snapshot schema starts at version `1`.
+- Future schema versions fail with a clear compatibility error until a migration exists.
+- Optional fields remain optional; missing match facts are not invented.
+- Official Hattrick match ID is stored when available but is never the only identity.
+- Planned snapshots can be enriched with official results while preserving snapshot ID,
+  created timestamp and original predictions.
+
+Tactical left/right convention:
+
+- `LEFT` and `RIGHT` are stored as Hattrick tactical attacking-perspective values.
+- Detailed XI, player inspector, copied lineup and historical snapshots display and
+  persist those canonical values.
+- The Formation Board performs visual mirroring only through
+  `ht_coach_app/widgets/formation_board/orientation.py`.
+- A player with field side `CENTER`, order `Towards Wing` and order side `LEFT` keeps
+  those canonical values; the board uses the order-side sector for visual placement
+  without mutating the player's field side.
+
+Future extension points are intentionally data-only in Alpha 0.5.8.2: sector deltas,
+formation-change detection, player-added/player-removed events, order changes,
+deterministic insight rules, executive summaries, trend analysis, prediction MAE,
+recommendation accuracy, opponent evolution and season reports belong to later
+roadmap sprints.
 
 ### Reasoning
 

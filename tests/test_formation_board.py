@@ -30,6 +30,11 @@ from ht_coach_app.widgets.formation_board.formation_layouts import (
     get_formation_layout,
     supported_formation_layouts,
 )
+from ht_coach_app.widgets.formation_board.orientation import (
+    mirror_normalized_x,
+    screen_x_for_tactical_side,
+    tactical_side_to_visual_side,
+)
 from models.player import Player
 from models.formations import FORMATION_BY_NAME
 from models.position import Position
@@ -250,10 +255,17 @@ class FormationLayoutTest(unittest.TestCase):
                 ]
 
                 if left and right:
-                    self.assertLess(
+                    self.assertGreater(
                         left[0].normalized_x,
                         right[0].normalized_x,
                     )
+
+    def test_tactical_left_right_screen_conversion_is_centralized(self):
+        self.assertEqual(mirror_normalized_x(0.2), 0.8)
+        self.assertEqual(screen_x_for_tactical_side(0.75), 0.25)
+        self.assertEqual(tactical_side_to_visual_side("LEFT"), "RIGHT")
+        self.assertEqual(tactical_side_to_visual_side("RIGHT"), "LEFT")
+        self.assertEqual(tactical_side_to_visual_side("CENTER"), "CENTER")
 
 
 class FormationBoardMapperTest(unittest.TestCase):
@@ -373,6 +385,66 @@ class FormationBoardMapperTest(unittest.TestCase):
         self.assertEqual(michael.order_label, "Towards Wing")
         self.assertEqual(michael.order_side, "LEFT")
         self.assertEqual(michael.order_side_label, "Left")
+
+    def test_directional_order_uses_order_side_sector_without_mutating_field_side(self):
+        result = order_sync_result()
+
+        board = FormationBoardMapper().to_board(result)
+        michael_slot = next(
+            slot
+            for slot in board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Michael Rushton"
+        )
+        right_forward_slot = next(
+            slot
+            for slot in board.slots
+            if slot.position == Position.FORWARD.value
+            and slot.side == "RIGHT"
+        )
+
+        self.assertEqual(michael_slot.side, "LEFT")
+        self.assertEqual(michael_slot.player.side, "CENTER")
+        self.assertEqual(michael_slot.player.order_side, "LEFT")
+        self.assertGreater(michael_slot.normalized_x, right_forward_slot.normalized_x)
+
+    def test_right_directional_order_uses_mirrored_tactical_sector(self):
+        result = order_sync_result()
+        lineup = [
+            (
+                LineupPlayerResult(
+                    player.number,
+                    player.position,
+                    player.side,
+                    player.order,
+                    "RIGHT",
+                    player.player_name,
+                )
+                if player.player_name == "Michael Rushton"
+                else player
+            )
+            for player in result.lineup
+        ]
+        result = FormationAnalysisResult(**{**result.__dict__, "lineup": lineup})
+
+        board = FormationBoardMapper().to_board(result)
+        michael_slot = next(
+            slot
+            for slot in board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Michael Rushton"
+        )
+        left_forward_slot = next(
+            slot
+            for slot in board.slots
+            if slot.position == Position.FORWARD.value
+            and slot.side == "LEFT"
+        )
+
+        self.assertEqual(michael_slot.side, "RIGHT")
+        self.assertEqual(michael_slot.player.side, "CENTER")
+        self.assertEqual(michael_slot.player.order_side, "RIGHT")
+        self.assertLess(michael_slot.normalized_x, left_forward_slot.normalized_x)
 
     def test_workspace_creation_can_preserve_authoritative_input_orders(self):
         from ht_coach_app.workspace.workspace_service import WorkspaceService
