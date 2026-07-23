@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.5.8 Hattrick Midfield Rating Engine v1: a new Qt-independent
+  `engine/hattrick_ratings` package estimates own-team midfield on Hattrick
+  quarter-step units with explicit model versioning, form/stamina/context
+  assumptions, confidence warnings, structured breakdowns, validation-provider
+  integration, reference fixtures and a non-destructive midfield validation CLI.
 - Added Alpha 0.5.7.4.2 Restored Window Geometry Fix: Match now refreshes
   geometry after resize and window-state changes, preserves the outer scroll
   position by ratio when restored dimensions change, restores Formation Board

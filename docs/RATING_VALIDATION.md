@@ -159,13 +159,33 @@ Implemented metrics:
 
 Metrics are calculated globally and per sector.
 
+Alpha 0.5.8 extends `ErrorMetrics` with Hattrick-rating validation fields:
+
+- exact quarter-step accuracy;
+- accuracy within 0.25;
+- accuracy within 0.50;
+- median absolute error;
+- signed bias, maximum error and sample count remain available.
+
+These metrics use Hattrick rating units only. They must not be mixed with internal
+contribution totals.
+
 ## CLI
 
 Run from the repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\validate_ratings.py fixtures\hattrick
+.\.venv\Scripts\python.exe tools\validate_ratings.py fixtures\hattrick\pata2008_reference.json
 ```
+
+Midfield Rating Engine v1 also provides a non-destructive provider-backed CLI:
+
+```powershell
+.\.venv\Scripts\python.exe -m engine.hattrick_ratings.midfield.calibration fixtures\hattrick\midfield_v1_reference.json
+```
+
+This command loads fixtures, predicts midfield with `midfield-v1`, prints validation
+metrics and never rewrites production parameters.
 
 Example output:
 
@@ -184,7 +204,8 @@ Warnings:
 
 ## Limitations
 
-- No rating prediction is implemented.
+- The validation framework itself does not implement prediction. Alpha 0.5.8 supplies a
+  separate Midfield Rating Engine provider for midfield-only validation.
 - No conversion from HT Coach internal contribution values is implemented.
 - No calibration, curve fitting or machine learning is implemented.
 - The initial reference fixture is minimal and cannot validate a future rating engine by
