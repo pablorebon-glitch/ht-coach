@@ -13,6 +13,50 @@
     "list_two": "{first} y {second}",
     "list_many": "{items} y {last}"
   },
+  "calibration": {
+    "title": "Calibracion de partidos reales",
+    "subtitle": "Registra partidos jugados y compara los ratings oficiales de Hattrick contra las predicciones de midfield-v1.",
+    "record_real_match": "Registrar partido real",
+    "add_record": "Agregar registro",
+    "finalize_record": "Finalizar registro",
+    "recalculate": "Recalcular dataset",
+    "export_dataset": "Exportar dataset de validacion",
+    "import_dataset": "Importar dataset de validacion",
+    "record_status": {
+      "draft": "Borrador",
+      "complete": "Completo",
+      "invalid": "Invalido",
+      "archived": "Archivado"
+    },
+    "quality": {
+      "complete": "Completo",
+      "usable_with_assumptions": "Utilizable con supuestos",
+      "incomplete": "Incompleto",
+      "invalid": "Invalido"
+    },
+    "validation": {
+      "missing_record_id": "El ID del registro es obligatorio.",
+      "match_not_played": "Solo se pueden finalizar partidos ya jugados.",
+      "future_match_cannot_be_finalized": "No se pueden finalizar partidos futuros.",
+      "invalid_match_date": "La fecha del partido no es valida.",
+      "missing_formation": "La formacion es obligatoria.",
+      "missing_lineup_snapshot": "La captura de alineacion es obligatoria.",
+      "duplicate_starter": "La alineacion contiene el mismo jugador mas de una vez.",
+      "missing_player_fields": "Faltan algunos datos del jugador y se pueden usar supuestos.",
+      "missing_official_midfield_rating": "El rating oficial de mediocampo es obligatorio."
+    },
+    "metrics": {
+      "sample_count": "Cantidad de muestras",
+      "exact_accuracy": "Precision exacta",
+      "within_0_25_accuracy": "Precision dentro de 0.25",
+      "within_0_50_accuracy": "Precision dentro de 0.50",
+      "mean_absolute_error": "Error absoluto medio",
+      "median_absolute_error": "Error absoluto mediano",
+      "signed_bias": "Sesgo con signo",
+      "maximum_error": "Error maximo",
+      "minimum_error": "Error minimo"
+    }
+  },
   "nav": {
     "dashboard": "Panel",
     "squad": "Plantel",

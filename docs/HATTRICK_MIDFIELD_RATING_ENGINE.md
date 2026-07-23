@@ -159,6 +159,20 @@ CLI:
 Metrics include exact quarter-step accuracy, within 0.25, within 0.50, mean absolute
 error, median absolute error, signed bias, maximum error and sample count.
 
+Alpha 0.5.8.1 adds `engine/hattrick_ratings/calibration`, a real-match calibration
+dataset workflow for `midfield-v1`. It records played-match lineup snapshots, official
+Hattrick midfield ratings, validation quality and model-versioned observations. The
+workflow can recalculate error reports and export/import validation fixtures, but it
+does not tune parameters or change the `midfield-v1` formula.
+
+CLI:
+
+```powershell
+.\.venv\Scripts\python.exe -m engine.hattrick_ratings.calibration --store .ht_coach_calibration\real_match_records.json report --model midfield-v1
+```
+
+See `docs/REAL_MATCH_CALIBRATION.md` for the full record schema and workflow.
+
 ## Opponent Comparison
 
 When own predicted midfield and opponent midfield are both on the Hattrick decimal
@@ -175,7 +189,8 @@ localized read-only display without changing the engine.
 ## Known Limitations
 
 - Midfield only.
-- Not calibrated from a complete real-match dataset.
+- Dataset capture exists, but `midfield-v1` is not yet tuned from a complete real-match
+  dataset.
 - No defense or attack predictions.
 - No possession, win probability or expected-goals prediction.
 - No automatic Hattrick scraping.

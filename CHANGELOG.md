@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.5.8.1 Real Match Calibration Dataset: a Qt-independent
+  `engine/hattrick_ratings/calibration` workflow records played-match lineup
+  snapshots, official Hattrick midfield ratings, validation quality, model-versioned
+  observations, aggregate and segmented error metrics, JSON persistence,
+  validation-dataset export/import, CLI commands, EN/ES localization keys, synthetic
+  schema fixtures and full documentation without tuning `midfield-v1`.
 - Added Alpha 0.5.8 Hattrick Midfield Rating Engine v1: a new Qt-independent
   `engine/hattrick_ratings` package estimates own-team midfield on Hattrick
   quarter-step units with explicit model versioning, form/stamina/context

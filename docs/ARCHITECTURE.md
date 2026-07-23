@@ -54,6 +54,13 @@ calculations. Predictions include model version `midfield-v1`, confidence,
 assumptions, warnings and a structured breakdown. The model is explicitly
 uncalibrated until enough complete official match fixtures exist.
 
+Alpha 0.5.8.1 adds `engine/hattrick_ratings/calibration` as the evidence layer for
+real played matches. It freezes lineup/context snapshots, stores official Hattrick
+midfield ratings, validates record quality, generates model-versioned observations and
+reports aggregate/segmented error metrics. It may export/import Rating Validation
+Framework fixtures, but it must not tune `midfield-v1`, convert internal contribution
+totals, change optimizers, change probabilities or alter desktop workspace layout.
+
 Alpha 0.5.6.2.1 refines `ht_coach_app/workspace` around manual intent. The initial
 optimizer result remains the global recommendation, but later valid manual slot
 assignments are authoritative. `WorkspaceService` is the canonical presentation-
@@ -92,6 +99,8 @@ ht_coach_app/
 engine/
   advisor/
   hattrick_ratings/
+    calibration/
+    midfield/
   rating_validation/
   squad_evolution/
   squad_health/

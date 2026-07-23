@@ -187,6 +187,19 @@ Midfield Rating Engine v1 also provides a non-destructive provider-backed CLI:
 This command loads fixtures, predicts midfield with `midfield-v1`, prints validation
 metrics and never rewrites production parameters.
 
+Alpha 0.5.8.1 adds a real-match calibration dataset workflow in
+`engine/hattrick_ratings/calibration`. It produces validation fixtures from finalized
+played-match records and can import exported validation fixtures back into calibration
+records when source metadata is present.
+
+```powershell
+.\.venv\Scripts\python.exe -m engine.hattrick_ratings.calibration --store .ht_coach_calibration\real_match_records.json recalculate --model midfield-v1
+.\.venv\Scripts\python.exe -m engine.hattrick_ratings.calibration --store .ht_coach_calibration\real_match_records.json export --model midfield-v1 --output validation_export.json
+```
+
+The calibration workflow records evidence and metrics only. It does not fit curves,
+retune parameters or convert internal HT Coach contribution totals.
+
 Example output:
 
 ```text
@@ -212,3 +225,6 @@ Warnings:
   itself.
 - Full validation will require complete own-team match fixtures with lineup, orders,
   player state and official Hattrick ratings.
+- Real-match calibration records can now store that evidence, but the included fixture
+  under `fixtures/hattrick/calibration` is synthetic and must not be treated as real
+  Hattrick calibration evidence.
