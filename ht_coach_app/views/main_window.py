@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QFrame,
@@ -151,8 +151,32 @@ class MainWindow(QMainWindow):
         self.sidebar.navigation_requested.connect(
             self.navigation_controller.navigate_to
         )
+        self.navigation_controller.page_changed.connect(
+            self._handle_page_changed
+        )
+        self.stacked_pages.currentChanged.connect(
+            self._handle_current_page_changed
+        )
         self.setCentralWidget(root)
         self.sidebar.select_first_page()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        QTimer.singleShot(
+            0,
+            lambda: self._activate_current_page("main_window_show"),
+        )
+
+    def _handle_page_changed(self, key):
+        self._activate_current_page(f"navigation:{key}")
+
+    def _handle_current_page_changed(self, _index):
+        self._activate_current_page("stacked_page_changed")
+
+    def _activate_current_page(self, reason):
+        widget = self.stacked_pages.currentWidget()
+        if widget is not None and hasattr(widget, "on_page_activated"):
+            widget.on_page_activated(reason)
 
     def _show_not_implemented_status(self):
         self.statusBar().showMessage(

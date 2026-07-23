@@ -7,11 +7,15 @@ from PySide6.QtWidgets import QApplication, QTabWidget
 from PySide6.QtTest import QTest
 
 from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
+from ht_coach_app.persistence.match_workspace_repository import (
+    MatchWorkspaceSettings,
+)
 from ht_coach_app.ui.responsive import (
     restore_splitter_geometry,
     splitter_ratios_from_sizes,
     splitter_sizes_from_ratios,
 )
+from ht_coach_app.views.main_window import MainWindow
 from ht_coach_app.views.match_page import MatchPage
 from ht_coach_app.views.squad_page import SquadPage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
@@ -39,6 +43,24 @@ class ResponsiveLayoutTest(unittest.TestCase):
         QApplication.processEvents()
         QTest.qWait(30)
         QApplication.processEvents()
+
+    def settle_geometry(self, milliseconds=120):
+        QApplication.processEvents()
+        QTest.qWait(milliseconds)
+        QApplication.processEvents()
+
+    def match_page_from_window(self, window):
+        for index in range(window.stacked_pages.count()):
+            widget = window.stacked_pages.widget(index)
+            if isinstance(widget, MatchPage):
+                return widget
+        self.fail("MainWindow did not create a MatchPage")
+
+    def sections(self, page):
+        return {
+            section.state_key: section
+            for section in page.findChildren(CollapsibleSection)
+        }
 
     def assert_pitch_is_readable(self, board):
         self.assertIsNotNone(board)
@@ -143,7 +165,11 @@ class ResponsiveLayoutTest(unittest.TestCase):
         self.show_page(page, 1366, 768)
         scroll = page.scroll_area.verticalScrollBar()
         scroll.setValue(120)
-        before = scroll.value()
+        before_ratio = (
+            scroll.value() / scroll.maximum()
+            if scroll.maximum() > 0
+            else 0.0
+        )
 
         for width, height in [
             (1920, 1080),
@@ -157,7 +183,13 @@ class ResponsiveLayoutTest(unittest.TestCase):
             self.assertFalse(page.findChild(QTabWidget, "matchResultTabs").isHidden())
 
         self.assertGreaterEqual(scroll.value(), 0)
-        self.assertLessEqual(abs(scroll.value() - before), 160)
+        self.assertLessEqual(scroll.value(), scroll.maximum())
+        if scroll.maximum() > 0:
+            self.assertAlmostEqual(
+                scroll.value() / scroll.maximum(),
+                before_ratio,
+                delta=0.35,
+            )
 
     def test_match_restored_window_state_sequences_keep_sections_readable(self):
         for width, height in [(1280, 720), (1366, 768), (1440, 900), (1600, 900)]:
@@ -262,6 +294,149 @@ class ResponsiveLayoutTest(unittest.TestCase):
             for section in sections
         ]
         self.assertTrue(all(height > 0 for height in expanded_heights))
+
+    def test_match_direct_restored_launch_stabilizes_without_manual_toggle(self):
+        window = MainWindow()
+        page = self.match_page_from_window(window)
+        toggle_events = []
+        page.match_section_toggled.connect(
+            lambda key, expanded: toggle_events.append((key, expanded))
+        )
+        page.show_results(rich_match_result(), restored=True)
+
+        window.resize(1366, 768)
+        window.show()
+        window.navigation_controller.navigate_to("match")
+        self.settle_geometry()
+
+        self.assertEqual(toggle_events, [])
+        self.assertEqual(page.match_geometry_invariant_failures(), [])
+        report = page.last_initial_geometry_report()
+        self.assertLessEqual(report.get("passes", 0), page.INITIAL_GEOMETRY_MAX_PASSES)
+
+    def test_match_hidden_page_activation_stabilizes_restored_geometry(self):
+        window = MainWindow()
+        page = self.match_page_from_window(window)
+        page.show_results(rich_match_result(), restored=True)
+
+        window.resize(1366, 768)
+        window.show()
+        window.navigation_controller.navigate_to("dashboard")
+        self.settle_geometry(40)
+        self.assertFalse(page.isVisible())
+
+        window.navigation_controller.navigate_to("match")
+        self.settle_geometry()
+
+        self.assertTrue(page.isVisible())
+        self.assertEqual(page.match_geometry_invariant_failures(), [])
+        self.assertEqual(
+            page.last_initial_geometry_report().get("viewport"),
+            page._current_visible_viewport(),
+        )
+
+    def test_match_initial_section_states_preserve_geometry_without_toggle(self):
+        state_sets = [
+            {
+                "decision_lab": False,
+                "match_intelligence": False,
+                "rating_calibration": False,
+                "match_analysis": False,
+            },
+            {"decision_lab": True},
+            {"match_intelligence": True},
+            {"rating_calibration": True},
+            {"match_analysis": True},
+            {
+                "decision_lab": True,
+                "match_intelligence": False,
+                "rating_calibration": True,
+                "match_analysis": False,
+            },
+        ]
+
+        for states in state_sets:
+            with self.subTest(states=states):
+                page = MatchPage()
+                page.apply_settings(
+                    MatchWorkspaceSettings(match_section_states=states)
+                )
+                toggle_events = []
+                page.match_section_toggled.connect(
+                    lambda key, expanded: toggle_events.append((key, expanded))
+                )
+                page.show_results(rich_match_result(), restored=True)
+                self.show_page(page, 1366, 768)
+                page.request_initial_geometry_stabilization("test")
+                self.settle_geometry()
+
+                effective = page.match_section_states()
+                for key, default in page.MATCH_SECTION_DEFAULTS.items():
+                    self.assertEqual(
+                        effective[key],
+                        states.get(key, default),
+                    )
+                self.assertEqual(toggle_events, [])
+                self.assertEqual(page.match_geometry_invariant_failures(), [])
+
+    def test_match_headers_reflow_without_overlap_on_initial_restored_width(self):
+        page = MatchPage()
+        page.show_results(rich_match_result(), restored=True)
+        self.show_page(page, 1280, 720)
+        page.request_initial_geometry_stabilization("test_header_reflow")
+        self.settle_geometry()
+
+        for section in self.sections(page).values():
+            with self.subTest(section=section.state_key):
+                self.assertGreaterEqual(
+                    section.header_button.height() + 1,
+                    section.header_button.minimumSizeHint().height(),
+                )
+                self.assertLess(
+                    section.title_label.geometry().bottom(),
+                    section.summary_label.geometry().top(),
+                )
+
+        page.resize(1600, 900)
+        self.settle_geometry()
+        self.assertEqual(page.match_geometry_invariant_failures(), [])
+
+    def test_match_startup_stale_callbacks_do_not_apply_old_viewport(self):
+        page = MatchPage()
+        page.show_results(rich_match_result(), restored=True)
+        self.show_page(page, 1366, 768)
+
+        page.request_initial_geometry_stabilization("test_old_viewport")
+        page.resize(1600, 900)
+        QApplication.processEvents()
+        page.request_initial_geometry_stabilization("test_new_viewport")
+        self.settle_geometry()
+
+        self.assertEqual(page.match_geometry_invariant_failures(), [])
+        self.assertEqual(
+            page.last_initial_geometry_report().get("viewport"),
+            page._current_visible_viewport(),
+        )
+
+    def test_match_return_after_navigate_away_uses_current_viewport(self):
+        window = MainWindow()
+        page = self.match_page_from_window(window)
+        page.show_results(rich_match_result(), restored=True)
+        window.resize(1366, 768)
+        window.show()
+
+        window.navigation_controller.navigate_to("match")
+        page.request_initial_geometry_stabilization("test_navigate_away")
+        window.navigation_controller.navigate_to("dashboard")
+        self.settle_geometry(80)
+        window.navigation_controller.navigate_to("match")
+        self.settle_geometry()
+
+        self.assertEqual(page.match_geometry_invariant_failures(), [])
+        self.assertEqual(
+            page.last_initial_geometry_report().get("viewport"),
+            page._current_visible_viewport(),
+        )
 
     def test_match_maximize_restore_cycle_keeps_pitch_visible(self):
         page = MatchPage()

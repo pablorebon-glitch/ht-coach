@@ -38,6 +38,16 @@ class CollapsibleHeaderButton(QPushButton):
             else super().minimumSizeHint()
         )
 
+    def hasHeightForWidth(self):
+        layout = self.layout()
+        return bool(layout is not None and layout.hasHeightForWidth())
+
+    def heightForWidth(self, width):
+        layout = self.layout()
+        if layout is not None and layout.hasHeightForWidth():
+            return layout.heightForWidth(width)
+        return super().heightForWidth(width)
+
 
 class CollapsibleArrowLabel(QLabel):
     def __init__(self, section, parent=None):
@@ -101,7 +111,7 @@ class CollapsibleSection(QFrame):
 
         self.summary_label = QLabel(self._summary)
         self.summary_label.setObjectName("sectionSubtitle")
-        self.summary_label.setWordWrap(False)
+        self.summary_label.setWordWrap(True)
         text_layout.addWidget(self.summary_label)
 
         header_layout.addLayout(text_layout, 1)
@@ -157,6 +167,33 @@ class CollapsibleSection(QFrame):
         if emit and changed:
             self.toggled.emit(self.state_key, expanded)
 
+    def refresh_geometry(self):
+        header_layout = self.header_button.layout()
+        if header_layout is not None:
+            header_layout.invalidate()
+            header_layout.activate()
+        for widget in (
+            self.title_label,
+            self.summary_label,
+            self.header_button,
+            self.body_host,
+            self._body_widget,
+        ):
+            if widget is not None:
+                layout = widget.layout()
+                if layout is not None:
+                    layout.invalidate()
+                widget.updateGeometry()
+        self.body_host.setMinimumHeight(
+            self._expanded_body_minimum_height()
+            if self._expanded
+            else 0
+        )
+        self.body_host.setMaximumHeight(16777215 if self._expanded else 0)
+        self._sync_header_geometry()
+        self.updateGeometry()
+        self._activate_parent_layouts()
+
     def set_title(self, title):
         self._title = str(title or "")
         self.title_label.setText(self._title)
@@ -205,9 +242,11 @@ class CollapsibleSection(QFrame):
         return f"{action}: {self._title}{summary}"
 
     def _sync_header_geometry(self):
-        self.header_button.setMinimumHeight(
-            self.header_button.sizeHint().height()
-        )
+        width = self.header_button.width() or self.width()
+        height = self.header_button.sizeHint().height()
+        if width > 0 and self.header_button.hasHeightForWidth():
+            height = max(height, self.header_button.heightForWidth(width))
+        self.header_button.setMinimumHeight(height)
         self.header_button.updateGeometry()
 
     def _expanded_body_minimum_height(self):

@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added Alpha 0.5.7.4.3 Match Initial Geometry Stabilization: Match now runs a
+  bounded post-show/page-activation geometry pass when restored-window viewport
+  dimensions become available, protects stale callbacks with generation tokens,
+  reflows two-line section headers for the actual width, and validates startup
+  section geometry without fake accordion toggles or analysis recalculation.
 - Added Alpha 0.5.7.4.2 Restored Window Geometry Fix: Match now refreshes
   geometry after resize and window-state changes, preserves the outer scroll
   position by ratio when restored dimensions change, restores Formation Board

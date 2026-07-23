@@ -1,3 +1,5 @@
+import logging
+
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -53,7 +55,14 @@ from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 class MatchPage(BasePage):
+    INITIAL_GEOMETRY_MIN_PASSES = 2
+    INITIAL_GEOMETRY_MAX_PASSES = 3
+    INITIAL_GEOMETRY_DELAYS_MS = (0, 16, 40)
+
     browse_players_requested = Signal()
     load_players_requested = Signal()
     analyze_requested = Signal()
@@ -94,6 +103,9 @@ class MatchPage(BasePage):
         self._result_tabs = None
         self._formation_board_widget = None
         self._geometry_refresh_revision = 0
+        self._initial_geometry_generation = 0
+        self._initial_stabilized_viewport = None
+        self._last_initial_geometry_report = {}
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
         self._build_scroll_content()
@@ -104,6 +116,7 @@ class MatchPage(BasePage):
         super().resizeEvent(event)
         if hasattr(self, "scroll_area"):
             self._schedule_deferred_geometry_refresh()
+            self.request_initial_geometry_stabilization("resize")
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -112,11 +125,16 @@ class MatchPage(BasePage):
             and hasattr(self, "scroll_area")
         ):
             self._schedule_deferred_geometry_refresh()
+            self.request_initial_geometry_stabilization("window_state")
 
     def showEvent(self, event):
         super().showEvent(event)
         if hasattr(self, "scroll_area"):
             self._schedule_deferred_geometry_refresh()
+            self.request_initial_geometry_stabilization("show")
+
+    def on_page_activated(self, reason="page_activated"):
+        self.request_initial_geometry_stabilization(reason)
 
     def _build_scroll_content(self):
         self.scroll_area = QScrollArea()
@@ -555,6 +573,7 @@ class MatchPage(BasePage):
             viewport_state,
             self._result_tabs,
         )
+        self.request_initial_geometry_stabilization("results_shown")
 
     def set_match_section_states(self, states):
         for key, default in self.MATCH_SECTION_DEFAULTS.items():
@@ -936,6 +955,181 @@ class MatchPage(BasePage):
 
         QTimer.singleShot(0, refresh)
 
+    def request_initial_geometry_stabilization(self, reason):
+        if (
+            not hasattr(self, "scroll_area")
+            or self._state != "success"
+            or not self.isVisible()
+        ):
+            return
+
+        viewport = self._current_visible_viewport()
+        if viewport[0] <= 0 or viewport[1] <= 0:
+            return
+
+        failures = self.match_geometry_invariant_failures()
+        if self._initial_stabilized_viewport == viewport and not failures:
+            return
+
+        self._initial_geometry_generation += 1
+        generation = self._initial_geometry_generation
+        viewport_state = self._capture_viewport_state()
+        self._last_initial_geometry_report = {
+            "reason": reason,
+            "viewport": viewport,
+            "passes": 0,
+            "before": self.match_geometry_snapshot(),
+            "failures": failures,
+        }
+        self._queue_initial_geometry_pass(
+            generation,
+            reason,
+            1,
+            viewport,
+            viewport_state,
+        )
+
+    def _queue_initial_geometry_pass(
+        self,
+        generation,
+        reason,
+        pass_number,
+        requested_viewport,
+        viewport_state,
+    ):
+        delay = self.INITIAL_GEOMETRY_DELAYS_MS[
+            min(pass_number - 1, len(self.INITIAL_GEOMETRY_DELAYS_MS) - 1)
+        ]
+
+        def run_pass():
+            self._run_initial_geometry_pass(
+                generation,
+                reason,
+                pass_number,
+                requested_viewport,
+                viewport_state,
+            )
+
+        QTimer.singleShot(delay, run_pass)
+
+    def _run_initial_geometry_pass(
+        self,
+        generation,
+        reason,
+        pass_number,
+        requested_viewport,
+        viewport_state,
+    ):
+        if generation != self._initial_geometry_generation:
+            LOGGER.debug(
+                "Skipping stale Match geometry stabilization pass %s for %s",
+                pass_number,
+                reason,
+            )
+            return
+        if self._state != "success" or not self.isVisible():
+            return
+
+        current_viewport = self._current_visible_viewport()
+        if current_viewport != requested_viewport:
+            LOGGER.debug(
+                "Continuing Match geometry stabilization pass %s after "
+                "viewport settled: "
+                "requested viewport=%s current viewport=%s",
+                pass_number,
+                requested_viewport,
+                current_viewport,
+            )
+
+        before_failures = self.match_geometry_invariant_failures()
+        LOGGER.debug(
+            "Match geometry stabilization requested reason=%s pass=%s "
+            "viewport=%s failures=%s",
+            reason,
+            pass_number,
+            current_viewport,
+            before_failures,
+        )
+        self._apply_initial_geometry_stabilization_pass(viewport_state)
+        settled_viewport = self._current_visible_viewport()
+        if (
+            settled_viewport != current_viewport
+            and pass_number < self.INITIAL_GEOMETRY_MAX_PASSES
+        ):
+            next_state = self._capture_viewport_state()
+            self._queue_initial_geometry_pass(
+                generation,
+                reason,
+                pass_number + 1,
+                settled_viewport,
+                next_state,
+            )
+            return
+        after_failures = self.match_geometry_invariant_failures()
+        self._last_initial_geometry_report = {
+            "reason": reason,
+            "viewport": settled_viewport,
+            "passes": pass_number,
+            "before_failures": before_failures,
+            "failures": after_failures,
+            "after": self.match_geometry_snapshot(),
+        }
+
+        if pass_number < self.INITIAL_GEOMETRY_MIN_PASSES:
+            self._queue_initial_geometry_pass(
+                generation,
+                reason,
+                pass_number + 1,
+                settled_viewport,
+                self._capture_viewport_state(),
+            )
+            return
+
+        if (
+            after_failures
+            and pass_number < self.INITIAL_GEOMETRY_MAX_PASSES
+        ):
+            self._queue_initial_geometry_pass(
+                generation,
+                reason,
+                pass_number + 1,
+                settled_viewport,
+                viewport_state,
+            )
+            return
+
+        if not after_failures:
+            self._initial_stabilized_viewport = settled_viewport
+        LOGGER.debug(
+            "Match geometry stabilization complete reason=%s pass=%s "
+            "viewport=%s failures=%s",
+            reason,
+            pass_number,
+            settled_viewport,
+            after_failures,
+        )
+
+    def _apply_initial_geometry_stabilization_pass(self, viewport_state):
+        self.match_content.setUpdatesEnabled(False)
+        try:
+            self.results_layout.invalidate()
+            for section in self._ordered_match_sections():
+                section.refresh_geometry()
+            self.results_host.layout().activate()
+            self.results_host.updateGeometry()
+            self.match_content_layout.invalidate()
+            self.match_content_layout.activate()
+            self.match_content.adjustSize()
+            self.match_content.updateGeometry()
+            self.scroll_area.updateGeometry()
+            self._restore_viewport_state(
+                viewport_state,
+                self._result_tabs,
+            )
+        finally:
+            self.match_content.setUpdatesEnabled(True)
+            self.match_content.update()
+
     def _refresh_current_geometry(self, viewport_state):
         if self._state != "success":
             return
@@ -945,7 +1139,7 @@ class MatchPage(BasePage):
                 body = section.body_widget()
                 if body is not None and body.layout() is not None:
                     body.layout().invalidate()
-                section.updateGeometry()
+            section.refresh_geometry()
         self.match_content_layout.invalidate()
         self.results_host.updateGeometry()
         self.match_content.updateGeometry()
@@ -960,6 +1154,127 @@ class MatchPage(BasePage):
         if maximum <= 0:
             return 0.0
         return scrollbar.value() / maximum
+
+    def _current_visible_viewport(self):
+        viewport = self.scroll_area.viewport()
+        return (viewport.width(), viewport.height())
+
+    def _ordered_match_sections(self):
+        return [
+            self._match_sections[key]
+            for key in (
+                "decision_lab",
+                "match_intelligence",
+                "rating_calibration",
+                "match_analysis",
+            )
+            if key in self._match_sections
+        ]
+
+    def match_geometry_invariant_failures(self):
+        if self._state != "success" or not self._match_sections:
+            return []
+
+        failures = []
+        ordered = self._ordered_match_sections()
+        previous_bottom = None
+        for section in ordered:
+            key = section.state_key
+            header = section.header_button
+            body_host = section.body_host
+            header_minimum = header.minimumSizeHint().height()
+            header_height = header.height()
+            section_height = section.height()
+
+            if section_height + 1 < header_minimum:
+                failures.append(f"{key}:section_shorter_than_header")
+            if header_height + 1 < header_minimum:
+                failures.append(f"{key}:header_shorter_than_minimum")
+            if section.title_label.geometry().bottom() >= (
+                section.summary_label.geometry().top()
+            ):
+                failures.append(f"{key}:title_summary_overlap")
+
+            if section.is_expanded():
+                if body_host.isHidden():
+                    failures.append(f"{key}:expanded_body_hidden")
+                if body_host.height() <= 0:
+                    failures.append(f"{key}:expanded_body_zero_height")
+                body = section.body_widget()
+                if body is not None and (
+                    body.width() <= 0 or body.height() <= 0
+                ):
+                    failures.append(f"{key}:expanded_body_widget_empty")
+                if section_height < header_height + body_host.height() - 2:
+                    failures.append(f"{key}:expanded_section_missing_body")
+            else:
+                if not body_host.isHidden():
+                    failures.append(f"{key}:collapsed_body_visible")
+                if body_host.height() > 1:
+                    failures.append(f"{key}:collapsed_body_has_height")
+                if section_height > header_height + 12:
+                    failures.append(f"{key}:collapsed_section_too_tall")
+
+            top = section.mapTo(self.match_content, section.rect().topLeft()).y()
+            bottom = section.mapTo(
+                self.match_content,
+                section.rect().bottomLeft(),
+            ).y()
+            if previous_bottom is not None and top - previous_bottom > 24:
+                failures.append(f"{key}:large_gap_before_section")
+            previous_bottom = bottom
+
+        workspace = self.findChild(QTabWidget, "matchResultTabs")
+        if workspace is None or workspace.isHidden():
+            failures.append("workspace:hidden")
+        else:
+            workspace_top = workspace.mapTo(
+                self.match_content,
+                workspace.rect().topLeft(),
+            ).y()
+            analysis = self._match_sections.get("match_analysis")
+            if analysis is not None:
+                analysis_bottom = analysis.mapTo(
+                    self.match_content,
+                    analysis.rect().bottomLeft(),
+                ).y()
+                if workspace_top - analysis_bottom > 24:
+                    failures.append("workspace:large_gap_after_analysis")
+
+        scrollbar = self.scroll_area.verticalScrollBar()
+        if scrollbar.maximum() < 0 or scrollbar.value() < 0:
+            failures.append("scrollbar:invalid_range")
+        if self.match_content.height() < self.results_host.sizeHint().height():
+            failures.append("content:shorter_than_results_hint")
+        return failures
+
+    def match_geometry_snapshot(self):
+        return {
+            "match_page": (self.width(), self.height()),
+            "viewport": self._current_visible_viewport(),
+            "results_size_hint": (
+                self.results_host.sizeHint().width(),
+                self.results_host.sizeHint().height(),
+            ),
+            "content_height": self.match_content.height(),
+            "sections": {
+                section.state_key: {
+                    "expanded": section.is_expanded(),
+                    "section_height": section.height(),
+                    "size_hint_height": section.sizeHint().height(),
+                    "header_height": section.header_button.height(),
+                    "header_minimum": (
+                        section.header_button.minimumSizeHint().height()
+                    ),
+                    "body_height": section.body_host.height(),
+                    "body_visible": not section.body_host.isHidden(),
+                }
+                for section in self._ordered_match_sections()
+            },
+        }
+
+    def last_initial_geometry_report(self):
+        return dict(self._last_initial_geometry_report)
 
     def show_workspace_updating(self):
         self.show_status(t("match.updating_workspace"))

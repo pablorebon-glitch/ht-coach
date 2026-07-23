@@ -377,6 +377,12 @@ Content:
   expanded section bodies, restores outer scroll by ratio when the restored viewport
   width changes, and restores the Formation Board splitter from logical proportions
   instead of cached maximized pixel sizes.
+- Alpha 0.5.7.4.3 stabilizes initial restored launches and hidden-page activation.
+  `MainWindow` notifies the active page after show and navigation changes; Match then
+  runs a bounded two-to-three-pass queued geometry stabilization using the actual
+  visible scroll viewport. The pass refreshes existing section/header/body geometry,
+  validates accordion invariants and ignores stale callbacks through a generation
+  token. It does not fake toggles, rebuild widgets or recalculate analysis.
 - Decision Lab remains a compact natural-height body. Match Intelligence uses a
   bounded internal scroll body for the matrix and wrapped summaries. Opponent Rating
   Calibration uses a bounded internal scroll body for the comparison table so headers
