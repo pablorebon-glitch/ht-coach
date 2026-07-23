@@ -44,11 +44,21 @@ class WorkspaceService:
     def __init__(self, analyzer=PlayerAnalyzer):
         self._analyzer = analyzer
 
-    def create(self, boards, selected_formation_name="", roster_players=()):
-        finalized_boards = [
-            self.optimize_orders_for_lineup(board, roster_players)[0]
-            for board in boards
-        ]
+    def create(
+        self,
+        boards,
+        selected_formation_name="",
+        roster_players=(),
+        optimize_orders=True,
+    ):
+        finalized_boards = (
+            [
+                self.optimize_orders_for_lineup(board, roster_players)[0]
+                for board in boards
+            ]
+            if optimize_orders
+            else list(boards)
+        )
         original = {
             board.formation_name: deepcopy(board)
             for board in finalized_boards

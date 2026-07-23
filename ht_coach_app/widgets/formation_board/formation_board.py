@@ -222,6 +222,7 @@ class FormationBoard(QWidget):
         player_details_by_name=None,
         roster_players=None,
         workspace_state=None,
+        preserve_input_orders=False,
     ):
         self._details_by_name = player_details_by_name or {}
         self._roster_players = list(roster_players or [])
@@ -231,6 +232,7 @@ class FormationBoard(QWidget):
                 list(boards),
                 selected_formation_name,
                 roster_players=self._roster_players,
+                optimize_orders=not preserve_input_orders,
             )
         else:
             self._workspace_state = (

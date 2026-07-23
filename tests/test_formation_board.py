@@ -22,10 +22,15 @@ from ht_coach_app.reasoning.models import (
     DecisionReason,
     RecommendedDecision,
 )
+from ht_coach_app.workspace.workspace_models import (
+    WorkspaceModification,
+    WorkspaceState,
+)
 from ht_coach_app.widgets.formation_board.formation_layouts import (
     get_formation_layout,
     supported_formation_layouts,
 )
+from models.player import Player
 from models.formations import FORMATION_BY_NAME
 from models.position import Position
 
@@ -68,6 +73,103 @@ def formation_result(name="3-5-2", recommended=True):
         lineup=lineup,
         is_recommended=recommended,
     )
+
+
+def order_sync_result(name="2-5-3", recommended=True):
+    lineup = [
+        LineupPlayerResult(1, "Goalkeeper (GK)", "CENTER", "Normal", "", "Goalkeeper One"),
+        LineupPlayerResult(2, "Central Defender (CD)", "LEFT", "Offensive", "", "Roberto Jubileu"),
+        LineupPlayerResult(3, "Central Defender (CD)", "RIGHT", "Offensive", "", "Mauricio Gustavo Bassedas"),
+        LineupPlayerResult(4, "Winger (W)", "LEFT", "Offensive", "", "Nahuel Pulian"),
+        LineupPlayerResult(5, "Winger (W)", "RIGHT", "Offensive", "", "Emiliano Jose Rodriguez"),
+        LineupPlayerResult(6, "Inner Midfielder (IM)", "LEFT", "Offensive", "", "Pierre-Jean Delion"),
+        LineupPlayerResult(7, "Inner Midfielder (IM)", "CENTER", "Offensive", "", "Fabian Abbiendi"),
+        LineupPlayerResult(8, "Inner Midfielder (IM)", "RIGHT", "Offensive", "", "Diego Garcia de Paredes"),
+        LineupPlayerResult(9, "Forward (F)", "LEFT", "Normal", "", "Nestor Agusevich"),
+        LineupPlayerResult(10, "Forward (F)", "CENTER", "Towards Wing", "LEFT", "Michael Rushton"),
+        LineupPlayerResult(11, "Forward (F)", "RIGHT", "Normal", "", "David Schiller"),
+    ]
+    return FormationAnalysisResult(
+        formation_name=name,
+        recommended_tactic="Normal",
+        tactic_level=0,
+        win_probability=0.55,
+        draw_probability=0.25,
+        loss_probability=0.20,
+        possession=0.61,
+        expected_goals=2.1,
+        opponent_expected_goals=1.2,
+        lineup=lineup,
+        is_recommended=recommended,
+    )
+
+
+def all_normal_result():
+    result = order_sync_result()
+    return FormationAnalysisResult(
+        **{
+            **result.__dict__,
+            "lineup": [
+                LineupPlayerResult(
+                    player.number,
+                    player.position,
+                    player.side,
+                    "Normal",
+                    "",
+                    player.player_name,
+                )
+                for player in result.lineup
+            ],
+        }
+    )
+
+
+def order_sync_roster():
+    return [
+        Player(
+            name=player.player_name,
+            age=25,
+            days=0,
+            speciality="",
+            form=7,
+            stamina=7,
+            goalkeeper=1,
+            defending=8,
+            playmaking=8,
+            winger=8,
+            passing=8,
+            scoring=8,
+            set_pieces=5,
+            experience=5,
+            leadership=5,
+            tsi=1000,
+            salary=1000,
+        )
+        for player in order_sync_result().lineup
+    ]
+
+
+def lineup_order_map(formation):
+    return {
+        (
+            player.player_name,
+            player.position,
+            player.side,
+        ): (player.order, player.order_side or "")
+        for player in formation.lineup
+    }
+
+
+def board_order_map(board):
+    return {
+        (
+            slot.player.player_name,
+            slot.player.position_label,
+            slot.player.side,
+        ): (slot.player.order_label, slot.player.order_side)
+        for slot in board.slots
+        if slot.player is not None
+    }
 
 
 class FormationLayoutTest(unittest.TestCase):
@@ -254,6 +356,41 @@ class FormationBoardMapperTest(unittest.TestCase):
             board = mapper.to_board(formation_result(name))
             self.assertEqual(board.formation_name, name)
             self.assertEqual(len(board.slots), 11)
+
+    def test_mapper_preserves_individual_orders_and_order_sides(self):
+        result = order_sync_result()
+
+        board = FormationBoardMapper().to_board(result)
+
+        self.assertEqual(board_order_map(board), lineup_order_map(result))
+        michael = next(
+            slot.player
+            for slot in board.slots
+            if slot.player is not None
+            and slot.player.player_name == "Michael Rushton"
+        )
+        self.assertEqual(michael.individual_order, "Towards Wing")
+        self.assertEqual(michael.order_label, "Towards Wing")
+        self.assertEqual(michael.order_side, "LEFT")
+        self.assertEqual(michael.order_side_label, "Left")
+
+    def test_workspace_creation_can_preserve_authoritative_input_orders(self):
+        from ht_coach_app.workspace.workspace_service import WorkspaceService
+
+        result = order_sync_result()
+        board = FormationBoardMapper().to_board(result)
+
+        state = WorkspaceService().create(
+            [board],
+            "2-5-3",
+            roster_players=order_sync_roster(),
+            optimize_orders=False,
+        )
+
+        self.assertEqual(
+            board_order_map(state.current_board),
+            lineup_order_map(result),
+        )
 
 
 class FormationBoardFormattingTest(unittest.TestCase):
@@ -450,6 +587,161 @@ class FormationBoardQtSmokeTest(unittest.TestCase):
 
         self.assertIn("Decision Lab", labels_before_tabs)
         self.assertEqual(tabs.tabText(0), "Formation Board")
+
+    def test_match_page_board_orders_match_detailed_xi_view_models(self):
+        page = MatchPage()
+        page.set_roster_players(order_sync_roster())
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[order_sync_result()],
+            analyzed_formations=["2-5-3"],
+            players_csv_filename="players.csv",
+            completed_at="2026-07-23 00:00:00",
+        )
+
+        page.show_results(result)
+        board = page._formation_board_widget.current_board()
+
+        self.assertEqual(
+            board_order_map(board),
+            lineup_order_map(result.recommended_formation),
+        )
+
+    def test_player_cards_render_optimized_offensive_and_directional_orders(self):
+        page = MatchPage()
+        page.set_roster_players(order_sync_roster())
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[order_sync_result()],
+            analyzed_formations=["2-5-3"],
+            players_csv_filename="players.csv",
+            completed_at="2026-07-23 00:00:00",
+        )
+
+        page.show_results(result)
+        cards_by_player = {
+            card.player.player_name: card
+            for card in page._formation_board_widget.findChildren(PlayerCard)
+        }
+
+        for player_name in (
+            "Roberto Jubileu",
+            "Mauricio Gustavo Bassedas",
+            "Pierre-Jean Delion",
+            "Fabian Abbiendi",
+            "Diego Garcia de Paredes",
+        ):
+            self.assertIn("Offensive", cards_by_player[player_name].text())
+
+        rushton_text = cards_by_player["Michael Rushton"].text()
+        self.assertIn("Towards Wing", rushton_text)
+        self.assertIn("Left", rushton_text)
+
+    def test_fresh_match_analysis_replaces_stale_board_orders(self):
+        page = MatchPage()
+        page.set_roster_players(order_sync_roster())
+        stale = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[all_normal_result()],
+            analyzed_formations=["2-5-3"],
+        )
+        fresh = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[order_sync_result()],
+            analyzed_formations=["2-5-3"],
+        )
+
+        page.show_results(stale)
+        self.assertNotEqual(
+            board_order_map(page._formation_board_widget.current_board()),
+            lineup_order_map(fresh.recommended_formation),
+        )
+
+        page.show_results(fresh)
+
+        self.assertEqual(
+            board_order_map(page._formation_board_widget.current_board()),
+            lineup_order_map(fresh.recommended_formation),
+        )
+
+    def test_match_result_refresh_preserves_board_order_consistency(self):
+        page = MatchPage()
+        page.set_roster_players(order_sync_roster())
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[order_sync_result()],
+            analyzed_formations=["2-5-3"],
+        )
+
+        page.show_results(result)
+        page.show_results(result)
+
+        self.assertEqual(
+            board_order_map(page._formation_board_widget.current_board()),
+            lineup_order_map(result.recommended_formation),
+        )
+
+    def test_formation_switch_preserves_each_formation_orders(self):
+        first = order_sync_result("2-5-3", recommended=True)
+        second = formation_result("4-5-1", recommended=False)
+        result = MatchAnalysisResult(
+            player_count=11,
+            opponent_name="Rival FC",
+            formations=[first, second],
+            analyzed_formations=["2-5-3", "4-5-1"],
+        )
+        page = MatchPage()
+
+        page.show_results(result)
+        page._formation_board_widget.formation_combo.setCurrentIndex(1)
+
+        self.assertEqual(
+            board_order_map(page._formation_board_widget.current_board()),
+            lineup_order_map(second),
+        )
+
+    def test_recalculated_manual_workspace_keeps_table_and_board_synchronized(self):
+        result = order_sync_result()
+        board = FormationBoardMapper().to_board(result)
+        manual_board = FormationBoardMapper().to_board(result)
+        state = WorkspaceState(
+            original_boards={"2-5-3": board},
+            workspace_boards={"2-5-3": manual_board},
+            current_formation_name="2-5-3",
+            history=(
+                WorkspaceModification(
+                    formation_name="2-5-3",
+                    slot_id="manual",
+                    role="Forward",
+                    original_player_name="Nestor Agusevich",
+                    replacement_player_name="Michael Rushton",
+                    score_difference=0.0,
+                    revision_after=1,
+                ),
+            ),
+            revision=1,
+        )
+        page = MatchPage()
+
+        page.show_results(
+            MatchAnalysisResult(
+                player_count=11,
+                opponent_name="Rival FC",
+                formations=[result],
+                analyzed_formations=["2-5-3"],
+            ),
+            workspace_state=state,
+        )
+
+        self.assertEqual(
+            board_order_map(page._formation_board_widget.current_board()),
+            lineup_order_map(result),
+        )
 
 
 if __name__ == "__main__":
