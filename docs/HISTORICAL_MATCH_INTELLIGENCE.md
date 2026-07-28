@@ -176,22 +176,29 @@ side.
 
 ## Future Work
 
-Alpha 0.5.8.3 will consume this foundation for historical comparison.
+Alpha 0.5.8.3 consumed this foundation for deterministic historical comparison
+(`engine/history/evolution`), and Alpha 0.5.8.4 built a deterministic, evidenced
+insights and executive-summary layer on top of that
+(`engine/history/insights`) — see docs/ARCHITECTURE.md's "Historical Evolution
+Engine" and "Historical Insights Engine" sections for both.
 
-Future extension points include:
+Future extension points still open:
 
-- sector rating deltas;
-- formation changes;
-- player-added and player-removed events;
-- position and order changes;
-- deterministic insight rules;
-- executive summaries;
 - season evolution;
 - team trends;
 - prediction MAE;
 - recommendation accuracy;
 - opponent evolution;
 - season reports;
-- tactical recommendations based on historical evidence.
+- tactical recommendations based on historical evidence (Alpha 0.5.8.5 — Decision
+  Validation, and Alpha 0.6.0 — Team Evolution Dashboard).
 
-These are intentionally not implemented in Alpha 0.5.8.2.
+Sector rating deltas, formation changes, player-added/player-removed events,
+position and order changes, deterministic insight rules and executive summaries —
+listed here as future work in Alpha 0.5.8.2 — are now implemented (Alpha 0.5.8.3 and
+0.5.8.4, respectively).
+
+Note: the Match History UI (a single coherent screen showing snapshots, evolution
+and insights together) has not been built by any of 0.5.8.2, 0.5.8.3 or 0.5.8.4. All
+three engine layers exist and are tested; none is wired into the application's
+navigation yet. See docs/ROADMAP.md's Alpha 0.5.8.4 entry.

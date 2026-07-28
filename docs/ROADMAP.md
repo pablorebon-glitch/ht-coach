@@ -189,10 +189,77 @@ Acceptance criteria:
   engine, midfield engine or Formation Board code is changed.
 - `engine/history/evolution` test suite: 100% statement coverage.
 
-### Alpha 0.5.8.4: Historical Match Insights and Executive Summary
+### Alpha 0.5.8.4: Historical Insights Engine and Match History
 
-Future sprint. Convert comparison results into deterministic coaching insights and
-executive summaries.
+Goal: turn Alpha 0.5.8.3's evolution results into deterministic, evidenced,
+confidence-scored insights and an executive summary, using explicit rules only — no
+generative AI, no external API, no probabilistic language model.
+
+Deliverables:
+
+- `engine/history/insights` package, Qt-independent, built on top of
+  `engine/history` and `engine/history/evolution` without modifying either.
+- A deterministic rule engine (`InsightRuleEngine`) evaluating a catalog of small,
+  single-responsibility rules (sector, formation, lineup, individual-order,
+  player-condition, tactical and prediction rules), each producing zero or more
+  structured `HistoricalInsight` objects with stable message keys/params rather than
+  translated strings.
+- An evidence model (`InsightEvidence`) — every explanatory insight carries at least
+  one evidence item; an insight with no evidence can only be `INSUFFICIENT_DATA`,
+  enforced by the model itself, not by convention.
+- A documented, deterministic confidence policy (`classify_confidence`): HIGH
+  requires a direct structural change, complete data, a known deterministic sector
+  effect and no contradictory evidence; MEDIUM requires complete-enough data and at
+  least two supporting signals; LOW requires at least one signal; anything else is
+  INSUFFICIENT_DATA.
+- A causal-language guardrail encoded as data (`InsightRelationship`: observed,
+  associated with, likely contributor, possible contributor, insufficient evidence)
+  instead of hand-written cautious wording — e.g. several inner midfielders switching
+  to an Offensive order alongside an improved midfield rating is reported as a
+  `LIKELY_CONTRIBUTOR`, never as a proven cause.
+- Deterministic deduplication and prioritization (`InsightRuleEngine`): each insight
+  declares its own `dedupe_key` (defaulting to its rule ID, so distinct rules never
+  collide by accident) and optional `excludes` for genuine mutual exclusivity; only
+  the highest-priority, highest-confidence insight per key survives.
+- A `SummaryEngine` (`build_executive_summary`) producing a structured
+  `ExecutiveSummary` (comparison target, overall direction, main improvement, main
+  decline, strongest likely contributor, confidence, limitation) purely by selecting
+  among already-generated insights — never generating free-form paragraphs.
+- `ht_coach_app/services/historical_insights_service.py` /
+  `historical_insights_formatting.py`: an app-facing bridge combining snapshot
+  lookup, Alpha 0.5.8.3's comparison policies and insight generation, plus
+  presentation-only formatting (visual hierarchy grouping, evidence rows) with no
+  text generation beyond fixed labels.
+
+Match History UI: **not built in this sprint.** The app has no Match History screen
+at all yet — Alpha 0.5.8.2 built the snapshot foundation and Alpha 0.5.8.3/0.5.8.4
+built the comparison and insight engines, but none of the three has ever been
+rendered. Building one coherent Match History page (snapshot list, details,
+comparison selector, evolution panel, insights panel, data-quality limitations) is
+sized like its own sprint and is intentionally deferred rather than shipped as a
+partial or unstable screen. The two app services above exist specifically so that
+future UI work is "wire it up," not "build the logic too."
+
+Acceptance criteria:
+
+- Historical Evolution results convert into structured, evidenced insights.
+- Confidence is deterministic, documented and tested (including contradictory
+  evidence and insufficient-data cases).
+- No unsupported causal claims are generated; the flagship example (offensive inner
+  midfielders alongside a midfield improvement) is reported as a likely contributor,
+  never as a cause.
+- Duplicate/near-duplicate insights are consolidated deterministically.
+- Executive summaries are structured (keys and parameters), not free text.
+- Historical insight generation never invokes `FormationOptimizer`,
+  `LineupOptimizer`, `TacticOptimizer` or `OrderOptimizer` (enforced by a static
+  import-scan test plus a behavioral test).
+- No optimizer, rating engine, calibration, planner, snapshot schema, probability
+  engine, midfield engine, Formation Board or Alpha 0.5.8.3 evolution calculation is
+  changed.
+- `engine/history/insights` test suite: >95% statement coverage.
+- The two pre-existing date-sensitive Weekly Planner test failures are investigated,
+  confirmed still preexisting and left unchanged, per the sprint's explicit
+  instruction not to broaden into a Planner redesign.
 
 ### Alpha 0.5.8.5: Decision Validation
 

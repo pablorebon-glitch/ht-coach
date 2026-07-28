@@ -4,6 +4,30 @@
 
 ### Added
 
+- Added Alpha 0.5.8.4 Historical Insights Engine: a new Qt-independent
+  `engine/history/insights` package turns Alpha 0.5.8.3 evolution results into
+  deterministic, evidenced, confidence-scored insights via a small rule-per-concern
+  catalog (sector, formation, lineup, individual-order, player-condition, tactical
+  and prediction rules). Every explanatory insight carries at least one piece of
+  evidence (enforced by the model itself); confidence follows a documented,
+  deterministic policy (HIGH/MEDIUM/LOW/INSUFFICIENT_DATA); causal language is
+  encoded as data (observed / associated with / likely contributor / possible
+  contributor / insufficient evidence) rather than hand-written wording, so e.g.
+  several inner midfielders switching to an Offensive order alongside an improved
+  midfield rating is reported as a likely contributor, never a proven cause.
+  Duplicate/near-duplicate insights are deterministically deduplicated and
+  prioritized. A SummaryEngine builds a structured executive summary (comparison
+  target, overall direction, main improvement, main decline, strongest likely
+  contributor, confidence, limitation) by selecting among generated insights, never
+  generating free text. `ht_coach_app/services/historical_insights_service.py` /
+  `historical_insights_formatting.py` provide an app-facing bridge and
+  presentation-only formatting, ready for a future Match History screen. No
+  optimizer, rating engine, calibration, planner, snapshot schema, probability
+  engine, midfield engine, Formation Board or Alpha 0.5.8.3 evolution calculation
+  was changed; static-import and behavioral tests confirm insight generation never
+  invokes FormationOptimizer/LineupOptimizer/TacticOptimizer/OrderOptimizer. The new
+  package's test suite reaches 99% statement coverage. The Match History UI itself
+  is intentionally not built in this sprint — see docs/ROADMAP.md for why.
 - Added Alpha 0.5.8.3 Historical Evolution Engine: a new Qt-independent
   `engine/history/evolution` package computes pure deterministic evolution between
   two historical snapshots — sector deltas (midfield plus the six directional
