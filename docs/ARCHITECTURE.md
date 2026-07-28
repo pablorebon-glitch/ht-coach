@@ -107,6 +107,7 @@ ht_coach_app/
 engine/
   advisor/
   history/
+    evolution/
   hattrick_ratings/
     calibration/
     midfield/
@@ -456,11 +457,136 @@ Tactical left/right convention:
   those canonical values; the board uses the order-side sector for visual placement
   without mutating the player's field side.
 
-Future extension points are intentionally data-only in Alpha 0.5.8.2: sector deltas,
-formation-change detection, player-added/player-removed events, order changes,
-deterministic insight rules, executive summaries, trend analysis, prediction MAE,
-recommendation accuracy, opponent evolution and season reports belong to later
-roadmap sprints.
+Future extension points remaining after Alpha 0.5.8.4: prediction MAE,
+recommendation accuracy and season reports belong to Alpha 0.5.8.5 and Alpha 0.6.0.
+Sector deltas, formation-change detection, player added/removed events and order
+changes are implemented in Alpha 0.5.8.3; deterministic insight rules, confidence
+scoring, executive summaries and the causal-language guardrail are implemented in
+Alpha 0.5.8.4 below. A Match History UI surfacing all three history layers
+(snapshots, evolution, insights) together is scoped but not yet built — see
+docs/ROADMAP.md.
+
+### Historical Evolution Engine
+
+`engine/history/evolution/`
+
+Alpha 0.5.8.3 adds a second Qt-independent layer on top of `engine/history/`: given
+two historical snapshots, it measures their complete evolution. It does not explain
+why anything changed — that is Alpha 0.5.8.4 — and it never touches the optimizer,
+rating engine, calibration, planner, snapshot schema, probability engine, midfield
+engine or Formation Board.
+
+Modules:
+
+- `comparison_models.py`: `Trend` enum and `TrendThresholds` (unchanged/major bands,
+  constructor-validated, never hardcoded into comparison logic), `classify_trend`, and
+  `SectorEvolution` (previous/current value, absolute delta, percentage delta, trend).
+- `comparison_metrics.py`: pure delta primitives (`absolute_delta`,
+  `percentage_delta`, `safe_average`) — a percentage delta against a zero previous
+  value is `None` (undefined), not infinite.
+- `comparison_result.py`: the aggregate result dataclasses — `OverallEvolution`,
+  `FormationEvolution`, `TacticalEvolution`, `LineupPlayerChange` /
+  `LineupChangeStatus` / `LineupEvolution`, `MetricDelta` / `PredictionEvolution`, and
+  the top-level `HistoricalEvolutionResult`.
+- `comparison_selector.py`: a thin adapter over the existing
+  `PreviousMatchSelector` / `PreviousMatchSelection` (previous match, previous league,
+  previous cup, previous friendly, same cohort, custom) — selection logic itself is
+  not duplicated.
+- `comparison_validation.py`: `ensure_comparable` guards against comparing a snapshot
+  to itself or against a missing snapshot; missing *optional* data inside a valid
+  snapshot is handled field-by-field in the engine, not treated as an error.
+- `comparison_engine.py`: the deterministic comparison functions
+  (`compare_sectors`, `compare_overall`, `compare_formation`, `compare_tactical`,
+  `compare_lineup`, `compare_prediction`, `evolution_score`), the `compare()` entry
+  point, and `HistoricalEvolutionEngine`, a facade combining comparison with the
+  Comparison Policies above (`compare_with_previous`, `compare_with_previous_league`,
+  `compare_with_previous_cup`, `compare_with_previous_friendly`,
+  `compare_same_cohort`, `compare_custom`).
+
+Design notes:
+
+- Lineup matching uses stable player identity — `player_id` when present, otherwise a
+  normalized `player_name` — never lineup row position, so a reordered lineup with the
+  same players reports no changes.
+- Trend classification is threshold-based on the *percentage* delta so it behaves
+  consistently across different rating scales; thresholds are a constructor argument
+  (`TrendThresholds`), never a hardcoded constant inside comparison logic.
+- `evolution_score` is documented, not a hidden formula: average sector percentage
+  delta divided by 10, rounded to 2 decimals. It is explicitly a summary metric, not a
+  rating.
+- Every `compare_with_*` convenience method returns `None` (not an error) when no
+  eligible previous snapshot exists among the supplied candidates.
+- Evolution results are not persisted; they are always reproducible from the two
+  input snapshots plus the thresholds used.
+
+### Historical Insights Engine
+
+`engine/history/insights/`
+
+Alpha 0.5.8.4 adds a third Qt-independent layer, on top of `engine/history/` and
+`engine/history/evolution/`: given a `HistoricalEvolutionResult`, it produces
+deterministic, evidenced, confidence-scored insights and an executive summary. No
+generative AI, no external API, no probabilistic language model — every insight is
+either a direct rule match against structured data or nothing at all.
+
+Modules:
+
+- `enums.py`: `InsightCategory`, `InsightDirection`, `InsightConfidence`,
+  `InsightSeverity`, `InsightRelationship` (the causal-language guardrail encoded as
+  data), `EvidenceType`, `DataLimitation`.
+- `evidence.py`: `InsightEvidence` — entity, previous/current value, delta, source
+  snapshot, reliability, affected sectors.
+- `confidence.py`: `ConfidenceInputs` and `classify_confidence`, a documented,
+  deterministic decision tree (HIGH requires a direct structural change, complete
+  data, a known deterministic sector effect and no contradictory evidence; MEDIUM
+  requires complete-enough data and 2+ supporting signals; LOW requires at least one
+  signal; anything else is INSUFFICIENT_DATA).
+- `models.py`: `HistoricalInsight` (rejects evidence-less insights unless they are
+  explicitly INSUFFICIENT_DATA), `ExecutiveSummary`, `InsightResult`.
+- `rule.py`: `InsightContext` (current snapshot, previous snapshot, evolution
+  result) and the `InsightRule` base class.
+- `sector_rules.py`, `formation_rules.py`, `lineup_rules.py`, `order_rules.py`,
+  `player_condition_rules.py`, `tactical_rules.py`, `prediction_rules.py`: one rule
+  class per concern (never one large if/elif block). Lineup and order rules match
+  players by stable identity (player ID, falling back to normalized name), reusing
+  Alpha 0.5.8.3's matching approach; a `side`-change rule reads both snapshots
+  directly since the Evolution Engine only tracks position/order/order-side/number.
+  Player-condition rules (form/stamina/experience/skill) never claim training as a
+  cause — that relationship is left to a future Training Impact Engine.
+- `rule_engine.py`: `InsightRuleEngine` evaluates every rule, then deterministically
+  deduplicates (each insight's `dedupe_key` defaults to its rule ID, so unrelated
+  rules never collide by accident; rules that are genuinely alternative phrasings of
+  the same finding opt in to a shared key) and resolves `excludes` mutual
+  exclusivity, keeping the highest-priority, highest-confidence insight per key.
+- `summary_engine.py`: `build_executive_summary` selects the overall direction, main
+  improvement, main decline, strongest likely contributor, summary confidence and a
+  missing-ratings limitation purely from already-generated insights.
+- `validation.py`: `ensure_insight_context_valid` guards against a missing snapshot
+  or an evolution result that doesn't match the given snapshot pair.
+- `__init__.py`: `generate_insights(current, previous, evolution, comparison_target_key)`
+  — the single pure-function entry point tying the above together.
+
+Design notes:
+
+- Domain rules never return translated strings — only stable `title_key` /
+  `message_key` plus structured `message_params`, matching the existing
+  localization convention (see Localization below).
+- The flagship example from the sprint brief — several inner midfielders switching
+  to an Offensive order alongside an improved midfield rating — is implemented
+  literally as `InnerMidfieldersOffensiveContributorRule`, returning
+  `InsightRelationship.LIKELY_CONTRIBUTOR` with `MEDIUM` confidence, never asserting
+  causality.
+- `ht_coach_app/services/historical_insights_service.py` bridges snapshot lookup,
+  Alpha 0.5.8.3's comparison policies (previous match/league/cup/friendly/cohort/
+  custom) and insight generation into one call; `historical_insights_formatting.py`
+  groups results into the requested visual hierarchy (summary, high-priority,
+  other, limitations) without generating any text itself.
+- Static-import and behavioral regression tests
+  (`tests/test_history_responsibility_boundaries.py`) confirm the insights (and
+  evolution) packages never import or invoke `FormationOptimizer`,
+  `LineupOptimizer`, `TacticOptimizer` or `OrderOptimizer`.
+- Not yet built: the Match History UI itself. See docs/ROADMAP.md's Alpha 0.5.8.4
+  entry for why a coherent single screen is deferred rather than shipped partially.
 
 ### Reasoning
 

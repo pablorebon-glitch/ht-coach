@@ -1422,5 +1422,241 @@
         "explanation": "Reemplazar a {outgoing} por {incoming} no produjo una mejora medible de victoria. Trátalo como preferencia, no como recomendación."
       }
     }
+  },
+  "insight": {
+    "sector": {
+      "midfield_improvement": {
+        "title": "El mediocampo mejoró",
+        "message": "El mediocampo mejoró {delta:+.2f}."
+      },
+      "midfield_decline": {
+        "title": "El mediocampo empeoró",
+        "message": "El mediocampo empeoró {delta:+.2f}."
+      },
+      "attack_improvement": {
+        "title": "El ataque mejoró",
+        "message": "Los sectores de ataque mejoraron en promedio."
+      },
+      "attack_decline": {
+        "title": "El ataque empeoró",
+        "message": "Los sectores de ataque empeoraron en promedio."
+      },
+      "defense_improvement": {
+        "title": "La defensa mejoró",
+        "message": "Los sectores de defensa mejoraron en promedio."
+      },
+      "defense_decline": {
+        "title": "La defensa empeoró",
+        "message": "Los sectores de defensa empeoraron en promedio."
+      }
+    },
+    "overall": {
+      "broad_improvement": {
+        "title": "Mejora amplia del equipo",
+        "message": "{count} de {total} sectores mejoraron."
+      },
+      "broad_decline": {
+        "title": "Declive amplio del equipo",
+        "message": "{count} de {total} sectores empeoraron."
+      },
+      "attack_defense_tradeoff": {
+        "title": "Compensación ataque/defensa",
+        "message": "El ataque y la defensa se movieron en direcciones opuestas."
+      }
+    },
+    "formation": {
+      "changed": {
+        "title": "Cambió la formación",
+        "message": "La formación cambió de {previous} a {current}."
+      },
+      "midfielder_count_changed": {
+        "title": "Cambió la cantidad de volantes",
+        "message": "Los puestos de volante cambiaron de {previous} a {current}."
+      },
+      "defender_count_changed": {
+        "title": "Cambió la cantidad de defensores",
+        "message": "Los puestos de defensor cambiaron de {previous} a {current}."
+      },
+      "forward_count_changed": {
+        "title": "Cambió la cantidad de delanteros",
+        "message": "Los puestos de delantero cambiaron de {previous} a {current}."
+      },
+      "same_formation_different_ratings": {
+        "title": "Misma formación, ratings distintos",
+        "message": "La formación {formation} no cambió, pero los ratings generales se movieron de forma considerable."
+      },
+      "midfield_slot_added_likely_contributor": {
+        "title": "Puesto extra de volante: posible contribuyente",
+        "message": "Los puestos de volante aumentaron de {previous_slots} a {current_slots}, lo que puede haber contribuido a la mejora del mediocampo."
+      }
+    },
+    "lineup": {
+      "player_added": {
+        "title": "Jugador incorporado",
+        "message": {
+          "single": "{player_name} entró a la alineación.",
+          "multiple": "{count} jugadores nuevos entraron a la alineación."
+        }
+      },
+      "player_removed": {
+        "title": "Jugador removido",
+        "message": {
+          "single": "{player_name} salió de la alineación.",
+          "multiple": "{count} jugadores salieron de la alineación."
+        }
+      },
+      "multiple_starter_changes": {
+        "title": "Varios cambios de titulares",
+        "message": "{count} titulares cambiaron respecto al partido anterior."
+      },
+      "same_core_retained": {
+        "title": "Se mantuvo el núcleo del equipo",
+        "message": "{count} jugadores se mantuvieron del partido anterior."
+      },
+      "player_position_changed": {
+        "title": "Cambió la posición de un jugador",
+        "message": {
+          "single": "{player_name} pasó de {previous_position} a {current_position}.",
+          "multiple": "{count} jugadores cambiaron de posición."
+        }
+      },
+      "player_side_changed": {
+        "title": "Cambió el lado de campo de un jugador",
+        "message": {
+          "single": "{player_name} pasó de {previous_side} a {current_side}.",
+          "multiple": "{count} jugadores cambiaron de lado de campo."
+        }
+      }
+    },
+    "order": {
+      "changed": {
+        "title": "Cambió el orden individual",
+        "message": {
+          "single": "El orden de {player_name} cambió de {previous_order} a {current_order}.",
+          "multiple": "{count} jugadores cambiaron su orden individual."
+        }
+      },
+      "inner_midfielders_offensive_likely_contributor": {
+        "title": "Volantes ofensivos: posible contribuyente",
+        "message": "{count} volantes internos pasaron a orden Ofensivo, lo que puede haber contribuido a la mejora del mediocampo."
+      },
+      "winger_changed": {
+        "title": "Cambió el orden de un lateral/extremo",
+        "message": "{count} jugadores de banda cambiaron su orden."
+      },
+      "forward_towards_wing": {
+        "title": "Delantero se abrió a la banda",
+        "message": "{count} delanteros pasaron a orden 'Hacia la banda'."
+      },
+      "defender_changed": {
+        "title": "Cambió el orden de un defensor",
+        "message": "{count} defensores cambiaron su orden."
+      },
+      "order_side_changed": {
+        "title": "Cambió el lado del orden",
+        "message": "{count} jugadores cambiaron el lado de su orden."
+      }
+    },
+    "player_condition": {
+      "form_increased": {
+        "title": "Aumentó la forma",
+        "message": {
+          "single": "La forma de {player_name} aumentó.",
+          "multiple": "{count} jugadores tuvieron mejor forma."
+        }
+      },
+      "form_decreased": {
+        "title": "Bajó la forma",
+        "message": {
+          "single": "La forma de {player_name} bajó.",
+          "multiple": "{count} jugadores tuvieron peor forma."
+        }
+      },
+      "stamina_increased": {
+        "title": "Aumentó la resistencia",
+        "message": {
+          "single": "La resistencia de {player_name} aumentó.",
+          "multiple": "{count} jugadores tuvieron mejor resistencia."
+        }
+      },
+      "stamina_decreased": {
+        "title": "Bajó la resistencia",
+        "message": {
+          "single": "La resistencia de {player_name} bajó.",
+          "multiple": "{count} jugadores tuvieron peor resistencia."
+        }
+      },
+      "experience_changed": {
+        "title": "Cambió la experiencia",
+        "message": "{count} jugadores tuvieron un cambio de experiencia."
+      },
+      "skill_changed": {
+        "title": "Cambiaron habilidades",
+        "message": "{count} jugadores tuvieron cambios en una o más habilidades."
+      }
+    },
+    "tactic": {
+      "changed": {
+        "title": "Cambió la táctica",
+        "message": "La táctica cambió de {previous} a {current}."
+      },
+      "level_improved": {
+        "title": "Mejoró el nivel táctico",
+        "message": "El nivel táctico mejoró {delta:+.2f}."
+      },
+      "level_declined": {
+        "title": "Bajó el nivel táctico",
+        "message": "El nivel táctico bajó {delta:+.2f}."
+      },
+      "attitude_changed": {
+        "title": "Cambió la actitud del equipo",
+        "message": "La actitud cambió de {previous} a {current}."
+      },
+      "confidence_changed": {
+        "title": "Cambió la confianza",
+        "message": "La confianza cambió de {previous} a {current}."
+      },
+      "home_away_changed": {
+        "title": "Cambió el contexto local/visitante",
+        "message": "El contexto cambió de {previous} a {current}."
+      }
+    },
+    "prediction": {
+      "win_probability_increased": {
+        "title": "Aumentó la probabilidad de victoria",
+        "message": "La probabilidad de victoria aumentó {delta:+.0%}."
+      },
+      "win_probability_decreased": {
+        "title": "Bajó la probabilidad de victoria",
+        "message": "La probabilidad de victoria bajó {delta:+.0%}."
+      },
+      "expected_goals_improved": {
+        "title": "Mejoraron los goles esperados",
+        "message": "Los goles esperados mejoraron {delta:+.2f}."
+      },
+      "expected_goals_declined": {
+        "title": "Bajaron los goles esperados",
+        "message": "Los goles esperados bajaron {delta:+.2f}."
+      },
+      "opponent_expected_goals_increased": {
+        "title": "Aumentaron los goles esperados del rival",
+        "message": "Los goles esperados del rival aumentaron {delta:+.2f}."
+      },
+      "possession_changed": {
+        "title": "Cambió la posesión predicha",
+        "message": "La posesión predicha cambió {delta:+.1f} puntos."
+      }
+    },
+    "limitation": {
+      "missing_ratings": "Faltan algunos ratings de sector en uno de los partidos comparados."
+    },
+    "comparison_target": {
+      "previous_match": "el partido anterior",
+      "previous_league_match": "el partido de liga anterior",
+      "previous_cup_match": "el partido de copa anterior",
+      "previous_friendly_match": "el amistoso anterior",
+      "same_cohort_match": "el partido equivalente anterior",
+      "custom": "el partido seleccionado"
+    }
   }
 }
