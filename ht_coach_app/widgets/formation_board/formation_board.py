@@ -49,6 +49,8 @@ class FormationBoard(QWidget):
     formation_changed = Signal(str)
     recalculate_requested = Signal(object)
     workspace_modified = Signal(object)
+    save_as_first_match_requested = Signal()
+    save_as_second_match_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -108,6 +110,26 @@ class FormationBoard(QWidget):
             self.reset_workspace
         )
         header_layout.addWidget(self.reset_workspace_button)
+
+        self.save_as_first_match_button = QPushButton(
+            t("match.save_as_first_match")
+        )
+        self.save_as_first_match_button.setObjectName("workspaceAction")
+        self.save_as_first_match_button.setVisible(False)
+        self.save_as_first_match_button.clicked.connect(
+            self.save_as_first_match_requested
+        )
+        header_layout.addWidget(self.save_as_first_match_button)
+
+        self.save_as_second_match_button = QPushButton(
+            t("match.save_as_second_match")
+        )
+        self.save_as_second_match_button.setObjectName("workspaceAction")
+        self.save_as_second_match_button.setVisible(False)
+        self.save_as_second_match_button.clicked.connect(
+            self.save_as_second_match_requested
+        )
+        header_layout.addWidget(self.save_as_second_match_button)
         layout.addWidget(header)
 
         self.splitter = QSplitter(Qt.Horizontal)
@@ -436,6 +458,12 @@ class FormationBoard(QWidget):
         self._render_current_board()
         if was_dirty:
             self.workspace_modified.emit(self._workspace_state)
+
+    def set_save_as_first_match_visible(self, visible):
+        self.save_as_first_match_button.setVisible(bool(visible))
+
+    def set_save_as_second_match_visible(self, visible):
+        self.save_as_second_match_button.setVisible(bool(visible))
 
     def _on_formation_changed(self):
         self._current_name = self.formation_combo.currentData() or ""

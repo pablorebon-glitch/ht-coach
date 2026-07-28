@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -23,7 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ht_coach_app.core.localization import t
+from ht_coach_app.core.localization import localization_service, t
+from ht_coach_app.services.recent_csv_labels import format_recent_csv_label
 from ht_coach_app.ui.design_system.badges import StatusBadge
 from ht_coach_app.ui.design_system.tables import configure_table
 from ht_coach_app.ui.responsive import set_splitter_proportions
@@ -62,6 +64,7 @@ class SquadPage(BasePage):
     cancel_first_match_edit_requested = Signal()
     replace_first_match_requested = Signal()
     delete_first_match_requested = Signal()
+    delete_second_match_requested = Signal()
     use_training_plan_requested = Signal()
 
     HEADERS = [
@@ -129,6 +132,12 @@ class SquadPage(BasePage):
         self.path_edit = QLineEdit()
         self.path_edit.setPlaceholderText("Select players.csv")
 
+        self.recent_csv_combo = QComboBox()
+        self.recent_csv_combo.setMinimumWidth(140)
+        self.recent_csv_combo.currentIndexChanged.connect(
+            self._on_recent_csv_selected
+        )
+
         browse_button = QPushButton("Browse")
         browse_button.clicked.connect(self.browse_requested)
 
@@ -183,17 +192,19 @@ class SquadPage(BasePage):
         layout.addWidget(browse_button, 0, 5)
         layout.addWidget(load_button, 0, 6)
         layout.addWidget(reload_button, 0, 7)
-        layout.addWidget(self.loaded_label, 1, 1, 1, 2)
-        layout.addWidget(self.status_label, 1, 3, 1, 6)
-        layout.addWidget(QLabel("Search"), 2, 0)
-        layout.addWidget(self.search_edit, 2, 1, 1, 2)
-        layout.addWidget(QLabel("Min form"), 2, 3)
-        layout.addWidget(self.minimum_form, 2, 4)
-        layout.addWidget(QLabel("Min stamina"), 2, 5)
-        layout.addWidget(self.minimum_stamina, 2, 6)
-        layout.addWidget(self.speciality_combo, 2, 7)
-        layout.addWidget(self.position_combo, 2, 8)
-        layout.addWidget(self.availability_filter_combo, 2, 9)
+        layout.addWidget(QLabel(t("squad_builder.recent_csv")), 1, 0)
+        layout.addWidget(self.recent_csv_combo, 1, 1, 1, 2)
+        layout.addWidget(self.loaded_label, 2, 1, 1, 2)
+        layout.addWidget(self.status_label, 2, 3, 1, 6)
+        layout.addWidget(QLabel("Search"), 3, 0)
+        layout.addWidget(self.search_edit, 3, 1, 1, 2)
+        layout.addWidget(QLabel("Min form"), 3, 3)
+        layout.addWidget(self.minimum_form, 3, 4)
+        layout.addWidget(QLabel("Min stamina"), 3, 5)
+        layout.addWidget(self.minimum_stamina, 3, 6)
+        layout.addWidget(self.speciality_combo, 3, 7)
+        layout.addWidget(self.position_combo, 3, 8)
+        layout.addWidget(self.availability_filter_combo, 3, 9)
         layout.setColumnStretch(1, 1)
 
         self.body_layout.addWidget(panel)
@@ -208,6 +219,7 @@ class SquadPage(BasePage):
         self._build_players_tab()
         self._build_evolution_tab()
         self._build_weekly_planner_tab()
+        self._build_weekly_planner_v2_tab()
         self._build_transfer_tab()
         self.body_layout.addWidget(self.tabs, 1)
 
@@ -920,7 +932,116 @@ class SquadPage(BasePage):
         weekly_scroll.setWidget(weekly_content)
         layout.addWidget(weekly_scroll, 1)
         self._set_weekly_mode(self.WEEKLY_MODE_NORMAL)
-        self._add_squad_tab(tab, t("planner.weekly_planner"), "weekly_planner")
+        # This legacy tab (pitch-based plan generator) is no longer shown
+        # in the tab bar in favor of the leaner "weekly_planner_v2" tab,
+        # but its widgets are still built so existing internal wiring
+        # that references them keeps working without changes. Keep a
+        # strong reference so the C++ objects aren't garbage collected
+        # now that it's never parented via addTab.
+        self._legacy_weekly_planner_tab = tab
+
+    def _build_weekly_planner_v2_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        controls = QFrame()
+        controls.setObjectName("workspacePanel")
+        controls_layout = QGridLayout(controls)
+        controls_layout.setContentsMargins(12, 10, 12, 10)
+        controls_layout.setHorizontalSpacing(8)
+        controls_layout.setVerticalSpacing(8)
+
+        self.weekly_training_type_combo_v2 = QComboBox()
+        self.weekly_training_type_combo_v2.addItem(t("planner.playmaking"), "PLAYMAKING")
+        self.weekly_week_label_v2 = QLabel(t("planner.no_active_week"))
+        self.weekly_week_label_v2.setWordWrap(True)
+
+        controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
+        controls_layout.addWidget(self.weekly_training_type_combo_v2, 0, 1)
+        controls_layout.addWidget(self.weekly_week_label_v2, 1, 0, 1, 2)
+        controls_layout.setColumnStretch(1, 1)
+        layout.addWidget(controls)
+
+        self.weekly_record_card_v2 = QFrame()
+        self.weekly_record_card_v2.setObjectName("metadataPanel")
+        record_layout = QGridLayout(self.weekly_record_card_v2)
+        record_layout.setContentsMargins(10, 8, 10, 8)
+        record_layout.setHorizontalSpacing(8)
+        record_layout.setVerticalSpacing(4)
+        self.weekly_record_status_label_v2 = QLabel("")
+        self.weekly_record_status_label_v2.setWordWrap(True)
+        self.weekly_delete_record_button_v2 = QPushButton(t("planner.delete_first_match"))
+        self.weekly_delete_record_button_v2.clicked.connect(
+            self._confirm_delete_first_match_record
+        )
+        self.weekly_delete_record_button_v2.setVisible(False)
+        record_layout.addWidget(self.weekly_record_status_label_v2, 0, 0)
+        record_layout.addWidget(self.weekly_delete_record_button_v2, 0, 1)
+        record_layout.setColumnStretch(0, 1)
+        layout.addWidget(self.weekly_record_card_v2)
+
+        self.weekly_second_record_card_v2 = QFrame()
+        self.weekly_second_record_card_v2.setObjectName("metadataPanel")
+        second_record_layout = QGridLayout(self.weekly_second_record_card_v2)
+        second_record_layout.setContentsMargins(10, 8, 10, 8)
+        second_record_layout.setHorizontalSpacing(8)
+        second_record_layout.setVerticalSpacing(4)
+        self.weekly_second_record_status_label_v2 = QLabel("")
+        self.weekly_second_record_status_label_v2.setWordWrap(True)
+        self.weekly_delete_second_record_button_v2 = QPushButton(
+            t("planner.delete_second_match")
+        )
+        self.weekly_delete_second_record_button_v2.clicked.connect(
+            self._confirm_delete_second_match_record
+        )
+        self.weekly_delete_second_record_button_v2.setVisible(False)
+        second_record_layout.addWidget(
+            self.weekly_second_record_status_label_v2, 0, 0
+        )
+        second_record_layout.addWidget(
+            self.weekly_delete_second_record_button_v2, 0, 1
+        )
+        second_record_layout.setColumnStretch(0, 1)
+        layout.addWidget(self.weekly_second_record_card_v2)
+
+        filter_row = QWidget()
+        filter_layout = QHBoxLayout(filter_row)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(6)
+        filter_layout.addWidget(QLabel(t("planner.filter")))
+        self.weekly_filter_combo_v2 = QComboBox()
+        for label, key in self._weekly_filter_options():
+            self.weekly_filter_combo_v2.addItem(label, key)
+        self.weekly_filter_combo_v2.currentIndexChanged.connect(
+            self._apply_weekly_filter_v2
+        )
+        filter_layout.addWidget(self.weekly_filter_combo_v2)
+        filter_layout.addStretch(1)
+        layout.addWidget(filter_row)
+
+        layout.addWidget(self._mini_heading(t("planner.weekly_players")))
+
+        self.weekly_player_table_v2 = QTableWidget(0, 4)
+        self.weekly_player_table_v2.setObjectName("weeklyPlayerTable")
+        self.weekly_player_table_v2.setHorizontalHeaderLabels(
+            [
+                t("planner.player"),
+                t("planner.age_header"),
+                t("planner.priority_header"),
+                t("planner.training_status"),
+            ]
+        )
+        self.weekly_player_table_v2.setSortingEnabled(True)
+        header = self.weekly_player_table_v2.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        layout.addWidget(self.weekly_player_table_v2, 1)
+
+        self._add_squad_tab(tab, t("planner.weekly_planner_v2"), "weekly_planner_v2")
 
     def _build_transfer_tab(self):
         tab = QWidget()
@@ -1095,6 +1216,31 @@ class SquadPage(BasePage):
         self.path_edit.setText(path)
         filename = path.split("\\")[-1].split("/")[-1] if path else ""
         self.set_source_indicator(filename, "neutral")
+
+    def set_recent_csv_paths(self, paths):
+        self.recent_csv_combo.blockSignals(True)
+        self.recent_csv_combo.clear()
+        self.recent_csv_combo.addItem(
+            t("squad_builder.recent_csv_placeholder"), ""
+        )
+        for path in paths or ():
+            self.recent_csv_combo.addItem(
+                format_recent_csv_label(
+                    path, language=localization_service().language
+                ),
+                path,
+            )
+        current = self.csv_path()
+        index = self.recent_csv_combo.findData(current)
+        self.recent_csv_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.recent_csv_combo.blockSignals(False)
+
+    def _on_recent_csv_selected(self, _index):
+        path = self.recent_csv_combo.currentData()
+        if not path or path == self.csv_path():
+            return
+        self.set_csv_path(path)
+        self.load_requested.emit()
 
     def selected_tab_key(self):
         index = self.tabs.currentIndex()
@@ -1462,8 +1608,13 @@ class SquadPage(BasePage):
     def show_weekly_training_empty(self):
         self._set_weekly_mode(self.WEEKLY_MODE_NORMAL)
         self.weekly_week_label.setText(t("planner.load_roster_first"))
+        if hasattr(self, "weekly_week_label_v2"):
+            self.weekly_week_label_v2.setText(t("planner.load_roster_first"))
         self.weekly_player_table.setRowCount(0)
+        if hasattr(self, "weekly_player_table_v2"):
+            self.weekly_player_table_v2.setRowCount(0)
         self._set_first_match_record_card(None)
+        self._set_second_match_record_card(None)
         self.weekly_plan_summary_label.setText(t("planner.empty_plan"))
         self.weekly_cost_label.setText("")
         self.weekly_explanations_label.setText("")
@@ -1490,24 +1641,39 @@ class SquadPage(BasePage):
         week = state.active_week
         if week is None:
             self.weekly_week_label.setText(t("planner.no_active_week"))
+            if hasattr(self, "weekly_week_label_v2"):
+                self.weekly_week_label_v2.setText(t("planner.no_active_week"))
         else:
-            self.weekly_week_label.setText(
-                t(
-                    "planner.week_summary",
-                    start=week.start_date.isoformat(),
-                    second=week.second_match_date.isoformat(),
-                    update=week.training_update_date.isoformat(),
-                )
+            week_text = t(
+                "planner.week_summary",
+                start=week.start_date.isoformat(),
+                second=week.second_match_date.isoformat(),
+                update=week.training_update_date.isoformat(),
             )
+            self.weekly_week_label.setText(week_text)
+            if hasattr(self, "weekly_week_label_v2"):
+                self.weekly_week_label_v2.setText(week_text)
+        week_prefix = f"{week.week_id}:" if week is not None else ""
         first_record = next(
             (
                 record for record in state.match_records
                 if getattr(record.match_role, "value", record.match_role)
                 == "FIRST_WEEKLY_MATCH"
+                and record.match_id.startswith(week_prefix)
             ),
             None,
         )
         self._set_first_match_record_card(first_record)
+        second_record = next(
+            (
+                record for record in state.match_records
+                if getattr(record.match_role, "value", record.match_role)
+                == "SECOND_WEEKLY_MATCH"
+                and record.match_id.startswith(week_prefix)
+            ),
+            None,
+        )
+        self._set_second_match_record_card(second_record)
         self._set_weekly_players(priority_rows, coverage_rows)
 
     def show_weekly_training_plan(self, plan, board, roster_players=None):
@@ -1641,8 +1807,14 @@ class SquadPage(BasePage):
         self.weekly_edit_record_button.setVisible(has_record and not editing)
         self.weekly_replace_record_button.setVisible(has_record and not editing)
         self.weekly_delete_record_button.setVisible(has_record and not editing)
+        if hasattr(self, "weekly_delete_record_button_v2"):
+            self.weekly_delete_record_button_v2.setVisible(has_record)
         if not has_record:
             self.weekly_record_status_label.setText(t("planner.no_first_match_record"))
+            if hasattr(self, "weekly_record_status_label_v2"):
+                self.weekly_record_status_label_v2.setText(
+                    t("planner.no_first_match_record")
+                )
             return
         status = getattr(record.planned_or_played, "value", record.planned_or_played)
         if status == "PLANNED":
@@ -1656,16 +1828,43 @@ class SquadPage(BasePage):
             temporal_warning = t("planner.future_match_planned")
         elif "today" in str(record.notes).casefold():
             temporal_warning = t("planner.today_match_planned")
-        self.weekly_record_status_label.setText(
-            "\n".join(
-                [
-                    t("planner.first_match_recorded"),
-                    f"{record.match_date.isoformat()} | {record.source}",
-                    f"{record.formation} | {str(status).title()} | {minutes}",
-                ]
-                + ([temporal_warning] if temporal_warning else [])
-            )
+        status_text = "\n".join(
+            [
+                t("planner.first_match_recorded"),
+                f"{record.match_date.strftime('%d-%m-%Y')} | {record.opponent_name or t('common.not_available')}",
+                f"{record.formation} | {str(status).title()} | {minutes}",
+            ]
+            + ([temporal_warning] if temporal_warning else [])
         )
+        self.weekly_record_status_label.setText(status_text)
+        if hasattr(self, "weekly_record_status_label_v2"):
+            self.weekly_record_status_label_v2.setText(status_text)
+
+    def _set_second_match_record_card(self, record):
+        if not hasattr(self, "weekly_second_record_status_label_v2"):
+            return
+        has_record = record is not None
+        self.weekly_delete_second_record_button_v2.setVisible(has_record)
+        if not has_record:
+            self.weekly_second_record_status_label_v2.setText(
+                t("planner.no_second_match_record")
+            )
+            return
+        status = getattr(record.planned_or_played, "value", record.planned_or_played)
+        if status == "PLANNED":
+            minutes = t("planner.planned_exposure_note")
+        elif record.minutes_known:
+            minutes = t("planner.confirmed_minutes")
+        else:
+            minutes = t("planner.assuming_90_minutes")
+        status_text = "\n".join(
+            [
+                t("planner.second_match_recorded"),
+                f"{record.match_date.strftime('%d-%m-%Y')} | {record.opponent_name or t('common.not_available')}",
+                f"{record.formation} | {str(status).title()} | {minutes}",
+            ]
+        )
+        self.weekly_second_record_status_label_v2.setText(status_text)
 
     def _edit_first_match_record(self):
         self.edit_first_match_requested.emit("", False)
@@ -1693,62 +1892,103 @@ class SquadPage(BasePage):
         ) == QMessageBox.Yes:
             self.delete_first_match_requested.emit()
 
+    def _confirm_delete_second_match_record(self):
+        if QMessageBox.question(
+            self,
+            t("planner.delete_second_match"),
+            t("planner.delete_second_match_confirm"),
+        ) == QMessageBox.Yes:
+            self.delete_second_match_requested.emit()
+
     def _set_weekly_players(self, priority_rows, coverage_rows):
         coverage_by_id = {row.player_id: row for row in coverage_rows}
+        views = [(self.weekly_player_table, self.weekly_filter_combo, "_weekly_filter_key")]
+        if hasattr(self, "weekly_player_table_v2"):
+            views.append(
+                (
+                    self.weekly_player_table_v2,
+                    self.weekly_filter_combo_v2,
+                    "_weekly_filter_key_v2",
+                )
+            )
+        for table, filter_combo, filter_attr in views:
+            filter_key = filter_combo.currentData() or "all"
+            setattr(self, filter_attr, filter_key)
+            self._populate_weekly_table(
+                table,
+                filter_key,
+                priority_rows,
+                coverage_by_id,
+            )
+
+    # Excel-style status shading: darker green once training is already
+    # confirmed this week, a lighter green while it's only planned (the
+    # match was saved but hasn't been played yet), and no fill when the
+    # player isn't training in a trainable slot at all.
+    STATUS_COLOR_TRAINED = QColor("#a9d18e")
+    STATUS_COLOR_PLANNED = QColor("#e2efda")
+
+    def _status_background(self, status_rank):
+        if status_rank == 0:
+            return self.STATUS_COLOR_TRAINED
+        if status_rank == 1:
+            return self.STATUS_COLOR_PLANNED
+        return None
+
+    def _populate_weekly_table(self, table, filter_key, priority_rows, coverage_by_id):
+        has_age_column = table.columnCount() >= 4
         filtered_rows = [
             row for row in priority_rows
-            if self._weekly_row_matches_filter(row, coverage_by_id.get(row.player_id))
+            if self._weekly_row_matches_filter(row, coverage_by_id.get(row.player_id), filter_key)
         ]
-        self.weekly_player_table.setSortingEnabled(False)
-        self.weekly_player_table.setRowCount(len(filtered_rows))
+        table.setSortingEnabled(False)
+        table.setRowCount(len(filtered_rows))
+        priority_column = 2 if has_age_column else 1
+        status_column = 3 if has_age_column else 2
         for row_index, row in enumerate(filtered_rows):
             coverage = coverage_by_id.get(row.player_id)
             priority_key = self._visible_weekly_priority(row)
             confirmed = getattr(coverage, "confirmed_exposure", 0) if coverage else 0
             assumed = getattr(coverage, "assumed_exposure", 0) if coverage else 0
             planned = getattr(coverage, "planned_exposure", 0) if coverage else 0
-            remaining = getattr(coverage, "remaining_exposure", 0) if coverage else 0
             confirmed_total = self._numeric(confirmed) + self._numeric(assumed)
             status, status_tip = self._training_status(confirmed_total, planned)
-            values = [
-                row.player_name,
-                "",
-                status,
-            ]
-            sort_values = [
-                row.player_name.casefold(),
-                self._priority_sort(priority_key),
-                status,
-            ]
-            for column, value in enumerate(values):
-                if column == 1:
-                    combo = QComboBox()
-                    for label, key in self._training_priority_options():
-                        combo.addItem(label, key)
-                    index = combo.findData(priority_key)
-                    combo.setCurrentIndex(index if index >= 0 else 0)
-                    combo.setProperty("player_id", row.player_id)
-                    combo.setProperty("priority_key", combo.currentData())
-                    combo.currentIndexChanged.connect(
-                        lambda _index, player_id=row.player_id, widget=combo:
-                        self._emit_weekly_priority_changed(player_id, widget)
-                    )
-                    self.weekly_priority_table.setCellWidget(row_index, column, combo)
-                    continue
-                item = SortableTableItem(value, sort_values[column])
-                item.setData(self.PLAYER_ID_ROLE, row.player_id)
-                item.setData(self.PRIORITY_ROLE, priority_key)
-                item.setData(self.TRAINING_STATUS_ROLE, status)
-                item.setData(self.AVAILABILITY_ROLE, row.availability)
-                if column == 2:
-                    item.setToolTip(status_tip)
-                    item.setData(Qt.AccessibleTextRole, status_tip)
-                self.weekly_player_table.setItem(
-                    row_index,
-                    column,
-                    item,
-                )
-        self.weekly_player_table.setSortingEnabled(True)
+            status_rank = self._status_sort(confirmed_total, planned)
+
+            name_item = SortableTableItem(row.player_name, row.player_name.casefold())
+            name_item.setData(self.PLAYER_ID_ROLE, row.player_id)
+            name_item.setData(self.PRIORITY_ROLE, priority_key)
+            name_item.setData(self.TRAINING_STATUS_ROLE, status)
+            name_item.setData(self.AVAILABILITY_ROLE, row.availability)
+            table.setItem(row_index, 0, name_item)
+
+            if has_age_column:
+                age_item = SortableTableItem(str(getattr(row, "age", "") or ""), getattr(row, "age", 0) or 0)
+                table.setItem(row_index, 1, age_item)
+
+            priority_item = SortableTableItem("", self._priority_sort(priority_key))
+            table.setItem(row_index, priority_column, priority_item)
+            combo = QComboBox()
+            for label, key in self._training_priority_options():
+                combo.addItem(label, key)
+            index = combo.findData(priority_key)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.setProperty("player_id", row.player_id)
+            combo.setProperty("priority_key", combo.currentData())
+            combo.currentIndexChanged.connect(
+                lambda _index, player_id=row.player_id, widget=combo:
+                self._emit_weekly_priority_changed(player_id, widget)
+            )
+            table.setCellWidget(row_index, priority_column, combo)
+
+            status_item = SortableTableItem(status, status_rank)
+            status_item.setToolTip(status_tip)
+            status_item.setData(Qt.AccessibleTextRole, status_tip)
+            background = self._status_background(status_rank)
+            if background is not None:
+                status_item.setBackground(background)
+            table.setItem(row_index, status_column, status_item)
+        table.setSortingEnabled(True)
 
     def _training_priority_options(self):
         return [
@@ -1769,7 +2009,12 @@ class SquadPage(BasePage):
         ]
 
     def _apply_weekly_filter(self):
-        self._weekly_filter_key = self.weekly_filter_combo.currentData() or "all"
+        self._set_weekly_players(
+            self._weekly_priority_rows,
+            self._weekly_coverage_rows,
+        )
+
+    def _apply_weekly_filter_v2(self):
         self._set_weekly_players(
             self._weekly_priority_rows,
             self._weekly_coverage_rows,
@@ -1781,16 +2026,19 @@ class SquadPage(BasePage):
         self._weekly_priority_by_player_id[player_id] = priority
         self.training_priority_changed.emit(player_id, priority)
         self._clear_weekly_training_plan()
-        if self._weekly_filter_key in {"100", "50", "no_priority"}:
+        refresh_keys = {"100", "50", "no_priority"}
+        if (
+            getattr(self, "_weekly_filter_key", "all") in refresh_keys
+            or getattr(self, "_weekly_filter_key_v2", "all") in refresh_keys
+        ):
             QTimer.singleShot(0, self._apply_weekly_filter)
 
-    def _weekly_row_matches_filter(self, row, coverage):
-        key = self._weekly_filter_key
+    def _weekly_row_matches_filter(self, row, coverage, filter_key="all"):
+        key = filter_key
         priority = self._visible_weekly_priority(row)
         confirmed = self._numeric(getattr(coverage, "confirmed_exposure", 0))
         assumed = self._numeric(getattr(coverage, "assumed_exposure", 0))
         planned = self._numeric(getattr(coverage, "planned_exposure", 0))
-        remaining = self._numeric(getattr(coverage, "remaining_exposure", 0))
         already = confirmed + assumed > 0
         will_train = planned > 0 and not already
         not_training = confirmed + assumed + planned == 0
@@ -1842,6 +2090,14 @@ class SquadPage(BasePage):
             "NO_PRIORITY": 2,
             "REST": 2,
         }.get(str(priority), 3)
+
+    @staticmethod
+    def _status_sort(confirmed_total, planned):
+        if SquadPage._numeric(confirmed_total) > 0:
+            return 0
+        if SquadPage._numeric(planned) > 0:
+            return 1
+        return 2
 
     def _priority_label(self, key):
         key = self._ui_priority(key)

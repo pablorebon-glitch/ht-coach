@@ -174,7 +174,9 @@
       "best": "{formation} has the strongest roster fit among the supported formations.",
       "manual": "{formation} is selected for manual review and is {delta} behind the best roster fit.",
       "formation_fit": "{formation} fits this roster with an overall formation score of {score}."
-    }
+    },
+    "recent_csv": "Recent CSVs",
+    "recent_csv_placeholder": "Select a recent file..."
   },
   "squad_identity": {
     "title": "Squad Identity",
@@ -771,7 +773,19 @@
     "order": "Order",
     "order_side": "Order Side",
     "board_error_title": "Formation board could not render",
-    "board_error_message": "The comparison and Detailed XI tabs are still available. Board error: {error}"
+    "board_error_message": "The comparison and Detailed XI tabs are still available. Board error: {error}",
+    "match_type": "Match Type",
+    "match_type_league": "League",
+    "match_type_cup": "Cup / Friendly",
+    "training_conflict_warning": "Not enough training-eligible slots for every required player. Could not fit: {players}.",
+    "save_as_first_match": "Save as Match 1 (Weekly Training)",
+    "save_as_first_match_success": "Recommended lineup saved as this week's first match.",
+    "save_as_first_match_error": "Could not save this lineup as the first match ({reason}).",
+    "save_as_first_match_no_result": "Run an analysis before saving a lineup to Weekly Training.",
+    "cup_training_rules_unavailable": "Automatic training rules are unavailable for Cup/Friendly analysis. Select a supported training type in Weekly Training.",
+    "save_as_second_match": "Save as Match 2 (Weekly Training)",
+    "save_type_mismatch_title": "Different Match Type",
+    "save_type_mismatch_confirm": "This analysis was run in {actual} mode, not {expected}. Save it into this slot anyway?"
   },
   "decision_lab": {
     "recommendation_confidence": "Recommendation confidence",
@@ -1145,13 +1159,13 @@
     "filter_50": "50%",
     "filter_needs_training": "Needs Training",
     "filter_already_trained": "Already Trained",
-        "filter_will_train": "Will Train",
-        "filter_unavailable": "Unavailable",
-        "filter_no_priority": "No Priority",
-        "filter_not_training": "Not Training",
-        "status_already_trained": "Already trained this week",
-        "status_will_train": "Will train in the generated plan",
-        "status_will_not_train": "Will not train in the generated plan",
+    "filter_will_train": "Will Train",
+    "filter_unavailable": "Unavailable",
+    "filter_no_priority": "No Priority",
+    "filter_not_training": "Not Training",
+    "status_already_trained": "Already trained this week",
+    "status_will_train": "Will train in the generated plan",
+    "status_will_not_train": "Will not train in the generated plan",
     "priority": {
       "required_100": "100%",
       "required_50": "50%",
@@ -1211,13 +1225,13 @@
     "no_plan_to_record": "Generate a plan before recording a played lineup.",
     "duplicate_first_match": "The first weekly match is already recorded.",
     "first_match_recorded": "First weekly match recorded.",
-        "first_match_planned": "First weekly match recorded as planned.",
-        "editing_recorded_lineup": "Editing the recorded first-match lineup",
-        "save_lineup_changes": "Save Lineup Changes",
-        "cancel_editing": "Cancel Editing",
-        "first_match_lineup_changed": "The first-match lineup changed. Generate the second-match plan again.",
-        "editing_cancelled": "Lineup editing cancelled.",
-        "future_match_planned": "This match is in the future and will be recorded as planned.",
+    "first_match_planned": "First weekly match recorded as planned.",
+    "editing_recorded_lineup": "Editing the recorded first-match lineup",
+    "save_lineup_changes": "Save Lineup Changes",
+    "cancel_editing": "Cancel Editing",
+    "first_match_lineup_changed": "The first-match lineup changed. Generate the second-match plan again.",
+    "editing_cancelled": "Lineup editing cancelled.",
+    "future_match_planned": "This match is in the future and will be recorded as planned.",
     "today_match_confirmation_title": "Confirm played match",
     "today_match_played_confirm": "This match has already been played.",
     "today_match_confirmation_required": "Today's match must be explicitly confirmed as played.",
@@ -1238,14 +1252,14 @@
     "summary_already_trained": "Already trained: {count}",
     "summary_will_train": "Will train: {count}",
     "summary_missing": "Still missing: {count}",
-        "summary_unavailable": "Unavailable priority players: {count}",
-        "warning": {
-            "assuming_90_minutes": "Assuming 90 minutes for starters.",
-            "best_effort": "Best-effort lineup generated; review unmet training targets.",
-            "one_required_unavailable": "One required player is unavailable or marked to rest.",
-            "full_training_slots": "Only {available} full-training slots exist for {requested} 100% targets."
-        },
-        "coverage": {
+    "summary_unavailable": "Unavailable priority players: {count}",
+    "warning": {
+      "assuming_90_minutes": "Assuming 90 minutes for starters.",
+      "best_effort": "Best-effort lineup generated; review unmet training targets.",
+      "one_required_unavailable": "One required player is unavailable or marked to rest.",
+      "full_training_slots": "Only {available} full-training slots exist for {requested} 100% targets."
+    },
+    "coverage": {
       "not_started": "Target Incomplete",
       "partially_covered": "Partially Covered",
       "target_met": "Target Completed",
@@ -1270,7 +1284,15 @@
       "required_target_unavailable": "{player} was not assigned because the player is unavailable or marked Rest.",
       "target_already_completed": "{player} already completed this week's target.",
       "high_priority_selected": "{player} was selected as a high-priority training player."
-    }
+    },
+    "age_header": "Age",
+    "weekly_planner_v2": "Weekly Planner",
+    "replace_second_match": "Replace Second-Match Record",
+    "replace_second_match_confirm": "Replace the existing second-match record with the current planned lineup?",
+    "delete_second_match": "Delete Second-Match Record",
+    "delete_second_match_confirm": "Delete the existing second-match record?",
+    "no_second_match_record": "No second-match record yet.",
+    "second_match_recorded": "Second weekly match recorded."
   },
   "advisor": {
     "title": "Tactical Advisor",

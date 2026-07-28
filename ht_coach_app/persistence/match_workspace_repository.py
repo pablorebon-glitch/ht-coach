@@ -1,5 +1,5 @@
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 from ht_coach_app.core.paths import user_data_dir
 from ht_coach_app.services.match_workspace_service import (
@@ -12,6 +12,7 @@ from models.formations import DEFAULT_FORMATION_NAMES
 @dataclass
 class MatchWorkspaceSettings:
     players_csv_path: str = ""
+    recent_players_csv_paths: list[str] = field(default_factory=list)
     opponent_name: str = ""
     selected_formations: list[str] = field(
         default_factory=lambda: list(DEFAULT_FORMATION_NAMES)
@@ -50,6 +51,9 @@ class MatchWorkspaceRepository:
 
         return MatchWorkspaceSettings(
             players_csv_path=data.get("players_csv_path", ""),
+            recent_players_csv_paths=list(
+                data.get("recent_players_csv_paths", [])
+            ),
             opponent_name=data.get("opponent_name", ""),
             selected_formations=list(
                 data.get(
@@ -119,6 +123,31 @@ class MatchWorkspaceRepository:
             )
 
         return settings
+
+    MAX_RECENT_PLAYERS_CSV = 3
+
+    def remember_players_csv_path(self, path):
+        """Records a newly loaded players.csv as the active one and adds
+        it to the shared "recent" list (Squad and Match both read/write
+        this same file, so loading a CSV once in either page makes it
+        available in both)."""
+        path = str(path or "").strip()
+        settings = self.load()
+        if not path:
+            return settings
+
+        recent = [path] + [
+            item for item in settings.recent_players_csv_paths
+            if item != path
+        ]
+        recent = recent[: self.MAX_RECENT_PLAYERS_CSV]
+
+        updated = replace(
+            settings,
+            players_csv_path=path,
+            recent_players_csv_paths=recent,
+        )
+        return self.save(updated)
 
     def load_last_result(self):
         if not self.result_storage_path.exists():

@@ -3,7 +3,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -12,31 +11,28 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import t
 
 
-class CollapsibleHeaderButton(QPushButton):
+class CollapsibleHeaderButton(QFrame):
+    clicked = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("collapsibleSectionHeader")
-        self.setFlat(True)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+            event.accept()
+            return
+        super().mousePressEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() in {Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space}:
-            self.click()
+            self.clicked.emit()
             event.accept()
             return
         super().keyPressEvent(event)
-
-    def sizeHint(self):
-        layout = self.layout()
-        return layout.sizeHint() if layout is not None else super().sizeHint()
-
-    def minimumSizeHint(self):
-        layout = self.layout()
-        return (
-            layout.minimumSize()
-            if layout is not None
-            else super().minimumSizeHint()
-        )
 
 
 class CollapsibleArrowLabel(QLabel):
@@ -205,6 +201,9 @@ class CollapsibleSection(QFrame):
         return f"{action}: {self._title}{summary}"
 
     def _sync_header_geometry(self):
+        layout = self.header_button.layout()
+        if layout is not None:
+            layout.activate()
         self.header_button.setMinimumHeight(
             self.header_button.sizeHint().height()
         )

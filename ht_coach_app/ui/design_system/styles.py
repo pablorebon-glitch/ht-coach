@@ -60,15 +60,14 @@ def application_stylesheet():
             border-radius: {metrics.CARD_RADIUS}px;
         }}
 
-        QPushButton#collapsibleSectionHeader {{
+        #collapsibleSectionHeader {{
             background: transparent;
             border: 0;
             border-radius: {metrics.CARD_RADIUS}px;
             padding: 0;
-            text-align: left;
         }}
 
-        QPushButton#collapsibleSectionHeader:hover {{
+        #collapsibleSectionHeader:hover {{
             background: #f8fafc;
         }}
 

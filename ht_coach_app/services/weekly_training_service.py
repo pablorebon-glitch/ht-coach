@@ -71,6 +71,8 @@ class WeeklyTrainingAppService:
                     archived_weeks=state.archived_weeks,
                 )
             )
+        elif date.today() >= state.active_week.training_update_date:
+            state = self._repository.rollover(state)
         return state
 
     def save_priority(self, player, priority):
@@ -85,12 +87,28 @@ class WeeklyTrainingAppService:
             ),
         )
 
+    @staticmethod
+    def _resolve_priority_record(state, player, player_id=None):
+        player_id = player_id or player_training_id(player)
+        record = state.priorities.get(player_id)
+        if record is not None:
+            return record
+
+        # Fallback for priorities saved before the identity fix. See
+        # _latest_priority_by_normalized_id for why a player can have
+        # several legacy entries and how the "current" one is chosen.
+        latest_by_id = WeeklyTrainingAppService._latest_priority_by_normalized_id(
+            state
+        )
+        match = latest_by_id.get(player_id)
+        return match[0] if match else None
+
     def priority_rows(self, players):
         state = self.load_state()
         rows = []
         for player in players:
             player_id = player_training_id(player)
-            record = state.priorities.get(player_id)
+            record = self._resolve_priority_record(state, player, player_id)
             rows.append(
                 TrainingPriorityRow(
                     player_id=player_id,
@@ -106,6 +124,96 @@ class WeeklyTrainingAppService:
                 )
             )
         return rows
+
+    def active_training_rules(self):
+        state = self.load_state()
+        return rule_provider_for(state.active_training_type)
+
+    def required_player_ids_for_match(self):
+        """Stable player_training_id values for players who still owe
+        weekly training minutes under a Required 100%/50% priority,
+        counting whatever has already been logged this week (e.g. a
+        recorded first match). Used to force these players into a
+        training-eligible slot when planning an opponent-aware lineup
+        for the week's second match (Cup/Friendly)."""
+        from decimal import Decimal
+
+        from engine.weekly_training.coverage import TARGET_MINUTES
+
+        state = self.load_state()
+        rules = rule_provider_for(state.active_training_type)
+        if rules is None:
+            return frozenset()
+
+        counted = {}
+        for record in state.match_records:
+            for exposure in record.training_exposure_entries:
+                counted[exposure.player_id] = (
+                    counted.get(exposure.player_id, Decimal("0"))
+                    + exposure.effective_training_minutes
+                )
+
+        latest_by_id = self._latest_priority_by_normalized_id(state)
+
+        required_priorities = {
+            TrainingPriority.REQUIRED_100,
+            TrainingPriority.REQUIRED_50,
+        }
+        required_ids = set()
+        for normalized_id, (record, legacy_ids) in latest_by_id.items():
+            if record.priority not in required_priorities:
+                continue
+            target = TARGET_MINUTES.get(record.priority, Decimal("0"))
+            if target <= 0:
+                continue
+            covered = max(
+                (
+                    counted.get(candidate_id, Decimal("0"))
+                    for candidate_id in legacy_ids | {normalized_id}
+                ),
+                default=Decimal("0"),
+            )
+            if covered < target:
+                required_ids.add(normalized_id)
+                required_ids.update(legacy_ids)
+        return frozenset(required_ids)
+
+    @staticmethod
+    def _latest_priority_by_normalized_id(state):
+        """Collapses state.priorities down to a single "latest" record
+        per normalized (3-part name|age|salary) player id. A player
+        whose priority was edited more than once before the identity
+        fix can have several legacy 5-part (name|age|days|tsi|salary)
+        entries; among those, the one with the highest "days" value is
+        the most recently saved and wins. Current-format (3-part)
+        entries always take precedence, since they're never stale.
+        Returns {normalized_id: (record, {all_stored_keys_for_it})}."""
+        grouped = {}
+        for key, record in state.priorities.items():
+            parts = str(key).split("|")
+            if len(parts) == 5:
+                normalized_id = "|".join([parts[0], parts[1], parts[4]])
+                try:
+                    recency = int(parts[2])
+                except ValueError:
+                    recency = -1
+            else:
+                normalized_id = key
+                recency = float("inf")
+
+            bucket = grouped.setdefault(
+                normalized_id,
+                {"record": None, "recency": float("-inf"), "keys": set()},
+            )
+            bucket["keys"].add(key)
+            if recency >= bucket["recency"]:
+                bucket["record"] = record
+                bucket["recency"] = recency
+
+        return {
+            normalized_id: (bucket["record"], bucket["keys"])
+            for normalized_id, bucket in grouped.items()
+        }
 
     def coverage(self, players):
         state = self.load_state()
@@ -251,14 +359,150 @@ class WeeklyTrainingAppService:
         )
         return self._repository.add_match_record(state, record)
 
-    def first_match_record(self):
-        state = self.load_state()
+    @staticmethod
+    def _current_first_match_record(state):
+        """The FIRST_WEEKLY_MATCH record that belongs to the currently
+        active training week, if any. Older first-match records are kept
+        in match_records after a week rolls over (for history), so a
+        plain role-only lookup would incorrectly surface last week's
+        match. Scoping by the active week's id prefix keeps this pointing
+        at the current week only."""
+        if state.active_week is None:
+            return None
+        week_prefix = f"{state.active_week.week_id}:"
         return next(
             (
                 record for record in state.match_records
                 if record.match_role == MatchRole.FIRST_WEEKLY_MATCH
+                and record.match_id.startswith(week_prefix)
             ),
             None,
+        )
+
+    def first_match_record(self):
+        state = self.load_state()
+        return self._current_first_match_record(state)
+
+    def record_second_match(
+        self,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+    ):
+        state = self.load_state()
+        record = self._second_match_record_for_board(
+            state,
+            board,
+            opponent_name,
+            roster_players=roster_players,
+            match_date=match_date,
+            requested_status=requested_status,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
+        return self._repository.add_match_record(state, record)
+
+    def replace_second_match(
+        self,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+    ):
+        state = self.load_state()
+        record = self._second_match_record_for_board(
+            state,
+            board,
+            opponent_name,
+            roster_players=roster_players,
+            match_date=match_date,
+            requested_status=requested_status,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
+        return self._repository.replace_match_record(state, record)
+
+    def delete_second_match(self):
+        state = self.load_state()
+        record = self._current_second_match_record(state)
+        if record is None:
+            return state
+        return self._repository.delete_match_record(state, record.match_id)
+
+    @staticmethod
+    def _current_second_match_record(state):
+        """Same scoping rationale as _current_first_match_record, for
+        the week's second (Cup/Friendly) match."""
+        if state.active_week is None:
+            return None
+        week_prefix = f"{state.active_week.week_id}:"
+        return next(
+            (
+                record for record in state.match_records
+                if record.match_role == MatchRole.SECOND_WEEKLY_MATCH
+                and record.match_id.startswith(week_prefix)
+            ),
+            None,
+        )
+
+    def second_match_record(self):
+        state = self.load_state()
+        return self._current_second_match_record(state)
+
+    def _second_match_record_for_board(
+        self,
+        state,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=MatchStatus.PLAYED,
+        played_confirmed=False,
+        today=None,
+    ):
+        rules = rule_provider_for(state.active_training_type)
+        if rules is None:
+            raise ValueError("automatic_rules_unavailable")
+        entries = tuple(
+            self._entry_from_slot(slot, roster_players)
+            for slot in board.slots
+            if slot.player is not None
+        )
+        match_id = f"{state.active_week.week_id}:second"
+        target_date = match_date or state.active_week.second_match_date
+        status, temporal, warning = self.validate_match_status(
+            target_date,
+            requested_status,
+            played_confirmed=played_confirmed,
+            today=today,
+        )
+        return WeeklyMatchRecord(
+            match_id=match_id,
+            match_date=target_date,
+            match_role=MatchRole.SECOND_WEEKLY_MATCH,
+            opponent_name=opponent_name,
+            formation=board.formation_name,
+            lineup=entries,
+            planned_or_played=status,
+            source="match_page",
+            minutes_known=False,
+            notes=self._record_notes(status, False, temporal, warning),
+            training_exposure_entries=tuple(
+                rules.exposure_for_entry(
+                    match_id,
+                    entry,
+                    "match_page",
+                    assumed_confidence(False),
+                )
+                for entry in entries
+            ),
         )
 
     def replace_first_match(
@@ -294,13 +538,7 @@ class WeeklyTrainingAppService:
         today=None,
     ):
         state = self.load_state()
-        record = next(
-            (
-                item for item in state.match_records
-                if item.match_role == MatchRole.FIRST_WEEKLY_MATCH
-            ),
-            None,
-        )
+        record = self._current_first_match_record(state)
         if record is None:
             return state
         target_date = match_date or record.match_date
@@ -343,13 +581,7 @@ class WeeklyTrainingAppService:
         today=None,
     ):
         state = self.load_state()
-        record = next(
-            (
-                item for item in state.match_records
-                if item.match_role == MatchRole.FIRST_WEEKLY_MATCH
-            ),
-            None,
-        )
+        record = self._current_first_match_record(state)
         if record is None:
             return state
         rules = rule_provider_for(state.active_training_type)
@@ -387,13 +619,7 @@ class WeeklyTrainingAppService:
 
     def delete_first_match(self):
         state = self.load_state()
-        record = next(
-            (
-                item for item in state.match_records
-                if item.match_role == MatchRole.FIRST_WEEKLY_MATCH
-            ),
-            None,
-        )
+        record = self._current_first_match_record(state)
         if record is None:
             return state
         return self._repository.delete_match_record(state, record.match_id)

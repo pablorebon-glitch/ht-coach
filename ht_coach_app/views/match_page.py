@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -40,6 +41,7 @@ from engine.advisor.recommendation_engine import (
 )
 from engine.ratings import format_rating_value
 from ht_coach_app.core.localization import localization_service
+from ht_coach_app.services.recent_csv_labels import format_recent_csv_label
 from ht_coach_app.reasoning.explanation_formatter import (
     confidence_level_label,
     decision_lab_support_label,
@@ -49,6 +51,10 @@ from ht_coach_app.reasoning.explanation_formatter import (
     localized_decision_summary,
 )
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
+from ht_coach_app.services.match_workspace_service import (
+    MATCH_TYPE_CUP,
+    MATCH_TYPE_LEAGUE,
+)
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 
@@ -63,6 +69,8 @@ class MatchPage(BasePage):
     workspace_recalculate_requested = Signal(object)
     workspace_changed = Signal()
     match_section_toggled = Signal(str, bool)
+    save_as_first_match_requested = Signal()
+    save_as_second_match_requested = Signal()
 
     MATCH_SECTION_DEFAULTS = {
         "decision_lab": False,
@@ -176,8 +184,15 @@ class MatchPage(BasePage):
         self.players_path_edit.setPlaceholderText(
             t("match.select_players_csv")
         )
+        self.players_path_edit.setVisible(False)
         self.players_path_edit.textChanged.connect(
             self._emit_workspace_changed
+        )
+
+        self.recent_csv_combo = QComboBox()
+        self.recent_csv_combo.setMinimumWidth(160)
+        self.recent_csv_combo.currentIndexChanged.connect(
+            self._on_recent_csv_selected
         )
 
         browse_button = QPushButton(t("match.browse"))
@@ -191,6 +206,7 @@ class MatchPage(BasePage):
         load_button.clicked.connect(
             self.load_players_requested
         )
+        load_button.setVisible(False)
 
         self.players_loaded_label = QLabel(t("match.no_players_loaded"))
 
@@ -265,6 +281,29 @@ class MatchPage(BasePage):
             "warning"
         )
 
+        match_type_label = QLabel(t("match.match_type"))
+        self.match_type_label = match_type_label
+        self.match_type_combo = QComboBox()
+        self.match_type_combo.addItem(
+            t("match.match_type_league"),
+            MATCH_TYPE_LEAGUE,
+        )
+        self.match_type_combo.addItem(
+            t("match.match_type_cup"),
+            MATCH_TYPE_CUP,
+        )
+        self.match_type_combo.currentIndexChanged.connect(
+            self._emit_workspace_changed
+        )
+
+        self.training_conflict_label = QLabel("")
+        self.training_conflict_label.setWordWrap(True)
+        self.training_conflict_label.setProperty(
+            "state",
+            "warning"
+        )
+        self.training_conflict_label.setVisible(False)
+
         self.status_label = QLabel(t("match.ready"))
         self.status_label.setWordWrap(True)
 
@@ -275,6 +314,7 @@ class MatchPage(BasePage):
         )
 
         layout.addWidget(csv_label, 0, 0)
+        layout.addWidget(self.recent_csv_combo, 0, 1)
         layout.addWidget(self.players_path_edit, 0, 1)
         layout.addWidget(browse_button, 0, 2)
         layout.addWidget(load_button, 0, 3)
@@ -287,9 +327,12 @@ class MatchPage(BasePage):
         layout.addWidget(formation_label, 5, 0)
         layout.addWidget(formation_actions_widget, 5, 1, 1, 3)
         layout.addWidget(self.formations_container, 6, 1, 1, 3)
-        layout.addWidget(self.formation_warning_label, 7, 1, 1, 3)
-        layout.addWidget(self.status_label, 8, 0, 1, 3)
-        layout.addWidget(self.analyze_button, 8, 3)
+        layout.addWidget(match_type_label, 7, 0)
+        layout.addWidget(self.match_type_combo, 7, 1, 1, 3)
+        layout.addWidget(self.formation_warning_label, 8, 1, 1, 3)
+        layout.addWidget(self.status_label, 9, 0, 1, 3)
+        layout.addWidget(self.analyze_button, 9, 3)
+        layout.addWidget(self.training_conflict_label, 10, 1, 1, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
@@ -363,6 +406,10 @@ class MatchPage(BasePage):
         self.players_path_edit.setText(
             settings.players_csv_path
         )
+        if hasattr(self, "recent_csv_combo"):
+            self.set_recent_csv_paths(
+                getattr(settings, "recent_players_csv_paths", ())
+            )
 
         opponent_index = self.opponent_combo.findText(
             settings.opponent_name
@@ -402,6 +449,32 @@ class MatchPage(BasePage):
         filename = path.split("\\")[-1].split("/")[-1] if path else ""
         self.set_source_indicator(filename, "neutral")
 
+    def set_recent_csv_paths(self, paths):
+        self.recent_csv_combo.blockSignals(True)
+        self.recent_csv_combo.clear()
+        if not paths:
+            self.recent_csv_combo.addItem(
+                t("match.select_players_csv"), ""
+            )
+        for path in paths or ():
+            self.recent_csv_combo.addItem(
+                format_recent_csv_label(
+                    path, language=localization_service().language
+                ),
+                path,
+            )
+        current = self.players_csv_path()
+        index = self.recent_csv_combo.findData(current)
+        self.recent_csv_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.recent_csv_combo.blockSignals(False)
+
+    def _on_recent_csv_selected(self, _index):
+        path = self.recent_csv_combo.currentData()
+        if not path or path == self.players_csv_path():
+            return
+        self.set_players_csv_path(path)
+        self.load_players_requested.emit()
+
     def selected_opponent_name(self):
         return self.opponent_combo.currentText().strip()
 
@@ -413,6 +486,39 @@ class MatchPage(BasePage):
 
     def availability_mode(self):
         return self.availability_combo.currentData() or CURRENT_AVAILABLE
+
+    def match_type(self):
+        return self.match_type_combo.currentData() or MATCH_TYPE_LEAGUE
+
+    def set_training_conflict_warning(self, message):
+        text = (message or "").strip()
+        self.training_conflict_label.setText(text)
+        self.training_conflict_label.setVisible(bool(text))
+
+    def confirm_replace_first_match(self):
+        return QMessageBox.question(
+            self,
+            t("planner.replace_first_match"),
+            t("planner.replace_first_match_confirm"),
+        ) == QMessageBox.Yes
+
+    def confirm_replace_second_match(self):
+        return QMessageBox.question(
+            self,
+            t("planner.replace_second_match"),
+            t("planner.replace_second_match_confirm"),
+        ) == QMessageBox.Yes
+
+    def confirm_save_match_type_mismatch(self, expected_label, actual_label):
+        return QMessageBox.question(
+            self,
+            t("match.save_type_mismatch_title"),
+            t(
+                "match.save_type_mismatch_confirm",
+                expected=expected_label,
+                actual=actual_label,
+            ),
+        ) == QMessageBox.Yes
 
     def select_all_formations(self):
         self._set_checked_formations(
@@ -519,6 +625,7 @@ class MatchPage(BasePage):
             t("match.loading_title"),
             t("match.loading_message")
         )
+        self._stabilize_match_results_layout()
 
     def show_results(self, result, restored=False, workspace_state=None):
         viewport_state = self._capture_viewport_state()
@@ -555,6 +662,7 @@ class MatchPage(BasePage):
             viewport_state,
             self._result_tabs,
         )
+        self._stabilize_match_results_layout()
 
     def set_match_section_states(self, states):
         for key, default in self.MATCH_SECTION_DEFAULTS.items():
@@ -1069,6 +1177,14 @@ class MatchPage(BasePage):
                 board.workspace_modified.connect(
                     self.workspace_recalculate_requested.emit
                 )
+                board.set_save_as_first_match_visible(True)
+                board.save_as_first_match_requested.connect(
+                    self.save_as_first_match_requested
+                )
+                board.set_save_as_second_match_visible(True)
+                board.save_as_second_match_requested.connect(
+                    self.save_as_second_match_requested
+                )
                 self._formation_board_widget = board
             recommended = result.recommended_formation
             board.set_boards(
@@ -1421,10 +1537,6 @@ class MatchPage(BasePage):
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(3)
 
-        title = QLabel(t("match.decision_lab"))
-        title.setObjectName("sectionTitle")
-        layout.addWidget(title, 0, 0, 1, 3)
-
         confidence = QLabel(
             t(
                 "match.recommendation_confidence",
@@ -1432,13 +1544,14 @@ class MatchPage(BasePage):
             )
         )
         confidence.setObjectName("recommendedBadge")
-        layout.addWidget(confidence, 0, 3)
+        layout.addWidget(confidence, 0, 0)
 
         support = QLabel(
             decision_lab_support_label(decision_lab.confidence_score)
         )
         support.setObjectName("compactDecisionText")
-        layout.addWidget(support, 0, 4)
+        layout.addWidget(support, 0, 1)
+        layout.setColumnStretch(2, 1)
 
         if recommended is None:
             headline = QLabel(localized_decision_summary(decision_lab.summary))

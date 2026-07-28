@@ -8,13 +8,17 @@ from ht_coach_app.core.localization import t
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
+from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.services.match_workspace_service import (
+    MATCH_TYPE_CUP,
+    MATCH_TYPE_LEAGUE,
     MatchWorkspaceValidationError,
     format_decision_lab,
     format_match_summary,
     format_recommended_lineup,
     with_tactical_advisor,
 )
+from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from ht_coach_app.workers.match_analysis_worker import (
     MatchAnalysisWorker,
 )
@@ -27,6 +31,7 @@ class MatchController(QObject):
         service,
         settings_repository,
         app_events=None,
+        weekly_training_service=None,
         parent=None
     ):
         super().__init__(parent)
@@ -34,6 +39,10 @@ class MatchController(QObject):
         self._service = service
         self._settings_repository = settings_repository
         self._app_events = app_events
+        self._weekly_training_service = (
+            weekly_training_service or WeeklyTrainingAppService()
+        )
+        self._formation_board_mapper = FormationBoardMapper()
         self._change_analysis_service = ChangeAnalysisService()
         self._thread = None
         self._worker = None
@@ -71,6 +80,14 @@ class MatchController(QObject):
         self._view.copy_lineup_requested.connect(
             self._copy_lineup
         )
+        if hasattr(self._view, "save_as_first_match_requested"):
+            self._view.save_as_first_match_requested.connect(
+                self._save_as_first_match
+            )
+        if hasattr(self._view, "save_as_second_match_requested"):
+            self._view.save_as_second_match_requested.connect(
+                self._save_as_second_match
+            )
         if hasattr(self._view, "workspace_recalculate_requested"):
             self._view.workspace_recalculate_requested.connect(
                 self._recalculate_workspace
@@ -154,6 +171,7 @@ class MatchController(QObject):
         if path:
             self._view.set_players_csv_path(path)
             self._save_current_settings()
+            self._load_players()
 
     def _load_players(self):
         try:
@@ -190,9 +208,30 @@ class MatchController(QObject):
             )
             return
 
+        match_type = (
+            self._view.match_type()
+            if hasattr(self._view, "match_type")
+            else MATCH_TYPE_LEAGUE
+        )
+
+        required_player_ids = None
+        training_rules = None
+        if match_type == MATCH_TYPE_CUP:
+            training_rules = self._weekly_training_service.active_training_rules()
+            if training_rules is None:
+                self._view.show_error(
+                    t("match.cup_training_rules_unavailable")
+                )
+                return
+            required_player_ids = (
+                self._weekly_training_service.required_player_ids_for_match()
+            )
+
+        if hasattr(self._view, "set_training_conflict_warning"):
+            self._view.set_training_conflict_warning("")
+
         self._save_current_settings()
         self._pending_workspace_state = None
-        self._view.clear_results()
         self._view.set_processing(
             True
         )
@@ -207,6 +246,9 @@ class MatchController(QObject):
             self._view.selected_opponent_name(),
             self._view.selected_formations(),
             availability_mode=self._availability_mode(),
+            match_type=match_type,
+            required_player_ids=required_player_ids,
+            training_rules=training_rules,
         )
         self._worker.moveToThread(
             self._thread
@@ -359,6 +401,10 @@ class MatchController(QObject):
             result
         )
         self._load_current_roster_for_inspector(show_errors=False)
+        if hasattr(self._view, "set_training_conflict_warning"):
+            self._view.set_training_conflict_warning(
+                getattr(result, "training_conflict_warning", "")
+            )
         self._view.show_results(
             result,
             workspace_state=self._pending_workspace_state,
@@ -441,9 +487,17 @@ class MatchController(QObject):
             self._workspace_recalc_timer.start()
 
     def _save_current_settings(self):
+        settings = self._settings_repository.load()
+        path = self._view.players_csv_path()
+        recent = [path] + [
+            item for item in settings.recent_players_csv_paths
+            if item != path
+        ] if path else list(settings.recent_players_csv_paths)
+        recent = recent[: self._settings_repository.MAX_RECENT_PLAYERS_CSV]
         self._settings_repository.save(
             MatchWorkspaceSettings(
-                players_csv_path=self._view.players_csv_path(),
+                players_csv_path=path,
+                recent_players_csv_paths=recent,
                 opponent_name=self._view.selected_opponent_name(),
             selected_formations=self._view.selected_formations(),
             squad_availability_mode=self._availability_mode(),
@@ -454,6 +508,8 @@ class MatchController(QObject):
             ),
         )
         )
+        if hasattr(self._view, "set_recent_csv_paths"):
+            self._view.set_recent_csv_paths(recent)
 
     def _load_current_roster_for_inspector(self, show_errors):
         try:
@@ -480,3 +536,172 @@ class MatchController(QObject):
             return self._view.availability_mode()
 
         return CURRENT_AVAILABLE
+
+    def _save_as_first_match(self):
+        result = self._settings_repository.load_last_result()
+        if result is None or not getattr(result, "formations", None):
+            self._view.show_error(
+                t("match.save_as_first_match_no_result")
+            )
+            return
+        if not self._confirm_match_type_for_save(result, MATCH_TYPE_LEAGUE):
+            return
+
+        recommended = result.recommended_formation
+        try:
+            board = self._formation_board_mapper.to_board(recommended)
+            self._weekly_training_service.record_first_match(
+                board,
+                opponent_name=result.opponent_name,
+                roster_players=self._roster_players,
+            )
+        except ValueError as exc:
+            if str(exc) == "duplicate_match_id":
+                self._replace_first_match_after_confirmation(board, result)
+                return
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason=f"ValueError: {exc}",
+                )
+            )
+            return
+        except Exception as exc:
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            return
+
+        self._view.show_status(
+            t("match.save_as_first_match_success")
+        )
+
+    def _confirm_match_type_for_save(self, result, expected_type):
+        """Warn if the analysis about to be saved (the last one that
+        finished, which may not be the one currently showing on screen)
+        was run in a different mode than the slot being saved into.
+        Saving a League-mode analysis as the second (Cup) match, or vice
+        versa, is very easy to do by mistake — e.g. re-running a League
+        check right before saving silently swaps out the Cup-aware
+        lineup for a plain one, with no error to flag it."""
+        actual_type = getattr(result, "match_type", None)
+        if actual_type is None or actual_type == expected_type:
+            return True
+        if not hasattr(self._view, "confirm_save_match_type_mismatch"):
+            return True
+        expected_label = (
+            t("match.match_type_league")
+            if expected_type == MATCH_TYPE_LEAGUE
+            else t("match.match_type_cup")
+        )
+        actual_label = (
+            t("match.match_type_league")
+            if actual_type == MATCH_TYPE_LEAGUE
+            else t("match.match_type_cup")
+        )
+        return self._view.confirm_save_match_type_mismatch(
+            expected_label, actual_label
+        )
+
+    def _replace_first_match_after_confirmation(self, board, result):
+        if not hasattr(self._view, "confirm_replace_first_match"):
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason="ValueError: duplicate_match_id",
+                )
+            )
+            return
+        if not self._view.confirm_replace_first_match():
+            return
+        try:
+            self._weekly_training_service.replace_first_match(
+                board,
+                opponent_name=result.opponent_name,
+                roster_players=self._roster_players,
+            )
+        except Exception as exc:
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            return
+        self._view.show_status(
+            t("match.save_as_first_match_success")
+        )
+
+    def _save_as_second_match(self):
+        result = self._settings_repository.load_last_result()
+        if result is None or not getattr(result, "formations", None):
+            self._view.show_error(
+                t("match.save_as_first_match_no_result")
+            )
+            return
+        if not self._confirm_match_type_for_save(result, MATCH_TYPE_CUP):
+            return
+
+        recommended = result.recommended_formation
+        try:
+            board = self._formation_board_mapper.to_board(recommended)
+            self._weekly_training_service.record_second_match(
+                board,
+                opponent_name=result.opponent_name,
+                roster_players=self._roster_players,
+            )
+        except ValueError as exc:
+            if str(exc) == "duplicate_match_id":
+                self._replace_second_match_after_confirmation(board, result)
+                return
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason=f"ValueError: {exc}",
+                )
+            )
+            return
+        except Exception as exc:
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            return
+
+        self._view.show_status(
+            t("match.save_as_first_match_success")
+        )
+
+    def _replace_second_match_after_confirmation(self, board, result):
+        if not hasattr(self._view, "confirm_replace_second_match"):
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason="ValueError: duplicate_match_id",
+                )
+            )
+            return
+        if not self._view.confirm_replace_second_match():
+            return
+        try:
+            self._weekly_training_service.replace_second_match(
+                board,
+                opponent_name=result.opponent_name,
+                roster_players=self._roster_players,
+            )
+        except Exception as exc:
+            self._view.show_error(
+                t(
+                    "match.save_as_first_match_error",
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            return
+        self._view.show_status(
+            t("match.save_as_first_match_success")
+        )
