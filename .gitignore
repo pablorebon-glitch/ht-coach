@@ -20,4 +20,4 @@ build/
 coverage.xml
 htmlcov/
 
-ht-coach-updated/
+.coverage

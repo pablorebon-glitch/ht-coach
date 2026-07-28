@@ -4,6 +4,22 @@
 
 ### Added
 
+- Added Alpha 0.5.8.3 Historical Evolution Engine: a new Qt-independent
+  `engine/history/evolution` package computes pure deterministic evolution between
+  two historical snapshots — sector deltas (midfield plus the six directional
+  defense/attack sectors) with configurable-threshold trend classification, overall
+  evolution (summed delta, average delta, best/worst sector, improved/declined/
+  unchanged counts, overall trend), formation and tactical change detection, lineup
+  evolution matched by stable player identity (never by row position, so reordered
+  lineups compare correctly) reporting added/removed/kept players and per-player
+  position/order/order-side/shirt-number changes, prediction evolution (expected
+  goals, win/draw/loss probability, possession) and a documented `evolution_score`
+  summary metric. A `HistoricalEvolutionEngine` service wraps the existing
+  `PreviousMatchSelector` comparison policies (previous match, previous league,
+  previous cup, previous friendly, same cohort, custom) without re-implementing
+  selection. No optimizer, rating engine, calibration, planner, snapshot schema,
+  probability engine, midfield engine or Formation Board code was changed; the new
+  package's test suite reaches 100% statement coverage.
 - Added Alpha 0.5.8.2 Historical Match Intelligence Foundation: a Qt-independent
   `engine/history` package now stores typed historical match snapshots with explicit
   schema versioning, planned-versus-played stages, canonical lineup orders and order

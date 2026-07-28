@@ -107,6 +107,7 @@ ht_coach_app/
 engine/
   advisor/
   history/
+    evolution/
   hattrick_ratings/
     calibration/
     midfield/
@@ -456,11 +457,63 @@ Tactical left/right convention:
   those canonical values; the board uses the order-side sector for visual placement
   without mutating the player's field side.
 
-Future extension points are intentionally data-only in Alpha 0.5.8.2: sector deltas,
-formation-change detection, player-added/player-removed events, order changes,
-deterministic insight rules, executive summaries, trend analysis, prediction MAE,
-recommendation accuracy, opponent evolution and season reports belong to later
-roadmap sprints.
+Future extension points remaining after Alpha 0.5.8.3: deterministic insight rules,
+executive summaries, prediction MAE, recommendation accuracy and season reports belong
+to Alpha 0.5.8.4 and 0.5.8.5. Sector deltas, formation-change detection, player
+added/removed events and order changes are implemented in Alpha 0.5.8.3 below.
+
+### Historical Evolution Engine
+
+`engine/history/evolution/`
+
+Alpha 0.5.8.3 adds a second Qt-independent layer on top of `engine/history/`: given
+two historical snapshots, it measures their complete evolution. It does not explain
+why anything changed — that is Alpha 0.5.8.4 — and it never touches the optimizer,
+rating engine, calibration, planner, snapshot schema, probability engine, midfield
+engine or Formation Board.
+
+Modules:
+
+- `comparison_models.py`: `Trend` enum and `TrendThresholds` (unchanged/major bands,
+  constructor-validated, never hardcoded into comparison logic), `classify_trend`, and
+  `SectorEvolution` (previous/current value, absolute delta, percentage delta, trend).
+- `comparison_metrics.py`: pure delta primitives (`absolute_delta`,
+  `percentage_delta`, `safe_average`) — a percentage delta against a zero previous
+  value is `None` (undefined), not infinite.
+- `comparison_result.py`: the aggregate result dataclasses — `OverallEvolution`,
+  `FormationEvolution`, `TacticalEvolution`, `LineupPlayerChange` /
+  `LineupChangeStatus` / `LineupEvolution`, `MetricDelta` / `PredictionEvolution`, and
+  the top-level `HistoricalEvolutionResult`.
+- `comparison_selector.py`: a thin adapter over the existing
+  `PreviousMatchSelector` / `PreviousMatchSelection` (previous match, previous league,
+  previous cup, previous friendly, same cohort, custom) — selection logic itself is
+  not duplicated.
+- `comparison_validation.py`: `ensure_comparable` guards against comparing a snapshot
+  to itself or against a missing snapshot; missing *optional* data inside a valid
+  snapshot is handled field-by-field in the engine, not treated as an error.
+- `comparison_engine.py`: the deterministic comparison functions
+  (`compare_sectors`, `compare_overall`, `compare_formation`, `compare_tactical`,
+  `compare_lineup`, `compare_prediction`, `evolution_score`), the `compare()` entry
+  point, and `HistoricalEvolutionEngine`, a facade combining comparison with the
+  Comparison Policies above (`compare_with_previous`, `compare_with_previous_league`,
+  `compare_with_previous_cup`, `compare_with_previous_friendly`,
+  `compare_same_cohort`, `compare_custom`).
+
+Design notes:
+
+- Lineup matching uses stable player identity — `player_id` when present, otherwise a
+  normalized `player_name` — never lineup row position, so a reordered lineup with the
+  same players reports no changes.
+- Trend classification is threshold-based on the *percentage* delta so it behaves
+  consistently across different rating scales; thresholds are a constructor argument
+  (`TrendThresholds`), never a hardcoded constant inside comparison logic.
+- `evolution_score` is documented, not a hidden formula: average sector percentage
+  delta divided by 10, rounded to 2 decimals. It is explicitly a summary metric, not a
+  rating.
+- Every `compare_with_*` convenience method returns `None` (not an error) when no
+  eligible previous snapshot exists among the supplied candidates.
+- Evolution results are not persisted; they are always reproducible from the two
+  input snapshots plus the thresholds used.
 
 ### Reasoning
 

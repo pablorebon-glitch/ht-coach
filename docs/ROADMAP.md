@@ -148,8 +148,46 @@ Acceptance criteria:
 
 ### Alpha 0.5.8.3: Historical Match Comparison Engine
 
-Future sprint. Compare selected historical snapshots and calculate deterministic rating,
-lineup, formation, order and player deltas.
+Goal: measure the complete evolution between two historical snapshots with pure
+deterministic comparison — no explanation, no heuristics, no AI. Explanation is
+deferred to Alpha 0.5.8.4.
+
+Deliverables:
+
+- `engine/history/evolution` package, Qt-independent, built entirely on the existing
+  `engine/history` foundation (snapshots, cohort classification, previous-match
+  selector) without modifying it.
+- Sector evolution for midfield and the six directional defense/attack sectors, each
+  with previous value, current value, absolute delta, percentage delta and a
+  configurable-threshold trend (`major_improvement` / `improvement` / `unchanged` /
+  `decline` / `major_decline`).
+- Overall evolution: summed sector delta, average sector delta, best-improved and
+  worst sectors, improved/declined/unchanged sector counts and an overall trend.
+- Formation evolution (changed/unchanged, old/new formation).
+- Tactical evolution (tactic, tactic level, attitude, confidence deltas).
+- Lineup evolution matched by stable player identity (player ID first, normalized
+  player name fallback) — never by row position — reporting players added, removed,
+  kept, and per-kept-player position/order/order-side/shirt-number changes.
+- Prediction evolution for expected goals, opponent expected goals, win/draw/loss
+  probability and possession.
+- A single deterministic `evolution_score` summary metric (average sector percentage
+  delta scaled by 10), documented as a summary, not a rating.
+- `HistoricalEvolutionEngine` service exposing `compare()`,
+  `compare_with_previous()`, `compare_with_previous_league()`,
+  `compare_with_previous_cup()`, `compare_with_previous_friendly()`,
+  `compare_same_cohort()` and `compare_custom()`, reusing the existing
+  `PreviousMatchSelector` comparison policies rather than re-implementing selection.
+
+Acceptance criteria:
+
+- Any two historical snapshots can be compared.
+- Every sector produces a deterministic delta and trend.
+- Lineup, tactical, formation and prediction evolution are all detected.
+- Missing optional data (ratings, tactic level, predictions) degrades gracefully to
+  `None` deltas instead of raising.
+- No optimizer, rating engine, calibration, planner, snapshot schema, probability
+  engine, midfield engine or Formation Board code is changed.
+- `engine/history/evolution` test suite: 100% statement coverage.
 
 ### Alpha 0.5.8.4: Historical Match Insights and Executive Summary
 
