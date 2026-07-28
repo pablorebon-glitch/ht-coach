@@ -18,6 +18,10 @@ from engine.squad_health.availability_service import (
 )
 from engine.optimizers.formation_optimizer import FormationOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
+from engine.optimizers.training_constrained_optimizer import (
+    TrainingConstrainedFormationOptimizer,
+)
+from engine.weekly_training.player_identity import player_training_id
 from engine.match_intelligence import MatchIntelligenceEngine
 from engine.match_intelligence.models import (
     IntelligenceItem,
@@ -76,6 +80,10 @@ from models.side import Side
 
 class MatchWorkspaceValidationError(ValueError):
     pass
+
+
+MATCH_TYPE_LEAGUE = "LEAGUE"
+MATCH_TYPE_CUP = "CUP"
 
 
 @dataclass(frozen=True)
@@ -168,6 +176,8 @@ class MatchAnalysisResult:
     availability_mode: str = CURRENT_AVAILABLE
     availability_warning: str = ""
     unavailable_players_count: int = 0
+    match_type: str = MATCH_TYPE_LEAGUE
+    training_conflict_warning: str = ""
 
     @property
     def recommended_formation(self):
@@ -224,6 +234,9 @@ class MatchWorkspaceService:
         opponent_name,
         formation_names,
         availability_mode=CURRENT_AVAILABLE,
+        match_type=MATCH_TYPE_LEAGUE,
+        required_player_ids=None,
+        training_rules=None,
     ):
         self.validate_inputs(
             players_csv_path,
@@ -256,11 +269,45 @@ class MatchWorkspaceService:
             for name in formation_names
         ]
 
-        engine_results = self._optimizer(
-            players,
-            formations,
-            opponent.ratings
-        )
+        training_conflict_warning = ""
+
+        if match_type == MATCH_TYPE_CUP:
+            if training_rules is None:
+                raise MatchWorkspaceValidationError(
+                    "Automatic training rules unavailable for Cup/Friendly analysis."
+                )
+            required_players = self._resolve_required_players(
+                players,
+                required_player_ids or (),
+            )
+            constrained_results = TrainingConstrainedFormationOptimizer.optimize_against(
+                players,
+                formations,
+                opponent.ratings,
+                required_players,
+                training_rules,
+            )
+            engine_results = [
+                item.formation_result for item in constrained_results
+            ]
+            unplaced_names = sorted(
+                {
+                    player.name
+                    for item in constrained_results
+                    for player in item.unplaced_required_players
+                }
+            )
+            if unplaced_names:
+                training_conflict_warning = t(
+                    "match.training_conflict_warning",
+                    players=", ".join(unplaced_names),
+                )
+        else:
+            engine_results = self._optimizer(
+                players,
+                formations,
+                opponent.ratings
+            )
 
         mapped_results = self._map_results(
             engine_results,
@@ -277,11 +324,23 @@ class MatchWorkspaceService:
             availability_mode=mode,
             availability_warning=self._availability_warning(mode),
             unavailable_players_count=self._unavailable_count(all_players),
+            match_type=match_type,
+            training_conflict_warning=training_conflict_warning,
         )
 
         return self._with_decision_lab(
             result
         )
+
+    @staticmethod
+    def _resolve_required_players(players, required_player_ids):
+        required_ids = set(required_player_ids)
+        if not required_ids:
+            return []
+        return [
+            player for player in players
+            if player_training_id(player) in required_ids
+        ]
 
     def analyze_workspace(
         self,

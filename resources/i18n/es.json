@@ -174,7 +174,9 @@
       "best": "{formation} tiene el mejor encaje de plantel entre las formaciones soportadas.",
       "manual": "{formation} esta seleccionada para revision manual y queda {delta} por detras del mejor encaje.",
       "formation_fit": "{formation} encaja con este plantel con un score general de formacion de {score}."
-    }
+    },
+    "recent_csv": "CSV recientes",
+    "recent_csv_placeholder": "Elegir un archivo reciente..."
   },
   "squad_identity": {
     "title": "Identidad del plantel",
@@ -771,7 +773,19 @@
     "order": "Orden",
     "order_side": "Lado orden",
     "board_error_title": "La cancha no pudo renderizarse",
-    "board_error_message": "La comparación y el XI detallado siguen disponibles. Error de cancha: {error}"
+    "board_error_message": "La comparación y el XI detallado siguen disponibles. Error de cancha: {error}",
+    "match_type": "Tipo de partido",
+    "match_type_league": "Liga",
+    "match_type_cup": "Copa / Amistoso",
+    "training_conflict_warning": "No entran todos los jugadores que deben entrenar en las posiciones habilitadas. No pudieron ubicarse: {players}.",
+    "save_as_first_match": "Guardar como Partido 1 (Entrenamiento semanal)",
+    "save_as_first_match_success": "La formación recomendada se guardó como el primer partido de la semana.",
+    "save_as_first_match_error": "No se pudo guardar esta formación como el primer partido ({reason}).",
+    "save_as_first_match_no_result": "Analizá un partido antes de guardar una formación en Entrenamiento semanal.",
+    "cup_training_rules_unavailable": "No hay reglas automáticas de entrenamiento disponibles para Copa/Amistoso. Elegí un tipo de entrenamiento soportado en Entrenamiento semanal.",
+    "save_as_second_match": "Guardar como Partido 2 (Entrenamiento semanal)",
+    "save_type_mismatch_title": "Tipo de partido distinto",
+    "save_type_mismatch_confirm": "Este análisis se corrió en modo {actual}, no {expected}. ¿Guardarlo igual en este casillero?"
   },
   "decision_lab": {
     "recommendation_confidence": "Confianza de la recomendacion",
@@ -1145,13 +1159,13 @@
     "filter_50": "50%",
     "filter_needs_training": "Necesita entrenamiento",
     "filter_already_trained": "Ya entreno",
-        "filter_will_train": "Va a entrenar",
-        "filter_unavailable": "No disponible",
-        "filter_no_priority": "Sin prioridad",
-        "filter_not_training": "No entrena",
-        "status_already_trained": "Ya entreno esta semana",
-        "status_will_train": "Va a entrenar en el plan generado",
-        "status_will_not_train": "No va a entrenar en el plan generado",
+    "filter_will_train": "Va a entrenar",
+    "filter_unavailable": "No disponible",
+    "filter_no_priority": "Sin prioridad",
+    "filter_not_training": "No entrena",
+    "status_already_trained": "Ya entreno esta semana",
+    "status_will_train": "Va a entrenar en el plan generado",
+    "status_will_not_train": "No va a entrenar en el plan generado",
     "priority": {
       "required_100": "100%",
       "required_50": "50%",
@@ -1211,13 +1225,13 @@
     "no_plan_to_record": "Generá un plan antes de registrar una alineación utilizada.",
     "duplicate_first_match": "El primer partido semanal ya está registrado.",
     "first_match_recorded": "Primer partido semanal registrado.",
-        "first_match_planned": "Primer partido semanal registrado como planificado.",
-        "editing_recorded_lineup": "Editando la alineación registrada del primer partido",
-        "save_lineup_changes": "Guardar cambios en la alineación",
-        "cancel_editing": "Cancelar edición",
-        "first_match_lineup_changed": "La alineación del primer partido cambió. Generá nuevamente el plan del segundo partido.",
-        "editing_cancelled": "Edición de alineación cancelada.",
-        "future_match_planned": "Este partido está en el futuro y se registrará como planificado.",
+    "first_match_planned": "Primer partido semanal registrado como planificado.",
+    "editing_recorded_lineup": "Editando la alineación registrada del primer partido",
+    "save_lineup_changes": "Guardar cambios en la alineación",
+    "cancel_editing": "Cancelar edición",
+    "first_match_lineup_changed": "La alineación del primer partido cambió. Generá nuevamente el plan del segundo partido.",
+    "editing_cancelled": "Edición de alineación cancelada.",
+    "future_match_planned": "Este partido está en el futuro y se registrará como planificado.",
     "today_match_confirmation_title": "Confirmar partido disputado",
     "today_match_played_confirm": "Este partido ya se disputó.",
     "today_match_confirmation_required": "El partido de hoy debe confirmarse explícitamente como disputado.",
@@ -1238,14 +1252,14 @@
     "summary_already_trained": "Ya entrenaron: {count}",
     "summary_will_train": "Van a entrenar: {count}",
     "summary_missing": "Todavía faltan: {count}",
-        "summary_unavailable": "Prioritarios no disponibles: {count}",
-        "warning": {
-            "assuming_90_minutes": "Se asumen 90 minutos para los titulares.",
-            "best_effort": "Se generó la mejor alineación posible; revisá los objetivos de entrenamiento pendientes.",
-            "one_required_unavailable": "Un jugador prioritario no está disponible o está marcado para descansar.",
-            "full_training_slots": "Solo hay {available} plazas de entrenamiento completo para {requested} objetivos del 100%."
-        },
-        "coverage": {
+    "summary_unavailable": "Prioritarios no disponibles: {count}",
+    "warning": {
+      "assuming_90_minutes": "Se asumen 90 minutos para los titulares.",
+      "best_effort": "Se generó la mejor alineación posible; revisá los objetivos de entrenamiento pendientes.",
+      "one_required_unavailable": "Un jugador prioritario no está disponible o está marcado para descansar.",
+      "full_training_slots": "Solo hay {available} plazas de entrenamiento completo para {requested} objetivos del 100%."
+    },
+    "coverage": {
       "not_started": "Objetivo pendiente",
       "partially_covered": "Parcialmente cubierto",
       "target_met": "Objetivo cumplido",
@@ -1270,7 +1284,15 @@
       "required_target_unavailable": "{player} no fue asignado porque no está disponible o está marcado para descansar.",
       "target_already_completed": "{player} ya completó el objetivo de esta semana.",
       "high_priority_selected": "{player} fue seleccionado como jugador de prioridad alta."
-    }
+    },
+    "age_header": "Edad",
+    "weekly_planner_v2": "Planificador semanal",
+    "replace_second_match": "Reemplazar registro del segundo partido",
+    "replace_second_match_confirm": "Reemplazar el registro existente del segundo partido con la alineacion actual?",
+    "delete_second_match": "Borrar registro del segundo partido",
+    "delete_second_match_confirm": "Borrar el registro existente del segundo partido?",
+    "no_second_match_record": "Todavia no hay registro del segundo partido.",
+    "second_match_recorded": "Segundo partido semanal registrado."
   },
   "advisor": {
     "title": "Asesor táctico",

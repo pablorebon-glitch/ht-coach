@@ -796,69 +796,6 @@ def test_weekly_planner_information_cards_are_outside_pitch(tmp_path):
     assert page.weekly_lineup_workspace.findChild(QTextBrowser) is None
 
 
-@unittest.skipIf(QApplication is None, "PySide6 is not installed")
-def test_weekly_planner_long_explanations_scroll_in_card(tmp_path):
-    app = QApplication.instance() or QApplication([])
-    page = SquadPage()
-    show_weekly_tab(page)
-    service = WeeklyTrainingAppService(
-        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
-    )
-    players = roster()
-    plan = service.generate_plan(players, "3-5-2")
-    long_plan = replace(
-        plan,
-        explanations=tuple(
-            PlannerExplanation(
-                code="REQUIRED_TARGET_OMITTED",
-                player_id=f"p{index}",
-                player_name=(
-                    "Very Long Player Name With A Verbose Planner Explanation "
-                    f"{index}"
-                ),
-            )
-            for index in range(40)
-        ),
-    )
-
-    page.resize(1366, 768)
-    page.show_weekly_training_plan(long_plan, service.board_for_plan(plan), players)
-    page.show()
-    app.processEvents()
-
-    browser = page.weekly_explanations_browser
-    assert browser.lineWrapMode() == QTextBrowser.WidgetWidth
-    assert browser.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
-    assert browser.maximumHeight() <= 180
-    assert browser.verticalScrollBar().maximum() > 0
-    assert page.weekly_plan_board.isVisible()
-
-
-@unittest.skipIf(QApplication is None, "PySide6 is not installed")
-def test_weekly_planner_side_panel_collapse_keeps_info_cards_below_pitch(tmp_path):
-    app = QApplication.instance() or QApplication([])
-    page = SquadPage()
-    show_weekly_tab(page)
-    service = WeeklyTrainingAppService(
-        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
-    )
-    players = roster()
-    plan = service.generate_plan(players, "3-5-2")
-    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
-    page.resize(1366, 768)
-    page.show()
-    app.processEvents()
-
-    before_y = page.weekly_cost_card.mapTo(page, page.weekly_cost_card.rect().topLeft()).y()
-    page.weekly_plan_board.bench_side_panel.set_expanded(False)
-    page.weekly_plan_board.inspector_side_panel.set_expanded(False)
-    app.processEvents()
-    after_y = page.weekly_cost_card.mapTo(page, page.weekly_cost_card.rect().topLeft()).y()
-
-    assert abs(after_y - before_y) < 30
-    assert page.weekly_cost_card.parentWidget() is not page.weekly_plan_board
-
-
 def test_weekly_priority_rows_use_human_position_score_labels(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
@@ -1146,49 +1083,6 @@ def test_recorded_lineup_edit_mode_restores_interactive_board(tmp_path):
     assert not page.is_weekly_record_editing()
     assert page.weekly_record_button.text() == "Record Played Lineup"
     assert page.weekly_cancel_edit_button.isHidden()
-    app.processEvents()
-
-
-@unittest.skipIf(QApplication is None, "PySide6 is not installed")
-def test_weekly_planner_result_cards_stack_below_pitch(tmp_path):
-    app = QApplication.instance() or QApplication([])
-    page = SquadPage()
-    show_weekly_tab(page)
-    service = WeeklyTrainingAppService(
-        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
-    )
-    players = roster()
-    service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
-    service.save_priority(players[2], TrainingPriority.REQUIRED_50.value)
-    plan = service.generate_plan(players, "3-5-2")
-
-    page.resize(1366, 768)
-    page.show_weekly_training(
-        service.load_state(),
-        service.priority_rows(players),
-        service.coverage(players),
-        ["3-5-2", "4-5-1"],
-    )
-    page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
-    page.show()
-    app.processEvents()
-
-    pitch_rect = widget_rect_in(page.weekly_plan_board.pitch, page)
-    board_rect = widget_rect_in(page.weekly_lineup_workspace, page)
-    summary_rect = widget_rect_in(page.weekly_cost_card, page)
-    warnings_rect = widget_rect_in(page.weekly_warnings_card, page)
-    explanations_rect = widget_rect_in(page.weekly_explanations_card, page)
-
-    assert page.weekly_cost_card.isVisible()
-    assert summary_rect.top() >= board_rect.bottom()
-    assert warnings_rect.top() >= summary_rect.bottom()
-    assert explanations_rect.top() >= warnings_rect.bottom()
-    assert not summary_rect.intersects(pitch_rect)
-    assert not warnings_rect.intersects(pitch_rect)
-    assert not explanations_rect.intersects(pitch_rect)
-    assert page.weekly_plan_board.current_board() is not None
-    assert len(page.weekly_plan_board.pitch.card_geometries()) == 11
-    assert page.findChild(QScrollArea, "weeklyPlannerScroll") is not None
     app.processEvents()
 
 

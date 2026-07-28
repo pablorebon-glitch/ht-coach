@@ -128,6 +128,10 @@ class SquadController:
             self._view.delete_first_match_requested.connect(
                 self._delete_first_training_match
             )
+        if hasattr(self._view, "delete_second_match_requested"):
+            self._view.delete_second_match_requested.connect(
+                self._delete_second_training_match
+            )
         if hasattr(self._view, "use_training_plan_requested"):
             self._view.use_training_plan_requested.connect(
                 self._accept_training_plan
@@ -183,10 +187,16 @@ class SquadController:
         self._view.set_csv_path(
             settings.players_csv_path
         )
+        if hasattr(self._view, "set_recent_csv_paths"):
+            self._view.set_recent_csv_paths(
+                settings.recent_players_csv_paths
+            )
         if hasattr(self._view, "set_selected_tab"):
             self._view.set_selected_tab(
                 getattr(settings, "squad_selected_tab", "ideal")
             )
+        if settings.players_csv_path and self._roster is None:
+            self._load()
 
     def _browse(self):
         path = self._view.choose_players_file()
@@ -473,6 +483,13 @@ class SquadController:
         self._show_weekly_training()
         self._view.show_status(t("planner.no_first_match_record"))
 
+    def _delete_second_training_match(self):
+        if self._roster is None:
+            return
+        self._weekly_training_service.delete_second_match()
+        self._show_weekly_training()
+        self._view.show_status(t("planner.no_second_match_record"))
+
     def _first_match_requested_status(
         self,
         match_date,
@@ -508,11 +525,15 @@ class SquadController:
         }.get(code, t("planner.validation_error"))
 
     def _first_match_save_message(self, state):
+        week_prefix = (
+            f"{state.active_week.week_id}:" if state.active_week else ""
+        )
         record = next(
             (
                 item for item in state.match_records
                 if getattr(item.match_role, "value", item.match_role)
                 == "FIRST_WEEKLY_MATCH"
+                and item.match_id.startswith(week_prefix)
             ),
             None,
         )
@@ -661,9 +682,16 @@ class SquadController:
 
     def _save_roster_path(self, path):
         settings = self._settings_repository.load()
+        path = str(path or "")
+        recent = [path] + [
+            item for item in settings.recent_players_csv_paths
+            if item != path
+        ] if path else list(settings.recent_players_csv_paths)
+        recent = recent[: self._settings_repository.MAX_RECENT_PLAYERS_CSV]
         self._settings_repository.save(
             MatchWorkspaceSettings(
-                players_csv_path=str(path),
+                players_csv_path=path,
+                recent_players_csv_paths=recent,
                 opponent_name=settings.opponent_name,
                 selected_formations=settings.selected_formations,
                 squad_availability_mode=self._availability_mode,
@@ -687,5 +715,10 @@ class SquadController:
                     if hasattr(self._view, "selected_tab_key")
                     else getattr(settings, "squad_selected_tab", "ideal")
                 ),
+                match_section_states=getattr(
+                    settings, "match_section_states", {}
+                ),
             )
         )
+        if hasattr(self._view, "set_recent_csv_paths"):
+            self._view.set_recent_csv_paths(recent)

@@ -229,6 +229,53 @@ class SquadSyncTest(unittest.TestCase):
                 str(csv_path)
             )
 
+    def test_squad_auto_loads_last_csv_on_startup(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "players.csv"
+            csv_path.write_text("placeholder", encoding="utf-8")
+            settings_path = Path(temp_dir) / "match_workspace.json"
+            repository = MatchWorkspaceRepository(settings_path)
+            repository.remember_players_csv_path(str(csv_path))
+
+            roster = RosterResult(
+                players=[object(), object(), object()],
+                rows=[],
+                source_path=str(csv_path)
+            )
+            squad_view = FakeSquadView(csv_path)
+
+            squad_controller = SquadController(
+                squad_view,
+                FakeSquadService(roster),
+                repository,
+            )
+
+            # The roster must already be loaded after construction, with
+            # no explicit load_requested click needed.
+            self.assertIsNotNone(squad_controller)
+            self.assertEqual(squad_view.loaded_count, 3)
+
+    def test_squad_does_not_auto_load_when_no_csv_was_ever_used(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            settings_path = Path(temp_dir) / "match_workspace.json"
+            repository = MatchWorkspaceRepository(settings_path)
+
+            roster = RosterResult(
+                players=[object()],
+                rows=[],
+                source_path=""
+            )
+            squad_view = FakeSquadView("")
+
+            squad_controller = SquadController(
+                squad_view,
+                FakeSquadService(roster),
+                repository,
+            )
+
+            self.assertIsNotNone(squad_controller)
+            self.assertEqual(squad_view.loaded_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
