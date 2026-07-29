@@ -1734,5 +1734,190 @@
       "same_cohort_match": "el partido equivalente anterior",
       "custom": "el partido seleccionado"
     }
+  },
+  "squad_intelligence": {
+    "role": {
+      "key_starter": "Titular clave",
+      "starter": "Titular",
+      "primary_trainee": "Trainee principal",
+      "secondary_trainee": "Trainee secundario",
+      "tactical_specialist": "Especialista táctico",
+      "useful_rotation": "Rotación útil",
+      "development_project": "Proyecto a desarrollar",
+      "veteran_mentor": "Veterano de referencia",
+      "depth_player": "Jugador de profundidad",
+      "transfer_candidate": "Candidato a transferencia",
+      "replaceable": "Reemplazable"
+    },
+    "status": {
+      "keep": "Conservar",
+      "train": "Entrenar",
+      "monitor": "Monitorear",
+      "review_at_next_skill_level": "Reevaluar en el próximo nivel",
+      "evaluate_sale": "Evaluar venta",
+      "maintain_as_depth": "Mantener como profundidad",
+      "gradually_replace": "Reemplazar gradualmente",
+      "do_not_invest_more_training": "No invertir más entrenamiento"
+    },
+    "performance": {
+      "very_high": "Muy alto",
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Bajo",
+      "very_low": "Muy bajo",
+      "insufficient_data": "Datos insuficientes"
+    },
+    "potential": {
+      "very_high": "Muy alto",
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Bajo",
+      "exhausted": "Agotado",
+      "not_applicable": "No aplica",
+      "insufficient_data": "Datos insuficientes"
+    },
+    "training_fit": {
+      "excellent": "Excelente",
+      "compatible": "Compatible",
+      "partial": "Parcial",
+      "not_prioritized": "No priorizado",
+      "no_training": "No entrena",
+      "unknown": "Desconocido"
+    },
+    "salary_efficiency": {
+      "excellent": "Excelente",
+      "good": "Buena",
+      "acceptable": "Aceptable",
+      "low": "Baja",
+      "very_low": "Muy baja",
+      "insufficient_data": "Datos insuficientes"
+    },
+    "strategic_value": {
+      "key": "Clave",
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Bajo",
+      "insufficient_data": "Datos insuficientes"
+    },
+    "strength": {
+      "strong_current_contribution": "Fuerte aporte actual",
+      "excellent_training_fit": "Ajuste de entrenamiento excelente",
+      "favorable_age": "Edad favorable",
+      "useful_secondary_skills": "Habilidades secundarias útiles",
+      "tactical_versatility": "Versatilidad táctica",
+      "valuable_specialty": "Especialidad valiosa",
+      "low_salary_relative_to_role": "Salario bajo para su rol",
+      "hard_to_replace": "Difícil de reemplazar",
+      "first_team_importance": "Importancia en el primer equipo"
+    },
+    "risk": {
+      "no_meaningful_active_training": "No recibe entrenamiento relevante",
+      "reduced_training_only": "Solo entrenamiento reducido",
+      "declining_development_runway": "Poco recorrido de desarrollo",
+      "high_salary_relative_to_role": "Salario alto para su rol",
+      "poor_stamina": "Resistencia baja",
+      "poor_form": "Forma baja",
+      "injured_or_unavailable": "Lesionado o no disponible",
+      "limited_positional_flexibility": "Flexibilidad posicional limitada",
+      "blocked_by_stronger_players": "Bloqueado por jugadores más fuertes",
+      "no_clear_squad_role": "Sin rol claro en el plantel",
+      "missing_data": "Datos faltantes"
+    },
+    "milestone": {
+      "reach_trained_skill_level": "Reevaluar cuando {skill} alcance el próximo nivel.",
+      "review_at_age": "Reevaluar al llegar a los {age} años.",
+      "review_after_matches": "Reevaluar después de los próximos {matches} partidos.",
+      "review_after_training_cycle": "Reevaluar después del ciclo de entrenamiento actual.",
+      "review_when_replacement_exists": "Mantener hasta que exista un reemplazo equivalente.",
+      "review_when_salary_threshold_context_exists": "Reevaluar cuando haya contexto financiero del club.",
+      "no_milestone": "Sin hito próximo.",
+      "insufficient_data": "Datos insuficientes para definir un hito."
+    },
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "insufficient_data": "Datos insuficientes"
+    },
+    "limitation": {
+      "missing_stable_player_id": "Sin ID estable de jugador",
+      "missing_salary": "Falta el salario",
+      "missing_age_days": "Faltan los días de edad",
+      "no_active_training": "Sin entrenamiento activo",
+      "no_historical_appearances": "Sin historial de partidos",
+      "no_positional_score": "Sin puntaje posicional",
+      "unavailable_current_roster": "No disponible en el plantel actual",
+      "unsupported_specialty": "Especialidad no soportada",
+      "incomplete_skills": "Habilidades incompletas"
+    },
+    "reason": {
+      "key_starter": "Es titular clave: rendimiento actual muy alto y difícil de reemplazar en el plantel.",
+      "starter": "Es titular habitual por su buen rendimiento actual.",
+      "primary_trainee": "Recibe entrenamiento completo de {training_type}, tiene una edad favorable y todavía aporta al primer equipo.",
+      "secondary_trainee": "Recibe un entrenamiento compatible o parcial de {training_type} y todavía tiene margen de desarrollo.",
+      "tactical_specialist": "Ofrece un valor táctico distintivo por su especialidad o perfil de habilidades.",
+      "useful_rotation": "Aporta como rotación útil sin ser un titular indiscutido.",
+      "development_project": "Es un proyecto a desarrollar: joven, con potencial, aunque todavía no recibe el entrenamiento ideal.",
+      "veteran_mentor": "Sigue siendo útil por su liderazgo y experiencia, más allá de su edad.",
+      "depth_player": "Cubre una posición del plantel sin un rol claramente definido todavía.",
+      "transfer_candidate": "Tiene bajo desarrollo futuro y presión salarial o de cupo; vale la pena evaluar su salida.",
+      "replaceable": "Aporta poco actualmente y hay reemplazo disponible en el plantel.",
+      "generic": "Evaluación basada en la evidencia disponible."
+    },
+    "evidence": {
+      "best_position": "Mejor posición",
+      "squad_rank": "Ranking en el plantel",
+      "alternative_positions": "Posiciones alternativas",
+      "current_performance": "Rendimiento actual",
+      "training_potential": "Potencial de entrenamiento",
+      "training_fit": "Ajuste de entrenamiento",
+      "training_effect": "Efecto de entrenamiento",
+      "priority": "Prioridad",
+      "age": "Edad",
+      "salary": "Salario",
+      "salary_percentile": "Percentil salarial en el plantel",
+      "strategic_value": "Valor estratégico",
+      "replacement_difficulty": "Dificultad de reemplazo",
+      "positional_depth": "Profundidad posicional",
+      "recommended_role": "Rol recomendado",
+      "speciality": "Especialidad",
+      "leadership_or_experience": "Liderazgo/Experiencia",
+      "low_form": "Forma baja",
+      "high_form": "Forma alta",
+      "low_stamina": "Resistencia baja",
+      "unavailable": "No disponible",
+      "missing_age": "Falta la edad",
+      "missing_salary": "Falta el salario",
+      "no_positional_score": "Sin puntaje posicional",
+      "no_active_training": "Sin entrenamiento activo",
+      "position_not_trained": "La posición no entrena en este tipo",
+      "insufficient_strategic_evidence": "Evidencia insuficiente para valor estratégico",
+      "fallback_role": "Sin evidencia suficiente para otro rol más específico",
+      "fallback_status": "Sin evidencia suficiente para otra acción más específica"
+    },
+    "panel": {
+      "title": "Inteligencia del plantel",
+      "recommended_role": "Rol recomendado",
+      "management_status": "Estado",
+      "primary_reason": "Razón",
+      "current_performance": "Rendimiento actual",
+      "training_potential": "Potencial de entrenamiento",
+      "training_fit": "Ajuste al entrenamiento",
+      "salary_efficiency": "Eficiencia salarial",
+      "strategic_value": "Valor estratégico",
+      "strengths": "Fortalezas",
+      "risks": "Riesgos",
+      "next_milestone": "Próximo hito",
+      "evidence": "Evidencia detallada",
+      "limitations": "Limitaciones",
+      "no_player_selected": "Seleccioná un jugador para ver su inteligencia de plantel.",
+      "no_roster": "Cargá un plantel para generar reportes de inteligencia.",
+      "unavailable_player": "Este jugador no está disponible en el plantel actual.",
+      "column": {
+        "role": "Rol",
+        "status": "Estado",
+        "training_fit": "Ajuste"
+      }
+    }
   }
 }

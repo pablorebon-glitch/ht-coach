@@ -477,7 +477,58 @@ state that already existed.
 
 ### Alpha 0.5.9.1: Squad Intelligence
 
-Future sprint. Not started.
+Goal: turn Squad from a roster-data screen into a player-management intelligence
+screen. For any current-roster player, produce a deterministic, explainable
+classification (recommended role, management status, why, training fit,
+strengths/risks, next milestone) understandable in five seconds, with no raw
+"Overall: 87" score exposed anywhere.
+
+Deliverables:
+
+- `engine/squad_intelligence/` (Qt- and localization-independent, 15 modules): a
+  role catalog (11 roles) and management-status catalog (8 statuses, deliberately
+  no unconditional "sell"), five qualitative dimensions (current performance,
+  training potential, training fit, salary efficiency, strategic value) each with
+  evidence, a documented internal-scoring layer (normalized [0,1], never shown
+  directly), one-rule-per-role/status classes (never a monolithic if/elif chain)
+  with a guaranteed fallback so every player gets exactly one role and one status,
+  deterministic milestone selection, and a documented confidence policy.
+- Reuses rather than duplicates: current performance is built from the existing
+  `PlayerAnalyzer` positional ranking (no second rating engine); training fit
+  reads the canonical Complete Training System via `rule_provider_for` (no second
+  training matrix).
+- `ht_coach_app/services/squad_intelligence_service.py`'s
+  `SquadIntelligenceAppService` bridges the current roster into the engine's
+  context objects. Building it against a real CSV surfaced a real bug —
+  `PlayerAnalyzer.best_position()` returns a `(position, score)` tuple, not a bare
+  enum — fixed and covered by a regression test using a realistic roster size.
+- `ht_coach_app/services/squad_intelligence_formatting.py`: stable
+  enum-to-localization-key mapping; full English/Spanish translations (151 keys)
+  for every role, status, dimension value, strength, risk, milestone, confidence
+  level, limitation and primary-reason template — verified by a dedicated test
+  that every enum member resolves in both languages.
+- UI: no new navigation page. The existing Squad "Jugadores" tab's player
+  selection now also renders a compact Squad Intelligence panel (role, status,
+  reason, the five dimensions, strengths, risks, next milestone, evidence,
+  limitations) directly below the existing player detail. Changing the active
+  training type recalculates the currently-shown report immediately.
+- 122 new tests (engine, app service, localization, UI), 96% coverage on the new
+  engine package. Full suite re-verified at 1320 passed / 0 failed.
+- `docs/SQUAD_INTELLIGENCE.md` added, documenting the role/status catalogs, the
+  documented KEY_STARTER-vs-PRIMARY_TRAINEE conflict resolution, the
+  salary-efficiency and strategic-value models, and the Club Advisor extension
+  point.
+
+Not shipped in this pass:
+
+- Historical-appearance evidence (recent starting frequency, no-show patterns) —
+  the engine is built to accept it when available and degrade safely without it,
+  but no adapter from `engine/history` was wired up this sprint.
+- A role/status/training-fit badge or column in the main Squad table/list (the
+  brief allows this but doesn't require it); the detailed panel is the
+  authoritative surface for now.
+- Any Club Advisor aggregation across the whole squad's reports — explicitly out
+  of scope until Alpha 0.6.0.
 
 ### Alpha 0.6.0: Club Advisor Foundation
 

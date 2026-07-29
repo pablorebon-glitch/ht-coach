@@ -116,6 +116,7 @@ engine/
   rating_validation/
   squad_evolution/
   squad_health/
+  squad_intelligence/
   weekly_training/
 models/
 importers/
@@ -326,6 +327,79 @@ for transfer-planning context in Alpha 0.5.4, not Hattrick match prediction.
   the current import format does not provide enough information to exclude safely.
 - Suspension is represented in the domain model for future support, but no suspension
   status is inferred from the current CSV.
+
+### Squad Intelligence
+
+`engine/squad_intelligence/`
+
+Alpha 0.5.9.1 adds a deterministic, explainable player-classification layer over
+Squad, distinct from — and reusing rather than duplicating — both Squad Evolution
+(long-term roster structure) and the Complete Training System (Alpha 0.5.8.5).
+Qt- and localization-independent, like every domain package before it.
+
+Modules:
+
+- `enums.py`: `ClubStrategy` (currently only `SUSTAINABLE_GROWTH`, read from
+  context rather than hardcoded so a future sprint can add more without touching
+  rules), `RecommendedRole` (11 values), `ManagementStatus` (8 values,
+  deliberately no unconditional "sell"), the five dimension enums
+  (`CurrentPerformance`, `TrainingPotential`, `TrainingFit`, `SalaryEfficiency`,
+  `StrategicValue`), `MilestoneType`, `IntelligenceConfidence`, `StrengthType`,
+  `RiskType`, `LimitationType`.
+- `context.py`: `PositionEvidence` / `TrainingEvidence` (per-player) and
+  `SquadIntelligenceContext` (squad-relative: positional depth, active training
+  type, salary/age distributions) — built once per batch analysis.
+- `scoring.py`: internal normalized `[0, 1]` scores (`match_value` from
+  squad-relative positional rank, `training_fit_value` from the canonical
+  `TrainingEffect` weight, `training_value` combining fit with an age-based
+  development-runway factor, `salary_efficiency_value`, `strategic_value_score`,
+  `replacement_difficulty` from positional depth) and `ScoringThresholds`
+  (typed, constructor-validated, never a magic constant inside a rule).
+- `dimensions.py`: the five classifiers, each returning a qualitative category
+  plus the `IntelligenceEvidence` that produced it — never a raw score as the
+  primary output.
+- `roles.py` / `statuses.py`: one rule class per role/status (never a monolithic
+  if/elif chain). A guaranteed lowest-priority fallback (`DepthPlayerRule` /
+  `MonitorStatusRule`) ensures every player resolves to exactly one role and one
+  status. `KeyStarterRule` (priority 95) deliberately outranks
+  `PrimaryTraineeRule` (priority 90) for the documented "very-high performer who's
+  also an excellent-fit trainee" conflict — see docs/SQUAD_INTELLIGENCE.md.
+- `milestones.py`: deterministic next-review selection — never an exact calendar
+  date, never an invented skill sub-level.
+- `warnings.py`: `detect_strengths` / `detect_risks`, capped at 3 visible items
+  each, always evidenced.
+- `confidence.py`: the same documented-policy style as the Historical Insights
+  Engine's confidence classification.
+- `rule.py` / `rule_engine.py`: `RoleEvaluationContext`, `RoleRule` / `StatusRule`
+  base classes, `SquadIntelligenceRuleEngine` (highest-priority match wins, ties
+  broken by rule ID).
+- `service.py`: `generate_report()` / `generate_squad_reports()` — pure functions
+  of their context inputs, no I/O.
+
+App-layer bridge:
+
+- `ht_coach_app/services/squad_intelligence_service.py`'s
+  `SquadIntelligenceAppService` builds context objects from the current roster
+  using the app's *existing* positional-ranking infrastructure
+  (`PlayerAnalyzer.best_position()` / `rank_players()`) and the canonical
+  training provider (`rule_provider_for`) — never a second rating engine or
+  training matrix. Note: `PlayerAnalyzer.best_position()` returns a
+  `(position, score)` tuple, not a bare `Position` enum — a real bug caught while
+  building this service against a real CSV, now regression-tested.
+- `ht_coach_app/services/squad_intelligence_formatting.py`: stable
+  enum-to-localization-key mapping (e.g. `role_label_key`), so domain rules never
+  assemble translated sentences themselves.
+
+UI: no new navigation page. Squad's existing "Jugadores" tab player-selection flow
+(`player_selected` → `_show_player_detail`) now also renders a compact Squad
+Intelligence panel — recommended role, status, primary reason, the five
+dimensions, strengths, risks, next milestone, evidence, limitations — directly
+below the existing player-detail widgets. Changing the active training type
+recalculates the currently-shown report immediately.
+
+Static-import and structural tests confirm this package never invokes
+`FormationOptimizer` or `TacticOptimizer`, and that `PlayerIntelligenceReport` has
+no `overall_score`/`score` field at all.
 
 ### Transfer Planner
 

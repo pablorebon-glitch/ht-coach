@@ -28,6 +28,7 @@ class SquadController:
         evolution_service=None,
         transfer_planner_service=None,
         weekly_training_service=None,
+        squad_intelligence_service=None,
     ):
         self._view = view
         self._service = service
@@ -41,9 +42,11 @@ class SquadController:
         self._weekly_training_service = (
             weekly_training_service or WeeklyTrainingAppService()
         )
+        self._squad_intelligence_service = squad_intelligence_service
         self._settings_repository = settings_repository
         self._app_events = app_events
         self._roster = None
+        self._last_selected_player_name = None
         self._visible_rows = []
         self._ideal_selection = AUTO_FORMATION
         self._availability_mode = AVAILABILITY_CURRENT
@@ -335,6 +338,8 @@ class SquadController:
             return
         self._weekly_training_service.set_active_training_type(training_type)
         self._show_weekly_training()
+        if self._last_selected_player_name:
+            self._show_squad_intelligence(self._last_selected_player_name)
 
     def _change_training_priority(self, player_id, priority):
         if self._roster is None:
@@ -672,6 +677,34 @@ class SquadController:
         self._view.show_player_detail(
             detail
         )
+        self._last_selected_player_name = player_name
+        self._show_squad_intelligence(player_name)
+
+    def _show_squad_intelligence(self, player_name):
+        if self._roster is None or not hasattr(self._view, "show_squad_intelligence"):
+            return
+        player = next(
+            (p for p in self._roster.players if p.name == player_name), None
+        )
+        if player is None:
+            self._view.clear_squad_intelligence()
+            return
+        if self._squad_intelligence_service is None:
+            from ht_coach_app.services.squad_intelligence_service import (
+                SquadIntelligenceAppService,
+            )
+
+            self._squad_intelligence_service = SquadIntelligenceAppService(
+                weekly_training_service=self._weekly_training_service
+            )
+        try:
+            report = self._squad_intelligence_service.generate_report(
+                player, self._roster.players
+            )
+        except Exception:
+            self._view.clear_squad_intelligence()
+            return
+        self._view.show_squad_intelligence(report)
 
     def _export(self):
         if not self._visible_rows:

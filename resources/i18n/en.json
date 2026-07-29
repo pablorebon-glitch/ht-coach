@@ -1734,5 +1734,190 @@
       "same_cohort_match": "the previous equivalent match",
       "custom": "the selected match"
     }
+  },
+  "squad_intelligence": {
+    "role": {
+      "key_starter": "Key Starter",
+      "starter": "Starter",
+      "primary_trainee": "Primary Trainee",
+      "secondary_trainee": "Secondary Trainee",
+      "tactical_specialist": "Tactical Specialist",
+      "useful_rotation": "Useful Rotation",
+      "development_project": "Development Project",
+      "veteran_mentor": "Veteran Mentor",
+      "depth_player": "Depth Player",
+      "transfer_candidate": "Transfer Candidate",
+      "replaceable": "Replaceable"
+    },
+    "status": {
+      "keep": "Keep",
+      "train": "Train",
+      "monitor": "Monitor",
+      "review_at_next_skill_level": "Review at Next Skill Level",
+      "evaluate_sale": "Evaluate Sale",
+      "maintain_as_depth": "Maintain as Depth",
+      "gradually_replace": "Gradually Replace",
+      "do_not_invest_more_training": "Do Not Invest More Training"
+    },
+    "performance": {
+      "very_high": "Very High",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "very_low": "Very Low",
+      "insufficient_data": "Insufficient Data"
+    },
+    "potential": {
+      "very_high": "Very High",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "exhausted": "Exhausted",
+      "not_applicable": "Not Applicable",
+      "insufficient_data": "Insufficient Data"
+    },
+    "training_fit": {
+      "excellent": "Excellent",
+      "compatible": "Compatible",
+      "partial": "Partial",
+      "not_prioritized": "Not Prioritized",
+      "no_training": "No Training",
+      "unknown": "Unknown"
+    },
+    "salary_efficiency": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "acceptable": "Acceptable",
+      "low": "Low",
+      "very_low": "Very Low",
+      "insufficient_data": "Insufficient Data"
+    },
+    "strategic_value": {
+      "key": "Key",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "insufficient_data": "Insufficient Data"
+    },
+    "strength": {
+      "strong_current_contribution": "Strong current contribution",
+      "excellent_training_fit": "Excellent training fit",
+      "favorable_age": "Favorable age",
+      "useful_secondary_skills": "Useful secondary skills",
+      "tactical_versatility": "Tactical versatility",
+      "valuable_specialty": "Valuable specialty",
+      "low_salary_relative_to_role": "Low salary relative to role",
+      "hard_to_replace": "Hard to replace",
+      "first_team_importance": "First-team importance"
+    },
+    "risk": {
+      "no_meaningful_active_training": "No meaningful active training",
+      "reduced_training_only": "Reduced training only",
+      "declining_development_runway": "Declining development runway",
+      "high_salary_relative_to_role": "High salary relative to role",
+      "poor_stamina": "Poor stamina",
+      "poor_form": "Poor form",
+      "injured_or_unavailable": "Injured or unavailable",
+      "limited_positional_flexibility": "Limited positional flexibility",
+      "blocked_by_stronger_players": "Blocked by stronger players",
+      "no_clear_squad_role": "No clear squad role",
+      "missing_data": "Missing data"
+    },
+    "milestone": {
+      "reach_trained_skill_level": "Reevaluate when {skill} reaches its next level.",
+      "review_at_age": "Reevaluate upon reaching age {age}.",
+      "review_after_matches": "Reevaluate after the next {matches} recorded matches.",
+      "review_after_training_cycle": "Reevaluate after the current training cycle.",
+      "review_when_replacement_exists": "Maintain until an equivalent replacement exists.",
+      "review_when_salary_threshold_context_exists": "Reevaluate once club financial context is available.",
+      "no_milestone": "No upcoming milestone.",
+      "insufficient_data": "Insufficient data to set a milestone."
+    },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "insufficient_data": "Insufficient Data"
+    },
+    "limitation": {
+      "missing_stable_player_id": "No stable player ID",
+      "missing_salary": "Missing salary",
+      "missing_age_days": "Missing age days",
+      "no_active_training": "No active training",
+      "no_historical_appearances": "No historical appearances",
+      "no_positional_score": "No positional score",
+      "unavailable_current_roster": "Unavailable in current roster",
+      "unsupported_specialty": "Unsupported specialty",
+      "incomplete_skills": "Incomplete skills"
+    },
+    "reason": {
+      "key_starter": "Key starter: very high current performance and hard to replace in the squad.",
+      "starter": "Regular starter thanks to strong current performance.",
+      "primary_trainee": "Receives full {training_type} training, has a favorable age profile and remains useful in the first team.",
+      "secondary_trainee": "Receives compatible or partial {training_type} training and still has development room.",
+      "tactical_specialist": "Offers distinctive tactical value through specialty or skill profile.",
+      "useful_rotation": "Contributes as useful rotation without being an undisputed starter.",
+      "development_project": "A development project: young, with potential, though not yet receiving ideal training.",
+      "veteran_mentor": "Remains useful for leadership and experience, beyond his age.",
+      "depth_player": "Covers a squad position without a clearly defined role yet.",
+      "transfer_candidate": "Low future development value and salary or squad-slot pressure; worth evaluating a sale.",
+      "replaceable": "Contributes little currently and an internal replacement is available.",
+      "generic": "Assessment based on available evidence."
+    },
+    "evidence": {
+      "best_position": "Best position",
+      "squad_rank": "Squad rank",
+      "alternative_positions": "Alternative positions",
+      "current_performance": "Current performance",
+      "training_potential": "Training potential",
+      "training_fit": "Training fit",
+      "training_effect": "Training effect",
+      "priority": "Priority",
+      "age": "Age",
+      "salary": "Salary",
+      "salary_percentile": "Salary percentile in squad",
+      "strategic_value": "Strategic value",
+      "replacement_difficulty": "Replacement difficulty",
+      "positional_depth": "Positional depth",
+      "recommended_role": "Recommended role",
+      "speciality": "Specialty",
+      "leadership_or_experience": "Leadership/Experience",
+      "low_form": "Low form",
+      "high_form": "High form",
+      "low_stamina": "Low stamina",
+      "unavailable": "Unavailable",
+      "missing_age": "Missing age",
+      "missing_salary": "Missing salary",
+      "no_positional_score": "No positional score",
+      "no_active_training": "No active training",
+      "position_not_trained": "Position not trained under this type",
+      "insufficient_strategic_evidence": "Insufficient evidence for strategic value",
+      "fallback_role": "Not enough evidence for a more specific role",
+      "fallback_status": "Not enough evidence for a more specific action"
+    },
+    "panel": {
+      "title": "Squad Intelligence",
+      "recommended_role": "Recommended role",
+      "management_status": "Status",
+      "primary_reason": "Reason",
+      "current_performance": "Current performance",
+      "training_potential": "Training potential",
+      "training_fit": "Training fit",
+      "salary_efficiency": "Salary efficiency",
+      "strategic_value": "Strategic value",
+      "strengths": "Strengths",
+      "risks": "Risks",
+      "next_milestone": "Next milestone",
+      "evidence": "Detailed evidence",
+      "limitations": "Limitations",
+      "no_player_selected": "Select a player to see their squad intelligence.",
+      "no_roster": "Load a roster to generate intelligence reports.",
+      "unavailable_player": "This player is not available in the current roster.",
+      "column": {
+        "role": "Role",
+        "status": "Status",
+        "training_fit": "Fit"
+      }
+    }
   }
 }

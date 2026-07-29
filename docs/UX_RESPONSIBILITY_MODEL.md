@@ -13,6 +13,12 @@ quietly starts making its own tactical decisions.
 - Owns the active roster.
 - Exposes roster data (and the shared "recent CSVs" list) to the rest of the
   application via the shared workspace settings file.
+- Hosts Squad Intelligence (Alpha 0.5.9.1) — a deterministic, evidenced
+  per-player classification (role, management status, dimensions, strengths,
+  risks, milestone) shown when a player is selected. It reads the active
+  training context and the app's existing positional ranking; it does not
+  optimize match formations and does not make club-wide financial decisions —
+  those remain Match's and a future Club Advisor's job respectively.
 
 ### Match
 
