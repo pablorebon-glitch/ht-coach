@@ -32,6 +32,7 @@ class MatchController(QObject):
         settings_repository,
         app_events=None,
         weekly_training_service=None,
+        official_rating_service=None,
         parent=None
     ):
         super().__init__(parent)
@@ -42,6 +43,7 @@ class MatchController(QObject):
         self._weekly_training_service = (
             weekly_training_service or WeeklyTrainingAppService()
         )
+        self._official_rating_service = official_rating_service
         self._formation_board_mapper = FormationBoardMapper()
         self._change_analysis_service = ChangeAnalysisService()
         self._thread = None
@@ -87,6 +89,10 @@ class MatchController(QObject):
         if hasattr(self._view, "save_as_second_match_requested"):
             self._view.save_as_second_match_requested.connect(
                 self._save_as_second_match
+            )
+        if hasattr(self._view, "official_rating_import_requested"):
+            self._view.official_rating_import_requested.connect(
+                self._import_official_ratings
             )
         if hasattr(self._view, "workspace_recalculate_requested"):
             self._view.workspace_recalculate_requested.connect(
@@ -704,4 +710,95 @@ class MatchController(QObject):
             return
         self._view.show_status(
             t("match.save_as_first_match_success")
+        )
+
+    def _import_official_ratings(self, raw_text, slot=None):
+        from ht_coach_app.services.official_rating_service import (
+            OfficialRatingAmbiguousMatch,
+            OfficialRatingImportError,
+            OfficialRatingImportService,
+            OfficialRatingReplaceConfirmationRequired,
+            PRE,
+        )
+
+        slot = slot or PRE
+        if self._official_rating_service is None:
+            self._official_rating_service = OfficialRatingImportService()
+
+        try:
+            outcome = self._official_rating_service.import_and_link(
+                raw_text, slot=slot
+            )
+        except OfficialRatingReplaceConfirmationRequired as exc:
+            if not self._view.confirm_official_import_replace(exc.slot):
+                return
+            try:
+                outcome = self._official_rating_service.import_and_link(
+                    raw_text, slot=slot, confirm_replace=True
+                )
+            except OfficialRatingImportError as retry_exc:
+                self._show_official_import_error(retry_exc)
+                return
+        except OfficialRatingAmbiguousMatch:
+            self._view.confirm_ambiguous_official_import(0)
+            return
+        except OfficialRatingImportError as exc:
+            self._show_official_import_error(exc)
+            return
+
+        self._show_official_import_success(outcome)
+
+    def _show_official_import_error(self, exc):
+        reason = str(exc)
+        specific_keys = {
+            "empty_copy_ratings_text": "match.official_import.error.no_hattrick_summary",
+            "no_match_id_in_text": "match.official_import.error.no_match_id",
+        }
+        matched_key = next(
+            (key for prefix, key in specific_keys.items() if reason.startswith(prefix)),
+            None,
+        )
+        message = (
+            t(matched_key)
+            if matched_key
+            else t("match.official_import.error.generic", reason=reason)
+        )
+        self._view.show_official_import_error(message)
+
+    def _show_official_import_success(self, outcome):
+        from ht_coach_app.services.official_rating_formatting import (
+            format_hattrick_notation,
+        )
+
+        parsed = outcome.parsed
+        summary_text = format_hattrick_notation(
+            parsed.ratings, parsed.formation, parsed.tactic, parsed.team_attitude
+        )
+        link_note = (
+            t("match.official_import.linked_existing")
+            if outcome.was_linked_to_existing_match
+            else t("match.official_import.created_new")
+        )
+        header = "\n".join(
+            [
+                f"{t('match.official_import.summary.source')}: "
+                f"{t('match.official_import.summary.source_value')}",
+                f"{t('match.official_import.summary.match_id')}: "
+                f"{parsed.hattrick_match_id or '-'}",
+                f"{t('match.official_import.summary.imported_at')}: "
+                f"{parsed.captured_at}",
+            ]
+        )
+        warning_lines = ""
+        if parsed.warnings:
+            warning_labels = ", ".join(t(key) for key in parsed.warnings)
+            warning_lines = (
+                f"\n{t('match.official_import.summary.warnings')}: {warning_labels}"
+            )
+
+        self._view.set_official_summary_text(
+            f"{summary_text}\n\n{header}{warning_lines}"
+        )
+        self._view.show_status(
+            f"{t('match.official_import.success')} {link_note}"
         )

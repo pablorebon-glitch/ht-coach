@@ -19,6 +19,9 @@ quietly starts making its own tactical decisions.
 - Is the only module responsible for optimizing formations and individual orders.
 - Analyzes the opponent.
 - Produces the recommended XI for a given match (League or Cup/Friendly).
+- Imports the official Hattrick Match Summary associated with the match (Alpha
+  0.5.9.0 / UX-02) — parsing and attaching it never reruns the optimizer or any
+  rating formula; the imported values are stored exactly as Hattrick provided them.
 - Remains focused on winning the selected match — it does not manage training
   priorities or long-term squad development.
 

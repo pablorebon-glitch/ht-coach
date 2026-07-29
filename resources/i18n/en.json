@@ -785,7 +785,42 @@
     "cup_training_rules_unavailable": "Automatic training rules are unavailable for Cup/Friendly analysis. Select a supported training type in Weekly Training.",
     "save_as_second_match": "Save as Match 2 (Weekly Training)",
     "save_type_mismatch_title": "Different Match Type",
-    "save_type_mismatch_confirm": "This analysis was run in {actual} mode, not {expected}. Save it into this slot anyway?"
+    "save_type_mismatch_confirm": "This analysis was run in {actual} mode, not {expected}. Save it into this slot anyway?",
+    "official_import": {
+      "title": "Import Official Match Summary",
+      "instructions": "Paste the text copied from Hattrick's \"Copy Ratings\" button (Match Orders page).",
+      "placeholder": "Paste the Hattrick Copy Ratings text here...",
+      "confirm": "Import",
+      "cancel": "Cancel",
+      "action": "Import Official Match Summary",
+      "success": "Official Hattrick Match Summary imported.",
+      "linked_existing": "Linked to the existing match record.",
+      "created_new": "No matching match record was found; a new one was created for it.",
+      "error_title": "Import could not be completed",
+      "error": {
+        "no_hattrick_summary": "No Hattrick summary was detected in the pasted text.",
+        "no_match_id": "No match ID was found in the pasted text, so it can't be linked automatically.",
+        "ambiguous_match": "More than one existing match record matches this Hattrick match ID. Resolve the conflict manually before importing.",
+        "generic": "The pasted text could not be imported: {reason}"
+      },
+      "confirm_replace_title": "Replace existing official data?",
+      "confirm_replace_pre": "An official PRE-match summary is already stored for this match. Replace it with the newly pasted one?",
+      "confirm_replace_post": "An official POST-match summary is already stored for this match. Replace it with the newly pasted one?",
+      "summary": {
+        "source": "Source",
+        "source_value": "Hattrick official import",
+        "match_id": "Match ID",
+        "imported_at": "Imported",
+        "warnings": "Warnings"
+      },
+      "warning": {
+        "unsupported_tactic": "The imported tactic name wasn't recognized; the original text was preserved."
+      },
+      "comparison": {
+        "title": "HT Coach estimate vs. Official Hattrick PRE",
+        "scale_limitation": "HT Coach's own predicted ratings use an internal scale not yet confirmed to align with Hattrick's official scale, so a numeric difference isn't shown here."
+      }
+    }
   },
   "decision_lab": {
     "recommendation_confidence": "Recommendation confidence",
@@ -1172,7 +1207,9 @@
       "high": "High priority",
       "secondary": "Secondary priority",
       "none": "No priority",
-      "rest": "Rest"
+      "rest": "Rest",
+      "uncovered_warning": "This prioritized player is not receiving the training they need.",
+      "retained_after_type_change": "Priority kept — its coverage is recalculated for the newly selected training."
     },
     "player": "Player",
     "age": "Age",
@@ -1266,7 +1303,11 @@
       "target_exceeded": "Target Exceeded",
       "unavailable": "Unavailable",
       "conflicted": "Conflicted",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "full_positions_used": "Full-effect positions used",
+      "reduced_positions_used": "Reduced-effect positions used",
+      "prioritized_players_covered": "Prioritized players covered",
+      "unused_full_opportunities": "Unused full opportunities"
     },
     "conflict": {
       "automatic_rules_unavailable": "Automatic training rules unavailable for this training type.",
@@ -1283,7 +1324,15 @@
       "required_target_omitted": "{player} was not assigned a training slot because stronger legal lineup constraints took precedence.",
       "required_target_unavailable": "{player} was not assigned because the player is unavailable or marked Rest.",
       "target_already_completed": "{player} already completed this week's target.",
-      "high_priority_selected": "{player} was selected as a high-priority training player."
+      "high_priority_selected": "{player} was selected as a high-priority training player.",
+      "full_effect": "Receives full {training} training as a {position}.",
+      "reduced_effect": "Receives reduced {training} training as a {position}.",
+      "very_small_effect": "Receives only the very small team-wide {training} effect.",
+      "no_effect": "Does not receive {training} training in this position.",
+      "participation_effect": "Receives {training} training because they participated in the match.",
+      "multi_skill": "Receives {primary_skill} training and a smaller {secondary_skill} effect.",
+      "priority_still_tracked": "The player is a {position}; full {training} training is received by {full_effect_positions}.",
+      "missing_set_pieces_taker": "No designated set-pieces taker is recorded; coverage is calculated without that bonus."
     },
     "age_header": "Age",
     "weekly_planner_v2": "Weekly Planner",
@@ -1292,7 +1341,34 @@
     "delete_second_match": "Delete Second-Match Record",
     "delete_second_match_confirm": "Delete the existing second-match record?",
     "no_second_match_record": "No second-match record yet.",
-    "second_match_recorded": "Second weekly match recorded."
+    "second_match_recorded": "Second weekly match recorded.",
+    "general": "General",
+    "set_pieces": "Set Pieces",
+    "defending": "Defending",
+    "scoring": "Scoring",
+    "winger_training": "Winger",
+    "shooting": "Shooting",
+    "short_passes": "Short Passes",
+    "goalkeeping": "Goalkeeping",
+    "through_passes": "Through Passes",
+    "defensive_positions": "Defensive Positions",
+    "wing_attacks": "Wing Attacks",
+    "effect": {
+      "full": "Full",
+      "reduced": "Reduced",
+      "very_small": "Very small",
+      "none": "Does not train"
+    },
+    "skill": {
+      "form": "Form",
+      "set_pieces": "Set Pieces",
+      "defending": "Defending",
+      "scoring": "Scoring",
+      "winger": "Winger",
+      "passing": "Passing",
+      "playmaking": "Playmaking",
+      "goalkeeping": "Goalkeeping"
+    }
   },
   "advisor": {
     "title": "Tactical Advisor",

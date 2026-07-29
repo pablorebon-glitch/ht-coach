@@ -136,6 +136,10 @@ class SquadController:
             self._view.use_training_plan_requested.connect(
                 self._accept_training_plan
             )
+        if hasattr(self._view, "training_type_changed"):
+            self._view.training_type_changed.connect(
+                self._change_active_training_type
+            )
 
     def refresh(self):
         self._view.set_supported_positions(
@@ -322,6 +326,15 @@ class SquadController:
             self._weekly_training_service.coverage(self._roster.players),
             self._builder_service.supported_formations(),
         )
+
+    def _change_active_training_type(self, training_type):
+        if self._roster is None:
+            return
+        current_state = self._weekly_training_service.load_state()
+        if current_state.active_training_type == training_type:
+            return
+        self._weekly_training_service.set_active_training_type(training_type)
+        self._show_weekly_training()
 
     def _change_training_priority(self, player_id, priority):
         if self._roster is None:

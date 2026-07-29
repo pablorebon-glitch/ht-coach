@@ -6,6 +6,8 @@ from engine.weekly_training.models import (
     TrainingCapacity,
     TrainingExposure,
 )
+from engine.weekly_training.training_catalog import definition_for
+from engine.weekly_training.training_types import TrainingType
 from models.position import Position
 
 
@@ -60,11 +62,93 @@ class PlaymakingTrainingRules(TrainingRuleProvider):
         return self._FACTORS.get(str(value), Decimal("0"))
 
 
+def _coerce_position(position):
+    if isinstance(position, Position):
+        return position
+    value = getattr(position, "value", position)
+    try:
+        return Position(str(value))
+    except ValueError:
+        return None
+
+
+class CatalogTrainingRules(TrainingRuleProvider):
+    """Generalized rule provider driven entirely by a declarative
+    `TrainingDefinition` (see training_catalog.py) — supports all 12
+    senior training types, including multi-skill ones (e.g. Shooting),
+    with no `if training_type == ...` branching.
+
+    For backward compatibility with the single-factor
+    `TrainingRuleProvider` interface (used by the Match optimizer and
+    coverage math), `factor_for_position` / `exposure_for_entry` report
+    the *primary* trained skill (the first one declared for that
+    training type). A multi-skill training's secondary skill is still
+    fully reflected in `factors_for_position` and
+    `best_effect_for_position`/`trainable_positions`, which drive
+    position eligibility for the optimizer — only the single stored
+    coverage-percentage number is scoped to the primary skill. This is
+    a documented, intentional simplification; see docs/WEEKLY_TRAINING_PLANNER.md.
+    """
+
+    def __init__(self, definition):
+        self._definition = definition
+        self.training_type = definition.training_type.value
+
+    @property
+    def definition(self):
+        return self._definition
+
+    @property
+    def trained_skills(self):
+        return self._definition.primary_skills
+
+    @property
+    def primary_skill(self):
+        return self._definition.primary_skills[0]
+
+    def factors_for_position(self, position):
+        """{skill: Decimal weight} for every trained skill at this
+        position."""
+        canonical = _coerce_position(position)
+        if canonical is None:
+            return {skill: Decimal("0") for skill in self._definition.primary_skills}
+        effects = self._definition.effects_for_position(canonical)
+        return {skill: effect.weight for skill, effect in effects.items()}
+
+    def factor_for_position(self, position):
+        canonical = _coerce_position(position)
+        if canonical is None:
+            return Decimal("0")
+        return self._definition.best_effect_for_position(canonical).weight
+
+    def effect_for_position(self, position, skill=None):
+        """The TrainingEffect (not just its weight) for a position and
+        skill (defaults to the primary skill) — used by explanation
+        text, which should never present a raw weight to the user."""
+        canonical = _coerce_position(position)
+        if canonical is None:
+            from engine.weekly_training.training_effects import TrainingEffect
+
+            return TrainingEffect.NONE
+        return self._definition.effect_for(canonical, skill or self.primary_skill)
+
+    def trainable_positions(self):
+        return self._definition.trainable_positions()
+
+
 def rule_provider_for(training_type):
-    provider = PlaymakingTrainingRules()
-    if provider.supports(training_type):
-        return provider
-    return None
+    parsed = TrainingType.parse(training_type)
+    if parsed is None:
+        return None
+    if parsed == TrainingType.PLAYMAKING:
+        # Unchanged, byte-for-byte identical to every prior release —
+        # see test_playmaking_backward_compatibility for proof the
+        # catalog-driven equivalent computes the same factors.
+        return PlaymakingTrainingRules()
+    definition = definition_for(parsed)
+    if definition is None:
+        return None
+    return CatalogTrainingRules(definition)
 
 
 def assumed_confidence(minutes_known):

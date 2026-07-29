@@ -108,6 +108,8 @@ engine/
   advisor/
   history/
     evolution/
+    insights/
+    official_ratings/
   hattrick_ratings/
     calibration/
     midfield/
@@ -587,6 +589,107 @@ Design notes:
   `LineupOptimizer`, `TacticOptimizer` or `OrderOptimizer`.
 - Not yet built: the Match History UI itself. See docs/ROADMAP.md's Alpha 0.5.8.4
   entry for why a coherent single screen is deferred rather than shipped partially.
+
+### Official Hattrick Rating Workflow
+
+`engine/history/official_ratings/`
+
+Alpha 0.5.9.0 adds a fourth Qt-independent layer, on top of `engine/history/`: it
+connects HT Coach with Hattrick's own "Copy Ratings" export from the Match Order
+page. Product principle: "HT Coach proposes. Hattrick calculates. HT Coach learns."
+Once imported, an official rating is authoritative and is never regenerated,
+adjusted, or reinterpreted by HT Coach.
+
+Modules:
+
+- `models.py`: `RatedAttribute` (Hattrick's "quality word + numeric level" pattern,
+  e.g. "world class (13)", either half optional) and `OfficialRatingSnapshot` — the
+  parsed Copy Ratings capture: a `SectorRatings` (tagged
+  `source=HATTRICK_OFFICIAL`), formation, formation experience, tactic, team
+  attitude, style, average rating, `team_name` / `hattrick_match_id` (from the
+  export's header line), plus provenance (`captured_at`, `language`, `raw_text`,
+  `unparsed_lines`).
+- `parser.py`: `parse_official_ratings`, calibrated against a real Copy Ratings
+  paste from a live Hattrick account. The actual export is BBCode: a
+  `[b]Team[/b] [matchid=...]` header, a `[table]` block with one row per sector
+  (Defense/Attack hold three `[td]` cells read left-to-right; Midfield uses a
+  single `colspan=3` cell), then `[b]Label[/b]: value` lines for everything else.
+  Both English and Spanish labels are recognized, accent/case-insensitively, with
+  longer keywords always tried before shorter ones that happen to be a prefix of
+  them (Spanish "tactica" before English "tactic"). Tactic lines like "Atacar por
+  el centro clase mundial (13)" have no delimiter between the fixed tactic name and
+  its free-text quality word — the parser carries a list of Hattrick's known
+  tactic names (in both this app's own translation and Hattrick's actual in-game
+  wording, which differ) and splits on the longest match. An unrecognized line is
+  preserved in `unparsed_lines` rather than failing the whole import; only
+  structurally empty input raises. If no `[table]` is present, a fallback
+  recognizes sectors from plain "Label: value" lines instead. See
+  `tests/test_official_ratings.py::test_real_sample_*` for the verbatim
+  regression tests and docs/OFFICIAL_RATING_WORKFLOW.md for the full writeup.
+- `validation.py`: `validate_official_rating_snapshot` separately rejects a parse
+  that's too incomplete to be useful (too few recognized sectors, or no formation
+  token) — parsing itself never fails on unknown content, but validation is where
+  "this doesn't look like a real Copy Ratings export" gets caught.
+- `comparison.py`: `compare_official_ratings` — a deterministic, per-sector
+  three-way comparison (predicted vs. official PRE vs. official POST) with all
+  three pairwise deltas; a missing side simply leaves those deltas `None`, never a
+  guess.
+- `summary.py`: `summarize_official_rating_comparison` — diagnostic prediction-
+  accuracy information (average/maximum error, closest/furthest sector, missing
+  sectors, a coverage-based confidence label). Explicitly diagnostic, not the
+  primary Match UI.
+
+`HistoricalMatchSnapshot` (in `engine/history/models.py`) gained two new optional
+fields, `official_pre` and `official_post`, sitting alongside the existing
+`predictions` (HT Coach's own estimate) and `official_result` (the existing
+post-match outcome/goals/lineup record) — all fully independent; setting one never
+touches another. Both new fields default to `None` and are read via `.get(...)` in
+`from_dict`, so this was a purely additive migration with no schema version bump; a
+snapshot saved before this sprint loads with both fields `None`.
+
+App-layer bridge:
+
+- `ht_coach_app/services/official_rating_service.py`'s
+  `OfficialRatingImportService`: parse → validate → locate or create the right
+  snapshot (via `import_and_link`, using the Hattrick match ID for automatic
+  matching — see "Match ID linking" below) → attach as `official_pre` or
+  `official_post` → save through the existing `HistoricalMatchRepository`. No
+  second storage format was introduced.
+- `ht_coach_app/services/official_rating_formatting.py`'s
+  `format_hattrick_notation`: a pure function rendering a `SectorRatings` plus
+  formation/tactic/team-attitude into the exact Hattrick-style summary text (three-
+  number sector bands, "quality word (number)" notation).
+  `format_prediction_vs_official_comparison` renders the prediction-vs-official
+  table but deliberately never computes a numeric delta (`SCALES_CONFIRMED_COMPATIBLE
+  = False`) — see "UX-02" below for why.
+- `engine/history/official_ratings/tactic_catalog.py`: the single canonical
+  tactic-alias table (English/Spanish, including Hattrick's actual wording where
+  it differs from this app's own historical translations), reused by the parser —
+  never duplicated across parser, UI or services. Resolves to the same `Tactic`
+  enum (`models/tactic.py`) the rest of the app already uses.
+
+**UX-02 (Expose Complete Training and Official Match Import Workflows)** wired both
+the training selector and this package into the actual UI:
+
+- Match's "Import Official Match Summary" action
+  (`ht_coach_app/widgets/official_rating_import_dialog.py`) is a single-step
+  paste-and-confirm dialog; `MatchController._import_official_ratings` calls
+  `OfficialRatingImportService.import_and_link`, handling
+  `OfficialRatingReplaceConfirmationRequired` (explicit confirm before replacing
+  an already-filled PRE/POST slot) and `OfficialRatingAmbiguousMatch` (shown as a
+  conflict, never guessed) before rendering the compact
+  `format_hattrick_notation` summary inline.
+- The prediction-vs-official comparison shows both raw values side by side with
+  an explicit compatibility-limitation note instead of a difference — HT Coach's
+  own predicted-rating scale isn't yet confirmed to align with Hattrick's
+  official one.
+- No new Match History screen, snapshot list, or navigation section was added.
+
+Static-import tests
+(`tests/test_history_responsibility_boundaries.py::test_history_official_ratings_package_never_imports_formation_optimizer`)
+confirm this package, like evolution and insights before it, never imports or
+invokes `FormationOptimizer`, `LineupOptimizer`, `TacticOptimizer` or
+`OrderOptimizer`.
 
 ### Reasoning
 

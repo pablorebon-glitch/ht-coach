@@ -4,6 +4,85 @@
 
 ### Added
 
+- Added UX-02 Expose Complete Training and Official Match Import Workflows: an
+  integration-only sprint (no new engine logic) wiring up two previously-built but
+  hidden capabilities. Part A: the Weekly Training Planner's training-type
+  selector (both the visible and legacy-compatibility combos) now populates from
+  the canonical `TrainingType` catalog directly — all 12 types, localized labels,
+  never a second hardcoded list — and changing the selection persists and
+  recalculates immediately;
+  `WeeklyTrainingAppService.set_active_training_type()` was added, fixing a real
+  bug found while building this (switching training type mid-week would have
+  silently orphaned already-recorded matches, since `TrainingWeek.week_id` embeds
+  the training type). Part B: a single "Import Official Match Summary" action was
+  added to Match (open, paste, confirm, no wizard), backed by a canonical
+  tactic-alias catalog (`engine/history/official_ratings/tactic_catalog.py`,
+  reused by the parser rather than duplicated) that resolves both this app's own
+  translations and Hattrick's actual in-game wording to the same canonical
+  `Tactic` enum; automatic Hattrick match-ID linking
+  (`OfficialRatingImportService.import_and_link`) that links to exactly one
+  matching record, creates an identifiable new one when none exists, and raises a
+  conflict rather than guessing when more than one exists; and explicit PRE/POST
+  replace-confirmation so a second paste is never silently reclassified. A
+  prediction-vs-official comparison deliberately shows no numeric delta, since
+  HT Coach's own predicted-rating scale isn't yet confirmed to align with
+  Hattrick's official scale. 111 new tests; full suite re-verified at 1198 passed
+  / 0 failed. See docs/ROADMAP.md's UX-02 entry and docs/OFFICIAL_RATING_WORKFLOW.md
+  for the full write-up.
+- Added Alpha 0.5.9.0 Official Hattrick Rating Workflow: a new Qt-independent
+  `engine/history/official_ratings` package connects HT Coach with Hattrick's own
+  "Copy Ratings" export. A tolerant English/Spanish parser extracts sector ratings,
+  formation, tactic, team attitude and style from the pasted text without ever
+  failing on unrecognized lines; validation separately rejects genuinely
+  malformed/incomplete pastes. `HistoricalMatchSnapshot` gained two new optional
+  fields, `official_pre` and `official_post`, coexisting with the existing
+  `predictions` and `official_result` — purely additive, no schema migration
+  needed. A deterministic three-way comparison (prediction vs. official PRE vs.
+  official POST) and a diagnostic (not primary-UI) accuracy summary round out the
+  engine layer. `OfficialRatingImportService` provides the "paste text, attach it
+  to a match" app workflow, reusing the existing snapshot repository; imported
+  official ratings are never regenerated or reinterpreted — "HT Coach proposes,
+  Hattrick calculates, HT Coach learns." A pure `format_hattrick_notation`
+  formatter renders the exact Hattrick-style ratings summary text but is not yet
+  wired into the Match page. Calibrated against a real Copy Ratings paste from a
+  live account (BBCode table format, not the originally assumed plain lines — see
+  docs/ROADMAP.md for what that changed). 57 new tests, 97% coverage on the new
+  modules; full suite re-verified at 1143 passed / 0 failed. See docs/OFFICIAL_RATING_WORKFLOW.md
+  for the full workflow and docs/ROADMAP.md's Alpha 0.5.9.0 entry for what's
+  shipped versus deferred.
+- Added Alpha 0.5.8.5 Complete Training System (partial — first pass): a
+  declarative training catalog (`engine/weekly_training/training_types.py`,
+  `training_effects.py`, `training_definition.py`, `training_catalog.py`)
+  generalizes the previously Playmaking-only weekly training system to all 12
+  senior Hattrick training types, matching the full position/effect matrix with
+  no `if training_type == ...` branching, including multi-skill training
+  (Shooting trains Scoring and Set Pieces at different levels) and team-wide
+  "every participant" effects (General, Set Pieces). `CatalogTrainingRules`
+  implements the existing `TrainingRuleProvider` interface so every current
+  caller (Match's Cup optimizer, weekly coverage) keeps working unchanged;
+  `rule_provider_for()` now resolves all 12 types. Playmaking specifically keeps
+  dispatching to the original, untouched `PlaymakingTrainingRules` class rather
+  than the catalog — building the catalog surfaced a genuine, documented
+  discrepancy (the matrix adds a "very small" effect for non-IM/winger
+  participants that the original implementation never had), so real users'
+  existing coverage numbers are not silently changed. 39 new tests, 100%
+  coverage on the new modules; full suite re-verified at 1073 passed / 0 failed.
+  Also added: English/Spanish localization for all 12 types, the four effect
+  levels (Spanish wording pinned to the brief's exact text) and structured
+  explanation templates; persistence migration tests proving legacy data
+  defaults to Playmaking, explicit values are never overwritten, and an unknown
+  future training type degrades safely with no data loss; `docs/PRODUCT_VISION.md`
+  updated with this sprint's ten product principles.
+  See docs/ROADMAP.md's Alpha 0.5.8.5 entry for what's shipped versus deferred
+  (Match optimizer trade-off modes, weekly `PlayerTrainingResult` aggregation,
+  and the Planner UI selector are not yet built).
+- Fixed both previously-reported date-sensitive Weekly Planner test failures,
+  root-caused rather than silenced: one was a missing `tzdata` package in the
+  test environment (now declared in `requirements.txt`), not a code bug; the
+  other was a test that implicitly built its "current week" from the real
+  system clock and then asserted a rollover against a hardcoded date that only
+  made sense in a specific wall-clock window — fixed by injecting an explicit
+  reference date, with the root cause documented inline in the test.
 - Added Alpha 0.5.8.4 Historical Insights Engine: a new Qt-independent
   `engine/history/insights` package turns Alpha 0.5.8.3 evolution results into
   deterministic, evidenced, confidence-scored insights via a small rule-per-concern

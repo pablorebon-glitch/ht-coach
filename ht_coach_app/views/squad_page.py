@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import localization_service, t
+from ht_coach_app.core.training_type_labels import training_type_label_key
+from engine.weekly_training.training_types import TrainingType
 from ht_coach_app.services.recent_csv_labels import format_recent_csv_label
 from ht_coach_app.ui.design_system.badges import StatusBadge
 from ht_coach_app.ui.design_system.tables import configure_table
@@ -66,6 +68,7 @@ class SquadPage(BasePage):
     delete_first_match_requested = Signal()
     delete_second_match_requested = Signal()
     use_training_plan_requested = Signal()
+    training_type_changed = Signal(str)
 
     HEADERS = [
         "Name",
@@ -730,7 +733,7 @@ class SquadPage(BasePage):
         controls_layout.setVerticalSpacing(8)
 
         self.weekly_training_type_combo = QComboBox()
-        self.weekly_training_type_combo.addItem(t("planner.playmaking"), "PLAYMAKING")
+        self._populate_training_type_combo(self.weekly_training_type_combo)
         self.weekly_formation_combo = QComboBox()
         self.weekly_formation_combo.currentIndexChanged.connect(
             self._clear_weekly_training_plan
@@ -954,7 +957,10 @@ class SquadPage(BasePage):
         controls_layout.setVerticalSpacing(8)
 
         self.weekly_training_type_combo_v2 = QComboBox()
-        self.weekly_training_type_combo_v2.addItem(t("planner.playmaking"), "PLAYMAKING")
+        self._populate_training_type_combo(self.weekly_training_type_combo_v2)
+        self.weekly_training_type_combo_v2.currentIndexChanged.connect(
+            self._emit_training_type_changed
+        )
         self.weekly_week_label_v2 = QLabel(t("planner.no_active_week"))
         self.weekly_week_label_v2.setWordWrap(True)
 
@@ -1216,6 +1222,35 @@ class SquadPage(BasePage):
         self.path_edit.setText(path)
         filename = path.split("\\")[-1].split("/")[-1] if path else ""
         self.set_source_indicator(filename, "neutral")
+
+    def _populate_training_type_combo(self, combo):
+        """Fills `combo` from the canonical TrainingType catalog — never
+        a second, UI-only list of training types. Item data is always
+        the stable value (e.g. "DEFENDING"), never the localized label.
+        Defaults the selection to Playmaking (the domain's own default
+        for state with no saved training type) until real state loads
+        and overrides it via set_active_training_type."""
+        for training_type in TrainingType:
+            key = training_type_label_key(training_type)
+            combo.addItem(t(key) if key else training_type.value, training_type.value)
+        default_index = combo.findData(TrainingType.PLAYMAKING.value)
+        if default_index >= 0:
+            combo.setCurrentIndex(default_index)
+
+    def active_training_type(self):
+        return self.weekly_training_type_combo_v2.currentData() or "PLAYMAKING"
+
+    def set_active_training_type(self, training_type):
+        for combo in (self.weekly_training_type_combo, self.weekly_training_type_combo_v2):
+            combo.blockSignals(True)
+            index = combo.findData(training_type)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.blockSignals(False)
+
+    def _emit_training_type_changed(self, _index):
+        training_type = self.weekly_training_type_combo_v2.currentData()
+        if training_type:
+            self.training_type_changed.emit(training_type)
 
     def set_recent_csv_paths(self, paths):
         self.recent_csv_combo.blockSignals(True)
@@ -1622,6 +1657,7 @@ class SquadPage(BasePage):
 
     def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
         self._clear_weekly_training_plan()
+        self.set_active_training_type(state.active_training_type)
         self._weekly_priority_rows = list(priority_rows)
         self._weekly_coverage_rows = list(coverage_rows)
         self._weekly_priority_by_player_id = {

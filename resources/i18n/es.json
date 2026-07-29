@@ -785,7 +785,42 @@
     "cup_training_rules_unavailable": "No hay reglas automáticas de entrenamiento disponibles para Copa/Amistoso. Elegí un tipo de entrenamiento soportado en Entrenamiento semanal.",
     "save_as_second_match": "Guardar como Partido 2 (Entrenamiento semanal)",
     "save_type_mismatch_title": "Tipo de partido distinto",
-    "save_type_mismatch_confirm": "Este análisis se corrió en modo {actual}, no {expected}. ¿Guardarlo igual en este casillero?"
+    "save_type_mismatch_confirm": "Este análisis se corrió en modo {actual}, no {expected}. ¿Guardarlo igual en este casillero?",
+    "official_import": {
+      "title": "Importar resumen oficial del partido",
+      "instructions": "Pegá el texto copiado con el botón \"Copy Ratings\" de Hattrick (página de alineación).",
+      "placeholder": "Pegá acá el texto de Copy Ratings de Hattrick...",
+      "confirm": "Importar",
+      "cancel": "Cancelar",
+      "action": "Importar resumen oficial",
+      "success": "Se importó el resumen oficial de Hattrick.",
+      "linked_existing": "Se vinculó al registro de partido existente.",
+      "created_new": "No se encontró un registro de partido coincidente; se creó uno nuevo.",
+      "error_title": "No se pudo completar la importación",
+      "error": {
+        "no_hattrick_summary": "No se detectó un resumen de Hattrick en el texto pegado.",
+        "no_match_id": "No se encontró un ID de partido en el texto pegado, así que no se puede vincular automáticamente.",
+        "ambiguous_match": "Hay más de un registro de partido existente que coincide con este ID de Hattrick. Resolvé el conflicto manualmente antes de importar.",
+        "generic": "No se pudo importar el texto pegado: {reason}"
+      },
+      "confirm_replace_title": "¿Reemplazar los datos oficiales existentes?",
+      "confirm_replace_pre": "Ya hay un resumen oficial PRE-partido guardado para este partido. ¿Reemplazarlo con el que acabás de pegar?",
+      "confirm_replace_post": "Ya hay un resumen oficial POST-partido guardado para este partido. ¿Reemplazarlo con el que acabás de pegar?",
+      "summary": {
+        "source": "Fuente",
+        "source_value": "Importación oficial de Hattrick",
+        "match_id": "ID de partido",
+        "imported_at": "Importado",
+        "warnings": "Avisos"
+      },
+      "warning": {
+        "unsupported_tactic": "No se reconoció el nombre de la táctica importada; se conservó el texto original."
+      },
+      "comparison": {
+        "title": "Estimación de HT Coach vs. Oficial Hattrick PRE",
+        "scale_limitation": "Los ratings predichos por HT Coach usan una escala interna que todavía no está confirmada como equivalente a la oficial de Hattrick, así que no se muestra una diferencia numérica acá."
+      }
+    }
   },
   "decision_lab": {
     "recommendation_confidence": "Confianza de la recomendacion",
@@ -1172,7 +1207,9 @@
       "high": "Prioridad alta",
       "secondary": "Prioridad secundaria",
       "none": "Sin prioridad",
-      "rest": "Descansar"
+      "rest": "Descansar",
+      "uncovered_warning": "Este jugador priorizado no está recibiendo el entrenamiento que necesita.",
+      "retained_after_type_change": "La prioridad se mantuvo — su cobertura se recalcula para el entrenamiento recién seleccionado."
     },
     "player": "Jugador",
     "age": "Edad",
@@ -1266,7 +1303,11 @@
       "target_exceeded": "Objetivo excedido",
       "unavailable": "No disponible",
       "conflicted": "En conflicto",
-      "unknown": "Desconocido"
+      "unknown": "Desconocido",
+      "full_positions_used": "Posiciones con efecto completo usadas",
+      "reduced_positions_used": "Posiciones con efecto reducido usadas",
+      "prioritized_players_covered": "Jugadores priorizados cubiertos",
+      "unused_full_opportunities": "Oportunidades completas sin usar"
     },
     "conflict": {
       "automatic_rules_unavailable": "Las reglas automáticas de entrenamiento no están disponibles para este tipo de entrenamiento.",
@@ -1283,7 +1324,15 @@
       "required_target_omitted": "{player} no fue asignado a un slot de entrenamiento porque las restricciones de alineación legal y fuerza tuvieron prioridad.",
       "required_target_unavailable": "{player} no fue asignado porque no está disponible o está marcado para descansar.",
       "target_already_completed": "{player} ya completó el objetivo de esta semana.",
-      "high_priority_selected": "{player} fue seleccionado como jugador de prioridad alta."
+      "high_priority_selected": "{player} fue seleccionado como jugador de prioridad alta.",
+      "full_effect": "Recibe entrenamiento completo de {training} como {position}.",
+      "reduced_effect": "Recibe entrenamiento reducido de {training} como {position}.",
+      "very_small_effect": "Solo recibe el efecto muy reducido de {training} que reciben todos los que juegan.",
+      "no_effect": "No recibe entrenamiento de {training} en esta posición.",
+      "participation_effect": "Recibe entrenamiento de {training} por haber participado del partido.",
+      "multi_skill": "Recibe entrenamiento de {primary_skill} y un efecto menor de {secondary_skill}.",
+      "priority_still_tracked": "El jugador es {position}; el entrenamiento completo de {training} lo reciben {full_effect_positions}.",
+      "missing_set_pieces_taker": "No hay un pateador de balón parado asignado; la cobertura se calcula sin ese bono."
     },
     "age_header": "Edad",
     "weekly_planner_v2": "Planificador semanal",
@@ -1292,7 +1341,34 @@
     "delete_second_match": "Borrar registro del segundo partido",
     "delete_second_match_confirm": "Borrar el registro existente del segundo partido?",
     "no_second_match_record": "Todavia no hay registro del segundo partido.",
-    "second_match_recorded": "Segundo partido semanal registrado."
+    "second_match_recorded": "Segundo partido semanal registrado.",
+    "general": "General",
+    "set_pieces": "Balón parado",
+    "defending": "Defensa",
+    "scoring": "Anotación",
+    "winger_training": "Lateral",
+    "shooting": "Tiros",
+    "short_passes": "Pases cortos",
+    "goalkeeping": "Portería",
+    "through_passes": "Pases largos",
+    "defensive_positions": "Posiciones defensivas",
+    "wing_attacks": "Ataques laterales",
+    "effect": {
+      "full": "Completo",
+      "reduced": "Reducido",
+      "very_small": "Muy reducido",
+      "none": "No entrena"
+    },
+    "skill": {
+      "form": "Forma",
+      "set_pieces": "Balón parado",
+      "defending": "Defensa",
+      "scoring": "Anotación",
+      "winger": "Lateral",
+      "passing": "Pases",
+      "playmaking": "Jugadas",
+      "goalkeeping": "Portería"
+    }
   },
   "advisor": {
     "title": "Asesor táctico",

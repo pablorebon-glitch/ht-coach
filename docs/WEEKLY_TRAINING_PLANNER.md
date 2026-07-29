@@ -2,12 +2,51 @@
 
 Alpha 0.5.7 adds a weekly training planner to the Squad page. Alpha 0.5.7.2 adds
 the Planner Execution Engine, so the planner now generates an actual second-match
-lineup instead of behaving only as a validator. The first supported training type is
+lineup instead of behaving only as a validator. The first supported training type was
 Playmaking.
+
+Alpha 0.5.8.5 (Complete Training System) generalizes the underlying rule engine to
+all 12 senior Hattrick training types via a declarative catalog — see "Training
+Catalog" below. Playmaking's own behavior is unchanged: `rule_provider_for("PLAYMAKING")`
+still returns the original, untouched rule class, not the catalog-driven one (see
+docs/ROADMAP.md's Alpha 0.5.8.5 entry for why). Full localization for the other 11
+types' explanation strings and the Match optimizer's training-aware trade-off modes
+are not yet wired up.
+
+UX-02 exposed the training-type selector itself in the UI: the Weekly Training
+Planner's combo (both the visible tab and the hidden legacy tab kept alive for
+compatibility) now populates from the canonical `TrainingType` catalog directly —
+all 12 types, localized labels — and changing it persists immediately and
+recalculates coverage on the next render. See docs/ROADMAP.md's UX-02 entry for the
+week_id-orphaning bug this surfaced and how it was fixed
+(`WeeklyTrainingAppService.set_active_training_type`).
 
 The planner helps answer a practical Hattrick question: after the first match of the
 training week, which second-match lineup covers the training priorities while keeping
 the team competitive?
+
+## Training Catalog
+
+`engine/weekly_training/training_types.py` / `training_effects.py` /
+`training_definition.py` / `training_catalog.py` declare all 12 senior training types
+(General, Set Pieces, Defending, Scoring, Winger, Shooting, Short Passes, Playmaking,
+Goalkeeping, Through Passes, Defensive Positions, Wing Attacks) as data — a
+`TrainingDefinition` per type, mapping each canonical position (Goalkeeper, Central
+Defender, Wing Back, Inner Midfielder, Winger, Forward) to a `TrainingEffect` (Full /
+Reduced / Very Small / None) per trained skill. Multi-skill training (Shooting trains
+both Scoring and Set Pieces, at different effect levels) and team-wide "every
+participant" effects (General's form training; Set Pieces' base training) are both
+modeled directly rather than special-cased. Individual orders never change which
+canonical position a player trains as — a Forward with a Towards Wing order still
+trains as a Forward.
+
+`CatalogTrainingRules` implements the same `TrainingRuleProvider` interface the
+original Playmaking-only class always has (`factor_for_position`,
+`exposure_for_entry`, `capacity_for_formation`), so the Match Cup optimizer and
+weekly coverage math work with any of the 12 types without themselves branching on
+training type. `rule_provider_for(training_type)` resolves all 12 stable string
+values; an unrecognized/future value returns `None` rather than raising, so an
+unsupported training type degrades to a safe "unavailable" state.
 
 ## Scope
 
@@ -15,9 +54,9 @@ The optimization engine remains stable. The planner does not change rating formu
 probability calculations, tactic behavior, order behavior or existing optimizers.
 
 It uses existing roster import, player ranking, formation catalog, Formation Board and
-automatic order support. New logic is limited to training-week state, Playmaking
-exposure rules, priority persistence, coverage aggregation and constrained lineup
-selection.
+automatic order support. New logic is limited to training-week state, training
+exposure rules (now generalized across all 12 types), priority persistence, coverage
+aggregation and constrained lineup selection.
 
 ## Active Week
 

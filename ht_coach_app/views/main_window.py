@@ -38,6 +38,7 @@ from ht_coach_app.services.match_workspace_service import (
 )
 from ht_coach_app.services.opponent_service import OpponentService
 from ht_coach_app.services.squad_service import SquadService
+from ht_coach_app.services.official_rating_service import OfficialRatingImportService
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from ht_coach_app.state.app_events import AppEvents
 from ht_coach_app.views.dashboard_page import DashboardPage
@@ -201,6 +202,7 @@ class MainWindow(QMainWindow):
                     MatchWorkspaceRepository(),
                     self._app_events,
                     WeeklyTrainingAppService(),
+                    OfficialRatingImportService(),
                     self
                 )
             )

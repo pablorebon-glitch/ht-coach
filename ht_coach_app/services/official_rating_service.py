@@ -1,0 +1,211 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from engine.history.official_ratings.parser import parse_official_ratings
+from engine.history.official_ratings.validation import (
+    OfficialRatingValidationError,
+    validate_official_rating_snapshot,
+)
+from engine.history.models import (
+    HistoricalMatchSnapshot,
+    MatchContext,
+    OpponentReference,
+    SnapshotProvenance,
+    stable_snapshot_id,
+)
+from engine.history.repository import HistoricalMatchRepository
+from ht_coach_app.core.paths import historical_match_snapshots_path
+
+PRE = "pre"
+POST = "post"
+
+IMPORT_WORKFLOW = "official_rating_import"
+
+
+class OfficialRatingImportError(ValueError):
+    pass
+
+
+class OfficialRatingReplaceConfirmationRequired(OfficialRatingImportError):
+    """Raised when the target slot (PRE or POST) is already filled and
+    the caller didn't explicitly confirm they want to replace it. The
+    UI is expected to show a confirmation prompt and retry with
+    `confirm_replace=True` rather than silently overwriting."""
+
+    def __init__(self, slot, existing_snapshot):
+        super().__init__(f"replace_confirmation_required:{slot}")
+        self.slot = slot
+        self.existing_snapshot = existing_snapshot
+
+
+class OfficialRatingAmbiguousMatch(OfficialRatingImportError):
+    """Raised when more than one existing snapshot shares the same
+    Hattrick match ID. HT Coach never guesses which one to attach an
+    import to -- the caller must resolve the ambiguity explicitly."""
+
+    def __init__(self, hattrick_match_id, candidates):
+        super().__init__(f"ambiguous_match_id:{hattrick_match_id}")
+        self.hattrick_match_id = hattrick_match_id
+        self.candidates = tuple(candidates)
+
+
+@dataclass(frozen=True)
+class ImportOutcome:
+    """What actually happened on a successful import, for the caller to
+    render a success message from (team/opponent, match ID, imported
+    stage, sectors, formation, tactic, warnings)."""
+
+    snapshot: HistoricalMatchSnapshot
+    slot: str
+    was_linked_to_existing_match: bool
+    was_new_snapshot_created: bool
+    parsed: object  # OfficialRatingSnapshot
+
+
+class OfficialRatingImportService:
+    """The app-facing "paste Copy Ratings text, get it attached to the
+    right match" workflow. HT Coach never regenerates or reinterprets an
+    imported official rating afterward -- this service's only job is
+    parse, validate, identify the right match (by Hattrick match ID when
+    available), and attach it exactly as parsed.
+    """
+
+    def __init__(self, repository=None):
+        self._repository = repository or HistoricalMatchRepository(
+            historical_match_snapshots_path()
+        )
+
+    def find_snapshots_by_hattrick_match_id(self, hattrick_match_id):
+        if not hattrick_match_id:
+            return ()
+        return tuple(
+            snapshot for snapshot in self._repository.list_all()
+            if snapshot.provenance.imported_match_id == hattrick_match_id
+        )
+
+    def import_ratings(
+        self,
+        snapshot_id,
+        raw_text,
+        slot=PRE,
+        *,
+        language="",
+        confirm_replace=False,
+    ):
+        """Attaches a parsed Copy Ratings capture to a *specific,
+        already-known* snapshot. Raises
+        OfficialRatingReplaceConfirmationRequired if that slot is
+        already filled and `confirm_replace` wasn't passed -- this
+        method never silently overwrites an existing PRE or POST
+        capture, and never infers POST just because PRE already exists;
+        the caller always states which slot it means.
+        """
+        if slot not in (PRE, POST):
+            raise OfficialRatingImportError(f"invalid_slot: {slot}")
+
+        snapshot = self._repository.get(snapshot_id)
+        if snapshot is None:
+            raise OfficialRatingImportError(f"snapshot_not_found: {snapshot_id}")
+
+        parsed = self._parse_and_validate(raw_text, language)
+
+        field_name = "official_pre" if slot == PRE else "official_post"
+        existing = getattr(snapshot, field_name)
+        if existing is not None and not confirm_replace:
+            raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
+
+        updated = snapshot.with_updates(**{field_name: parsed})
+        saved = self._repository.save(updated)
+        return ImportOutcome(
+            snapshot=saved,
+            slot=slot,
+            was_linked_to_existing_match=True,
+            was_new_snapshot_created=False,
+            parsed=parsed,
+        )
+
+    def import_and_link(
+        self,
+        raw_text,
+        slot=PRE,
+        *,
+        language="",
+        confirm_replace=False,
+    ):
+        """The primary import entry point: parses the text, then uses
+        its Hattrick match ID (if present) to find the right snapshot
+        automatically.
+
+        - Exactly one existing snapshot shares that match ID -> attach
+          to it (subject to the same replace-confirmation rule as
+          `import_ratings`).
+        - No existing snapshot shares it -> create a new, minimal,
+          identifiable snapshot (provenance.imported_match_id set) and
+          attach to that, rather than forcing the user to have analyzed
+          the match in HT Coach first.
+        - More than one shares it -> raises OfficialRatingAmbiguousMatch
+          with the candidates, rather than guessing.
+        - No match ID in the text at all -> raises
+          OfficialRatingImportError; the caller must fall back to
+          `import_ratings` with an explicitly chosen snapshot_id.
+        """
+        if slot not in (PRE, POST):
+            raise OfficialRatingImportError(f"invalid_slot: {slot}")
+
+        parsed = self._parse_and_validate(raw_text, language)
+
+        if not parsed.hattrick_match_id:
+            raise OfficialRatingImportError("no_match_id_in_text")
+
+        candidates = self.find_snapshots_by_hattrick_match_id(parsed.hattrick_match_id)
+
+        if len(candidates) > 1:
+            raise OfficialRatingAmbiguousMatch(parsed.hattrick_match_id, candidates)
+
+        if len(candidates) == 1:
+            snapshot = candidates[0]
+            was_created = False
+        else:
+            snapshot = self._create_identifiable_snapshot(parsed)
+            was_created = True
+
+        field_name = "official_pre" if slot == PRE else "official_post"
+        existing = getattr(snapshot, field_name)
+        if existing is not None and not confirm_replace:
+            raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
+
+        updated = snapshot.with_updates(**{field_name: parsed})
+        saved = self._repository.save(updated)
+        return ImportOutcome(
+            snapshot=saved,
+            slot=slot,
+            was_linked_to_existing_match=not was_created,
+            was_new_snapshot_created=was_created,
+            parsed=parsed,
+        )
+
+    def get_snapshot(self, snapshot_id):
+        return self._repository.get(snapshot_id)
+
+    def _create_identifiable_snapshot(self, parsed):
+        snapshot = HistoricalMatchSnapshot(
+            snapshot_id=stable_snapshot_id(),
+            match_context=MatchContext(
+                opponent=OpponentReference(opponent_name=parsed.team_name)
+            ),
+            provenance=SnapshotProvenance(
+                imported_match_id=parsed.hattrick_match_id,
+                creation_workflow=IMPORT_WORKFLOW,
+            ),
+        )
+        return self._repository.save(snapshot)
+
+    @staticmethod
+    def _parse_and_validate(raw_text, language):
+        try:
+            parsed = parse_official_ratings(raw_text, language=language)
+            validate_official_rating_snapshot(parsed)
+        except (ValueError, OfficialRatingValidationError) as exc:
+            raise OfficialRatingImportError(str(exc)) from exc
+        return parsed

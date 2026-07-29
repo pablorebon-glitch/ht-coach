@@ -3,6 +3,9 @@ from pathlib import Path
 
 INSIGHTS_PACKAGE = Path(__file__).resolve().parents[1] / "engine" / "history" / "insights"
 EVOLUTION_PACKAGE = Path(__file__).resolve().parents[1] / "engine" / "history" / "evolution"
+OFFICIAL_RATINGS_PACKAGE = (
+    Path(__file__).resolve().parents[1] / "engine" / "history" / "official_ratings"
+)
 
 FORBIDDEN_MODULES = (
     "engine.optimizers.formation_optimizer",
@@ -36,6 +39,15 @@ def test_history_insights_package_never_imports_formation_optimizer():
 
 def test_history_evolution_package_never_imports_formation_optimizer():
     for path in EVOLUTION_PACKAGE.glob("*.py"):
+        imported = _imported_modules(path)
+        assert not (imported & set(FORBIDDEN_MODULES)), (
+            f"{path.name} imports a forbidden optimizer module: "
+            f"{imported & set(FORBIDDEN_MODULES)}"
+        )
+
+
+def test_history_official_ratings_package_never_imports_formation_optimizer():
+    for path in OFFICIAL_RATINGS_PACKAGE.glob("*.py"):
         imported = _imported_modules(path)
         assert not (imported & set(FORBIDDEN_MODULES)), (
             f"{path.name} imports a forbidden optimizer module: "

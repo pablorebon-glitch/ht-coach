@@ -71,6 +71,7 @@ class MatchPage(BasePage):
     match_section_toggled = Signal(str, bool)
     save_as_first_match_requested = Signal()
     save_as_second_match_requested = Signal()
+    official_rating_import_requested = Signal(str)
 
     MATCH_SECTION_DEFAULTS = {
         "decision_lab": False,
@@ -313,6 +314,17 @@ class MatchPage(BasePage):
             self.analyze_requested
         )
 
+        self.official_import_button = QPushButton(
+            t("match.official_import.action")
+        )
+        self.official_import_button.clicked.connect(
+            self._open_official_import_dialog
+        )
+        self.official_summary_label = QLabel("")
+        self.official_summary_label.setWordWrap(True)
+        self.official_summary_label.setObjectName("officialSummaryLabel")
+        self.official_summary_label.setVisible(False)
+
         layout.addWidget(csv_label, 0, 0)
         layout.addWidget(self.recent_csv_combo, 0, 1)
         layout.addWidget(self.players_path_edit, 0, 1)
@@ -333,6 +345,8 @@ class MatchPage(BasePage):
         layout.addWidget(self.status_label, 9, 0, 1, 3)
         layout.addWidget(self.analyze_button, 9, 3)
         layout.addWidget(self.training_conflict_label, 10, 1, 1, 3)
+        layout.addWidget(self.official_import_button, 11, 0)
+        layout.addWidget(self.official_summary_label, 11, 1, 1, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
@@ -519,6 +533,43 @@ class MatchPage(BasePage):
                 actual=actual_label,
             ),
         ) == QMessageBox.Yes
+
+    def _open_official_import_dialog(self):
+        from ht_coach_app.widgets.official_rating_import_dialog import (
+            OfficialRatingImportDialog,
+        )
+
+        text = OfficialRatingImportDialog.request_text(self)
+        if text:
+            self.official_rating_import_requested.emit(text)
+
+    def confirm_official_import_replace(self, slot):
+        key = (
+            "match.official_import.confirm_replace_pre"
+            if slot == "pre"
+            else "match.official_import.confirm_replace_post"
+        )
+        return QMessageBox.question(
+            self,
+            t("match.official_import.confirm_replace_title"),
+            t(key),
+        ) == QMessageBox.Yes
+
+    def confirm_ambiguous_official_import(self, candidate_count):
+        QMessageBox.warning(
+            self,
+            t("match.official_import.error_title"),
+            t("match.official_import.error.ambiguous_match"),
+        )
+
+    def show_official_import_error(self, message):
+        QMessageBox.warning(
+            self, t("match.official_import.error_title"), message
+        )
+
+    def set_official_summary_text(self, text):
+        self.official_summary_label.setText(text)
+        self.official_summary_label.setVisible(bool(text))
 
     def select_all_formations(self):
         self._set_checked_formations(

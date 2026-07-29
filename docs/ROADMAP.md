@@ -261,9 +261,228 @@ Acceptance criteria:
   confirmed still preexisting and left unchanged, per the sprint's explicit
   instruction not to broaden into a Planner redesign.
 
-### Alpha 0.5.8.5: Decision Validation
+### Alpha 0.5.8.5: Complete Training System
 
-Future sprint. Evaluate recommendation and prediction accuracy over historical records.
+**Status: partially complete.** This sprint generalizes the previously
+Playmaking-only weekly training system to all 12 senior Hattrick training types.
+Given the size of the full brief (canonical catalog, weekly aggregation, Match
+optimizer trade-off modes, Planner UI, full localization, persistence migration),
+this entry documents what shipped in the first pass versus what remains.
+
+Shipped:
+
+- A fully declarative training catalog (`engine/weekly_training/training_types.py`,
+  `training_effects.py`, `training_definition.py`, `training_catalog.py`) covering
+  all 12 senior training types (General, Set Pieces, Defending, Scoring, Winger,
+  Shooting, Short Passes, Playmaking, Goalkeeping, Through Passes, Defensive
+  Positions, Wing Attacks) against the exact position/effect matrix in the brief,
+  including multi-skill training (Shooting trains both Scoring and Set Pieces at
+  different effect levels) and team-wide "every participant" effects (General's
+  form training, Set Pieces' base training) — no `if training_type == ...`
+  branching anywhere in the catalog.
+- `CatalogTrainingRules`, a generalized rule provider implementing the existing
+  `TrainingRuleProvider` interface (`factor_for_position`, `exposure_for_entry`,
+  `capacity_for_formation`) so it works with every existing caller (Match's Cup
+  optimizer, weekly coverage) without those callers changing, plus new
+  multi-skill-aware methods (`factors_for_position`, `trained_skills`,
+  `effect_for_position`, `trainable_positions`).
+- `rule_provider_for()` now resolves all 12 types. **Playmaking is deliberately
+  left dispatching to the original, untouched `PlaymakingTrainingRules` class**,
+  not the catalog-driven one — see "Playmaking backward compatibility" below.
+- Both previously-reported date-sensitive Weekly Planner test failures are fixed
+  and root-caused, not just silenced (see "Known Test Health" below).
+- 39 new tests for the catalog and generalized rule provider, both at 100%
+  coverage; full existing suite re-verified at 1073 passed / 0 failed (excluding
+  the separately-tracked slow optimizer test and the pre-existing tactical
+  adaptation hang, both unrelated to this sprint).
+- English and Spanish localization for all 12 training-type labels, the four
+  effect levels (using the brief's exact Spanish wording — Completo / Reducido /
+  Muy reducido / No entrena, pinned by a dedicated test so it can't silently
+  drift), trained-skill names, and structured explanation templates (full/
+  reduced/very-small/no-effect, participation-only, multi-skill, priority-
+  retained-after-type-change, missing-set-pieces-taker).
+- Persistence migration tests confirming (against the real, unmodified
+  persistence code, not a mock): legacy data with no training type defaults to
+  Playmaking; an explicitly saved type is never overwritten; an unrecognized
+  future training type loads without crashing and degrades safely (`rule_provider_for`
+  and `active_training_rules()` both return `None`); all 12 types round-trip
+  through save/load; unrelated priorities/match records survive alongside an
+  unknown training type (no silent data deletion); serialization is
+  deterministic.
+- `docs/PRODUCT_VISION.md` updated with the ten product principles from this
+  sprint's brief, plus an explicit note that Club DNA remains unconfigurable
+  before Alpha 0.6.0.
+
+Deliberately not shipped in this pass (tracked as follow-up work under this same
+sprint number, not pushed to 0.5.9.0):
+
+- The Match optimizer's typed `TrainingContext` and sporting-vs-training trade-off
+  modes (`SPORTING_ONLY` / `BALANCED` / `PRIORITIZE_TRAINING` /
+  `REQUIRE_SELECTED_PRIORITIES`) — the Copa/Amistoso optimizer still only
+  understands Playmaking's IM/Winger split; generalizing it to lock the correct
+  positions for all 12 types safely (without risking the live Cup-analysis
+  behavior already in production use) needs its own dedicated pass.
+- The structured `PlayerTrainingResult` weekly-aggregation model and multi-skill
+  coverage tracking (Shooting's Scoring and Set Pieces coverage are only tracked
+  as a single combined number today, scoped to the primary skill).
+- The Weekly Planner training-type selector UI and its immediate-recalculation
+  wiring.
+
+Playmaking backward compatibility: building the catalog against this sprint's own
+matrix surfaced a genuine, documented discrepancy — the matrix's Playmaking rule
+adds a "very small" effect for every non-IM/non-winger participant, but the
+original implementation (still what real users' saved coverage numbers reflect)
+always treated those positions as exactly zero. Per this sprint's own instruction
+("preserve existing behavior unless it contradicts the canonical model"), this is
+a genuine contradiction, so it is surfaced rather than silently applied:
+`rule_provider_for("PLAYMAKING")` keeps returning the original class untouched,
+and the discrepancy is captured in
+`tests/test_catalog_training_rules.py::test_playmaking_very_small_tier_is_a_documented_new_behavior_not_yet_active`.
+Adopting the very-small tier for Playmaking, if wanted, is a one-line dispatch
+change once made deliberately rather than as a side effect of this refactor.
+
+Known Test Health: both previously-reported failures were root-caused, not
+config-tweaked away.
+`test_training_week_handles_year_boundary_and_timezone_aware_datetime` failed only
+because the test environment's `tzdata` package was missing — not a code bug;
+fixed by adding `tzdata` to `requirements.txt`.
+`test_priorities_persist_duplicate_names_and_rollover_resets_records` implicitly
+built its "current week" from the real system clock via `repository.load()`, then
+asserted a rollover against a hardcoded `date(2026, 7, 23)` that only made sense
+while real wall-clock time happened to fall in a specific window; fixed by
+injecting an explicit reference date for the initial active week, with the root
+cause documented inline in the test itself.
+
+### Alpha 0.5.9.0: Official Hattrick Rating Workflow
+
+Goal: connect HT Coach with Hattrick's own "Copy Ratings" export so official
+ratings — not just HT Coach's own predictions — become part of History. Product
+principle: "HT Coach proposes. Hattrick calculates. HT Coach learns." Imported
+official ratings are never regenerated or reinterpreted; they're stored exactly as
+parsed.
+
+Deliverables:
+
+- `engine/history/official_ratings/` (Qt-independent, built on `engine/history/`
+  without modifying its evolution or insights calculations): `OfficialRatingSnapshot`
+  / `RatedAttribute` models, a tolerant English/Spanish `parse_official_ratings`
+  parser (unknown lines are preserved, never fail parsing), validation for
+  malformed/incomplete input, a deterministic three-way `compare_official_ratings`
+  (prediction vs. official PRE vs. official POST, whichever are present) and a
+  diagnostic (not primary-UI) `summarize_official_rating_comparison`.
+- `HistoricalMatchSnapshot` gained two new optional fields, `official_pre` and
+  `official_post`, coexisting with the existing `predictions` and `official_result`
+  — none replaces another. Purely additive: no schema version bump, and a snapshot
+  saved before this sprint loads unchanged (see
+  `tests/test_official_rating_snapshot_migration.py`).
+- `ht_coach_app/services/official_rating_service.py`'s `OfficialRatingImportService`:
+  the "paste Copy Ratings text, attach it to a match" workflow, reusing the existing
+  `HistoricalMatchRepository` rather than introducing a second storage format.
+- `ht_coach_app/services/official_rating_formatting.py`'s `format_hattrick_notation`:
+  a pure formatter producing the exact Hattrick-style summary text (three-number
+  sector bands, "quality word (number)" formation/tactic notation) — not yet wired
+  into the Match page UI (see "Not shipped" below).
+- 57 new tests across parser, validation, comparison, summary, the import service,
+  formatting, and snapshot migration (including a dedicated verbatim real-sample
+  regression group) — 97% coverage on the new modules. Full suite re-verified at
+  1143 passed / 0 failed.
+- `docs/OFFICIAL_RATING_WORKFLOW.md` added, documenting the workflow, data model,
+  parser tolerance rules and the "never regenerate an import" principle.
+
+Not shipped in this pass:
+
+- Actual Match page UI wiring for `format_hattrick_notation` (a visible summary
+  section showing it) — the guardrail against redesigning the Match UI made this
+  premature to wire up.
+- Any UI for pasting Copy Ratings text and picking PRE vs. POST — the import
+  service exists and is tested; there is no dialog or button calling it yet.
+- Automatically matching an imported snapshot to the right historical match via
+  the `hattrick_match_id` now extracted from the header line — the field is
+  captured and tested, but nothing consumes it yet to skip manual snapshot
+  selection.
+
+**Parser calibration:** initially built from documented knowledge of the Copy
+Ratings feature and marked as unvalidated; since then, calibrated against a real
+paste from a live Hattrick account. The actual format turned out to be BBCode (a
+`[table]` block for Defense/Midfield/Attack, `[b]Label[/b]: value` lines for
+everything else, a `[matchid=...]` header), not the plain-line format originally
+assumed — the parser was rewritten around the real structure, with the original
+line-based approach kept only as a fallback for sectors not found in a table. The
+real sample also revealed that Hattrick's actual tactic-name wording ("atacar por
+el centro") differs from this app's own existing translation ("ataque por el
+centro") — both are now recognized. See
+`tests/test_official_ratings.py::test_real_sample_*` for the verbatim regression
+tests and docs/OFFICIAL_RATING_WORKFLOW.md for the full calibration writeup.
+
+### UX-02: Expose Complete Training and Official Match Import Workflows
+
+Goal: two engine capabilities built in prior sprints (all 12 training types, and the
+official Hattrick rating import pipeline) were complete but not user-facing. This
+sprint is integration-only — no new engine logic, no new analytical formulas, no
+application redesign — it exposes what already existed through small, coherent UI
+additions.
+
+**Part A — Complete Training Selector.** The Weekly Training Planner's training-type
+combo (both the visible v2 tab and the hidden legacy tab kept alive for
+compatibility) now populates from `TrainingType` directly — all 12 canonical types,
+localized labels, canonical values as item data, never a second hardcoded list.
+Changing the selection persists immediately and recalculates coverage, priorities
+and warnings on the next render, since those were always derived fresh from
+`state.active_training_type` rather than cached.
+
+Building this surfaced a real bug: naively recomputing the active week when
+switching training type would have silently orphaned any first/second match already
+recorded that week, since `TrainingWeek.week_id` embeds the training type
+(`"2026-07-26:PLAYMAKING"`) and match records are looked up by a `week_id`-scoped
+prefix. `WeeklyTrainingAppService.set_active_training_type()` fixes this by keeping
+the week's identity unchanged and only updating its `active_training_type` field —
+see `tests/test_training_type_selector_ui.py::test_changing_training_type_does_not_orphan_recorded_matches`.
+
+**Part B — Official Match Summary Import.** A single "Import Official Match
+Summary" action was added to Match: open, paste, confirm — no wizard, no setup
+pages. Three pieces of new logic support it:
+
+- A canonical tactic-alias catalog (`engine/history/official_ratings/tactic_catalog.py`),
+  reused by the parser rather than duplicated, resolving both this app's own
+  historical translations and Hattrick's actual in-game wording (confirmed to
+  differ) to the same canonical `Tactic` enum. Unrecognized tactics preserve their
+  raw text and produce a structured warning without invalidating the rest of the
+  import.
+- Automatic Match ID linking (`OfficialRatingImportService.import_and_link`): one
+  matching snapshot links automatically; none creates a new, identifiable one;
+  more than one raises a conflict rather than guessing.
+- Explicit PRE/POST replace-confirmation: importing into an already-filled slot
+  requires confirmation, and a second paste is never silently reclassified as POST
+  just because PRE exists. Post-match ("Copy Ratings" after a match) support is
+  not claimed beyond the data model until a real post-match sample is validated,
+  the same way the PRE sample was in Alpha 0.5.9.0.
+
+A prediction-vs-official comparison is available but deliberately shows no numeric
+delta — HT Coach's own predicted-rating scale isn't yet confirmed to align with
+Hattrick's official scale, so a "difference" number would imply an unverified
+equivalence. See docs/OFFICIAL_RATING_WORKFLOW.md for the full write-up of both
+parts.
+
+Testing: 111 new tests (selector UI, tactic catalog, match-ID linking, import UI,
+prediction-comparison scale limitation, sector-order/orientation-independence)
+across `tests/test_training_type_selector_ui.py`, `tests/test_tactic_catalog.py`,
+`tests/test_official_rating_match_linking.py`, `tests/test_official_import_ui.py`
+and additions to `tests/test_official_ratings.py` /
+`tests/test_official_rating_app_service.py`. Full suite re-verified at 1198 passed
+/ 0 failed (excluding the separately-tracked slow optimizer test and the
+pre-existing tactical adaptation hang, both unrelated to this sprint). No rating,
+probability, optimizer, calibration, or Formation Board orientation formula was
+touched — the training-type selector and official import both only read/write
+state that already existed.
+
+### Alpha 0.5.9.1: Squad Intelligence
+
+Future sprint. Not started.
+
+### Alpha 0.6.0: Club Advisor Foundation
+
+Future sprint. Not started. Configurable Club DNA is explicitly out of scope until
+this sprint at the earliest.
 
 ### Epic 2: State And Services
 

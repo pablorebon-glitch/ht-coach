@@ -75,6 +75,28 @@ class WeeklyTrainingAppService:
             state = self._repository.rollover(state)
         return state
 
+    def set_active_training_type(self, training_type):
+        """Switches the active training type mid-week. Deliberately does
+        NOT recompute `active_week.week_id` (which would happen if this
+        just called `active_training_week(training_type=...)` fresh) --
+        that would silently orphan any first/second match already
+        recorded this week, since their match_id is scoped under the
+        *old* week_id. Instead, the same week (same id, same date
+        boundaries) is kept, and only its `active_training_type` and the
+        state-level preference are updated. Coverage, priorities and
+        explanations are recalculated the next time they're read, since
+        they're always derived fresh from `state.active_training_type`
+        rather than cached."""
+        state = self.load_state()
+        if state.active_week is not None:
+            new_week = replace(state.active_week, active_training_type=training_type)
+        else:
+            new_week = active_training_week(training_type=training_type)
+        new_state = replace(
+            state, active_training_type=training_type, active_week=new_week
+        )
+        return self._repository.save(new_state)
+
     def save_priority(self, player, priority):
         state = self.load_state()
         player_id = player_training_id(player)

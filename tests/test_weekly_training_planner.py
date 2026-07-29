@@ -557,8 +557,27 @@ def test_updating_recorded_lineup_replaces_same_record_and_preserves_metadata(tm
 
 
 def test_priorities_persist_duplicate_names_and_rollover_resets_records(tmp_path):
+    # Root cause of this test's date-sensitivity: `repository.load()` on a
+    # fresh file computes `active_week` from the *real* system clock
+    # (`active_training_week()` with no argument), so this test used to
+    # only pass while "today" happened to fall inside the specific
+    # 2026-07-19..07-22 window the `date(2026, 7, 23)` rollover check
+    # below assumes. As real calendar time moved past that window, the
+    # implicit "current week" silently became a different, later week,
+    # so `date(2026, 7, 23)` no longer looked like "the future" relative
+    # to it and rollover correctly declined to archive anything.
+    #
+    # Fix: inject an explicit reference date for the initial active week
+    # instead of relying on the ambient clock, so the test is
+    # deterministic regardless of when the suite actually runs. This
+    # changes only the test, not `active_training_week`'s real
+    # (correct) behavior of using "now" when no date is supplied.
     repository = WeeklyTrainingRepository(tmp_path / "planner.json")
     state = repository.load()
+    state = replace(
+        state, active_week=active_training_week(datetime(2026, 7, 20, 12, 0))
+    )
+    state = repository.save(state)
     first = player("Same Name", tsi=0)
     second = player("Same Name", tsi=0, salary=2000)
     state = repository.save_priority(
