@@ -520,6 +520,40 @@ class SquadPage(BasePage):
         detail_layout.addWidget(self.detail_label)
         detail_layout.addWidget(self.rankings_table)
 
+        intelligence_title = QLabel(t("squad_intelligence.panel.title"))
+        intelligence_title.setObjectName("sectionTitle")
+        self.intelligence_headline_label = QLabel(
+            t("squad_intelligence.panel.no_player_selected")
+        )
+        self.intelligence_headline_label.setObjectName("intelligenceHeadline")
+        self.intelligence_headline_label.setWordWrap(True)
+        self.intelligence_reason_label = QLabel("")
+        self.intelligence_reason_label.setWordWrap(True)
+        self.intelligence_dimensions_label = QLabel("")
+        self.intelligence_dimensions_label.setWordWrap(True)
+        self.intelligence_strengths_label = QLabel("")
+        self.intelligence_strengths_label.setWordWrap(True)
+        self.intelligence_risks_label = QLabel("")
+        self.intelligence_risks_label.setWordWrap(True)
+        self.intelligence_milestone_label = QLabel("")
+        self.intelligence_milestone_label.setWordWrap(True)
+        self.intelligence_evidence_label = QLabel("")
+        self.intelligence_evidence_label.setWordWrap(True)
+        self.intelligence_evidence_label.setObjectName("intelligenceEvidence")
+        self.intelligence_limitations_label = QLabel("")
+        self.intelligence_limitations_label.setWordWrap(True)
+        self.intelligence_limitations_label.setObjectName("intelligenceLimitations")
+
+        detail_layout.addWidget(intelligence_title)
+        detail_layout.addWidget(self.intelligence_headline_label)
+        detail_layout.addWidget(self.intelligence_reason_label)
+        detail_layout.addWidget(self.intelligence_dimensions_label)
+        detail_layout.addWidget(self.intelligence_strengths_label)
+        detail_layout.addWidget(self.intelligence_risks_label)
+        detail_layout.addWidget(self.intelligence_milestone_label)
+        detail_layout.addWidget(self.intelligence_evidence_label)
+        detail_layout.addWidget(self.intelligence_limitations_label)
+
         splitter.addWidget(table_panel)
         splitter.addWidget(detail_panel)
         set_splitter_proportions(splitter, [0.73, 0.27])
@@ -3197,6 +3231,101 @@ class SquadPage(BasePage):
     def clear_detail(self):
         self.detail_label.setText("Select a player to see details.")
         self.rankings_table.setRowCount(0)
+        self.clear_squad_intelligence()
+
+    def clear_squad_intelligence(self):
+        self.intelligence_headline_label.setText(
+            t("squad_intelligence.panel.no_player_selected")
+        )
+        for label in (
+            self.intelligence_reason_label,
+            self.intelligence_dimensions_label,
+            self.intelligence_strengths_label,
+            self.intelligence_risks_label,
+            self.intelligence_milestone_label,
+            self.intelligence_evidence_label,
+            self.intelligence_limitations_label,
+        ):
+            label.setText("")
+
+    def show_squad_intelligence(self, report):
+        role_label = t(f"squad_intelligence.role.{report.recommended_role.value}")
+        status_label = t(f"squad_intelligence.status.{report.management_status.value}")
+        self.intelligence_headline_label.setText(
+            f"{t('squad_intelligence.panel.recommended_role')}: {role_label}\n"
+            f"{t('squad_intelligence.panel.management_status')}: {status_label}"
+        )
+
+        reason_text = t(report.primary_reason_key, **report.primary_reason_params)
+        self.intelligence_reason_label.setText(
+            f"{t('squad_intelligence.panel.primary_reason')}: {reason_text}"
+        )
+
+        dimension_lines = [
+            f"{t('squad_intelligence.panel.current_performance')}: "
+            f"{t(f'squad_intelligence.performance.{report.current_performance.value}')}",
+            f"{t('squad_intelligence.panel.training_potential')}: "
+            f"{t(f'squad_intelligence.potential.{report.training_potential.value}')}",
+            f"{t('squad_intelligence.panel.training_fit')}: "
+            f"{t(f'squad_intelligence.training_fit.{report.training_fit.value}')}",
+            f"{t('squad_intelligence.panel.salary_efficiency')}: "
+            f"{t(f'squad_intelligence.salary_efficiency.{report.salary_efficiency.value}')}",
+            f"{t('squad_intelligence.panel.strategic_value')}: "
+            f"{t(f'squad_intelligence.strategic_value.{report.strategic_value.value}')}",
+        ]
+        self.intelligence_dimensions_label.setText("\n".join(dimension_lines))
+
+        if report.strengths:
+            strength_lines = [
+                f"• {t(f'squad_intelligence.strength.{item.strength_type.value}')}"
+                for item in report.strengths
+            ]
+            self.intelligence_strengths_label.setText(
+                f"{t('squad_intelligence.panel.strengths')}:\n" + "\n".join(strength_lines)
+            )
+        else:
+            self.intelligence_strengths_label.setText("")
+
+        if report.risks:
+            risk_lines = [
+                f"• {t(f'squad_intelligence.risk.{item.risk_type.value}')}"
+                for item in report.risks
+            ]
+            self.intelligence_risks_label.setText(
+                f"{t('squad_intelligence.panel.risks')}:\n" + "\n".join(risk_lines)
+            )
+        else:
+            self.intelligence_risks_label.setText("")
+
+        milestone_text = t(
+            f"squad_intelligence.milestone.{report.next_milestone.milestone_type.value}",
+            **report.next_milestone.message_params,
+        )
+        self.intelligence_milestone_label.setText(
+            f"{t('squad_intelligence.panel.next_milestone')}: {milestone_text}"
+        )
+
+        evidence_lines = [
+            f"• {item.label_key.rsplit('.', 1)[-1] if not item.label_key else t(item.label_key)}"
+            f"{': ' + str(item.value) if item.value not in (None, '') else ''}"
+            for item in report.evidence
+        ]
+        confidence_text = t(f"squad_intelligence.confidence.{report.confidence.value}")
+        self.intelligence_evidence_label.setText(
+            f"{t('squad_intelligence.panel.evidence')} ({confidence_text}):\n"
+            + "\n".join(evidence_lines)
+        )
+
+        if report.limitations:
+            limitation_lines = [
+                f"• {t(f'squad_intelligence.limitation.{item.value}')}"
+                for item in report.limitations
+            ]
+            self.intelligence_limitations_label.setText(
+                f"{t('squad_intelligence.panel.limitations')}:\n" + "\n".join(limitation_lines)
+            )
+        else:
+            self.intelligence_limitations_label.setText("")
 
     def show_player_detail(self, detail):
         player = detail.player

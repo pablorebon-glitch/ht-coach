@@ -4,6 +4,33 @@
 
 ### Added
 
+- Added Alpha 0.5.9.1 Squad Intelligence: a new Qt-independent
+  `engine/squad_intelligence` package (15 modules) turns Squad into a
+  player-management intelligence screen. For any current-roster player it
+  produces a deterministic, evidenced classification — one of 11 recommended
+  roles, one of 8 management statuses (deliberately no unconditional "sell"),
+  five qualitative dimensions (current performance, training potential, training
+  fit, salary efficiency, strategic value), strengths, risks, and a next
+  milestone — with no raw overall score ever shown (a structural guarantee, not
+  just a convention). Current performance reuses the existing `PlayerAnalyzer`
+  positional ranking rather than a second rating engine; training fit reads the
+  canonical Complete Training System via `rule_provider_for` rather than
+  duplicating the training matrix. A documented rule ensures a very-high
+  performer who's also an excellent-fit trainee resolves to KEY_STARTER over
+  PRIMARY_TRAINEE (being currently irreplaceable outranks training status), with
+  the training fit still fully visible in evidence either way.
+  `ht_coach_app/services/squad_intelligence_service.py` bridges the current
+  roster into the engine — building it against a real CSV caught a real bug
+  (`PlayerAnalyzer.best_position()` returns a tuple, not a bare enum), now fixed
+  and covered by a regression test. Full English/Spanish localization (151 keys,
+  every enum member verified translated in both languages). UI: no new
+  navigation page — the existing Squad player-selection flow now also renders a
+  compact intelligence panel below the existing player detail, recalculating
+  immediately when the active training type changes. 122 new tests, 96%
+  coverage on the new engine package; full suite re-verified at 1320 passed / 0
+  failed. See docs/SQUAD_INTELLIGENCE.md for the full write-up, including the
+  documented role-conflict resolution and what's deferred to a future Club
+  Advisor sprint.
 - Added UX-02 Expose Complete Training and Official Match Import Workflows: an
   integration-only sprint (no new engine logic) wiring up two previously-built but
   hidden capabilities. Part A: the Weekly Training Planner's training-type

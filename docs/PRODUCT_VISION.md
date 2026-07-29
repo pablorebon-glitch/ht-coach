@@ -100,6 +100,23 @@ anticipated future extension — but it is not implemented, and no sprint before
 Alpha 0.6.0 should attempt a partial version of it. Until then, "sustainable
 growth" (principle 9) is the single implicit reference strategy.
 
+## Understanding Every Player (Alpha 0.5.9.1)
+
+Principles 1 and 10 ("Hattrick is the source of truth" / "every feature must
+answer a concrete manager decision") became concrete for individual players with
+Squad Intelligence: for any current-roster player, HT Coach now answers, within
+five seconds and with evidence — not an opaque score — who they are within the
+sporting project, what to currently do with them, and why.
+
+This is deliberately still a *reporting* layer, not a decision-maker: recommended
+roles and management statuses (KEEP, TRAIN, MONITOR, EVALUATE_SALE, and so on)
+are inputs to the manager's own judgment, evaluated against the single reference
+strategy this sprint implements — sustainable growth — represented as a typed,
+swappable input rather than hardcoded, so a future club-strategy sprint can
+extend it without redesigning anything. There is deliberately no unconditional
+"sell" status yet: HT Coach doesn't know club finances, market prices or transfer
+deadlines, so it says "evaluate," not "sell."
+
 ## Official Ratings Are the Truth (Alpha 0.5.9.0)
 
 Principle 1 ("Hattrick is the source of truth") became concrete with Alpha 0.5.9.0:
