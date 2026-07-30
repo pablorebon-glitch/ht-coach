@@ -739,7 +739,21 @@ def test_app_service_persists_priority_and_records_first_match(tmp_path):
 
     plan = service.generate_plan(players, "3-5-2")
     board = service.board_for_plan(plan)
-    service.record_first_match(board, roster_players=players)
+    # Root cause of a previously-flaky assertion here, documented inline:
+    # record_first_match() defaults to the active week's dynamically
+    # computed first_match_date (relative to the real wall clock) when no
+    # match_date is given. As real time passes, that date can drift into
+    # the future relative to "today", which triggers a deliberate safety
+    # downgrade (a future match can't be marked PLAYED). This test's
+    # intent is "a match that has already happened", so it fixes both
+    # the match date and "today" explicitly rather than depending on
+    # which day of the week the suite happens to run on.
+    service.record_first_match(
+        board,
+        roster_players=players,
+        match_date=date(2026, 7, 19),
+        today=date(2026, 7, 26),
+    )
     loaded = repository.load()
 
     assert loaded.priorities[player_training_id(players[1])].priority == TrainingPriority.REQUIRED_100

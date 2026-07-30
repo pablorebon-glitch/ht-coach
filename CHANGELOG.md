@@ -4,6 +4,29 @@
 
 ### Added
 
+- Added Alpha 0.6.0 Club Advisor Foundation: the first club-level intelligence
+  layer, a new Qt-independent `engine/club_advisor` package that summarizes the
+  current sporting project entirely from evidence already produced by Squad
+  Intelligence and Training — never a new player-rating or scoring engine. A
+  five-value project status is evaluated from three independent
+  sub-assessments (training utilization, positional depth, squad composition)
+  with the worst one capping the overall status, never a single blended score.
+  An ordered priority catalog (8 types) never recommends a purchase, a
+  specific player, or a transfer price. Independent strength/risk/warning
+  detectors, each carrying evidence (warnings additionally carry an explicit
+  reason). Five limitations (financial data, league comparison, transfer
+  market, salary budget, promotion target) are always disclosed, since this
+  sprint has no data source for any of them. A new "Club Advisor" navigation
+  tab renders one concise card per section — no charts, no gauges, no overall
+  score. `SquadIntelligenceContext` gained an additive `ages_by_position`
+  field enabling genuine "future shortage" depth detection. Building against a
+  real CSV caught and permanently fixed a pre-existing, unrelated flaky test
+  in the training planner suite (a match-date safety guard tripped by real
+  time having passed since the test was written). 62 new tests, 96% coverage
+  on the new engine package; full suite re-verified at 1386 passed / 0 failed.
+  See docs/CLUB_ADVISOR.md for the full write-up, including what's explicitly
+  deferred (History integration, Transfer/Financial Planner, configurable
+  Club DNA).
 - Added Alpha 0.5.9.1 Squad Intelligence: a new Qt-independent
   `engine/squad_intelligence` package (15 modules) turns Squad into a
   player-management intelligence screen. For any current-roster player it

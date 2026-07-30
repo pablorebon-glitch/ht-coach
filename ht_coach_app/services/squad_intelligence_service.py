@@ -36,11 +36,14 @@ class SquadIntelligenceAppService:
 
     def build_squad_context(self, players) -> SquadIntelligenceContext:
         positional_depth: dict[str, int] = {}
+        ages_by_position: dict[str, list] = {}
         for player in players:
             best_position, _score = PlayerAnalyzer.best_position(player)
             if not best_position:
                 continue
             positional_depth[best_position] = positional_depth.get(best_position, 0) + 1
+            if getattr(player, "age", None) is not None:
+                ages_by_position.setdefault(best_position, []).append(player.age)
 
         state = self._weekly_training_service.load_state()
         salary_values = tuple(
@@ -55,6 +58,9 @@ class SquadIntelligenceAppService:
             active_training_type=state.active_training_type or "",
             salary_values=salary_values,
             age_values=age_values,
+            ages_by_position={
+                position: tuple(ages) for position, ages in ages_by_position.items()
+            },
         )
 
     def build_player_context(

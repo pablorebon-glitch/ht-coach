@@ -106,6 +106,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  club_advisor/
   history/
     evolution/
     insights/
@@ -400,6 +401,67 @@ recalculates the currently-shown report immediately.
 Static-import and structural tests confirm this package never invokes
 `FormationOptimizer` or `TacticOptimizer`, and that `PlayerIntelligenceReport` has
 no `overall_score`/`score` field at all.
+
+### Club Advisor
+
+`engine/club_advisor/`
+
+Alpha 0.6.0 adds the first club-level intelligence layer, deliberately built as
+an *aggregation* over Squad Intelligence and Training rather than a new scoring
+engine — enforced by static-import tests confirming this package never imports
+`PlayerRatingEngine`, `PlayerAnalyzer`, `FormationOptimizer`, `TacticOptimizer`
+or `LineupOptimizer`.
+
+Modules:
+
+- `enums.py`: `ProjectStatus` (5 values), `PriorityType` (8), `ClubStrengthType`
+  (6), `ClubRiskType` (8), `ClubWarningType` (6), `ClubConfidence` (4),
+  `ClubLimitationType` (8), `DepthStatus` (5).
+- `context.py`: `ClubAdvisorContext` — holds only already-computed inputs
+  (Squad Intelligence's `squad_reports`, `squad_context` from
+  `SquadIntelligenceAppService`, active training type).
+- `summary.py`: `build_training_summary` / `build_squad_summary` /
+  `build_depth_summary` / `build_sporting_summary` — pure aggregations
+  (counts and classifications) over already-computed data, never a new rating.
+- `dimensions.py`: `evaluate_project_status` — three independently evaluated
+  sub-assessments (training utilization, positional depth, squad composition);
+  the worst one caps the overall status. Never a single blended score.
+- `priorities.py` / `strengths.py` / `risks.py` / `warnings.py`: independent
+  evidenced detector functions. Unlike Squad Intelligence's role/status rules,
+  every detector here may fire independently and all findings are kept —
+  there's no single-winner conflict resolution to do. Priorities are then
+  sorted by urgency and assigned a 1-based rank.
+- `confidence.py`: the same documented-policy style used throughout HT Coach's
+  domain layers.
+- `rule_engine.py` / `service.py`: `ClubAdvisorRuleEngine.evaluate()` (thin
+  orchestration) and `generate_report()` (the only entry point most callers
+  need).
+
+App-layer bridge:
+
+- `ht_coach_app/services/club_advisor_service.py`'s `ClubAdvisorAppService`
+  reuses `SquadIntelligenceAppService` to build context — it does not rebuild
+  roster/training context a second time.
+- `ht_coach_app/services/club_advisor_formatting.py`: stable
+  enum-to-localization-key mapping.
+
+`SquadIntelligenceContext` (from Alpha 0.5.9.1) gained an additive
+`ages_by_position` field to support genuine "future shortage" depth detection
+(a position where the only replacements are aging) — backward compatible,
+defaults to `{}`.
+
+UI: a new "Club Advisor" top-level navigation tab
+(`ht_coach_app/views/club_advisor_page.py`,
+`ht_coach_app/controllers/club_advisor_controller.py`) — the first genuinely
+new page since the original module set. A "Generate report" button reads the
+roster CSV already remembered by Squad's workspace settings, then renders one
+concise `workspacePanel`-styled card per section. No charts, no gauges, no
+overall score.
+
+Five limitations (`FINANCIAL_DATA_UNAVAILABLE`, `LEAGUE_COMPARISON_UNAVAILABLE`,
+`TRANSFER_MARKET_UNAVAILABLE`, `SALARY_BUDGET_UNAVAILABLE`,
+`PROMOTION_TARGET_UNKNOWN`) are always present in every report, by design —
+this sprint has no data source for any of them.
 
 ### Transfer Planner
 

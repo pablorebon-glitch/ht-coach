@@ -64,7 +64,8 @@
     "match": "Match",
     "reports": "Reports",
     "settings": "Settings",
-    "ready": "{page} ready"
+    "ready": "{page} ready",
+    "club_advisor": "Club Advisor"
   },
   "settings": {
     "title": "Settings",
@@ -1917,6 +1918,128 @@
         "role": "Role",
         "status": "Status",
         "training_fit": "Fit"
+      }
+    }
+  },
+  "club_advisor": {
+    "status": {
+      "excellent": "Excellent",
+      "healthy": "Healthy",
+      "stable": "Stable",
+      "needs_attention": "Needs Attention",
+      "critical": "Critical"
+    },
+    "priority": {
+      "maintain_current_training": "Maintain current training",
+      "increase_positional_depth": "Increase positional depth",
+      "develop_secondary_trainees": "Develop secondary trainees",
+      "reduce_starter_dependency": "Reduce dependency on one starter",
+      "monitor_salary_growth": "Monitor salary growth",
+      "review_aging_veterans": "Review aging veterans",
+      "improve_training_utilization": "Improve training utilization",
+      "address_goalkeeper_coverage": "Address goalkeeper coverage"
+    },
+    "strength": {
+      "training_fully_utilized": "Training fully utilized",
+      "excellent_trainee_pipeline": "Excellent trainee pipeline",
+      "balanced_midfield": "Balanced midfield",
+      "good_tactical_flexibility": "Good tactical flexibility",
+      "healthy_age_distribution": "Healthy age distribution",
+      "strong_positional_coverage": "Strong positional coverage"
+    },
+    "risk": {
+      "only_one_goalkeeper": "Only one goalkeeper",
+      "no_central_defender_replacement": "No central defender replacement",
+      "players_without_training": "Several players receive no training",
+      "too_many_players_per_training_slot": "Too many players competing for one training slot",
+      "starter_dependency": "Starter dependency",
+      "weak_positional_depth": "Weak positional depth",
+      "poor_tactical_flexibility": "Poor tactical flexibility",
+      "high_age_concentration": "High age concentration"
+    },
+    "warning": {
+      "no_goalkeeper_backup": "No goalkeeper backup",
+      "training_capacity_underused": "Training capacity underused",
+      "starter_has_no_replacement": "Starter has no replacement",
+      "players_not_receiving_training": "Several players not receiving training",
+      "high_experience_concentration": "High concentration of experience",
+      "low_positional_flexibility": "Low positional flexibility"
+    },
+    "warning_reason": {
+      "no_goalkeeper_backup": "Only {count} goalkeeper is on the roster; an injury would leave the team without options.",
+      "training_capacity_underused": "No player is receiving the full {training_type} effect this week.",
+      "starter_has_no_replacement": "{count} key starter(s) have no direct replacement at their position.",
+      "players_not_receiving_training": "{count} players receive no meaningful training this week.",
+      "high_experience_concentration": "{count} players are veterans; renewal planning is worth considering.",
+      "low_positional_flexibility": "No player currently offers distinctive tactical versatility."
+    },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "insufficient_data": "Insufficient Data"
+    },
+    "limitation": {
+      "financial_data_unavailable": "Financial data unavailable",
+      "league_comparison_unavailable": "League comparison unavailable",
+      "transfer_market_unavailable": "Transfer market unavailable",
+      "salary_budget_unavailable": "Salary budget unavailable",
+      "promotion_target_unknown": "Promotion target unknown",
+      "historical_data_unavailable": "Historical data unavailable",
+      "no_active_training": "No active training",
+      "empty_roster": "Empty roster"
+    },
+    "depth_status": {
+      "no_replacement": "No replacement",
+      "one_replacement": "One replacement",
+      "healthy_competition": "Healthy competition",
+      "excess_players": "Excess players",
+      "future_shortage": "Future shortage"
+    },
+    "sporting": {
+      "midfield_concentrated": "Midfield strength is concentrated in few players.",
+      "attack_relies_on_few_players": "Attack relies on very few players.",
+      "defensive_flexibility_limited": "Defensive flexibility is limited.",
+      "wing_depth_acceptable": "Wing depth is acceptable."
+    },
+    "evidence": {
+      "goalkeeper_depth": "Available goalkeepers",
+      "no_replacement_position": "Position without replacement",
+      "key_starter_count": "Key starters",
+      "players_without_training": "Players without training",
+      "secondary_trainee_count": "Secondary trainees",
+      "full_effect_slots_used": "Full-effect slots in use",
+      "veteran_count": "Veterans",
+      "low_salary_efficiency_count": "Players with low salary efficiency"
+    },
+    "panel": {
+      "title": "Club Advisor",
+      "project_status": "Project status",
+      "priorities": "Current priorities",
+      "strengths": "Strengths",
+      "risks": "Risks",
+      "section_training": "Training",
+      "section_squad": "Squad",
+      "depth": "Depth",
+      "warnings": "Warnings",
+      "confidence": "Confidence",
+      "limitations": "Limitations",
+      "no_roster": "Load a roster in Squad to generate the Club Advisor report.",
+      "generate": "Generate report",
+      "training": {
+        "active_type": "Active training",
+        "primary_trainees": "Primary trainees",
+        "secondary_trainees": "Secondary trainees",
+        "without_training": "Without training"
+      },
+      "squad": {
+        "key_starters": "Key starters",
+        "rotation": "Rotation",
+        "development_projects": "Development projects",
+        "transfer_candidates": "Transfer candidates",
+        "replaceable": "Replaceable",
+        "veterans": "Veterans",
+        "depth_players": "Depth players"
       }
     }
   }

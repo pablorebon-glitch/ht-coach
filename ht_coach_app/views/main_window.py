@@ -43,6 +43,8 @@ from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppServi
 from ht_coach_app.state.app_events import AppEvents
 from ht_coach_app.views.dashboard_page import DashboardPage
 from ht_coach_app.views.match_page import MatchPage
+from ht_coach_app.views.club_advisor_page import ClubAdvisorPage
+from ht_coach_app.controllers.club_advisor_controller import ClubAdvisorController
 from ht_coach_app.views.opponents_page import OpponentsPage
 from ht_coach_app.views.reports_page import ReportsPage
 from ht_coach_app.views.settings_page import SettingsPage
@@ -56,6 +58,7 @@ class MainWindow(QMainWindow):
         {"key": "squad", "label": lambda: t("nav.squad"), "factory": SquadPage},
         {"key": "opponents", "label": lambda: t("nav.opponents"), "factory": OpponentsPage},
         {"key": "match", "label": lambda: t("nav.match"), "factory": MatchPage},
+        {"key": "club_advisor", "label": lambda: t("nav.club_advisor"), "factory": ClubAdvisorPage},
         {"key": "reports", "label": lambda: t("nav.reports"), "factory": ReportsPage},
         {"key": "settings", "label": lambda: t("nav.settings"), "factory": SettingsPage},
     ]
@@ -208,6 +211,16 @@ class MainWindow(QMainWindow):
             )
             widget.set_advisor_verbosity(
                 self._settings.advisor_verbosity
+            )
+
+        if page["key"] == "club_advisor":
+            self._controllers.append(
+                ClubAdvisorController(
+                    widget,
+                    SquadService(),
+                    MatchWorkspaceRepository(),
+                    parent=self
+                )
             )
 
         if page["key"] == "settings":

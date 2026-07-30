@@ -64,7 +64,8 @@
     "match": "Partido",
     "reports": "Reportes",
     "settings": "Configuración",
-    "ready": "{page} listo"
+    "ready": "{page} listo",
+    "club_advisor": "Asesor del club"
   },
   "settings": {
     "title": "Configuración",
@@ -1917,6 +1918,128 @@
         "role": "Rol",
         "status": "Estado",
         "training_fit": "Ajuste"
+      }
+    }
+  },
+  "club_advisor": {
+    "status": {
+      "excellent": "Excelente",
+      "healthy": "Saludable",
+      "stable": "Estable",
+      "needs_attention": "Necesita atención",
+      "critical": "Crítico"
+    },
+    "priority": {
+      "maintain_current_training": "Mantener el entrenamiento actual",
+      "increase_positional_depth": "Aumentar la profundidad posicional",
+      "develop_secondary_trainees": "Desarrollar trainees secundarios",
+      "reduce_starter_dependency": "Reducir la dependencia de un titular",
+      "monitor_salary_growth": "Monitorear el crecimiento salarial",
+      "review_aging_veterans": "Revisar a los veteranos",
+      "improve_training_utilization": "Mejorar el aprovechamiento del entrenamiento",
+      "address_goalkeeper_coverage": "Atender la cobertura de arqueros"
+    },
+    "strength": {
+      "training_fully_utilized": "Entrenamiento completamente aprovechado",
+      "excellent_trainee_pipeline": "Excelente cantera de trainees",
+      "balanced_midfield": "Mediocampo equilibrado",
+      "good_tactical_flexibility": "Buena flexibilidad táctica",
+      "healthy_age_distribution": "Distribución de edad saludable",
+      "strong_positional_coverage": "Fuerte cobertura posicional"
+    },
+    "risk": {
+      "only_one_goalkeeper": "Un solo arquero disponible",
+      "no_central_defender_replacement": "Sin reemplazo de defensor central",
+      "players_without_training": "Varios jugadores sin entrenamiento",
+      "too_many_players_per_training_slot": "Demasiados jugadores compitiendo por un cupo de entrenamiento",
+      "starter_dependency": "Dependencia de un titular",
+      "weak_positional_depth": "Profundidad posicional débil",
+      "poor_tactical_flexibility": "Poca flexibilidad táctica",
+      "high_age_concentration": "Alta concentración de edad"
+    },
+    "warning": {
+      "no_goalkeeper_backup": "Sin arquero de respaldo",
+      "training_capacity_underused": "Capacidad de entrenamiento subutilizada",
+      "starter_has_no_replacement": "El titular no tiene reemplazo",
+      "players_not_receiving_training": "Varios jugadores no reciben entrenamiento",
+      "high_experience_concentration": "Alta concentración de experiencia",
+      "low_positional_flexibility": "Baja flexibilidad posicional"
+    },
+    "warning_reason": {
+      "no_goalkeeper_backup": "Solo hay {count} arquero en el plantel; una lesión dejaría al equipo sin opciones.",
+      "training_capacity_underused": "Ningún jugador recibe el efecto completo de {training_type} esta semana.",
+      "starter_has_no_replacement": "{count} titular(es) clave no tienen un reemplazo directo en su posición.",
+      "players_not_receiving_training": "{count} jugadores no reciben ningún entrenamiento relevante esta semana.",
+      "high_experience_concentration": "{count} jugadores son veteranos; conviene planificar el recambio.",
+      "low_positional_flexibility": "Ningún jugador ofrece versatilidad táctica distintiva en este momento."
+    },
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "insufficient_data": "Datos insuficientes"
+    },
+    "limitation": {
+      "financial_data_unavailable": "Datos financieros no disponibles",
+      "league_comparison_unavailable": "Comparación con la liga no disponible",
+      "transfer_market_unavailable": "Mercado de transferencias no disponible",
+      "salary_budget_unavailable": "Presupuesto salarial no disponible",
+      "promotion_target_unknown": "Objetivo de ascenso desconocido",
+      "historical_data_unavailable": "Datos históricos no disponibles",
+      "no_active_training": "Sin entrenamiento activo",
+      "empty_roster": "Plantel vacío"
+    },
+    "depth_status": {
+      "no_replacement": "Sin reemplazo",
+      "one_replacement": "Un reemplazo",
+      "healthy_competition": "Competencia saludable",
+      "excess_players": "Exceso de jugadores",
+      "future_shortage": "Escasez futura"
+    },
+    "sporting": {
+      "midfield_concentrated": "La fortaleza del mediocampo está concentrada en pocos jugadores.",
+      "attack_relies_on_few_players": "El ataque depende de pocos jugadores.",
+      "defensive_flexibility_limited": "La flexibilidad defensiva es limitada.",
+      "wing_depth_acceptable": "La profundidad en las bandas es aceptable."
+    },
+    "evidence": {
+      "goalkeeper_depth": "Arqueros disponibles",
+      "no_replacement_position": "Posición sin reemplazo",
+      "key_starter_count": "Titulares clave",
+      "players_without_training": "Jugadores sin entrenamiento",
+      "secondary_trainee_count": "Trainees secundarios",
+      "full_effect_slots_used": "Cupos con efecto completo en uso",
+      "veteran_count": "Veteranos",
+      "low_salary_efficiency_count": "Jugadores con baja eficiencia salarial"
+    },
+    "panel": {
+      "title": "Asesor del club",
+      "project_status": "Estado del proyecto",
+      "priorities": "Prioridades actuales",
+      "strengths": "Fortalezas",
+      "risks": "Riesgos",
+      "section_training": "Entrenamiento",
+      "section_squad": "Plantel",
+      "depth": "Profundidad",
+      "warnings": "Avisos",
+      "confidence": "Confianza",
+      "limitations": "Limitaciones",
+      "no_roster": "Cargá un plantel en Squad para generar el reporte del Asesor del club.",
+      "generate": "Generar reporte",
+      "training": {
+        "active_type": "Entrenamiento activo",
+        "primary_trainees": "Trainees principales",
+        "secondary_trainees": "Trainees secundarios",
+        "without_training": "Sin entrenamiento"
+      },
+      "squad": {
+        "key_starters": "Titulares clave",
+        "rotation": "Rotación",
+        "development_projects": "Proyectos a desarrollar",
+        "transfer_candidates": "Candidatos a transferencia",
+        "replaceable": "Reemplazables",
+        "veterans": "Veteranos",
+        "depth_players": "Jugadores de profundidad"
       }
     }
   }

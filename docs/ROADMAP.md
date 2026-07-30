@@ -532,8 +532,66 @@ Not shipped in this pass:
 
 ### Alpha 0.6.0: Club Advisor Foundation
 
-Future sprint. Not started. Configurable Club DNA is explicitly out of scope until
-this sprint at the earliest.
+Goal: the first club-level intelligence layer. Summarize the current state of
+the sporting project and its most important priorities, entirely from evidence
+already produced by Squad Intelligence and Training — never a new player-rating
+or scoring engine.
+
+Deliverables:
+
+- `engine/club_advisor/` (Qt- and localization-independent, 12 modules): a
+  five-value `ProjectStatus` deliberately evaluated from three *independent*
+  sub-assessments (training utilization, positional depth, squad composition)
+  with the worst one capping the overall status — never a single blended score
+  (see `test_project_status_never_uses_a_single_blended_score`). An 8-value
+  ordered priority catalog that never recommends a purchase, a specific player,
+  or a transfer price. Independent evidence-based detectors for strengths (6
+  types), risks (8 types) and warnings (6 types, each carrying an explicit
+  reason). Training/Squad/Depth/Sporting summaries built as pure aggregations
+  over Squad Intelligence's already-computed `PlayerIntelligenceReport`s and
+  positional depth — no second rating engine.
+- `SquadIntelligenceContext` gained an additive `ages_by_position` field
+  (backward-compatible, defaults to `{}`) enabling genuine "future shortage"
+  depth detection (a position with only aging replacements) rather than a
+  documented-but-inactive code path.
+- `ht_coach_app/services/club_advisor_service.py`'s `ClubAdvisorAppService`
+  bridges the current roster into the engine by reusing
+  `SquadIntelligenceAppService` — never rebuilding roster/training context a
+  second time.
+- A new "Club Advisor" navigation tab — the first genuinely new top-level page
+  since the original module set — with one concise card per section (Project
+  Status, Priorities, Strengths, Risks, Training, Squad, Depth, Warnings,
+  Limitations). No charts, no gauges, no overall score.
+- Five limitations (financial data, league comparison, transfer market, salary
+  budget, promotion target) are always present in every report, by design —
+  this sprint has no data source for any of them at all.
+- Full English/Spanish localization (92 keys) for every enum member, every
+  warning's reason template, and the UI panel headings.
+- 62 new tests (engine, app service, localization, UI), 96% coverage on the new
+  engine package. Full suite re-verified at 1386 passed / 0 failed.
+- Building against a real CSV caught (and permanently fixed) a genuinely
+  pre-existing, unrelated flaky test in `test_weekly_training_planner.py`: a
+  first-match record's default `match_date` is computed relative to the real
+  wall clock, and enough real time had passed since that test was written that
+  the computed date drifted into the future, tripping a deliberate "a future
+  match can't be marked PLAYED" safety guard. Fixed the same way two similar
+  cases were fixed in Alpha 0.5.8.5: injecting explicit `match_date` / `today`
+  values instead of depending on which day of the week the suite happens to
+  run on.
+- `docs/CLUB_ADVISOR.md` added.
+
+Not shipped in this pass (explicitly deferred, matches the sprint's own "out of
+scope" list):
+
+- Wiring `has_historical_data` / `evolution_result` / `insights_result` to a
+  real History adapter — the context objects already have the shape for this,
+  but nothing populates them yet.
+- Transfer Planner, Financial Planner, League analysis, Promotion planner,
+  automatic purchases/sales, market searches, budget calculations — all
+  explicitly out of scope per the brief.
+- Configurable Club DNA — `SUSTAINABLE_GROWTH` remains the only implemented
+  strategy, read from context rather than hardcoded so a future sprint can add
+  more without redesigning the engine.
 
 ### Epic 2: State And Services
 

@@ -67,6 +67,7 @@ class SquadIntelligenceContext:
     active_training_type: str = ""
     salary_values: tuple[int, ...] = ()
     age_values: tuple[int, ...] = ()
+    ages_by_position: dict = field(default_factory=dict)
 
     def depth_at(self, position: str) -> int:
         return self.positional_depth.get(position, 0)

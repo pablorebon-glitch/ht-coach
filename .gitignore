@@ -19,7 +19,3 @@ build/
 
 coverage.xml
 htmlcov/
-
-.coverage
-correr_claude.ps1
-instrucciones.txt

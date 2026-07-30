@@ -100,6 +100,21 @@ anticipated future extension — but it is not implemented, and no sprint before
 Alpha 0.6.0 should attempt a partial version of it. Until then, "sustainable
 growth" (principle 9) is the single implicit reference strategy.
 
+## The Club-Level View (Alpha 0.6.0)
+
+Squad Intelligence answers "who is this player, and what should I do with him?"
+one player at a time. Club Advisor is the first layer that steps back and asks
+the club-level version of the same question: how healthy is the project, what
+deserves attention first, what should this week's priorities be?
+
+It is deliberately an aggregation, not a new opinion-generating engine — every
+conclusion traces back to Squad Intelligence's or Training's already-computed
+evidence, never a recalculated player score. And it stays honest about what it
+doesn't know: financial data, league comparison, transfer-market context and a
+promotion target are permanent, disclosed limitations this sprint, not gaps
+papered over with a guess. The Club Advisor does not replace the manager — it
+helps the manager decide what to look at first.
+
 ## Understanding Every Player (Alpha 0.5.9.1)
 
 Principles 1 and 10 ("Hattrick is the source of truth" / "every feature must
