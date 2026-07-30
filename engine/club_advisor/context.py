@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from engine.squad_intelligence.enums import ClubStrategy
 
@@ -17,9 +17,11 @@ class ClubAdvisorContext:
     squad_context: object = None
     active_training_type: str = ""
     coverage_rows: tuple = ()
+    training_priority_rows: tuple = ()
     has_historical_data: bool = False
     evolution_result: object = None
     insights_result: object = None
+    players_by_position: dict = field(default_factory=dict)
 
     @property
     def roster_size(self) -> int:

@@ -62,6 +62,40 @@ section shows both raw values side by side with an explicit compatibility note,
 never a numeric difference. See `ht_coach_app/services/official_rating_formatting.py`'s
 `SCALES_CONFIRMED_COMPATIBLE` flag.
 
+## PRE/POST format support (Alpha 0.6.3)
+
+The parser now automatically detects which of two confirmed/expected shapes a
+pasted "Copy Ratings" text uses (`engine/history/official_ratings/parser.py`'s
+`detect_format()`):
+
+- **COMPACT_PRE**: the BBCode `[table]` layout confirmed against a real
+  pre-match sample in Alpha 0.5.9.0.
+- **DETAILED_POST**: a plain labeled-line layout (no `[table]` block) matching
+  the field list Hattrick's detailed post-match summary is documented to
+  include (Midfield, Right/Central/Left Defense, Right/Central/Left Attack,
+  Indirect Set Pieces, Game Plan, Average Ratings, Hidden Team Attitude,
+  Playing Style).
+
+**Calibration status: DETAILED_POST is not yet validated against a real
+sample.** Unlike COMPACT_PRE (calibrated against an actual account paste in
+Alpha 0.5.9.0), no real post-match "Copy Ratings" export has been provided as
+of this sprint — the parser's POST support is built entirely from the field
+names in this sprint's brief, using the same tolerant keyword-matching and
+decimal-comma/point normalization the parser already had. It's been verified
+against a synthetic fixture covering all listed fields
+(`tests/test_official_rating_pre_post_formats.py`), but should be re-verified
+against a real sample the next time one is available.
+
+Detection itself doesn't change how parsing works underneath — the existing
+tolerant line-based fallback already handled both shapes reasonably; `
+detect_format()` mainly makes the distinction visible and testable
+(`OfficialRatingSnapshot.detected_format`).
+
+**Validation relaxed for POST.** A formation token is now only *required* for
+COMPACT_PRE (where it's always present in the confirmed real sample).
+DETAILED_POST may legitimately omit formation, team attitude, and other
+PRE-only fields — their absence no longer fails an otherwise-usable import.
+
 ## Known limitation: opponent ratings and cross-match comparisons
 
 The sprint brief describes an "Official Comparison" section (Official PRE vs.

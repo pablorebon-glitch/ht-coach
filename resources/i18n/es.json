@@ -8,6 +8,8 @@
   },
   "common": {
     "not_available": "No disponible",
+    "apply": "Aplicar",
+    "back": "Volver",
     "expand_section": "Expandir sección",
     "collapse_section": "Colapsar sección",
     "list_two": "{first} y {second}",
@@ -811,6 +813,13 @@
       "confirm_replace_title": "¿Reemplazar los datos oficiales existentes?",
       "confirm_replace_pre": "Ya hay un resumen oficial PRE-partido guardado para este partido. ¿Reemplazarlo con el que acabás de pegar?",
       "confirm_replace_post": "Ya hay un resumen oficial POST-partido guardado para este partido. ¿Reemplazarlo con el que acabás de pegar?",
+      "match_id_mismatch": {
+        "title": "Los Match ID no coinciden",
+        "message": "El PRE y el POST importados pertenecen a partidos distintos. Revisa los Match ID antes de continuar.",
+        "warning": "Los Match ID identifican de forma unica los partidos oficiales de Hattrick. HT Coach no va a asociar IDs diferentes automaticamente.",
+        "pre_match_id": "Match ID PRE",
+        "post_match_id": "Match ID POST"
+      },
       "summary": {
         "source": "Fuente",
         "source_value": "Importación oficial de Hattrick",
@@ -1065,7 +1074,7 @@
   },
   "change": {
     "title": "Análisis del cambio",
-    "last_change": "Último cambio",
+    "last_change": "Ãšltimo cambio",
     "incoming_player": "Jugador que entra",
     "outgoing_player": "Jugador que sale",
     "slot": "Puesto",
@@ -1214,7 +1223,7 @@
       "none": "Sin prioridad",
       "rest": "Descansar",
       "uncovered_warning": "Este jugador priorizado no está recibiendo el entrenamiento que necesita.",
-      "retained_after_type_change": "La prioridad se mantuvo — su cobertura se recalcula para el entrenamiento recién seleccionado."
+      "retained_after_type_change": "La prioridad se mantuvo â€” su cobertura se recalcula para el entrenamiento recién seleccionado."
     },
     "player": "Jugador",
     "age": "Edad",
@@ -1380,9 +1389,9 @@
       "next": "Siguiente",
       "save": "Guardar",
       "cancel": "Cancelar",
-      "step_of": "Paso {step} de {total} — {training}",
+      "step_of": "Paso {step} de {total} â€” {training}",
       "step_instructions": "Seleccioná {count} jugadores para entrenamiento {effect}.",
-      "no_fixed_quota": "Este tipo de entrenamiento no tiene un cupo posicional fijo — entrena a todo el que juega. No hace falta seleccionar jugadores específicos.",
+      "no_fixed_quota": "Este tipo de entrenamiento no tiene un cupo posicional fijo â€” entrena a todo el que juega. No hace falta seleccionar jugadores específicos.",
       "no_selection": "No se seleccionó ningún jugador.",
       "confirm_change_title": "¿Cambiar el entrenamiento activo?",
       "confirm_change_body": "Las prioridades actuales se crearon para un tipo de entrenamiento distinto. ¿Continuar?"
@@ -1981,7 +1990,11 @@
       "starter_has_no_replacement": "El titular no tiene reemplazo",
       "players_not_receiving_training": "Varios jugadores no reciben entrenamiento",
       "high_experience_concentration": "Alta concentración de experiencia",
-      "low_positional_flexibility": "Baja flexibilidad posicional"
+      "low_positional_flexibility": "Baja flexibilidad posicional",
+      "reduced_temporary_availability": "Disponibilidad temporal reducida",
+      "priority_trainees_missing_training": "Trainees prioritarios sin entrenar",
+      "training_slot_competition": "Competencia por cupos de entrenamiento",
+      "training_plan_deviation": "Desviación del plan de entrenamiento"
     },
     "warning_reason": {
       "no_goalkeeper_backup": "Solo hay {count} arquero en el plantel; una lesión dejaría al equipo sin opciones.",
@@ -1989,7 +2002,11 @@
       "starter_has_no_replacement": "{count} titular(es) clave no tienen un reemplazo directo en su posición.",
       "players_not_receiving_training": "{count} jugadores no reciben ningún entrenamiento relevante esta semana.",
       "high_experience_concentration": "{count} jugadores son veteranos; conviene planificar el recambio.",
-      "low_positional_flexibility": "Ningún jugador ofrece versatilidad táctica distintiva en este momento."
+      "low_positional_flexibility": "Ningún jugador ofrece versatilidad táctica distintiva en este momento.",
+      "reduced_temporary_availability": "{position}: el plantel tiene {structural} jugador(es), pero solo {available} disponible(s) esta semana.",
+      "priority_trainees_missing_training": "{count} jugador(es) marcados como trainees prioritarios no están recibiendo el efecto de entrenamiento esperado.",
+      "training_slot_competition": "Hay {count} jugadores compitiendo por los cupos de entrenamiento en {position}.",
+      "training_plan_deviation": "{count} jugador(es) reciben el efecto completo de entrenamiento sin estar marcados como trainees ni titulares â€” revisar si es intencional."
     },
     "confidence": {
       "high": "Alta",
@@ -2040,7 +2057,8 @@
       "late_season_increases_urgency": "El final de temporada aumenta la urgencia",
       "promotion_targeted_increases_urgency": "El objetivo de ascenso aumenta la urgencia",
       "training_utilization_healthy": "El aprovechamiento del entrenamiento es saludable",
-      "weak_positions_for_promotion": "Posiciones débiles de cara a un ascenso"
+      "weak_positions_for_promotion": "Posiciones débiles de cara a un ascenso",
+      "structural_vs_temporary": "Disponibles / plantel estructural"
     },
     "panel": {
       "title": "Asesor del club",
@@ -2079,6 +2097,8 @@
       "urgency": "Urgencia",
       "action": "Acción",
       "review": "Revisión",
+      "explanation": "Explicación",
+      "players_involved": "Jugadores involucrados",
       "reason": "Razón",
       "season_phase": "Fase de temporada",
       "promotion_objective": "Objetivo de ascenso",
@@ -2087,7 +2107,13 @@
       "recent_signing": "Fichaje reciente importante",
       "notes": "Notas",
       "save_context": "Guardar contexto",
-      "unknown": "Desconocido"
+      "unknown": "Desconocido",
+      "structural_status": "Estado estructural",
+      "operational_status": "Estado operativo",
+      "driven_by": "Impulsado por",
+      "impact": "Impacto",
+      "affected_players": "Jugadores afectados",
+      "temporary_availability": "Disponibilidad temporal"
     },
     "season_phase": {
       "preseason": "Pretemporada",
@@ -2182,6 +2208,46 @@
         "weak_positions": "Hay posiciones débiles que afectarían el rendimiento en una división más exigente.",
         "no_major_gaps": "No se detectan vacíos estructurales mayores en las posiciones evaluadas."
       }
+    },
+    "risk_reason": {
+      "only_one_goalkeeper": "Solo hay {count} arquero en el plantel.",
+      "central_defense_uncovered": "Solo {count} defensores centrales, por debajo de los {slots} que exige la formación preferida.",
+      "central_defense_covered_by_formation": "Hay {count} defensor(es) central(es) directo(s), pero la formación preferida sigue cubierta combinando con los laterales.",
+      "weak_positional_depth": "La posición {position} tiene solo {count} jugador(es) disponible(s).",
+      "starter_dependency": "{count} titular(es) clave no tienen un reemplazo directo.",
+      "poor_tactical_flexibility": "Ningún jugador ofrece versatilidad táctica distintiva en este momento.",
+      "high_age_concentration": "{count} jugadores son veteranos; conviene planificar el recambio."
+    },
+    "risk_review": {
+      "goalkeeper_injury_or_signing": "Si el arquero actual se lesiona o se ficha un segundo arquero.",
+      "another_defender_unavailable": "Si otro defensor queda no disponible.",
+      "position_unavailable": "Si la posición queda sin cobertura disponible.",
+      "key_starter_unavailable": "Si un titular clave queda no disponible.",
+      "formation_change": "Si cambia la formación preferida.",
+      "next_season_planning": "Al planificar la próxima temporada."
+    },
+    "status_dimension": {
+      "training": "Entrenamiento",
+      "depth": "Profundidad",
+      "squad_composition": "Composición del plantel"
+    },
+    "operational_status": {
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Bajo",
+      "unknown": "Desconocido"
+    },
+    "impact": {
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Bajo"
+    },
+    "status_explanation": {
+      "driven_by_dimension": "El estado general está impulsado por: {dimensions}."
+    },
+    "drilldown": {
+      "close": "Cerrar",
+      "future_integration_note": "Esta limitación se resolverá en una integración futura (ver hoja de ruta)."
     }
   },
   "official_match_intelligence": {
@@ -2197,13 +2263,18 @@
       "slot_pre": "PRE-partido",
       "slot_post": "POST-partido"
     },
-    "section": {
-      "official_pre": "Oficial PRE",
-      "official_post": "Oficial POST",
-      "ht_coach_comparison": "Estimación de HT Coach",
-      "sector_analysis": "Análisis por sector",
-      "not_yet_available": "Todavía no disponible"
-    },
-    "not_yet_available_body": "Ratings del rival, comparación oficial contra el rival, comparaciones históricas entre partidos, e insights automáticos todavía no están soportados — no hay una fuente de datos confirmada para el rival todavía. Esto es una limitación conocida, no un error."
+        "section": {
+            "official_pre": "Oficial PRE",
+            "official_post": "Oficial POST",
+            "ht_coach_comparison": "Estimacion HT Coach de apoyo",
+            "sector_analysis": "Comparacion",
+            "not_yet_available": "Conclusiones"
+        },
+        "conclusion": {
+            "pre_post_available": "PRE y POST estan asociados por Match ID. Revisa los cambios oficiales por sector antes de sacar conclusiones tacticas.",
+            "awaiting_post": "El PRE oficial esta importado. Importa el POST despues del partido para completar la comparacion oficial.",
+            "post_without_pre": "El POST oficial esta importado sin PRE. Importa el PRE para comparar el estado oficial planeado contra el final."
+        },
+    "not_yet_available_body": "Ratings del rival, comparación oficial contra el rival, comparaciones históricas entre partidos, e insights automáticos todavía no están soportados â€” no hay una fuente de datos confirmada para el rival todavía. Esto es una limitación conocida, no un error."
   }
 }

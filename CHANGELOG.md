@@ -4,6 +4,44 @@
 
 ### Added
 
+- Added Alpha 0.6.4 UX Polish & Data Integrity stabilization. Official PRE
+  and POST imports now keep independent parser/validator entry points because
+  they are different Hattrick documents even though both feed the same internal
+  snapshot model. PRE and POST are associated only by canonical Hattrick Match
+  ID; when IDs differ, HT Coach shows a manual confirmation dialog instead of
+  guessing, keeps the existing PRE unchanged on Back, and enables Apply only
+  after both IDs match. Match Intelligence now emphasizes Official PRE,
+  Official POST, Comparison and Conclusions, with HT Coach internal estimates
+  demoted to supporting context. Club Advisor status text now always includes
+  immediate causes when risks or warnings drive the global state, and its
+  training card reads 100% / 50% / No training counts directly from Weekly
+  Training Planner priority rows. Squad player filters were simplified to the
+  practical Role, State and Specialty controls near the player table. The Club
+  Advisor drill-down overlay was tightened into one elevated modal surface with
+  explicit Explanation, Players involved, Reason, Impact and Review fields.
+- Added Alpha 0.6.3 Advisor Grounding, Official POST Compatibility &
+  Drill-down UX: not more rules, better-grounded ones. Official Match
+  Intelligence gained automatic PRE/POST format detection and decimal
+  comma/point normalization (calibration note: no real POST sample was
+  available this sprint, so DETAILED_POST support is built from the brief's
+  field list and verified against a synthetic fixture, pending a real sample).
+  Club Advisor now separates structural club status (complete roster) from
+  temporary availability (this week only, from the existing AvailabilityService)
+  so a short-term injury is never conflated with a genuine depth gap; depth
+  conclusions are formation-aware (reusing the training wizard's own
+  formation-max helper) rather than assuming a flat replacement count; and a
+  player's current position and future training project now coexist, fixing a
+  real "Projects: 0" bug. Every risk now carries position, reason, impact,
+  urgency, real affected-player names, and a review trigger instead of an
+  abstract label; players-without-training and training-slot-pressure moved
+  out of risks entirely into training-plan-specific warnings, since a position
+  outside the active training's effect is often expected. Every squad count
+  now exposes the actual player list behind it. Clicking any Club Advisor card
+  opens a centered drill-down modal over a translucent overlay (closes via
+  button, Escape, or outside click), and the headline project status now
+  explains which dimension drove it rather than showing "Critical" with no
+  reason. 39 new/updated tests; full suite re-verified at 1567 passed / 0
+  failed. See docs/CLUB_ADVISOR.md and docs/OFFICIAL_MATCH_INTELLIGENCE.md.
 - Added Alpha 0.6.2 Season-Aware Club Advisor: the core principle this sprint
   implements is that strategic need and operational urgency are independent
   dimensions -- a club can have HIGH defensive-depth need while simultaneously

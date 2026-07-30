@@ -213,6 +213,15 @@ class SquadPage(BasePage):
             self.training_fit_filter_combo, "training_fit", TrainingFit
         )
         self.training_fit_filter_combo.currentIndexChanged.connect(self.filters_changed)
+        for removed_filter in (
+            self.search_edit,
+            self.minimum_form,
+            self.minimum_stamina,
+            self.position_combo,
+            self.availability_filter_combo,
+            self.training_fit_filter_combo,
+        ):
+            removed_filter.setVisible(False)
 
         layout.addWidget(QLabel("Players CSV"), 0, 0)
         layout.addWidget(self.path_edit, 0, 1, 1, 4)
@@ -223,18 +232,6 @@ class SquadPage(BasePage):
         layout.addWidget(self.recent_csv_combo, 1, 1, 1, 2)
         layout.addWidget(self.loaded_label, 2, 1, 1, 2)
         layout.addWidget(self.status_label, 2, 3, 1, 6)
-        layout.addWidget(QLabel("Search"), 3, 0)
-        layout.addWidget(self.search_edit, 3, 1, 1, 2)
-        layout.addWidget(QLabel("Min form"), 3, 3)
-        layout.addWidget(self.minimum_form, 3, 4)
-        layout.addWidget(QLabel("Min stamina"), 3, 5)
-        layout.addWidget(self.minimum_stamina, 3, 6)
-        layout.addWidget(self.speciality_combo, 3, 7)
-        layout.addWidget(self.position_combo, 3, 8)
-        layout.addWidget(self.availability_filter_combo, 3, 9)
-        layout.addWidget(self.role_filter_combo, 4, 7)
-        layout.addWidget(self.status_filter_combo, 4, 8)
-        layout.addWidget(self.training_fit_filter_combo, 4, 9)
         layout.setColumnStretch(1, 1)
 
         self.body_layout.addWidget(panel)
@@ -501,6 +498,19 @@ class SquadPage(BasePage):
         self.state_label = QLabel("Load a roster to inspect players.")
         self.state_label.setWordWrap(True)
         table_layout.addWidget(self.state_label)
+
+        filter_row = QWidget()
+        filter_layout = QHBoxLayout(filter_row)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(8)
+        filter_layout.addWidget(QLabel("Role"))
+        filter_layout.addWidget(self.role_filter_combo)
+        filter_layout.addWidget(QLabel("State"))
+        filter_layout.addWidget(self.status_filter_combo)
+        filter_layout.addWidget(QLabel("Specialty"))
+        filter_layout.addWidget(self.speciality_combo)
+        filter_layout.addStretch(1)
+        table_layout.addWidget(filter_row)
 
         self.players_table = QTableWidget(0, len(self.HEADERS))
         self.players_table.setHorizontalHeaderLabels(self.HEADERS)
@@ -1584,15 +1594,15 @@ class SquadPage(BasePage):
 
     def filter_values(self):
         return {
-            "search_text": self.search_edit.text(),
-            "minimum_form": self.minimum_form.value(),
-            "minimum_stamina": self.minimum_stamina.value(),
+            "search_text": "",
+            "minimum_form": 0,
+            "minimum_stamina": 0,
             "speciality": self.speciality_combo.currentText(),
-            "selected_position": self.position_combo.currentText(),
-            "availability": self.availability_filter_combo.currentData() or "all",
+            "selected_position": "",
+            "availability": "all",
             "role": self.role_filter_combo.currentData() or "all",
             "status": self.status_filter_combo.currentData() or "all",
-            "training_fit": self.training_fit_filter_combo.currentData() or "all",
+            "training_fit": "all",
         }
 
     def _populate_squad_intelligence_filter_combo(self, combo, filter_kind, enum_cls):

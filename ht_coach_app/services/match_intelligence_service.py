@@ -43,6 +43,23 @@ class MatchIntelligenceAppService:
             raw_text, slot=slot, confirm_replace=confirm_replace
         )
 
+    def associate_post_after_match_id_confirmation(
+        self,
+        pre_snapshot_id,
+        raw_text,
+        match_id,
+        *,
+        language="",
+        confirm_replace=False,
+    ):
+        return self._import_service.associate_post_after_match_id_confirmation(
+            pre_snapshot_id,
+            raw_text,
+            match_id,
+            language=language,
+            confirm_replace=confirm_replace,
+        )
+
     @staticmethod
     def format_official_summary(official_rating_snapshot):
         if official_rating_snapshot is None:
@@ -66,6 +83,20 @@ class MatchIntelligenceAppService:
             prediction_ratings, snapshot.official_pre, snapshot.official_post
         )
         return format_prediction_vs_official_comparison(comparison)
+
+    def official_pre_post_rows(self, snapshot):
+        if snapshot is None:
+            return ()
+        comparison = compare_official_ratings(
+            None, snapshot.official_pre, snapshot.official_post
+        )
+        rows = []
+        for sector in comparison.sectors:
+            pre = "?" if sector.official_pre_value is None else f"{sector.official_pre_value:.2f}"
+            post = "?" if sector.official_post_value is None else f"{sector.official_post_value:.2f}"
+            delta = "-" if sector.pre_vs_post_delta is None else f"{sector.pre_vs_post_delta:.2f}"
+            rows.append((sector.sector, pre, post, delta))
+        return tuple(rows)
 
     def prediction_accuracy_summary(self, snapshot):
         if snapshot is None or snapshot.official_pre is None:

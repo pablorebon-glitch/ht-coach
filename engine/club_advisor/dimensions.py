@@ -76,3 +76,59 @@ def evaluate_project_status(training_summary, squad_summary, depth_summary, rost
         _squad_composition_health(squad_summary, roster_size),
     )
     return min(dimensions, key=lambda status: _STATUS_ORDER[status])
+
+
+def explain_project_status(training_summary, squad_summary, depth_summary, roster_size,
+                            operational_priorities=()):
+    """Alpha 0.6.3, Part 9: never show "Critical" (or any status) with
+    no explanation. Identifies which of the three independent
+    dimensions actually drove the overall (structural) status, and
+    separately reads the season-aware operational priorities' urgency
+    to answer "does this also require acting now, or is the structural
+    weakness already being handled with low urgency?" -- the same
+    need-vs-urgency distinction from Alpha 0.6.2, applied to the
+    headline status itself rather than just individual priorities.
+    """
+    from engine.club_advisor.models import ProjectStatusExplanation
+
+    per_dimension = {
+        "training": _training_health(training_summary),
+        "depth": _depth_health(depth_summary),
+        "squad_composition": _squad_composition_health(squad_summary, roster_size),
+    }
+    overall = min(per_dimension.values(), key=lambda status: _STATUS_ORDER[status])
+    driving_dimensions = tuple(
+        name for name, status in per_dimension.items() if status == overall
+    )
+
+    operational_status = _summarize_operational_status(operational_priorities)
+
+    reason_key = "club_advisor.status_explanation.driven_by_dimension"
+    return ProjectStatusExplanation(
+        structural_status=overall,
+        operational_status=operational_status,
+        driving_dimensions=driving_dimensions,
+        reason_key=reason_key,
+        reason_params={"dimensions": ", ".join(driving_dimensions)},
+    )
+
+
+_URGENCY_SEVERITY = {
+    "immediate": 3, "high": 3, "medium": 2, "low": 1, "deferred": 1, "none": 0,
+    "insufficient_data": 0,
+}
+
+
+def _summarize_operational_status(operational_priorities):
+    if not operational_priorities:
+        return "unknown"
+    severities = []
+    for priority in operational_priorities:
+        urgency = getattr(priority.operational_urgency, "value", priority.operational_urgency)
+        severities.append(_URGENCY_SEVERITY.get(urgency, 0))
+    worst = max(severities) if severities else 0
+    if worst >= 3:
+        return "high"
+    if worst == 2:
+        return "medium"
+    return "low"

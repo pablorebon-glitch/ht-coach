@@ -275,6 +275,122 @@ competitiveness itself is unknown — never a guessed readiness. A
 `LEAGUE_COMPARISON_UNAVAILABLE` limitation is always attached, since this
 sprint has no data about the target division at all.
 
+## Structural vs. Temporary (Alpha 0.6.3)
+
+A defender injured for four weeks does not mean "no central defender depth" if
+the club still owns enough players — a short-term absence and a genuine
+structural gap are different facts, and conflating them was a real grounding
+problem this sprint fixes.
+
+Two explicit layers:
+
+- **Structural club status** uses the *complete* roster — an unavailable
+  player still counts as a real, owned player. This is what `positional_depth`
+  has always meant.
+- **Temporary availability** reflects only players available *this week* —
+  `SquadIntelligenceContext.temporary_positional_depth`, built from the
+  existing `AvailabilityService` (never a new availability engine).
+
+`PositionDepth` now carries both: `player_count`/`status` (structural) and
+`temporary_count`/`temporary_status` (this week only), plus
+`has_reduced_temporary_availability` — true only when the two genuinely
+differ. A new `REDUCED_TEMPORARY_AVAILABILITY` warning fires from that flag,
+kept entirely separate from the structural `WEAK_POSITIONAL_DEPTH` risk.
+
+## Formation-Aware Depth
+
+Depth conclusions now read against what the manager actually plays, not a flat
+replacement count. `formation_position_maximums()` (built for the Training
+Priority Wizard in Alpha 0.6.1, reused here rather than duplicated) gives the
+maximum legal count of a position across every canonical formation — so a
+manager who consistently plays 2-5-3 doesn't get told they need four or five
+starting central defenders. The central-defense risk (see below) explicitly
+compares combined central-defender-plus-wing-back coverage against this
+formation demand before deciding whether the gap has real match-day impact.
+
+## Training-Aware Projects
+
+A player's *current* best position and their *future* training project
+coexist — they are not mutually exclusive. A Wing Back currently starting
+every week can simultaneously be a deliberate Playmaking trainee being
+developed toward Inner Midfielder. `_is_training_project()`
+(`engine/club_advisor/summary.py`) flags this independently of
+`recommended_role`: any player whose `training_fit` is
+`EXCELLENT`/`COMPATIBLE`/`PARTIAL` *and* whose `training_potential` is
+`MEDIUM` or higher counts as a project, regardless of what role they're
+currently playing. This fixed a real reporting bug (Part 4 of this sprint):
+"Projects: 0" when developing players clearly existed.
+
+## Club Advisor Uses the Weekly Planner as Source of Truth
+
+The training summary (active training, primary/secondary trainee counts,
+players without training) is built entirely from Squad Intelligence's
+already-computed reports, which themselves read training fit through the
+canonical Training catalog and the Weekly Planner's own priority records —
+never re-derived independently. `TRAINING_CAPACITY_UNDERUSED`,
+`PRIORITY_TRAINEES_MISSING_TRAINING`, `TRAINING_SLOT_COMPETITION` and
+`TRAINING_PLAN_DEVIATION` are all read the same way.
+
+## Detailed Risks, Not Abstract Labels
+
+Every `ClubRisk` now carries `position`, `reason_key`/`reason_params`,
+`impact`, `urgency`, `affected_players` (real names, from
+`ClubAdvisorContext.players_by_position`), and `review_condition_key` — never
+just an abstract "Weak positional depth" label. The central-defense risk is
+the clearest example of formation-awareness changing the actual conclusion:
+if combined central-defender-plus-wing-back coverage still clears what the
+preferred formations field, `impact` is `low` even though the position itself
+shows no direct replacement — matching this sprint's own worked example
+exactly (Roberto + Jae covering a 2-5-3 formation, one temporary injury,
+impact low).
+
+## Training Warnings, Not Training Risks
+
+Per this sprint's explicit instruction: a position sitting outside the active
+training's effect is often entirely expected (e.g. Playmaking simply doesn't
+train goalkeepers) and must never be reported as a squad-structure risk.
+`PLAYERS_WITHOUT_TRAINING` and `TOO_MANY_PLAYERS_PER_TRAINING_SLOT` were moved
+out of `risks.py` entirely; the training-plan-specific concerns they used to
+conflate with genuine squad risks now live in `warnings.py` as
+`PLAYERS_NOT_RECEIVING_TRAINING`, `PRIORITY_TRAINEES_MISSING_TRAINING` (a
+player Squad Intelligence flagged as a trainee but who isn't actually getting
+the training effect), `TRAINING_SLOT_COMPETITION`, and
+`TRAINING_PLAN_DEVIATION` (a player receiving the full training effect despite
+not being a flagged trainee, starter, or tactical specialist — worth a look,
+not necessarily a problem).
+
+## Every Count Is Also a Player List
+
+`SquadSummary` now carries the actual player names behind every count
+(`key_starter_players`, `rotation_players`, `development_project_players`,
+`transfer_candidate_players`, `replaceable_players`, `veteran_players`,
+`depth_players`) — a manager can always see who's behind a number, not just
+the number.
+
+## Card Drill-Down UX
+
+Clicking any card (Squad, Training, Depth, Risks, Strengths, Limitations) on
+the Club Advisor page opens a centered modal
+(`ht_coach_app/widgets/drilldown_overlay.py`'s `DrillDownOverlay`) over a
+translucent full-page overlay: a clickable list on the left (first row
+selected by default), full detail on the right. Closes via the Close button,
+Escape, or a click outside the centered panel. Each card defines its own
+drill-down content (e.g. Risks shows reason/impact/urgency/affected
+players/review trigger per risk; Squad shows the actual player list per
+category), reusing the exact same report data already shown on the card —
+never a second calculation.
+
+## Project Status Explanation
+
+Never show "Critical" (or any status) without saying why.
+`dimensions.explain_project_status()` identifies which of the three
+independent health dimensions (training/depth/squad composition) actually
+drove the overall status, and separately reads the season-aware operational
+priorities to answer "does this also require acting now, or is the structural
+weakness already being handled with low urgency?" — applying Alpha 0.6.2's
+need-vs-urgency distinction to the headline status itself, not just individual
+priorities.
+
 ## Future roadmap
 
 Alpha 0.6.0 was explicitly a *foundation*; Alpha 0.6.2 delivered the season-aware

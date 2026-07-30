@@ -26,6 +26,8 @@ from engine.club_advisor.rule_engine import ClubAdvisorRuleEngine
 from engine.club_advisor.service import generate_report
 from engine.club_advisor.strengths import detect_strengths
 from engine.club_advisor.summary import build_depth_summary, build_squad_summary, build_training_summary
+from engine.weekly_training.models import TrainingPriority
+from ht_coach_app.services.weekly_training_service import TrainingPriorityRow
 from engine.club_advisor.validation import ClubAdvisorError, ensure_context_valid
 from engine.club_advisor.warnings import generate_warnings
 from engine.squad_intelligence.context import SquadIntelligenceContext
@@ -261,14 +263,24 @@ def test_risk_no_central_defender_replacement():
     assert any(r.risk_type == ClubRiskType.NO_CENTRAL_DEFENDER_REPLACEMENT for r in risks)
 
 
-def test_risk_players_without_training():
+def test_players_without_training_is_a_warning_not_a_risk():
+    """Alpha 0.6.3, Part 6: players outside the active training's
+    effect is a training-plan concern, not a squad-structure risk --
+    it's often entirely expected (e.g. a training type that simply
+    doesn't cover certain positions)."""
+    from engine.club_advisor.warnings import generate_warnings
+
     reports = [make_report(name=f"P{i}", training_fit=TrainingFit.NO_TRAINING) for i in range(8)]
     context = make_context(squad_reports=reports, positional_depth={"WINGER": 8})
     training_summary = TrainingSummary(players_without_training=6, total_players_evaluated=8)
     squad_summary = build_squad_summary(context)
     depth_summary = build_depth_summary(context)
+
     risks = detect_risks(context, training_summary, squad_summary, depth_summary)
-    assert any(r.risk_type == ClubRiskType.PLAYERS_WITHOUT_TRAINING for r in risks)
+    assert not any(r.risk_type == ClubRiskType.PLAYERS_WITHOUT_TRAINING for r in risks)
+
+    warnings = generate_warnings(context, training_summary, squad_summary, depth_summary)
+    assert any(w.warning_type.value == "players_not_receiving_training" for w in warnings)
 
 
 def test_risk_starter_dependency():
@@ -383,6 +395,26 @@ def test_training_summary_counts_training_fit_effects():
     summary = build_training_summary(context)
     assert summary.full_effect_slots_used == 1
     assert summary.reduced_effect_slots_used == 1
+    assert summary.players_without_training == 1
+
+
+def test_training_summary_uses_weekly_planner_priority_rows_when_available():
+    context = make_context()
+    context = type(context)(
+        **{
+            **context.__dict__,
+            "training_priority_rows": (
+                TrainingPriorityRow("1", "A", 18, "Inner Midfielder", TrainingPriority.REQUIRED_100, "available"),
+                TrainingPriorityRow("2", "B", 19, "Winger", TrainingPriority.REQUIRED_50, "available"),
+                TrainingPriorityRow("3", "C", 25, "Forward", TrainingPriority.NO_PRIORITY, "available"),
+            ),
+        }
+    )
+
+    summary = build_training_summary(context)
+
+    assert summary.primary_trainee_count == 1
+    assert summary.secondary_trainee_count == 1
     assert summary.players_without_training == 1
 
 
@@ -600,3 +632,40 @@ def test_club_advisor_never_computes_a_player_score_directly():
             if isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module)
         assert not (imported & forbidden), f"{path.name} imports {imported & forbidden}"
+
+
+def test_explain_project_status_identifies_driving_dimension():
+    from engine.club_advisor.dimensions import explain_project_status
+
+    training_summary = TrainingSummary(
+        primary_trainee_count=2, secondary_trainee_count=2, players_without_training=0,
+        full_effect_slots_used=4, total_players_evaluated=10,
+    )
+    squad_summary = SquadSummary(replaceable_count=0)
+    depth_summary = DepthSummary(
+        positions=tuple(
+            PositionDepth(position=p, status=DepthStatus.NO_REPLACEMENT.value, player_count=1)
+            for p in ("GOALKEEPER", "CENTRAL_DEFENDER", "WING_BACK")
+        )
+    )
+    explanation = explain_project_status(training_summary, squad_summary, depth_summary, 10)
+    assert explanation.structural_status == ProjectStatus.CRITICAL
+    assert "depth" in explanation.driving_dimensions
+    assert "training" not in explanation.driving_dimensions
+
+
+def test_explain_project_status_never_shows_status_without_a_reason_key():
+    training_summary = TrainingSummary()
+    squad_summary = SquadSummary()
+    depth_summary = DepthSummary(positions=())
+    from engine.club_advisor.dimensions import explain_project_status
+
+    explanation = explain_project_status(training_summary, squad_summary, depth_summary, 0)
+    assert explanation.reason_key
+
+
+def test_report_status_explanation_present_end_to_end():
+    context = ClubAdvisorContext()
+    report = generate_report(context)
+    assert report.status_explanation is not None
+    assert report.status_explanation.structural_status == report.project_status

@@ -20,6 +20,29 @@ The roadmap protects the engine and moves product work into the application laye
 
 ## Alpha 0.2 Milestones
 
+### Alpha 0.6.4: UX Polish & Data Integrity
+
+Goal: stabilize the Alpha 0.6 product before adding more capability.
+
+Deliverables:
+
+- Independent PRE and POST official-summary parser/validator entry points.
+- Match ID mismatch dialog that requires manual ID agreement before PRE/POST association.
+- Match Intelligence layout centered on Official PRE, Official POST, Comparison and
+  Conclusions.
+- Club Advisor global states with immediate visible causes.
+- Club Advisor training counts synchronized from Weekly Training Planner.
+- Simplified Squad filters focused on Role, State and Specialty.
+- Club Advisor drill-down modal as one elevated surface with clear detail fields.
+
+Acceptance criteria:
+
+- PRE and POST documents are never validated with each other's rules.
+- PRE and POST with different Hattrick Match IDs are never associated automatically.
+- Manual confirmation preserves data integrity because the Match ID uniquely identifies
+  the official Hattrick match.
+- No optimizer, probability, rating or formula code is changed.
+
 ### Milestone 1: Architecture Foundation
 
 Goal: define and scaffold the desktop application boundary.
@@ -750,6 +773,69 @@ league import, CHPP/API integration, opponent scraping, a target-division
 promotion simulator, financial budgets, salary affordability, specific-player
 or transfer-price recommendations, automatic sales, configurable Club DNA,
 Experience Engine, machine learning.
+
+### Alpha 0.6.3: Advisor Grounding, Official POST Compatibility & Drill-down UX
+
+Goal: not more rules -- better-grounded ones. The Advisor must use the correct
+context and distinguish structural club situation from temporary match
+situation, training plan, and actual sporting context.
+
+**Official POST support.** Automatic format detection
+(`engine/history/official_ratings/parser.py`'s `detect_format()`) between
+`COMPACT_PRE` (the confirmed BBCode table layout) and `DETAILED_POST` (a plain
+labeled-line layout matching the detailed post-match field list). Decimal
+comma and point both normalize correctly. Validation relaxed so POST can
+legitimately omit formation/team attitude without failing. **Calibration
+note**: no real POST sample was available this sprint -- the parser is built
+from the field list in the brief and verified against a synthetic fixture; it
+should be re-verified against a real sample when one becomes available.
+
+**Structural vs. temporary.** `SquadIntelligenceContext.temporary_positional_depth`
+(built from the existing `AvailabilityService`, never a new one) separates
+"the real, complete-roster club" from "who's available this week" --
+`PositionDepth` now carries both, so a four-week injury no longer gets
+conflated with a genuine structural gap.
+
+**Formation-aware depth.** Central-defense risk now compares combined
+central-defender-plus-wing-back coverage against
+`formation_position_maximums()` (reused from the Alpha 0.6.1 training wizard)
+before deciding impact -- a manager who plays 2-5-3 isn't told they need four
+or five starting central defenders.
+
+**Training-aware projects.** `_is_training_project()` fixed a real "Projects:
+0" reporting bug: a player's current best position and future training
+project now coexist (a Wing Back can simultaneously be a Playmaking trainee),
+derived from `training_fit` + `training_potential`, independent of
+`recommended_role`.
+
+**Detailed risks, not abstract labels.** Every `ClubRisk` now carries
+position, reason, impact, urgency, real affected-player names, and a review
+trigger. `PLAYERS_WITHOUT_TRAINING` and `TOO_MANY_PLAYERS_PER_TRAINING_SLOT`
+moved entirely out of risks into training-plan-specific warnings
+(`PRIORITY_TRAINEES_MISSING_TRAINING`, `TRAINING_SLOT_COMPETITION`,
+`TRAINING_PLAN_DEVIATION`) -- a position outside the active training's effect
+is often expected, never a squad-structure risk by itself.
+
+**Every count is also a player list.** `SquadSummary` carries the actual names
+behind every category count.
+
+**Card drill-down UX.** Clicking any Club Advisor card opens a centered modal
+over a translucent overlay (`ht_coach_app/widgets/drilldown_overlay.py`) --
+clickable list on the left (first row selected by default), full detail on
+the right. Closes via Close button, Escape, or outside click. Each card
+defines its own drill-down content, reusing the same report data already
+shown -- never a second calculation.
+
+**Project status explanation.** `explain_project_status()` identifies which
+of the three independent health dimensions actually drove the overall status
+and separately reads season-aware operational urgency -- never "Critical"
+displayed with no explanation.
+
+Testing: 15 PRE/POST format tests, 7 detailed-risk/training-warning tests, 3
+project-status-explanation tests, 14 drill-down UI tests, plus fixes to
+pre-existing tests whose assumptions this sprint intentionally changed (formation
+validation, players-without-training reclassified from risk to warning). Full
+suite re-verified at 1567 passed / 0 failed.
 
 ### Epic 2: State And Services
 

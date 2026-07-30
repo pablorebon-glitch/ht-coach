@@ -142,7 +142,7 @@ _INDIRECT_ATTACK_KEYWORDS = (
     "jugadas de pizarra indirectas (ataque)",
 )
 
-_TACTIC_KEYWORDS = ("tactic type", "tactics", "tactic", "tacticas", "tactica")
+_TACTIC_KEYWORDS = ("tactic type", "game plan", "tactics", "tactic", "tacticas", "tactica", "plan de juego")
 _TACTIC_LEVEL_KEYWORDS = ("tactic level", "tactic skill", "nivel tactico")
 _FORMATION_KEYWORDS = ("formation", "formacion")
 _FORMATION_EXPERIENCE_KEYWORDS = (
@@ -150,9 +150,14 @@ _FORMATION_EXPERIENCE_KEYWORDS = (
     "experiencia de formacion",
     "experiencia con la formacion",
 )
-_TEAM_ATTITUDE_KEYWORDS = ("team attitude", "actitud del equipo", "actitud")
-_STYLE_KEYWORDS = ("style of play", "style", "estilo de juego", "estilo")
-_AVERAGE_KEYWORDS = ("average rating", "average", "promedio", "calificacion promedio")
+_TEAM_ATTITUDE_KEYWORDS = (
+    "hidden team attitude", "team attitude", "actitud del equipo", "actitud oculta", "actitud",
+)
+_STYLE_KEYWORDS = ("style of play", "playing style", "style", "estilo de juego", "estilo")
+_AVERAGE_KEYWORDS = (
+    "average ratings", "average rating", "average", "promedio", "calificacion promedio",
+    "calificaciones promedio",
+)
 
 # Fallback for sector values when no [table] block is present at all, or a
 # sector wasn't found inside it (e.g. a manually retyped or differently
@@ -166,6 +171,34 @@ _LEGACY_SECTOR_LINE_KEYWORDS = {
     "central_attack": ("central attack", "ataque central"),
     "right_attack": ("right attack", "ataque derecho", "ataque der"),
 }
+
+
+COMPACT_PRE = "COMPACT_PRE"
+DETAILED_POST = "DETAILED_POST"
+
+
+def detect_format(raw_text):
+    """Automatic format detection between the two confirmed/expected
+    Hattrick "Copy Ratings" shapes:
+
+    - COMPACT_PRE: the BBCode `[table]` layout confirmed against a real
+      pre-match sample in Alpha 0.5.9.0 (one row per sector, left/
+      center/right as separate `[td]` cells).
+    - DETAILED_POST: a plain labeled-line layout (no `[table]` block),
+      matching the field list Hattrick's detailed post-match summary is
+      documented to include (Midfield, Right/Central/Left Defense,
+      Right/Central/Left Attack, Indirect Set Pieces, Game Plan,
+      Average Ratings, Hidden Team Attitude, Tactic, Tactic Level,
+      Playing Style).
+
+    This is purely informational/testable -- `parse_official_ratings`
+    itself doesn't branch on the result, since its line-based fallback
+    parsing already tolerates both shapes; `detect_format` exists so
+    callers and tests can assert which shape was actually recognized.
+    """
+    if raw_text and _TABLE_BLOCK.search(raw_text):
+        return COMPACT_PRE
+    return DETAILED_POST
 
 
 def _extract_header(raw_text):
@@ -419,4 +452,23 @@ def parse_official_ratings(raw_text, *, captured_at=None, language=""):
         hattrick_match_id=match_id,
         canonical_tactic=canonical_tactic_value,
         warnings=tuple(warnings),
+        detected_format=detect_format(raw_text),
     )
+
+
+def parse_official_pre_ratings(raw_text, *, captured_at=None, language=""):
+    snapshot = parse_official_ratings(
+        raw_text,
+        captured_at=captured_at,
+        language=language,
+    )
+    return snapshot
+
+
+def parse_official_post_ratings(raw_text, *, captured_at=None, language=""):
+    snapshot = parse_official_ratings(
+        raw_text,
+        captured_at=captured_at,
+        language=language,
+    )
+    return snapshot

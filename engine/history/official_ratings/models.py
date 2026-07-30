@@ -69,6 +69,7 @@ class OfficialRatingSnapshot:
     hattrick_match_id: str = ""
     canonical_tactic: str = ""
     warnings: tuple[str, ...] = ()
+    detected_format: str = ""
 
     def __post_init__(self):
         if self.ratings.source != HistoricalRatingSource.HATTRICK_OFFICIAL:
@@ -107,6 +108,7 @@ class OfficialRatingSnapshot:
             "hattrick_match_id": self.hattrick_match_id,
             "canonical_tactic": self.canonical_tactic,
             "warnings": list(self.warnings),
+            "detected_format": self.detected_format,
         }
 
     @classmethod
@@ -129,4 +131,5 @@ class OfficialRatingSnapshot:
             hattrick_match_id=data.get("hattrick_match_id", ""),
             canonical_tactic=data.get("canonical_tactic", ""),
             warnings=tuple(data.get("warnings", ()) or ()),
+            detected_format=data.get("detected_format", ""),
         )

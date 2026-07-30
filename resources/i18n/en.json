@@ -8,6 +8,8 @@
   },
   "common": {
     "not_available": "Not available",
+    "apply": "Apply",
+    "back": "Back",
     "expand_section": "Expand Section",
     "collapse_section": "Collapse Section",
     "list_two": "{first} and {second}",
@@ -811,6 +813,13 @@
       "confirm_replace_title": "Replace existing official data?",
       "confirm_replace_pre": "An official PRE-match summary is already stored for this match. Replace it with the newly pasted one?",
       "confirm_replace_post": "An official POST-match summary is already stored for this match. Replace it with the newly pasted one?",
+      "match_id_mismatch": {
+        "title": "Match IDs do not match",
+        "message": "The imported PRE and POST belong to different matches. Review the Match IDs before continuing.",
+        "warning": "Match IDs uniquely identify official Hattrick matches. HT Coach will not associate different IDs automatically.",
+        "pre_match_id": "PRE Match ID",
+        "post_match_id": "POST Match ID"
+      },
       "summary": {
         "source": "Source",
         "source_value": "Hattrick official import",
@@ -1981,7 +1990,11 @@
       "starter_has_no_replacement": "Starter has no replacement",
       "players_not_receiving_training": "Several players not receiving training",
       "high_experience_concentration": "High concentration of experience",
-      "low_positional_flexibility": "Low positional flexibility"
+      "low_positional_flexibility": "Low positional flexibility",
+      "reduced_temporary_availability": "Reduced temporary availability",
+      "priority_trainees_missing_training": "Priority Trainees Missing Training",
+      "training_slot_competition": "Training Slot Competition",
+      "training_plan_deviation": "Training Plan Deviation"
     },
     "warning_reason": {
       "no_goalkeeper_backup": "Only {count} goalkeeper is on the roster; an injury would leave the team without options.",
@@ -1989,7 +2002,11 @@
       "starter_has_no_replacement": "{count} key starter(s) have no direct replacement at their position.",
       "players_not_receiving_training": "{count} players receive no meaningful training this week.",
       "high_experience_concentration": "{count} players are veterans; renewal planning is worth considering.",
-      "low_positional_flexibility": "No player currently offers distinctive tactical versatility."
+      "low_positional_flexibility": "No player currently offers distinctive tactical versatility.",
+      "reduced_temporary_availability": "{position}: the roster has {structural} player(s), but only {available} available this week.",
+      "priority_trainees_missing_training": "{count} player(s) marked as priority trainees aren't receiving the expected training effect.",
+      "training_slot_competition": "{count} players are competing for training slots at {position}.",
+      "training_plan_deviation": "{count} player(s) receive the full training effect without being marked as trainees or starters -- check whether this is intentional."
     },
     "confidence": {
       "high": "High",
@@ -2040,7 +2057,8 @@
       "late_season_increases_urgency": "Late season increases urgency",
       "promotion_targeted_increases_urgency": "Promotion objective increases urgency",
       "training_utilization_healthy": "Training utilization is healthy",
-      "weak_positions_for_promotion": "Weak positions for promotion"
+      "weak_positions_for_promotion": "Weak positions for promotion",
+      "structural_vs_temporary": "Available / structural roster"
     },
     "panel": {
       "title": "Club Advisor",
@@ -2079,6 +2097,8 @@
       "urgency": "Urgency",
       "action": "Action",
       "review": "Review",
+      "explanation": "Explanation",
+      "players_involved": "Players involved",
       "reason": "Reason",
       "season_phase": "Season Phase",
       "promotion_objective": "Promotion Objective",
@@ -2087,7 +2107,13 @@
       "recent_signing": "Recent Major Signing",
       "notes": "Notes",
       "save_context": "Save Context",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "structural_status": "Structural Status",
+      "operational_status": "Operational Status",
+      "driven_by": "Driven By",
+      "impact": "Impact",
+      "affected_players": "Affected Players",
+      "temporary_availability": "Temporary Availability"
     },
     "season_phase": {
       "preseason": "Preseason",
@@ -2182,6 +2208,46 @@
         "weak_positions": "There are weak positions that would affect performance in a more demanding division.",
         "no_major_gaps": "No major structural gaps detected in the evaluated positions."
       }
+    },
+    "risk_reason": {
+      "only_one_goalkeeper": "Only {count} goalkeeper is on the roster.",
+      "central_defense_uncovered": "Only {count} central defenders, below the {slots} the preferred formation calls for.",
+      "central_defense_covered_by_formation": "There are {count} direct central defender(s), but the preferred formation remains covered combining with wing backs.",
+      "weak_positional_depth": "Position {position} has only {count} player(s) available.",
+      "starter_dependency": "{count} key starter(s) have no direct replacement.",
+      "poor_tactical_flexibility": "No player currently offers distinctive tactical versatility.",
+      "high_age_concentration": "{count} players are veterans; renewal planning is worth considering."
+    },
+    "risk_review": {
+      "goalkeeper_injury_or_signing": "If the current goalkeeper is injured or a second goalkeeper is signed.",
+      "another_defender_unavailable": "If another defender becomes unavailable.",
+      "position_unavailable": "If the position loses all available coverage.",
+      "key_starter_unavailable": "If a key starter becomes unavailable.",
+      "formation_change": "If the preferred formation changes.",
+      "next_season_planning": "When planning next season."
+    },
+    "status_dimension": {
+      "training": "Training",
+      "depth": "Depth",
+      "squad_composition": "Squad Composition"
+    },
+    "operational_status": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "unknown": "Unknown"
+    },
+    "impact": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "status_explanation": {
+      "driven_by_dimension": "Overall status is driven by: {dimensions}."
+    },
+    "drilldown": {
+      "close": "Close",
+      "future_integration_note": "This limitation will be addressed by a future integration (see roadmap)."
     }
   },
   "official_match_intelligence": {
@@ -2197,13 +2263,18 @@
       "slot_pre": "PRE-match",
       "slot_post": "POST-match"
     },
-    "section": {
-      "official_pre": "Official PRE",
-      "official_post": "Official POST",
-      "ht_coach_comparison": "HT Coach Estimate",
-      "sector_analysis": "Sector Analysis",
-      "not_yet_available": "Not Yet Available"
-    },
+        "section": {
+            "official_pre": "Official PRE",
+            "official_post": "Official POST",
+            "ht_coach_comparison": "Supporting HT Coach Estimate",
+            "sector_analysis": "Comparison",
+            "not_yet_available": "Conclusions"
+        },
+        "conclusion": {
+            "pre_post_available": "PRE and POST are associated by Match ID. Review the official sector changes before drawing tactical conclusions.",
+            "awaiting_post": "Official PRE is imported. Import POST after the match to complete the official comparison.",
+            "post_without_pre": "Official POST is imported without PRE. Import PRE to compare the planned official state against the final official state."
+        },
     "not_yet_available_body": "Opponent ratings, official comparison against the opponent, cross-match historical comparisons, and automatic insights aren't supported yet -- there's no confirmed data source for the opponent's ratings yet. This is a known limitation, not a bug."
   }
 }

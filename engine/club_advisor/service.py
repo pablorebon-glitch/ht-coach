@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from engine.club_advisor.confidence import ClubConfidenceInputs, classify_confidence
-from engine.club_advisor.dimensions import evaluate_project_status
+from engine.club_advisor.dimensions import evaluate_project_status, explain_project_status
 from engine.club_advisor.enums import ClubLimitationType
 from engine.club_advisor.models import ClubAdvisorReport
 from engine.club_advisor.recommendation_policy import (
@@ -100,10 +100,18 @@ def generate_report(context, engine=None, season_context=None) -> ClubAdvisorRep
         base_report, season_context
     )
     promotion_readiness = assess_promotion_readiness(base_report, season_context)
+    status_explanation = explain_project_status(
+        results["training_summary"],
+        results["squad_summary"],
+        results["depth_summary"],
+        context.roster_size,
+        operational_priorities=operational_priorities,
+    )
 
     return base_report.with_season_data(
         strategic_priorities=strategic_priorities,
         operational_priorities=operational_priorities,
         promotion_readiness=promotion_readiness,
         season_context=season_context,
+        status_explanation=status_explanation,
     )

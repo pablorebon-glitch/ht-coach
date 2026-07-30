@@ -67,10 +67,19 @@ class PlayerIntelligenceContext:
 @dataclass(frozen=True)
 class SquadIntelligenceContext:
     """Squad-relative facts shared across every player's report in a
-    batch analysis -- built once, not recomputed per player."""
+    batch analysis -- built once, not recomputed per player.
+
+    `positional_depth` always reflects the *structural* club (the
+    complete roster -- a player out injured for four weeks still
+    counts as a real, owned player). `temporary_positional_depth`
+    reflects only players available *this week*; the difference
+    between the two is what lets Club Advisor say "structural depth:
+    adequate, temporary availability: reduced" instead of conflating a
+    short-term absence with a genuine structural gap (Alpha 0.6.3)."""
 
     roster_size: int = 0
     positional_depth: dict = field(default_factory=dict)
+    temporary_positional_depth: dict = field(default_factory=dict)
     active_training_type: str = ""
     salary_values: tuple[int, ...] = ()
     age_values: tuple[int, ...] = ()
@@ -78,3 +87,8 @@ class SquadIntelligenceContext:
 
     def depth_at(self, position: str) -> int:
         return self.positional_depth.get(position, 0)
+
+    def temporary_depth_at(self, position: str) -> int:
+        return self.temporary_positional_depth.get(
+            position, self.positional_depth.get(position, 0)
+        )

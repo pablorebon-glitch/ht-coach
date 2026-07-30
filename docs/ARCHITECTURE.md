@@ -69,6 +69,16 @@ classification, previous-equivalent snapshot selection, deterministic JSON persi
 and a small developer CLI. It does not compare ratings, generate insights, validate
 decisions, tune rating engines, call optimizers or modify any analytical formula.
 
+Alpha 0.6.4 tightens official Match Intelligence integrity. Official PRE and POST
+summaries are treated as different Hattrick documents with separate parser and
+validator entry points, even though both produce the same internal official-rating
+snapshot model. The Hattrick Match ID remains the canonical association key. When an
+imported POST has a different Match ID than the current PRE, the application must stop
+and ask the manager to review the IDs; it must not automatically associate documents
+from different official matches. Manual confirmation is preferred because Match IDs
+uniquely identify official Hattrick matches and a silent association would corrupt
+historical evidence.
+
 Alpha 0.5.6.2.1 refines `ht_coach_app/workspace` around manual intent. The initial
 optimizer result remains the global recommendation, but later valid manual slot
 assignments are authoritative. `WorkspaceService` is the canonical presentation-
@@ -519,6 +529,27 @@ Five limitations (`FINANCIAL_DATA_UNAVAILABLE`, `LEAGUE_COMPARISON_UNAVAILABLE`,
 `TRANSFER_MARKET_UNAVAILABLE`, `SALARY_BUDGET_UNAVAILABLE`,
 `PROMOTION_TARGET_UNKNOWN`) are always present in every report, by design —
 this sprint has no data source for any of them.
+
+**Grounding layer (Alpha 0.6.3).** `ClubAdvisorContext` gained
+`players_by_position` (built by `ClubAdvisorAppService` the same way the
+Training Priority Wizard builds its own eligibility map — never a new
+mapping mechanism). `SquadIntelligenceContext` gained
+`temporary_positional_depth`, built from the existing `AvailabilityService`;
+`PositionDepth` carries both structural (`player_count`/`status`) and
+temporary (`temporary_count`/`temporary_status`) readings. `ClubRisk` gained
+`position`/`reason_key`/`impact`/`urgency`/`affected_players`/
+`review_condition_key` — `risks.py` now reuses
+`formation_position_maximums()` (from `training_priority_policy.py`) to decide
+whether a depth gap has real formation-demand impact. `PLAYERS_WITHOUT_TRAINING`
+and `TOO_MANY_PLAYERS_PER_TRAINING_SLOT` moved from `risks.py` to `warnings.py`
+entirely, joined by three new training-plan-specific warning types.
+`SquadSummary` exposes the actual player names behind every count.
+`dimensions.explain_project_status()` identifies which independent health
+dimension drove the overall status and reads season-aware operational
+urgency to explain it. `ht_coach_app/widgets/drilldown_overlay.py`'s
+`DrillDownOverlay` is a reusable centered-modal-over-translucent-overlay
+widget; every relevant Club Advisor card is now clickable and opens its own
+drill-down built from the same report data already computed.
 
 ### Transfer Planner
 

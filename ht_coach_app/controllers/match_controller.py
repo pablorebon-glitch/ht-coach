@@ -717,8 +717,12 @@ class MatchController(QObject):
             OfficialRatingAmbiguousMatch,
             OfficialRatingImportError,
             OfficialRatingImportService,
+            OfficialRatingMatchIdMismatch,
             OfficialRatingReplaceConfirmationRequired,
             PRE,
+        )
+        from ht_coach_app.widgets.match_id_mismatch_dialog import (
+            MatchIdMismatchDialog,
         )
 
         slot = slot or PRE
@@ -729,6 +733,27 @@ class MatchController(QObject):
             outcome = self._official_rating_service.import_and_link(
                 raw_text, slot=slot
             )
+        except OfficialRatingMatchIdMismatch as exc:
+            match_id = MatchIdMismatchDialog.request_match_id(
+                exc.pre_match_id,
+                exc.post_match_id,
+                self._view,
+            )
+            if not match_id:
+                return
+            try:
+                outcome = (
+                    self._official_rating_service
+                    .associate_post_after_match_id_confirmation(
+                        exc.pre_snapshot_id,
+                        exc.raw_text,
+                        match_id,
+                        language=exc.language,
+                    )
+                )
+            except OfficialRatingImportError as retry_exc:
+                self._show_official_import_error(retry_exc)
+                return
         except OfficialRatingReplaceConfirmationRequired as exc:
             if not self._view.confirm_official_import_replace(exc.slot):
                 return

@@ -70,11 +70,25 @@ class ClubStrength:
 class ClubRisk:
     risk_type: ClubRiskType
     evidence: tuple[ClubEvidence, ...] = ()
+    position: str = ""
+    reason_key: str = ""
+    reason_params: dict = field(default_factory=dict)
+    impact: str = ""
+    urgency: str = ""
+    affected_players: tuple[str, ...] = ()
+    review_condition_key: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "risk_type": self.risk_type.value,
             "evidence": [item.to_dict() for item in self.evidence],
+            "position": self.position,
+            "reason_key": self.reason_key,
+            "reason_params": dict(self.reason_params),
+            "impact": self.impact,
+            "urgency": self.urgency,
+            "affected_players": list(self.affected_players),
+            "review_condition_key": self.review_condition_key,
         }
 
 
@@ -125,6 +139,13 @@ class SquadSummary:
     replaceable_count: int = 0
     veteran_count: int = 0
     depth_player_count: int = 0
+    key_starter_players: tuple[str, ...] = ()
+    rotation_players: tuple[str, ...] = ()
+    development_project_players: tuple[str, ...] = ()
+    transfer_candidate_players: tuple[str, ...] = ()
+    replaceable_players: tuple[str, ...] = ()
+    veteran_players: tuple[str, ...] = ()
+    depth_players: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -135,6 +156,13 @@ class SquadSummary:
             "replaceable_count": self.replaceable_count,
             "veteran_count": self.veteran_count,
             "depth_player_count": self.depth_player_count,
+            "key_starter_players": list(self.key_starter_players),
+            "rotation_players": list(self.rotation_players),
+            "development_project_players": list(self.development_project_players),
+            "transfer_candidate_players": list(self.transfer_candidate_players),
+            "replaceable_players": list(self.replaceable_players),
+            "veteran_players": list(self.veteran_players),
+            "depth_players": list(self.depth_players),
         }
 
 
@@ -143,13 +171,24 @@ class PositionDepth:
     position: str
     status: str
     player_count: int
+    temporary_count: "int | None" = None
+    temporary_status: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "position": self.position,
             "status": self.status,
             "player_count": self.player_count,
+            "temporary_count": self.temporary_count,
+            "temporary_status": self.temporary_status,
         }
+
+    @property
+    def has_reduced_temporary_availability(self) -> bool:
+        return (
+            self.temporary_count is not None
+            and self.temporary_count < self.player_count
+        )
 
 
 @dataclass(frozen=True)
@@ -166,6 +205,26 @@ class SportingSummary:
 
     def to_dict(self) -> dict[str, Any]:
         return {"observation_keys": list(self.observation_keys)}
+
+
+@dataclass(frozen=True)
+class ProjectStatusExplanation:
+    structural_status: object = None
+    operational_status: str = "unknown"
+    driving_dimensions: tuple = ()
+    reason_key: str = ""
+    reason_params: dict = field(default_factory=dict)
+    confidence: ClubConfidence = ClubConfidence.MEDIUM
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "structural_status": getattr(self.structural_status, "value", self.structural_status),
+            "operational_status": self.operational_status,
+            "driving_dimensions": list(self.driving_dimensions),
+            "reason_key": self.reason_key,
+            "reason_params": dict(self.reason_params),
+            "confidence": self.confidence.value,
+        }
 
 
 @dataclass(frozen=True)
@@ -214,9 +273,11 @@ class ClubAdvisorReport:
     operational_priorities: tuple[ClubPriority, ...] = ()
     promotion_readiness: "PromotionReadinessAssessment | None" = None
     season_context: object = None
+    status_explanation: "ProjectStatusExplanation | None" = None
 
     def with_season_data(self, strategic_priorities=(), operational_priorities=(),
-                          promotion_readiness=None, season_context=None):
+                          promotion_readiness=None, season_context=None,
+                          status_explanation=None):
         from dataclasses import replace
 
         return replace(
@@ -225,6 +286,7 @@ class ClubAdvisorReport:
             operational_priorities=operational_priorities,
             promotion_readiness=promotion_readiness,
             season_context=season_context,
+            status_explanation=status_explanation,
         )
 
     def to_dict(self) -> dict[str, Any]:

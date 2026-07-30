@@ -52,6 +52,11 @@ class ClubWarningType(_StableEnum):
     PLAYERS_NOT_RECEIVING_TRAINING = "players_not_receiving_training"
     HIGH_EXPERIENCE_CONCENTRATION = "high_experience_concentration"
     LOW_POSITIONAL_FLEXIBILITY = "low_positional_flexibility"
+    REDUCED_TEMPORARY_AVAILABILITY = "reduced_temporary_availability"
+    PRIORITY_TRAINEES_MISSING_TRAINING = "priority_trainees_missing_training"
+    TRAINING_SLOT_COMPETITION = "training_slot_competition"
+    UNUSED_TRAINING_CAPACITY = "unused_training_capacity"
+    TRAINING_PLAN_DEVIATION = "training_plan_deviation"
 
 
 class ClubConfidence(_StableEnum):

@@ -4,7 +4,12 @@ from engine.history.official_ratings.comparison import (
     compare_official_ratings,
 )
 from engine.history.official_ratings.models import OfficialRatingSnapshot, RatedAttribute
-from engine.history.official_ratings.parser import parse_official_ratings
+from engine.history.official_ratings.parser import (
+    COMPACT_PRE,
+    DETAILED_POST,
+    detect_format,
+    parse_official_ratings,
+)
 from engine.history.official_ratings.summary import (
     OfficialRatingSummary,
     summarize_official_rating_comparison,
@@ -27,4 +32,7 @@ __all__ = [
     "compare_official_ratings",
     "OfficialRatingSummary",
     "summarize_official_rating_comparison",
+    "COMPACT_PRE",
+    "DETAILED_POST",
+    "detect_format",
 ]

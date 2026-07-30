@@ -36,6 +36,26 @@ class MatchIntelligenceController(QObject):
         pre_text = service.format_official_summary(snapshot.official_pre)
         post_text = service.format_official_summary(snapshot.official_post)
 
+        official_rows = service.official_pre_post_rows(snapshot)
+        official_lines = [
+            f"{sector}: PRE {pre} -> POST {post} | {delta}"
+            for sector, pre, post, delta in official_rows
+            if pre != "?" or post != "?"
+        ]
+        conclusion_lines = []
+        if snapshot.official_pre is not None and snapshot.official_post is not None:
+            conclusion_lines.append(
+                t("official_match_intelligence.conclusion.pre_post_available")
+            )
+        elif snapshot.official_pre is not None:
+            conclusion_lines.append(
+                t("official_match_intelligence.conclusion.awaiting_post")
+            )
+        elif snapshot.official_post is not None:
+            conclusion_lines.append(
+                t("official_match_intelligence.conclusion.post_without_pre")
+            )
+
         comparison_rows = service.prediction_comparison_rows(snapshot)
         prediction_lines = []
         if not service.scales_confirmed_compatible:
@@ -44,18 +64,13 @@ class MatchIntelligenceController(QObject):
             delta_text = "-" if delta is None else str(delta)
             prediction_lines.append(f"{sector}: {predicted} | {official} | {delta_text}")
 
-        sector_lines = [
-            f"{sector}: {t('official_match_intelligence.official')}={official}"
-            for sector, _predicted, official, _delta in comparison_rows
-            if official != "?"
-        ]
-
         self._view.show_snapshot(
             {
                 "pre": pre_text,
                 "post": post_text,
+                "comparison": "\n".join(official_lines),
+                "conclusions": "\n".join(conclusion_lines),
                 "prediction": "\n".join(prediction_lines),
-                "sector": "\n".join(sector_lines) or None,
             }
         )
 
@@ -74,12 +89,54 @@ class MatchIntelligenceController(QObject):
         from ht_coach_app.services.official_rating_service import (
             OfficialRatingAmbiguousMatch,
             OfficialRatingImportError,
+            OfficialRatingMatchIdMismatch,
             OfficialRatingReplaceConfirmationRequired,
+        )
+        from ht_coach_app.widgets.match_id_mismatch_dialog import (
+            MatchIdMismatchDialog,
         )
 
         service = self._get_service()
         try:
             service.import_ratings(text, slot=slot, confirm_replace=confirm_replace)
+        except OfficialRatingMatchIdMismatch as exc:
+            match_id = MatchIdMismatchDialog.request_match_id(
+                exc.pre_match_id,
+                exc.post_match_id,
+                self._view,
+            )
+            if not match_id:
+                return
+            try:
+                service.associate_post_after_match_id_confirmation(
+                    exc.pre_snapshot_id,
+                    exc.raw_text,
+                    match_id,
+                    language=exc.language,
+                    confirm_replace=confirm_replace,
+                )
+            except OfficialRatingReplaceConfirmationRequired:
+                if QMessageBox.question(
+                    self._view,
+                    t("match.official_import.confirm_replace_title"),
+                    t("match.official_import.confirm_replace_post"),
+                ) == QMessageBox.Yes:
+                    service.associate_post_after_match_id_confirmation(
+                        exc.pre_snapshot_id,
+                        exc.raw_text,
+                        match_id,
+                        language=exc.language,
+                        confirm_replace=True,
+                    )
+            except OfficialRatingImportError as retry_exc:
+                QMessageBox.warning(
+                    self._view,
+                    t("match.official_import.error_title"),
+                    t("match.official_import.error.generic", reason=str(retry_exc)),
+                )
+                return
+            self.refresh()
+            return
         except OfficialRatingReplaceConfirmationRequired as exc:
             key = (
                 "match.official_import.confirm_replace_pre"

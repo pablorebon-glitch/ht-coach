@@ -12,13 +12,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 
 from ht_coach_app.core.localization import t
 from ht_coach_app.views.base_page import BasePage
 
 
-def _card(title_key):
+def _card(title_key, card_key=None, page=None):
     frame = QFrame()
     frame.setObjectName("workspacePanel")
     layout = QVBoxLayout(frame)
@@ -30,12 +30,22 @@ def _card(title_key):
     body.setWordWrap(True)
     layout.addWidget(title)
     layout.addWidget(body)
+
+    if card_key and page is not None:
+        frame.setCursor(Qt.PointingHandCursor)
+
+        def _handle_click(event, key=card_key):
+            page.card_clicked.emit(key)
+
+        frame.mousePressEvent = _handle_click
+
     return frame, title, body
 
 
 class ClubAdvisorPage(BasePage):
     generate_requested = Signal()
     season_context_changed = Signal()
+    card_clicked = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(
@@ -78,27 +88,27 @@ class ClubAdvisorPage(BasePage):
         )
         # 6. Strengths / 7. Risks
         self.strengths_frame, self._strengths_title, self.strengths_label = _card(
-            "club_advisor.panel.strengths"
+            "club_advisor.panel.strengths", "strengths", self
         )
         self.risks_frame, self._risks_title, self.risks_label = _card(
-            "club_advisor.panel.risks"
+            "club_advisor.panel.risks", "risks", self
         )
         # existing structural sections, kept as-is
         self.training_frame, self._training_title, self.training_label = _card(
-            "club_advisor.panel.section_training"
+            "club_advisor.panel.section_training", "training", self
         )
         self.squad_frame, self._squad_title, self.squad_label = _card(
-            "club_advisor.panel.section_squad"
+            "club_advisor.panel.section_squad", "squad", self
         )
         self.depth_frame, self._depth_title, self.depth_label = _card(
-            "club_advisor.panel.depth"
+            "club_advisor.panel.depth", "depth", self
         )
         self.warnings_frame, self._warnings_title, self.warnings_label = _card(
             "club_advisor.panel.warnings"
         )
         # 8. Limitations
         self.limitations_frame, self._limitations_title, self.limitations_label = _card(
-            "club_advisor.panel.limitations"
+            "club_advisor.panel.limitations", "limitations", self
         )
 
         grid.addWidget(self.status_frame, 0, 0)

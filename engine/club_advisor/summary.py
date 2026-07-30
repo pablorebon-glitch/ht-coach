@@ -8,7 +8,8 @@ from engine.club_advisor.models import (
     SquadSummary,
     TrainingSummary,
 )
-from engine.squad_intelligence.enums import RecommendedRole, TrainingFit
+from engine.squad_intelligence.enums import RecommendedRole, TrainingFit, TrainingPotential
+from engine.weekly_training.models import TrainingPriority
 from models.position import Position
 
 _ROTATION_ROLES = (
@@ -35,6 +36,27 @@ _FUTURE_SHORTAGE_AGE_THRESHOLD = 29
 
 
 def build_training_summary(context) -> TrainingSummary:
+    priority_rows = getattr(context, "training_priority_rows", ()) or ()
+    if priority_rows:
+        required_100 = sum(
+            1 for row in priority_rows
+            if getattr(row, "priority", None) == TrainingPriority.REQUIRED_100
+        )
+        required_50 = sum(
+            1 for row in priority_rows
+            if getattr(row, "priority", None) == TrainingPriority.REQUIRED_50
+        )
+        return TrainingSummary(
+            active_training_type=context.active_training_type,
+            primary_trainee_count=required_100,
+            secondary_trainee_count=required_50,
+            players_without_training=max(
+                0,
+                len(priority_rows) - required_100 - required_50,
+            ),
+            total_players_evaluated=len(priority_rows),
+        )
+
     reports = context.squad_reports
     primary = sum(1 for r in reports if r.recommended_role == RecommendedRole.PRIMARY_TRAINEE)
     secondary = sum(1 for r in reports if r.recommended_role == RecommendedRole.SECONDARY_TRAINEE)
@@ -55,20 +77,55 @@ def build_training_summary(context) -> TrainingSummary:
     )
 
 
+_PROJECT_TRAINING_FITS = (TrainingFit.EXCELLENT, TrainingFit.COMPATIBLE, TrainingFit.PARTIAL)
+_PROJECT_TRAINING_POTENTIALS = (
+    TrainingPotential.MEDIUM, TrainingPotential.HIGH, TrainingPotential.VERY_HIGH,
+)
+
+
+def _is_training_project(report) -> bool:
+    """A player is a development "project" whenever they're
+    genuinely being developed under the active training -- this is
+    independent of their current recommended_role. A player can be
+    both a STARTER right now *and* a project for a future position
+    (the sprint's own example: current best position Wing Back, future
+    project Playmaking trainee) -- these are not mutually exclusive,
+    even though `recommended_role` only ever picks one primary label."""
+    return (
+        report.training_fit in _PROJECT_TRAINING_FITS
+        and report.training_potential in _PROJECT_TRAINING_POTENTIALS
+    )
+
+
 def build_squad_summary(context) -> SquadSummary:
     reports = context.squad_reports
 
-    def _count(roles):
-        return sum(1 for r in reports if r.recommended_role in roles)
+    def _select(roles):
+        return tuple(r.player_name for r in reports if r.recommended_role in roles)
+
+    project_players = tuple(r.player_name for r in reports if _is_training_project(r))
+    key_starter_players = _select((RecommendedRole.KEY_STARTER,))
+    rotation_players = _select(_ROTATION_ROLES)
+    transfer_candidate_players = _select((RecommendedRole.TRANSFER_CANDIDATE,))
+    replaceable_players = _select((RecommendedRole.REPLACEABLE,))
+    veteran_players = _select((RecommendedRole.VETERAN_MENTOR,))
+    depth_players = _select((RecommendedRole.DEPTH_PLAYER,))
 
     return SquadSummary(
-        key_starter_count=_count((RecommendedRole.KEY_STARTER,)),
-        rotation_count=_count(_ROTATION_ROLES),
-        development_project_count=_count(_DEVELOPMENT_ROLES),
-        transfer_candidate_count=_count((RecommendedRole.TRANSFER_CANDIDATE,)),
-        replaceable_count=_count((RecommendedRole.REPLACEABLE,)),
-        veteran_count=_count((RecommendedRole.VETERAN_MENTOR,)),
-        depth_player_count=_count((RecommendedRole.DEPTH_PLAYER,)),
+        key_starter_count=len(key_starter_players),
+        rotation_count=len(rotation_players),
+        development_project_count=len(project_players),
+        transfer_candidate_count=len(transfer_candidate_players),
+        replaceable_count=len(replaceable_players),
+        veteran_count=len(veteran_players),
+        depth_player_count=len(depth_players),
+        key_starter_players=key_starter_players,
+        rotation_players=rotation_players,
+        development_project_players=project_players,
+        transfer_candidate_players=transfer_candidate_players,
+        replaceable_players=replaceable_players,
+        veteran_players=veteran_players,
+        depth_players=depth_players,
     )
 
 
@@ -99,8 +156,21 @@ def build_depth_summary(context) -> DepthSummary:
     for position in Position:
         count = positional_depth.get(position.value, 0)
         status = _depth_status_for(position.value, count, squad_context)
+        temporary_count = None
+        temporary_status = ""
+        if squad_context is not None and hasattr(squad_context, "temporary_depth_at"):
+            temporary_count = squad_context.temporary_depth_at(position.value)
+            temporary_status = _depth_status_for(
+                position.value, temporary_count, squad_context
+            ).value
         positions.append(
-            PositionDepth(position=position.value, status=status.value, player_count=count)
+            PositionDepth(
+                position=position.value,
+                status=status.value,
+                player_count=count,
+                temporary_count=temporary_count,
+                temporary_status=temporary_status,
+            )
         )
     return DepthSummary(positions=tuple(positions))
 

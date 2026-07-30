@@ -24,6 +24,16 @@ REAL_SAMPLE = """[b]Hit'em up - Torres Futbol Club[/b] [matchid=770131822]
 [b]Estilo de juego[/b]: 100% ofensivo"""
 
 REAL_SAMPLE_DIFFERENT_MIDFIELD = REAL_SAMPLE.replace("7.25", "7.50")
+POST_DIFFERENT_MATCH = """
+[b]Other Match[/b] [matchid=999999999]
+Midfield: 7.50
+Right Defense: 4.25
+Central Defense: 7.00
+Left Defense: 3.75
+Right Attack: 8.00
+Central Attack: 9.75
+Left Attack: 7.75
+"""
 
 
 @pytest.fixture(autouse=True)
@@ -105,6 +115,47 @@ def test_importing_post_populates_post_section(tmp_path):
 
     assert "4.25 | 7.00 | 3.75" in page.pre_label.text()
     assert "7.50" in page.post_label.text()
+
+
+def test_post_with_different_match_id_prompts_manual_confirmation(tmp_path, monkeypatch):
+    page, controller, service = make_controller(tmp_path)
+    controller._import(REAL_SAMPLE, "pre")
+
+    from ht_coach_app.widgets.match_id_mismatch_dialog import MatchIdMismatchDialog
+
+    prompts = []
+    monkeypatch.setattr(
+        MatchIdMismatchDialog,
+        "request_match_id",
+        staticmethod(lambda pre, post, parent=None: prompts.append((pre, post)) or None),
+    )
+
+    controller._import(POST_DIFFERENT_MATCH, "post")
+
+    snapshot = service.latest_snapshot_with_official_data()
+    assert prompts == [("770131822", "999999999")]
+    assert snapshot.official_pre is not None
+    assert snapshot.official_post is None
+
+
+def test_editing_mismatched_match_id_associates_pre_and_post(tmp_path, monkeypatch):
+    page, controller, service = make_controller(tmp_path)
+    controller._import(REAL_SAMPLE, "pre")
+
+    from ht_coach_app.widgets.match_id_mismatch_dialog import MatchIdMismatchDialog
+
+    monkeypatch.setattr(
+        MatchIdMismatchDialog,
+        "request_match_id",
+        staticmethod(lambda pre, post, parent=None: pre),
+    )
+
+    controller._import(POST_DIFFERENT_MATCH, "post")
+
+    snapshot = service.latest_snapshot_with_official_data()
+    assert snapshot.official_pre.hattrick_match_id == "770131822"
+    assert snapshot.official_post.hattrick_match_id == "770131822"
+    assert snapshot.provenance.imported_match_id == "770131822"
 
 
 def test_scale_limitation_note_shown_never_a_misleading_delta(tmp_path):

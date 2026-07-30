@@ -23,15 +23,29 @@ class ClubAdvisorAppService:
         )
 
     def build_context(self, players) -> ClubAdvisorContext:
+        from engine.analyzers.player_analyzer import PlayerAnalyzer
+
         squad_context = self._squad_intelligence_service.build_squad_context(players)
         squad_reports = self._squad_intelligence_service.generate_squad_reports(players)
+
+        players_by_position: dict[str, list[str]] = {}
+        for player in players:
+            best_position, _score = PlayerAnalyzer.best_position(player)
+            if not best_position:
+                continue
+            players_by_position.setdefault(best_position, []).append(player.name)
 
         return ClubAdvisorContext(
             strategy=ClubStrategy.SUSTAINABLE_GROWTH,
             squad_reports=squad_reports,
             squad_context=squad_context,
             active_training_type=squad_context.active_training_type,
+            coverage_rows=self._weekly_training_service.coverage(players),
+            training_priority_rows=self._weekly_training_service.priority_rows(players),
             has_historical_data=False,
+            players_by_position={
+                position: tuple(names) for position, names in players_by_position.items()
+            },
         )
 
     def generate_report(self, players, season_context=None):

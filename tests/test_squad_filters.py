@@ -54,14 +54,12 @@ def make_controller(tmp_path, players=None):
     return page, controller, players
 
 
-def test_role_status_training_fit_combos_populated_with_all_option(tmp_path):
+def test_role_status_combos_populated_with_all_option(tmp_path):
     page, controller, players = make_controller(tmp_path)
     assert page.role_filter_combo.itemData(0) == "all"
     assert page.status_filter_combo.itemData(0) == "all"
-    assert page.training_fit_filter_combo.itemData(0) == "all"
     assert page.role_filter_combo.count() == 12
     assert page.status_filter_combo.count() == 9
-    assert page.training_fit_filter_combo.count() == 7
 
 
 def test_default_filter_state_shows_every_player(tmp_path):
@@ -70,20 +68,21 @@ def test_default_filter_state_shows_every_player(tmp_path):
     assert len(controller._visible_rows) == len(players)
 
 
-def test_filtering_by_no_training_does_not_crash(tmp_path):
+def test_removed_training_fit_filter_is_neutral(tmp_path):
     page, controller, players = make_controller(tmp_path)
     index = page.training_fit_filter_combo.findData("no_training")
     page.training_fit_filter_combo.setCurrentIndex(index)
-    assert isinstance(controller._visible_rows, list)
+    controller._apply_filters()
+    assert page.filter_values()["training_fit"] == "all"
+    assert len(controller._visible_rows) == len(players)
 
 
-def test_role_status_training_fit_filters_combine_with_existing_filters(tmp_path):
+def test_removed_search_filter_is_neutral(tmp_path):
     page, controller, players = make_controller(tmp_path)
     page.search_edit.setText("Keeper")
-    combined_count = len(controller._visible_rows)
-    assert combined_count <= len(players)
-    for row in controller._visible_rows:
-        assert "Keeper" in row.name
+    controller._apply_filters()
+    assert page.filter_values()["search_text"] == ""
+    assert len(controller._visible_rows) == len(players)
 
 
 def test_filters_never_crash_with_empty_roster(tmp_path):

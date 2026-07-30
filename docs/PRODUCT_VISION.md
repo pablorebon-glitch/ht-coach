@@ -183,3 +183,11 @@ it — the same "propose, don't replace" discipline extends to how it's presente
 when HT Coach's own predicted ratings and an imported official value are shown
 together, and the two scales aren't yet confirmed to align, HT Coach says so
 plainly instead of showing a number that implies more precision than it has.
+
+## Match ID Integrity (Alpha 0.6.4)
+
+PRE and POST official summaries must share the same Hattrick Match ID before HT Coach
+associates them. If they differ, the manager reviews and corrects the IDs manually.
+This extra step is intentional: the Match ID uniquely identifies an official Hattrick
+match, and automatic association would risk turning two truthful documents into one
+false story.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
-from engine.squad_health.availability_service import AvailabilityService
+from engine.squad_health.availability_service import CURRENT_AVAILABLE, AvailabilityService
 from engine.squad_intelligence import (
     ClubStrategy,
     generate_report,
@@ -46,6 +46,8 @@ class SquadIntelligenceAppService:
             if getattr(player, "age", None) is not None:
                 ages_by_position.setdefault(best_position, []).append(player.age)
 
+        temporary_positional_depth = self._temporary_positional_depth(players)
+
         state = self._weekly_training_service.load_state()
         salary_values = tuple(
             player.salary for player in players if getattr(player, "salary", None) is not None
@@ -56,6 +58,7 @@ class SquadIntelligenceAppService:
         return SquadIntelligenceContext(
             roster_size=len(players),
             positional_depth=positional_depth,
+            temporary_positional_depth=temporary_positional_depth,
             active_training_type=state.active_training_type or "",
             salary_values=salary_values,
             age_values=age_values,
@@ -63,6 +66,27 @@ class SquadIntelligenceAppService:
                 position: tuple(ages) for position, ages in ages_by_position.items()
             },
         )
+
+    def _temporary_positional_depth(self, players) -> dict[str, int]:
+        """Positional depth counted only among players available *this
+        week* -- a short-term injury/suspension reduces this layer
+        without touching `positional_depth` (the structural club, which
+        always includes every owned player). See
+        SquadIntelligenceContext's docstring."""
+        try:
+            available_players = self._availability_service.eligible_players(
+                players, CURRENT_AVAILABLE
+            )
+        except Exception:
+            available_players = players
+
+        temporary_depth: dict[str, int] = {}
+        for player in available_players:
+            best_position, _score = PlayerAnalyzer.best_position(player)
+            if not best_position:
+                continue
+            temporary_depth[best_position] = temporary_depth.get(best_position, 0) + 1
+        return temporary_depth
 
     def build_player_context(
         self, player, players, squad_context: SquadIntelligenceContext | None = None
