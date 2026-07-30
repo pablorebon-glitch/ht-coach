@@ -469,6 +469,39 @@ App-layer bridge:
 - `ht_coach_app/services/club_advisor_formatting.py`: stable
   enum-to-localization-key mapping.
 
+**Season-aware layer (Alpha 0.6.2).** Six additional modules, still inside
+`engine/club_advisor/`, no second engine:
+
+- `season_context.py`: `SeasonContext` — every field optional, defaults never
+  fabricated. `promotion_objective` defaults to `WELCOME_IF_NATURAL`.
+- `urgency.py`: `compute_urgency(strategic_need, season_context, inputs)` — the
+  only function that turns a `StrategicNeed` into an `OperationalUrgency`,
+  always via documented, evidenced reducers/increasers and a per-need-tier
+  floor (never straight equality).
+- `timing.py`: `determine_action_type(strategic_need, operational_urgency)` —
+  the only place both dimensions combine into one `ActionType`.
+- `horizons.py`: `default_horizon_for_action()` — every priority gets a
+  `RecommendationHorizon`, sharpened by season/promotion context.
+- `season_plan.py`: pure derivation functions reading Club Advisor's
+  *already-computed* `DepthSummary`/`TrainingSummary`/`SquadSummary` into a
+  `StrategicNeed` per area — never a recalculation.
+- `recommendation_policy.py`: `build_season_aware_priorities()` (strategic +
+  operational `ClubPriority` lists) and `assess_promotion_readiness()`
+  (preliminary, evidence-limited `PromotionReadiness`).
+
+`service.py`'s `generate_report()` gained an optional `season_context` keyword;
+`ClubAdvisorReport` gained four optional fields
+(`strategic_priorities`/`operational_priorities`/`promotion_readiness`/
+`season_context`) via a `with_season_data()` replace-helper. Both changes are
+fully backward compatible — every pre-Alpha-0.6.2 Club Advisor test passes
+unchanged. The existing three-independent-dimension project-status calculation
+is completely untouched by season context, per this sprint's explicit
+requirement.
+
+`ht_coach_app/services/season_plan_formatting.py` provides the
+enum-to-localization-key mapping for the new season enums, mirroring
+`club_advisor_formatting.py`'s existing pattern.
+
 `SquadIntelligenceContext` (from Alpha 0.5.9.1) gained an additive
 `ages_by_position` field to support genuine "future shortage" depth detection
 (a position where the only replacements are aging) — backward compatible,

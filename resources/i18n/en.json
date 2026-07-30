@@ -2028,7 +2028,19 @@
       "secondary_trainee_count": "Secondary trainees",
       "full_effect_slots_used": "Full-effect slots in use",
       "veteran_count": "Veterans",
-      "low_salary_efficiency_count": "Players with low salary efficiency"
+      "low_salary_efficiency_count": "Players with low salary efficiency",
+      "strategic_need": "Strategic need",
+      "competitiveness_reduces_urgency": "Current competitiveness reduces urgency",
+      "bot_opponents_reduce_urgency": "Bot opponents reduce urgency",
+      "early_season_reduces_urgency": "Early season reduces urgency",
+      "recent_signing_reduces_urgency": "A recent signing reduces urgency",
+      "promotion_deprioritized_reduces_urgency": "Promotion not a priority reduces urgency",
+      "no_replacement_increases_urgency": "No internal replacement increases urgency",
+      "player_unavailable_increases_urgency": "Player unavailable increases urgency",
+      "late_season_increases_urgency": "Late season increases urgency",
+      "promotion_targeted_increases_urgency": "Promotion objective increases urgency",
+      "training_utilization_healthy": "Training utilization is healthy",
+      "weak_positions_for_promotion": "Weak positions for promotion"
     },
     "panel": {
       "title": "Club Advisor",
@@ -2058,6 +2070,117 @@
         "replaceable": "Replaceable",
         "veterans": "Veterans",
         "depth_players": "Depth players"
+      },
+      "season_context": "Season Context",
+      "operational_priorities": "Operational Priorities",
+      "strategic_priorities": "Strategic Priorities",
+      "promotion_readiness": "Promotion Readiness",
+      "need": "Need",
+      "urgency": "Urgency",
+      "action": "Action",
+      "review": "Review",
+      "reason": "Reason",
+      "season_phase": "Season Phase",
+      "promotion_objective": "Promotion Objective",
+      "competitiveness": "Current Competitiveness",
+      "bot_opponents": "Bot Opponents",
+      "recent_signing": "Recent Major Signing",
+      "notes": "Notes",
+      "save_context": "Save Context",
+      "unknown": "Unknown"
+    },
+    "season_phase": {
+      "preseason": "Preseason",
+      "early_season": "Early Season",
+      "mid_season": "Mid Season",
+      "late_season": "Late Season",
+      "promotion_stage": "Promotion Stage",
+      "offseason": "Offseason",
+      "unknown": "Unknown"
+    },
+    "promotion_objective": {
+      "not_a_priority": "Not a Priority",
+      "welcome_if_natural": "Welcome if Natural",
+      "target_this_season": "Target This Season",
+      "must_promote": "Must Promote",
+      "avoid_promotion": "Avoid Promotion",
+      "unspecified": "Unspecified"
+    },
+    "competitiveness": {
+      "dominant": "Dominant",
+      "strong": "Strong",
+      "competitive": "Competitive",
+      "under_pressure": "Under Pressure",
+      "outmatched": "Outmatched",
+      "unknown": "Unknown"
+    },
+    "signing_cost": {
+      "low": "Low",
+      "moderate": "Moderate",
+      "high": "High",
+      "very_high": "Very High",
+      "unknown": "Unknown"
+    },
+    "horizon": {
+      "this_week": "This Week",
+      "next_matches": "Next Matches",
+      "current_season": "Current Season",
+      "before_promotion": "Before Promotion",
+      "next_season": "Next Season",
+      "long_term": "Long Term",
+      "when_condition_changes": "When Conditions Change",
+      "no_action_required": "No Action Required"
+    },
+    "need": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "none": "None",
+      "insufficient_data": "Insufficient Data"
+    },
+    "urgency": {
+      "immediate": "Immediate",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "deferred": "Deferred",
+      "none": "None",
+      "insufficient_data": "Insufficient Data"
+    },
+    "readiness": {
+      "ready": "Ready",
+      "nearly_ready": "Nearly Ready",
+      "developing": "Developing",
+      "not_ready": "Not Ready",
+      "not_evaluated": "Not Evaluated"
+    },
+    "action": {
+      "act_now": "Act Now",
+      "maintain": "Maintain",
+      "monitor": "Monitor",
+      "prepare": "Prepare",
+      "reevaluate": "Reevaluate",
+      "defer": "Defer",
+      "no_action": "No Action"
+    },
+    "season": {
+      "strategic": {
+        "goalkeeper_succession": "Goalkeeper Succession",
+        "central_defense_depth": "Central Defense Depth",
+        "veteran_succession": "Veteran Succession"
+      },
+      "operational": {
+        "goalkeeper": "Goalkeeper: {area}",
+        "central_defense": "Central Defense: {area}",
+        "training_utilization": "Training Utilization",
+        "maintain_training": "Maintain the current training cycle."
+      },
+      "readiness": {
+        "not_evaluated": "Cannot be evaluated without current competitiveness data.",
+        "dominant_but_incomplete": "The squad dominates the current league but still has structural gaps for a stronger division.",
+        "weak_positions": "There are weak positions that would affect performance in a more demanding division.",
+        "no_major_gaps": "No major structural gaps detected in the evaluated positions."
       }
     }
   },

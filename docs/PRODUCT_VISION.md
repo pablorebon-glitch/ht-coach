@@ -115,6 +115,25 @@ promotion target are permanent, disclosed limitations this sprint, not gaps
 papered over with a guess. The Club Advisor does not replace the manager — it
 helps the manager decide what to look at first.
 
+## Patience Is Also Intelligence (Alpha 0.6.2)
+
+A club-level advisor that treats every genuine weakness as an urgent call to
+action isn't actually helping a manager pursuing sustainable growth — it's just
+adding noise. This sprint's core addition: **what the club eventually needs and
+what the manager should do right now are two different questions**, and HT
+Coach must answer them separately rather than collapsing one into the other.
+
+A club can be dominant in its current league, facing mostly weaker or bot
+opponents, having just made a relevant signing, with promotion welcome but not
+pursued — and still have a real structural gap worth eventually addressing.
+The honest answer in that situation isn't "buy a defender now" or "ignore the
+gap" — it's "the need is real, the urgency is low, monitor it, and revisit
+before it actually matters (an injury, a promotion push, a rival strengthening)."
+Recommending deliberate inaction, with evidence and a review trigger, is just
+as much a product of intelligence as recommending action — and current
+dominance in one's own league is never treated as proof of readiness for a
+tougher one.
+
 ## Understanding Every Player (Alpha 0.5.9.1)
 
 Principles 1 and 10 ("Hattrick is the source of truth" / "every feature must

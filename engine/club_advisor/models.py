@@ -23,12 +23,34 @@ class ClubPriority:
     priority_type: PriorityType
     rank: int
     evidence: tuple[ClubEvidence, ...] = ()
+    area: str = ""
+    strategic_need: object = None
+    operational_urgency: object = None
+    recommendation_horizon: object = None
+    action_type: object = None
+    trigger_conditions: tuple[str, ...] = ()
+    deferral_reason: str = ""
+    reason_key: str = ""
+    reason_params: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "priority_type": self.priority_type.value,
             "rank": self.rank,
             "evidence": [item.to_dict() for item in self.evidence],
+            "area": self.area,
+            "strategic_need": getattr(self.strategic_need, "value", self.strategic_need),
+            "operational_urgency": getattr(
+                self.operational_urgency, "value", self.operational_urgency
+            ),
+            "recommendation_horizon": getattr(
+                self.recommendation_horizon, "value", self.recommendation_horizon
+            ),
+            "action_type": getattr(self.action_type, "value", self.action_type),
+            "trigger_conditions": list(self.trigger_conditions),
+            "deferral_reason": self.deferral_reason,
+            "reason_key": self.reason_key,
+            "reason_params": dict(self.reason_params),
         }
 
 
@@ -147,6 +169,26 @@ class SportingSummary:
 
 
 @dataclass(frozen=True)
+class PromotionReadinessAssessment:
+    readiness: object = None  # PromotionReadiness
+    reason_key: str = ""
+    reason_params: dict = field(default_factory=dict)
+    confidence: ClubConfidence = ClubConfidence.INSUFFICIENT_DATA
+    limitations: tuple = ()
+    evidence: tuple[ClubEvidence, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "readiness": getattr(self.readiness, "value", self.readiness),
+            "reason_key": self.reason_key,
+            "reason_params": dict(self.reason_params),
+            "confidence": self.confidence.value,
+            "limitations": [getattr(item, "value", item) for item in self.limitations],
+            "evidence": [item.to_dict() for item in self.evidence],
+        }
+
+
+@dataclass(frozen=True)
 class ClubAdvisorReport:
     """The club-level summary of the current sporting project. Every
     section is built from already-computed evidence from Squad
@@ -168,6 +210,22 @@ class ClubAdvisorReport:
     limitations: tuple[ClubLimitationType, ...]
     evidence: tuple[ClubEvidence, ...] = ()
     engine_version: str = ENGINE_VERSION
+    strategic_priorities: tuple[ClubPriority, ...] = ()
+    operational_priorities: tuple[ClubPriority, ...] = ()
+    promotion_readiness: "PromotionReadinessAssessment | None" = None
+    season_context: object = None
+
+    def with_season_data(self, strategic_priorities=(), operational_priorities=(),
+                          promotion_readiness=None, season_context=None):
+        from dataclasses import replace
+
+        return replace(
+            self,
+            strategic_priorities=strategic_priorities,
+            operational_priorities=operational_priorities,
+            promotion_readiness=promotion_readiness,
+            season_context=season_context,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -186,4 +244,9 @@ class ClubAdvisorReport:
             "limitations": [item.value for item in self.limitations],
             "evidence": [item.to_dict() for item in self.evidence],
             "engine_version": self.engine_version,
+            "strategic_priorities": [item.to_dict() for item in self.strategic_priorities],
+            "operational_priorities": [item.to_dict() for item in self.operational_priorities],
+            "promotion_readiness": (
+                self.promotion_readiness.to_dict() if self.promotion_readiness else None
+            ),
         }

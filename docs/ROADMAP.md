@@ -683,6 +683,74 @@ pre-existing tests whose assumptions this sprint intentionally changed (the old
 7-option Planner filter, Match's detailed post-import summary). Full suite
 re-verified at 1467 passed / 0 failed.
 
+### Alpha 0.6.2: Season-Aware Club Advisor
+
+Goal: the Club Advisor evaluated structural squad needs correctly (Alpha 0.6.0),
+but a structural need doesn't automatically imply an immediate action. This
+sprint's core principle: **strategic need and operational urgency are
+independent dimensions** — a club can have `HIGH` defensive-depth need while
+simultaneously having `LOW` urgency to act on it (dominant in its current
+league, several bot opponents, early season, a recent relevant signing,
+promotion not being a priority). Never compute one from the other.
+
+Six new Qt-independent modules extend the existing Club Advisor package (no
+second engine): `season_context.py` (a fully optional, typed `SeasonContext` --
+every field may be unknown, never fabricated), `urgency.py`
+(`compute_urgency()`: a documented "prior" from need, evidenced reducers and
+increasers, and a per-need-tier floor that keeps a genuine need from ever being
+reduced to "no need to look at this at all"), `timing.py`
+(`determine_action_type()`: the single place need and urgency combine into one
+of 7 action types), `horizons.py` (every priority gets a
+`RecommendationHorizon`, sharpened by season context — e.g. an age-driven depth
+concern becomes "next season" rather than "this season"), `season_plan.py`
+(derives `StrategicNeed` per area from Club Advisor's *already-computed* depth/
+training/squad evidence, never recalculating anything), and
+`recommendation_policy.py` (the orchestrator: builds separately-framed
+strategic and operational priority lists, and a preliminary
+`PromotionReadiness` assessment).
+
+The sprint's own worked example — central-defense depth with `HIGH` strategic
+need and `LOW` operational urgency, action `MONITOR`, review `BEFORE_PROMOTION`
+— is reproduced exactly by the engine, not just narratively described. A
+synthetic regression fixture matching the sprint's own described 19-player
+scenario (weak defense, two aging goalkeepers, several non-training players,
+league dominance, several bots, one recent expensive defensive signing) confirms
+all five of its expected conclusions, including that goalkeeper succession
+correctly lands as a *next-season* concern (using an age-aware "future
+shortage" depth status, not just a raw replacement count) and that current
+league dominance never implies promotion readiness by itself.
+
+Deliberate inaction ("maintain the current training cycle, no additional
+signing is currently required") is treated as a first-class, evidenced
+recommendation, not an absence of intelligence.
+
+`ClubAdvisorReport` gained four new optional fields (`strategic_priorities`,
+`operational_priorities`, `promotion_readiness`, `season_context`) and
+`generate_report()` gained an optional `season_context` keyword argument --
+both fully backward compatible; every pre-existing Club Advisor test continues
+to pass unchanged. The existing three-independent-dimension project-status
+calculation (training/depth/squad composition health, worst-dimension-caps-
+overall) is completely untouched by season awareness, per this sprint's own
+explicit requirement.
+
+UI: the existing Club Advisor page (no new top-level page) gained a compact,
+optional Season Plan card (season phase, promotion objective, current
+competitiveness, bot opponent count, a recent-signing checkbox, free-text
+notes) plus Operational Priorities, Strategic Priorities and Promotion
+Readiness sections, each showing need/urgency/action/horizon/reason per
+recommendation.
+
+Testing: 35 engine tests (all 12 required scenarios from the brief plus the
+synthetic regression fixture), 9 localization tests, 9 UI tests. 97% coverage
+on the new/changed `engine/club_advisor` code. Full suite re-verified at 1520
+passed / 0 failed.
+
+Not shipped in this pass (explicitly out of scope per the brief): automatic
+league import, CHPP/API integration, opponent scraping, a target-division
+promotion simulator, financial budgets, salary affordability, specific-player
+or transfer-price recommendations, automatic sales, configurable Club DNA,
+Experience Engine, machine learning.
+
 ### Epic 2: State And Services
 
 Goal: introduce application state and use-case services.

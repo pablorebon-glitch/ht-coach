@@ -78,3 +78,94 @@ class DepthStatus(_StableEnum):
     HEALTHY_COMPETITION = "healthy_competition"
     EXCESS_PLAYERS = "excess_players"
     FUTURE_SHORTAGE = "future_shortage"
+
+
+class SeasonPhase(_StableEnum):
+    PRESEASON = "preseason"
+    EARLY_SEASON = "early_season"
+    MID_SEASON = "mid_season"
+    LATE_SEASON = "late_season"
+    PROMOTION_STAGE = "promotion_stage"
+    OFFSEASON = "offseason"
+    UNKNOWN = "unknown"
+
+
+class PromotionObjective(_StableEnum):
+    NOT_A_PRIORITY = "not_a_priority"
+    WELCOME_IF_NATURAL = "welcome_if_natural"
+    TARGET_THIS_SEASON = "target_this_season"
+    MUST_PROMOTE = "must_promote"
+    AVOID_PROMOTION = "avoid_promotion"
+    UNSPECIFIED = "unspecified"
+
+
+class CurrentCompetitiveness(_StableEnum):
+    DOMINANT = "dominant"
+    STRONG = "strong"
+    COMPETITIVE = "competitive"
+    UNDER_PRESSURE = "under_pressure"
+    OUTMATCHED = "outmatched"
+    UNKNOWN = "unknown"
+
+
+class SigningCostCategory(_StableEnum):
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+    UNKNOWN = "unknown"
+
+
+class RecommendationHorizon(_StableEnum):
+    THIS_WEEK = "this_week"
+    NEXT_MATCHES = "next_matches"
+    CURRENT_SEASON = "current_season"
+    BEFORE_PROMOTION = "before_promotion"
+    NEXT_SEASON = "next_season"
+    LONG_TERM = "long_term"
+    WHEN_CONDITION_CHANGES = "when_condition_changes"
+    NO_ACTION_REQUIRED = "no_action_required"
+
+
+class StrategicNeed(_StableEnum):
+    """Answers "how important is it for the club to address this area
+    eventually?" -- independent of OperationalUrgency (see
+    urgency.py's documented policy for why the two must never be
+    computed from one another)."""
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    NONE = "none"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class OperationalUrgency(_StableEnum):
+    """Answers "how soon must the club act?" -- see StrategicNeed."""
+
+    IMMEDIATE = "immediate"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    DEFERRED = "deferred"
+    NONE = "none"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class PromotionReadiness(_StableEnum):
+    READY = "ready"
+    NEARLY_READY = "nearly_ready"
+    DEVELOPING = "developing"
+    NOT_READY = "not_ready"
+    NOT_EVALUATED = "not_evaluated"
+
+
+class ActionType(_StableEnum):
+    ACT_NOW = "act_now"
+    MAINTAIN = "maintain"
+    MONITOR = "monitor"
+    PREPARE = "prepare"
+    REEVALUATE = "reevaluate"
+    DEFER = "defer"
+    NO_ACTION = "no_action"

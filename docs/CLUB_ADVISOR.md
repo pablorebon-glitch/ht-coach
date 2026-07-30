@@ -150,18 +150,152 @@ Limitations). No charts, no gauges, no overall score anywhere on the page.
 - No financial affordability calculation, no market-price estimation, no
   automatic sale or purchase recommendation.
 
+## Need vs. Urgency (Alpha 0.6.2)
+
+The single most important addition this sprint makes: **a structural need does
+not automatically imply an immediate action.** A club can have weak defensive
+depth while simultaneously being dominant in its current league, facing several
+bot opponents, having just signed an expensive defender, and treating promotion
+as "welcome if natural" rather than a target. All of that context should lower
+the *urgency* of acting on the defensive gap -- but it must never erase the
+underlying *need* to eventually address it.
+
+Two genuinely independent dimensions:
+
+- **`StrategicNeed`** (`CRITICAL`/`HIGH`/`MEDIUM`/`LOW`/`NONE`/`INSUFFICIENT_DATA`)
+  answers "how important is it for the club to address this eventually?" —
+  derived entirely from structural evidence Club Advisor's existing engine
+  already computed (positional depth status, training utilization ratio,
+  veteran concentration). Season context **never** changes this.
+- **`OperationalUrgency`** (`IMMEDIATE`/`HIGH`/`MEDIUM`/`LOW`/`DEFERRED`/`NONE`/`INSUFFICIENT_DATA`)
+  answers "how soon must the club act?" — computed from `StrategicNeed` *and*
+  `SeasonContext` together (`engine/club_advisor/urgency.py`'s `compute_urgency`),
+  never from need alone.
+
+`compute_urgency` starts from a documented "prior" (need's baseline urgency,
+already one tier gentler than a naive need-equals-urgency reading) and applies
+named, evidenced reducers (strong/dominant current competitiveness, several bot
+opponents, early season, a recent relevant signing, promotion not prioritized)
+and increasers (no internal replacement, an unavailable player, late
+season/promotion stage, promotion explicitly targeted). Critically, **a genuine
+need can never be reduced all the way to nothing**: a documented floor per need
+tier (e.g. `HIGH` need can never be reduced below `LOW` urgency) keeps
+"high need, low urgency" from silently collapsing into "no need to look at this
+at all" — this is what makes "monitor" a meaningfully different recommendation
+from "do nothing."
+
+`engine/club_advisor/timing.py`'s `determine_action_type` is the **only** place
+need and urgency are combined into one recommended `ActionType`
+(`ACT_NOW`/`MAINTAIN`/`MONITOR`/`PREPARE`/`REEVALUATE`/`DEFER`/`NO_ACTION`).
+The sprint's own worked example — central-defense depth with `HIGH` need and
+`LOW` urgency — is reproduced exactly:
+`tests/test_club_advisor_season_aware.py::test_scenario_1_high_need_low_urgency_monitors_or_defers`
+and the real-data regression fixture both verify this.
+
+## Strategic vs. Operational Priorities
+
+Every area Club Advisor tracks (goalkeeper succession, central-defense depth,
+training utilization, veteran succession) can produce **two** differently
+framed recommendations:
+
+- A **strategic** priority: the longer-term structural statement ("goalkeeper
+  succession needs planning eventually").
+- An **operational** priority: the actual recommended action for *this*
+  season, using the real computed urgency/action/horizon ("monitor central
+  defense; no purchase justified right now; review before promotion").
+
+The same area never repeats identical text between the two lists — they use
+different `reason_key`s by design.
+
+## Recommendation Horizons
+
+Every `ClubPriority` has a `RecommendationHorizon`
+(`THIS_WEEK`/`NEXT_MATCHES`/`CURRENT_SEASON`/`BEFORE_PROMOTION`/`NEXT_SEASON`/
+`LONG_TERM`/`WHEN_CONDITION_CHANGES`/`NO_ACTION_REQUIRED`),
+derived from its `ActionType` (`engine/club_advisor/horizons.py`) and sharpened
+by season context: a `MONITOR`/`REEVALUATE` action becomes `BEFORE_PROMOTION`
+when promotion is actually being targeted, and an age-driven ("future
+shortage") depth concern becomes `NEXT_SEASON` rather than `CURRENT_SEASON`,
+since a succession question is a roster-planning concern, not a mid-season one.
+
+## Deliberate Inaction
+
+"No additional signing is currently required" is a legitimate, first-class
+recommendation — not an absence of intelligence. Whenever training utilization
+is already healthy, the operational list includes a `MAINTAIN_CURRENT_TRAINING`
+priority with its own evidence, exactly like every other recommendation. The
+same principle extends through the `NO_ACTION`/`DEFER` action types more
+generally: a `LOW` need that reduces to `NONE`/`DEFERRED` urgency produces
+`NO_ACTION`, always with supporting evidence, never silence.
+
+## Season Context
+
+`SeasonContext` (`engine/club_advisor/season_context.py`) is a fully optional,
+typed input — every field may be unknown, and this sprint never fabricates a
+missing value. `promotion_objective` defaults to `WELCOME_IF_NATURAL` (a
+season-level planning input, not configurable Club DNA — there is still only
+one implemented `ClubStrategy`, `SUSTAINABLE_GROWTH`). A compact "Season Plan"
+configuration lives directly in the Club Advisor page (season phase, promotion
+objective, current competitiveness, bot opponent count, a recent-major-signing
+checkbox, free-text notes) — no wizard, no required fields.
+
+`generate_report()` accepts `season_context` as an entirely optional keyword
+argument; omitting it still produces strategic/operational priorities and a
+promotion-readiness assessment, just reflecting an unknown/default context
+(lower confidence, more limitations) rather than crashing or fabricating
+season-level conclusions.
+
+## Recent-Signing Policy
+
+A recently completed signing in the same area as a structural need is treated
+as *evidence that reduces urgency*, never as evidence that erases the need
+itself. `SeasonContext.signing_matches_area()` matches a recorded
+`recent_signing_position` (e.g. `"CENTRAL_DEFENDER"`) against an area name; a
+match feeds `UrgencyInputs.area_matches_recent_signing` into `compute_urgency`,
+applying exactly one reducer step — the same floor-protected mechanism as every
+other reducer, so a `HIGH` need with a matching recent signing still can't drop
+below `LOW` urgency on that basis alone. No transfer cost, market value or
+affordability is ever estimated — `SigningCostCategory`
+(`LOW`/`MODERATE`/`HIGH`/`VERY_HIGH`/`UNKNOWN`) is a coarse, optional
+qualitative tag only.
+
+## Promotion Readiness (Preliminary, Not a Simulator)
+
+`PromotionReadiness` (`READY`/`NEARLY_READY`/`DEVELOPING`/`NOT_READY`/
+`NOT_EVALUATED`) is explicitly preliminary — this sprint does not build a
+target-division simulator. `assess_promotion_readiness()`
+(`engine/club_advisor/recommendation_policy.py`) uses only what's already
+available: positional depth gaps (`NO_REPLACEMENT`/`FUTURE_SHORTAGE`) and
+current competitiveness. **Current-league dominance never implies promotion
+readiness by itself** — the sprint's own core distinction: a squad that
+comfortably dominates its current league but still has a genuine depth gap is
+`DEVELOPING`, not `READY`, and the reason explicitly says so. Confidence is
+always `INSUFFICIENT_DATA` (readiness `NOT_EVALUATED`) whenever current
+competitiveness itself is unknown — never a guessed readiness. A
+`LEAGUE_COMPARISON_UNAVAILABLE` limitation is always attached, since this
+sprint has no data about the target division at all.
+
 ## Future roadmap
 
-This sprint is explicitly a *foundation*. Deliberately deferred:
+Alpha 0.6.0 was explicitly a *foundation*; Alpha 0.6.2 delivered the season-aware
+priority/urgency/timing layer promised there. Still deliberately deferred:
 
+- **A real League Intelligence integration.** `CurrentCompetitiveness` and
+  `estimated_league_strength`/`direct_rival_strength` remain free-text/manual
+  inputs this sprint — there is no automated Hattrick league import, CHPP/API
+  integration, or opponent scraping. A future sprint could compute
+  competitiveness from Match Intelligence's own official-rating comparisons
+  instead of asking the manager to classify it by hand.
 - Wiring `has_historical_data` / `evolution_result` / `insights_result` to a
   real History adapter, so the Advisor can eventually say things like "training
   utilization has improved over the last 3 weeks" using Historical Evolution.
 - A Transfer Planner or Financial Planner that could eventually replace the
   "always present" financial/transfer/budget limitations with real evidence.
 - Configurable Club DNA (multiple reference strategies instead of the single
-  `SUSTAINABLE_GROWTH` implementation).
-- League analysis and promotion planning.
+  `SUSTAINABLE_GROWTH` implementation) — `PromotionObjective` remains a
+  season-level planning input, not a second Club DNA system.
+- A real target-division simulator for `PromotionReadiness` (this sprint's
+  assessment is deliberately preliminary and evidence-limited).
 
-None of these require redesigning what's built here: `ClubAdvisorContext` and
-`ClubAdvisorReport` already have the shape to grow into them.
+None of these require redesigning what's built here: `ClubAdvisorContext`,
+`ClubAdvisorReport` and `SeasonContext` already have the shape to grow into them.

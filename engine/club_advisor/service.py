@@ -6,7 +6,12 @@ from engine.club_advisor.confidence import ClubConfidenceInputs, classify_confid
 from engine.club_advisor.dimensions import evaluate_project_status
 from engine.club_advisor.enums import ClubLimitationType
 from engine.club_advisor.models import ClubAdvisorReport
+from engine.club_advisor.recommendation_policy import (
+    assess_promotion_readiness,
+    build_season_aware_priorities,
+)
 from engine.club_advisor.rule_engine import ClubAdvisorRuleEngine
+from engine.club_advisor.season_context import SeasonContext
 from engine.club_advisor.validation import ensure_context_valid
 
 _DEFAULT_ENGINE = ClubAdvisorRuleEngine()
@@ -34,13 +39,26 @@ def _detect_limitations(context):
     return tuple(limitations)
 
 
-def generate_report(context, engine=None) -> ClubAdvisorReport:
+def generate_report(context, engine=None, season_context=None) -> ClubAdvisorReport:
     """Pure function: given a ClubAdvisorContext (already built from
     Squad Intelligence reports and Training coverage), returns a
     complete ClubAdvisorReport. No I/O, no Qt, no localization --
-    everything user-facing here is a stable key or typed enum."""
+    everything user-facing here is a stable key or typed enum.
+
+    `season_context` is entirely optional (Alpha 0.6.2) -- when omitted,
+    an empty/unknown SeasonContext is used, which still produces
+    strategic and operational priorities and a promotion-readiness
+    assessment; they simply reflect the season context's own defaults
+    (WELCOME_IF_NATURAL promotion objective, UNKNOWN competitiveness)
+    rather than fabricating anything. The existing three-dimension
+    project-status calculation (training/depth/squad composition
+    health) is completely unchanged by season context -- season
+    awareness only affects urgency and timing, never structural
+    diagnosis, per this sprint's core principle.
+    """
     ensure_context_valid(context)
     engine = engine or _DEFAULT_ENGINE
+    season_context = season_context or SeasonContext()
 
     results = engine.evaluate(context)
 
@@ -61,7 +79,7 @@ def generate_report(context, engine=None) -> ClubAdvisorReport:
         )
     )
 
-    return ClubAdvisorReport(
+    base_report = ClubAdvisorReport(
         generated_at=datetime.now(timezone.utc).isoformat(),
         strategy=context.strategy,
         project_status=project_status,
@@ -76,4 +94,16 @@ def generate_report(context, engine=None) -> ClubAdvisorReport:
         confidence=confidence,
         limitations=limitations,
         evidence=(),
+    )
+
+    strategic_priorities, operational_priorities = build_season_aware_priorities(
+        base_report, season_context
+    )
+    promotion_readiness = assess_promotion_readiness(base_report, season_context)
+
+    return base_report.with_season_data(
+        strategic_priorities=strategic_priorities,
+        operational_priorities=operational_priorities,
+        promotion_readiness=promotion_readiness,
+        season_context=season_context,
     )

@@ -34,6 +34,6 @@ class ClubAdvisorAppService:
             has_historical_data=False,
         )
 
-    def generate_report(self, players):
+    def generate_report(self, players, season_context=None):
         context = self.build_context(players)
-        return generate_report(context)
+        return generate_report(context, season_context=season_context)

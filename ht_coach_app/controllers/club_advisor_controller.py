@@ -11,6 +11,13 @@ from ht_coach_app.services.club_advisor_formatting import (
     strength_label_key,
     warning_label_key,
 )
+from ht_coach_app.services.season_plan_formatting import (
+    action_label_key,
+    horizon_label_key,
+    need_label_key,
+    readiness_label_key,
+    urgency_label_key,
+)
 
 
 class ClubAdvisorController(QObject):
@@ -30,6 +37,8 @@ class ClubAdvisorController(QObject):
 
         if hasattr(self._view, "generate_requested"):
             self._view.generate_requested.connect(self._generate_report)
+        if hasattr(self._view, "season_context_changed"):
+            self._view.season_context_changed.connect(self._generate_report)
 
         self._view.show_empty_state()
 
@@ -43,6 +52,31 @@ class ClubAdvisorController(QObject):
             return None
         return roster.players if roster else None
 
+    def _build_season_context(self):
+        from engine.club_advisor.enums import (
+            CurrentCompetitiveness,
+            PromotionObjective,
+            SeasonPhase,
+        )
+        from engine.club_advisor.season_context import SeasonContext
+
+        if not hasattr(self._view, "season_context_values"):
+            return SeasonContext()
+
+        values = self._view.season_context_values()
+        return SeasonContext(
+            season_phase=SeasonPhase(values.get("season_phase", "unknown")),
+            promotion_objective=PromotionObjective(
+                values.get("promotion_objective", "welcome_if_natural")
+            ),
+            current_competitiveness=CurrentCompetitiveness(
+                values.get("current_competitiveness", "unknown")
+            ),
+            bot_opponent_count=values.get("bot_opponent_count") or None,
+            recent_major_signing=bool(values.get("recent_major_signing")),
+            notes=values.get("notes", ""),
+        )
+
     def _generate_report(self):
         players = self._load_players()
         if not players:
@@ -54,23 +88,64 @@ class ClubAdvisorController(QObject):
 
             self._club_advisor_service = ClubAdvisorAppService()
 
-        report = self._club_advisor_service.generate_report(players)
+        season_context = self._build_season_context()
+        report = self._club_advisor_service.generate_report(players, season_context=season_context)
         sections = self._format_sections(report)
         self._view.show_report(sections)
 
     @staticmethod
-    def _format_sections(report):
+    def _format_priority_line(priority):
+        need = t(need_label_key(priority.strategic_need)) if priority.strategic_need else "-"
+        urgency = (
+            t(urgency_label_key(priority.operational_urgency))
+            if priority.operational_urgency
+            else "-"
+        )
+        action = t(action_label_key(priority.action_type)) if priority.action_type else "-"
+        horizon = (
+            t(horizon_label_key(priority.recommendation_horizon))
+            if priority.recommendation_horizon
+            else "-"
+        )
+        reason = t(priority.reason_key, **priority.reason_params) if priority.reason_key else ""
+        return (
+            f"{t(priority_label_key(priority.priority_type))}\n"
+            f"  {t('club_advisor.panel.need')}: {need} | "
+            f"{t('club_advisor.panel.urgency')}: {urgency}\n"
+            f"  {t('club_advisor.panel.action')}: {action} | "
+            f"{t('club_advisor.panel.review')}: {horizon}\n"
+            f"  {t('club_advisor.panel.reason')}: {reason}"
+        )
+
+    @classmethod
+    def _format_priority_list(cls, priorities):
+        return "\n\n".join(cls._format_priority_line(p) for p in priorities) or "-"
+
+    @staticmethod
+    def _format_promotion_readiness(assessment):
+        if assessment is None:
+            return "-"
+        readiness_text = t(readiness_label_key(assessment.readiness))
+        reason_text = t(assessment.reason_key, **assessment.reason_params) if assessment.reason_key else ""
+        confidence_text = t(confidence_label_key(assessment.confidence))
+        limitations_text = ", ".join(
+            t(limitation_label_key(item)) for item in assessment.limitations
+        )
+        lines = [
+            readiness_text,
+            reason_text,
+            f"{t('club_advisor.panel.confidence')}: {confidence_text}",
+        ]
+        if limitations_text:
+            lines.append(f"{t('club_advisor.panel.limitations')}: {limitations_text}")
+        return "\n".join(line for line in lines if line)
+
+    @classmethod
+    def _format_sections(cls, report):
         status_text = (
             f"{t(project_status_label_key(report.project_status))}\n"
             f"{t('club_advisor.panel.confidence')}: {t(confidence_label_key(report.confidence))}"
         )
-
-        if report.priorities:
-            priorities_text = "\n".join(
-                f"{p.rank}. {t(priority_label_key(p.priority_type))}" for p in report.priorities
-            )
-        else:
-            priorities_text = "-"
 
         strengths_text = (
             "\n".join(f"• {t(strength_label_key(s.strength_type))}" for s in report.strengths)
@@ -117,7 +192,9 @@ class ClubAdvisorController(QObject):
 
         return {
             "status": status_text,
-            "priorities": priorities_text,
+            "operational": cls._format_priority_list(report.operational_priorities),
+            "strategic": cls._format_priority_list(report.strategic_priorities),
+            "promotion_readiness": cls._format_promotion_readiness(report.promotion_readiness),
             "strengths": strengths_text,
             "risks": risks_text,
             "training": training_text,

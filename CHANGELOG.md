@@ -4,6 +4,35 @@
 
 ### Added
 
+- Added Alpha 0.6.2 Season-Aware Club Advisor: the core principle this sprint
+  implements is that strategic need and operational urgency are independent
+  dimensions -- a club can have HIGH defensive-depth need while simultaneously
+  having LOW urgency to act on it, and the Advisor must never compute one from
+  the other. Six new Qt-independent modules extend the existing Club Advisor
+  package (no second engine): a fully optional `SeasonContext` that never
+  fabricates missing values; `compute_urgency()` with documented, evidenced
+  reducers/increasers and a per-need-tier floor that keeps a genuine need from
+  ever collapsing to "nothing to look at"; `determine_action_type()`, the
+  single place need and urgency combine into one recommended action;
+  season-aware `RecommendationHorizon`s; need derivation from Club Advisor's
+  already-computed depth/training/squad evidence (never recalculated); and an
+  orchestrator producing separately-framed strategic and operational priority
+  lists plus a preliminary, evidence-limited `PromotionReadiness` assessment
+  (current-league dominance never implies promotion readiness by itself).
+  Deliberate inaction ("maintain training, no signing currently required") is a
+  first-class evidenced recommendation. The sprint's own worked example
+  (central-defense depth: HIGH need, LOW urgency, MONITOR, review before
+  promotion) and a synthetic 19-player regression fixture matching its
+  described scenario are both reproduced exactly by the engine. Fully backward
+  compatible: `generate_report()`'s new `season_context` argument is optional,
+  `ClubAdvisorReport` gained four new optional fields, and every pre-existing
+  Club Advisor test passes unchanged. UI: the existing Club Advisor page gained
+  a compact, optional Season Plan card and Operational/Strategic
+  Priorities/Promotion Readiness sections -- no new top-level page. 35 engine
+  tests (all 12 required scenarios), 9 localization tests, 9 UI tests, 97%
+  coverage on the new/changed code; full suite re-verified at 1520 passed / 0
+  failed. See docs/CLUB_ADVISOR.md's "Need vs. Urgency" section for the full
+  write-up.
 - Added Alpha 0.6.1 Workflow Consolidation & Match Intelligence UI (UX-03): no
   new intelligence this sprint, just making HT Coach feel coherent.
   Training-type changes now show a confirmation dialog and a fully

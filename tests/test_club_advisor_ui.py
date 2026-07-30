@@ -73,7 +73,8 @@ def test_generate_report_populates_all_sections(tmp_path):
     controller._generate_report()
 
     assert page.status_label.text()
-    assert page.priorities_label.text()
+    assert page.operational_label.text()
+    assert page.strategic_label.text()
     assert page.training_label.text()
     assert page.squad_label.text()
     assert page.depth_label.text()
@@ -87,7 +88,7 @@ def test_no_overall_score_shown_in_any_section(tmp_path):
     combined = "\n".join(
         [
             page.status_label.text(),
-            page.priorities_label.text(),
+            page.operational_label.text(),
             page.strengths_label.text(),
             page.risks_label.text(),
         ]
