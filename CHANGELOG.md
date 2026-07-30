@@ -4,6 +4,30 @@
 
 ### Added
 
+- Added Alpha 0.6.1 Workflow Consolidation & Match Intelligence UI (UX-03): no
+  new intelligence this sprint, just making HT Coach feel coherent.
+  Training-type changes now show a confirmation dialog and a fully
+  catalog-driven Training Priority Wizard
+  (`engine/weekly_training/training_priority_policy.py`, verified against every
+  worked example in the brief across all 12 training types, 41 parameterized
+  tests). Match's official-summary import UI simplified to a single
+  confirmation dialog; all ratings/metadata/comparison display moved to a new
+  Match Intelligence page that reuses Alpha 0.5.9.0/UX-02's import service and
+  formatting rather than duplicating it, and auto-refreshes on tab focus.
+  Squad gained Role/Status/Training Fit filters and a scrollable, minimum-width
+  detail panel. Found and fixed a genuine role-calibration bug behind "too many
+  starters": positional rank was being computed against the entire roster
+  instead of real peers, and current performance didn't account for how many
+  players a position's formation slots actually call for -- fixing both dropped
+  starter-tier roles from 63% to 47% of a real 19-player squad and correctly
+  stopped a second goalkeeper from being classified as a starter. Also found
+  and fixed a real localization-namespace collision: this sprint's first draft
+  silently overwrote two keys of an existing, unrelated "Match Intelligence"
+  (tactical focus) section inside Match's results panel, caught by an existing
+  regression test; this sprint's content now lives under a distinct
+  `official_match_intelligence.*` namespace. Full suite re-verified at 1467
+  passed / 0 failed. See docs/ROADMAP.md's Alpha 0.6.1 entry and
+  docs/OFFICIAL_MATCH_INTELLIGENCE.md for the full write-up.
 - Added Alpha 0.6.0 Club Advisor Foundation: the first club-level intelligence
   layer, a new Qt-independent `engine/club_advisor` package that summarizes the
   current sporting project entirely from evidence already produced by Squad

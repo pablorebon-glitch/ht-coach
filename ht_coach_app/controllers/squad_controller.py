@@ -270,9 +270,48 @@ class SquadController:
             selected_position=filters["selected_position"],
             availability=filters.get("availability", "all")
         )
+        self._visible_rows = self._apply_squad_intelligence_filters(
+            self._visible_rows,
+            role=filters.get("role", "all"),
+            status=filters.get("status", "all"),
+            training_fit=filters.get("training_fit", "all"),
+        )
         self._view.set_players(
             self._visible_rows
         )
+
+    def _apply_squad_intelligence_filters(self, rows, role="all", status="all", training_fit="all"):
+        if role == "all" and status == "all" and training_fit == "all":
+            return rows
+        if self._squad_intelligence_service is None:
+            from ht_coach_app.services.squad_intelligence_service import (
+                SquadIntelligenceAppService,
+            )
+
+            self._squad_intelligence_service = SquadIntelligenceAppService(
+                weekly_training_service=self._weekly_training_service
+            )
+        try:
+            reports = self._squad_intelligence_service.generate_squad_reports(
+                self._roster.players
+            )
+        except Exception:
+            return rows
+        reports_by_name = {report.player_name: report for report in reports}
+
+        def _matches(row):
+            report = reports_by_name.get(row.name)
+            if report is None:
+                return False
+            if role != "all" and report.recommended_role.value != role:
+                return False
+            if status != "all" and report.management_status.value != status:
+                return False
+            if training_fit != "all" and report.training_fit.value != training_fit:
+                return False
+            return True
+
+        return [row for row in rows if _matches(row)]
 
     def _show_ideal_xi(self, formation_name=AUTO_FORMATION):
         self._ideal_selection = formation_name or AUTO_FORMATION
@@ -336,10 +375,68 @@ class SquadController:
         current_state = self._weekly_training_service.load_state()
         if current_state.active_training_type == training_type:
             return
+
+        if current_state.priorities:
+            if not self._view.confirm_training_type_change():
+                self._view.set_active_training_type(current_state.active_training_type)
+                return
+
+        eligible_by_position = self._eligible_players_by_position(training_type)
+        selections = self._request_training_priority_selections(
+            training_type, eligible_by_position
+        )
+        if selections is None:
+            self._view.set_active_training_type(current_state.active_training_type)
+            return
+
         self._weekly_training_service.set_active_training_type(training_type)
+        self._apply_wizard_selections(selections)
+
         self._show_weekly_training()
         if self._last_selected_player_name:
             self._show_squad_intelligence(self._last_selected_player_name)
+
+    def _eligible_players_by_position(self, training_type):
+        from engine.analyzers.player_analyzer import PlayerAnalyzer
+        from engine.weekly_training.player_identity import player_training_id
+
+        by_position = {}
+        for player in self._roster.players:
+            best_position, _score = PlayerAnalyzer.best_position(player)
+            if not best_position:
+                continue
+            by_position.setdefault(best_position, []).append(
+                (player_training_id(player), player.name)
+            )
+        return by_position
+
+    def _request_training_priority_selections(self, training_type, eligible_by_position):
+        from ht_coach_app.widgets.training_priority_wizard import TrainingPriorityWizard
+
+        return TrainingPriorityWizard.request_selections(
+            training_type, eligible_by_position, self._view
+        )
+
+    def _apply_wizard_selections(self, selections):
+        from engine.weekly_training.models import TrainingPriority
+        from engine.weekly_training.player_identity import player_training_id
+
+        effect_to_priority = {
+            "FULL": TrainingPriority.REQUIRED_100.value,
+            "REDUCED": TrainingPriority.REQUIRED_50.value,
+            "VERY_SMALL": TrainingPriority.SECONDARY_PRIORITY.value,
+        }
+        players_by_id = {
+            player_training_id(player): player for player in self._roster.players
+        }
+        for effect, player_ids in (selections or {}).items():
+            priority_value = effect_to_priority.get(effect)
+            if priority_value is None:
+                continue
+            for player_id in player_ids:
+                player = players_by_id.get(player_id)
+                if player is not None:
+                    self._weekly_training_service.save_priority(player, priority_value)
 
     def _change_training_priority(self, player_id, priority):
         if self._roster is None:

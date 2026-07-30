@@ -65,7 +65,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "ready": "{page} ready",
-    "club_advisor": "Club Advisor"
+    "club_advisor": "Club Advisor",
+    "official_match_intelligence": "Official Intelligence"
   },
   "settings": {
     "title": "Settings",
@@ -177,7 +178,10 @@
       "formation_fit": "{formation} fits this roster with an overall formation score of {score}."
     },
     "recent_csv": "Recent CSVs",
-    "recent_csv_placeholder": "Select a recent file..."
+    "recent_csv_placeholder": "Select a recent file...",
+    "filter_role_all": "All roles",
+    "filter_status_all": "All statuses",
+    "filter_training_fit_all": "All fits"
   },
   "squad_identity": {
     "title": "Squad Identity",
@@ -1369,7 +1373,21 @@
       "passing": "Passing",
       "playmaking": "Playmaking",
       "goalkeeping": "Goalkeeping"
-    }
+    },
+    "wizard": {
+      "title": "Training Priority Wizard",
+      "previous": "Previous",
+      "next": "Next",
+      "save": "Save",
+      "cancel": "Cancel",
+      "step_of": "Step {step} of {total} — {training}",
+      "step_instructions": "Select {count} players for {effect} training.",
+      "no_fixed_quota": "This training type has no fixed positional quota — it trains everyone who plays. There's no specific player selection needed.",
+      "no_selection": "No players were selected.",
+      "confirm_change_title": "Change active training?",
+      "confirm_change_body": "Current priorities were created for a different training type. Continue?"
+    },
+    "filter_training_players": "Training Players"
   },
   "advisor": {
     "title": "Tactical Advisor",
@@ -2042,5 +2060,27 @@
         "depth_players": "Depth players"
       }
     }
+  },
+  "official_match_intelligence": {
+    "title": "Official Match Intelligence",
+    "no_data": "No official summary has been imported yet. Use the button below to import one.",
+    "not_imported": "Not imported",
+    "official": "Official",
+    "scale_limitation": "HT Coach's internal scale isn't yet confirmed to align with Hattrick's official scale, so no numeric difference is shown.",
+    "import": {
+      "action": "Import Official Summary",
+      "title": "Import Official Summary",
+      "instructions": "Paste the text copied from Hattrick's \"Copy Ratings\" button, and choose whether it's PRE or POST match.",
+      "slot_pre": "PRE-match",
+      "slot_post": "POST-match"
+    },
+    "section": {
+      "official_pre": "Official PRE",
+      "official_post": "Official POST",
+      "ht_coach_comparison": "HT Coach Estimate",
+      "sector_analysis": "Sector Analysis",
+      "not_yet_available": "Not Yet Available"
+    },
+    "not_yet_available_body": "Opponent ratings, official comparison against the opponent, cross-match historical comparisons, and automatic insights aren't supported yet -- there's no confirmed data source for the opponent's ratings yet. This is a known limitation, not a bug."
   }
 }

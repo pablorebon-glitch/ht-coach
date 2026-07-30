@@ -766,39 +766,10 @@ class MatchController(QObject):
         self._view.show_official_import_error(message)
 
     def _show_official_import_success(self, outcome):
-        from ht_coach_app.services.official_rating_formatting import (
-            format_hattrick_notation,
-        )
-
-        parsed = outcome.parsed
-        summary_text = format_hattrick_notation(
-            parsed.ratings, parsed.formation, parsed.tactic, parsed.team_attitude
-        )
-        link_note = (
-            t("match.official_import.linked_existing")
-            if outcome.was_linked_to_existing_match
-            else t("match.official_import.created_new")
-        )
-        header = "\n".join(
-            [
-                f"{t('match.official_import.summary.source')}: "
-                f"{t('match.official_import.summary.source_value')}",
-                f"{t('match.official_import.summary.match_id')}: "
-                f"{parsed.hattrick_match_id or '-'}",
-                f"{t('match.official_import.summary.imported_at')}: "
-                f"{parsed.captured_at}",
-            ]
-        )
-        warning_lines = ""
-        if parsed.warnings:
-            warning_labels = ", ".join(t(key) for key in parsed.warnings)
-            warning_lines = (
-                f"\n{t('match.official_import.summary.warnings')}: {warning_labels}"
-            )
-
-        self._view.set_official_summary_text(
-            f"{summary_text}\n\n{header}{warning_lines}"
-        )
-        self._view.show_status(
-            f"{t('match.official_import.success')} {link_note}"
-        )
+        # Ratings, metadata, timestamps and comparisons intentionally
+        # are not shown here -- Match only prepares the next match; all
+        # official-rating analysis lives in the dedicated Match
+        # Intelligence page. `outcome` is still returned to callers
+        # that need it (e.g. Match Intelligence's own refresh), it's
+        # just not rendered inside Match itself.
+        self._view.show_official_import_success()

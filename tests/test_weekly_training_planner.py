@@ -1010,18 +1010,20 @@ def test_weekly_status_filters_use_simplified_status_roles(tmp_path):
     )
 
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("already_trained")
+        page.weekly_filter_combo.findData("training_players")
     )
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == "Done"
-    assert page.weekly_player_table.item(0, 2).text() == "\u2713"
-
-    page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("will_train")
-    )
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == "Planned"
-    assert page.weekly_player_table.item(0, 2).text() == "\u25cb"
+    assert page.weekly_player_table.rowCount() == 2
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert visible_names == {"Done", "Planned"}
+    status_by_name = {
+        page.weekly_player_table.item(row, 0).text(): page.weekly_player_table.item(row, 2).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert status_by_name["Done"] == "\u2713"
+    assert status_by_name["Planned"] == "\u25cb"
 
     page.weekly_filter_combo.setCurrentIndex(
         page.weekly_filter_combo.findData("not_training")
@@ -1165,21 +1167,36 @@ def test_weekly_priority_filter_uses_visible_priority_and_updates_on_edit(tmp_pa
     )
 
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("100")
+        page.weekly_filter_combo.findData("training_players")
     )
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == players[1].name
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name in visible_names
+    assert players[2].name in visible_names
 
-    combo = page.weekly_player_table.cellWidget(0, 1)
+    combo = page.weekly_player_table.cellWidget(
+        [
+            row for row in range(page.weekly_player_table.rowCount())
+            if page.weekly_player_table.item(row, 0).text() == players[1].name
+        ][0],
+        1,
+    )
     combo.setCurrentIndex(combo.findData("NO_PRIORITY"))
     app.processEvents()
     QTimer.singleShot(0, lambda: None)
     app.processEvents()
 
-    assert page.weekly_player_table.rowCount() == 0
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name not in visible_names
+    assert players[2].name in visible_names
 
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("no_priority")
+        page.weekly_filter_combo.findData("not_training")
     )
     names = {
         page.weekly_player_table.item(row, 0).text()
@@ -1210,18 +1227,26 @@ def test_weekly_priority_filter_survives_sorting_plan_and_localization(tmp_path)
         ["3-5-2"],
     )
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("50")
+        page.weekly_filter_combo.findData("training_players")
     )
     page.weekly_player_table.sortItems(0, Qt.DescendingOrder)
     page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
 
-    assert page.weekly_filter_combo.currentData() == "50"
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == players[2].name
-    assert (
-        page.weekly_player_table.item(0, 0).data(SquadPage.PRIORITY_ROLE)
-        == "REQUIRED_50"
-    )
+    assert page.weekly_filter_combo.currentData() == "training_players"
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name in visible_names
+    assert players[2].name in visible_names
+    priorities_by_name = {
+        page.weekly_player_table.item(row, 0).text(): page.weekly_player_table.item(
+            row, 0
+        ).data(SquadPage.PRIORITY_ROLE)
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert priorities_by_name[players[1].name] == "REQUIRED_100"
+    assert priorities_by_name[players[2].name] == "REQUIRED_50"
     page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
     assert "Se asumen 90 minutos" in page.weekly_warnings_label.text()
     configure_localization("en")

@@ -593,6 +593,96 @@ scope" list):
   strategy, read from context rather than hardcoded so a future sprint can add
   more without redesigning the engine.
 
+### Alpha 0.6.1: Workflow Consolidation & Match Intelligence UI (UX-03)
+
+Goal: no new intelligence this sprint -- consolidate the workflows introduced in
+recent versions so HT Coach feels like one coherent application rather than a
+collection of modules. Four areas: Weekly Training workflow, Match workflow,
+Match Intelligence separation, and Squad usability.
+
+**Weekly Training workflow.** Changing the active training type is now treated
+as an important club decision: a confirmation dialog appears when existing
+priorities exist, and a fully catalog-driven Training Priority Wizard follows
+confirmation. `engine/weekly_training/training_priority_policy.py`'s
+`build_policy()` derives everything the wizard needs -- five policy types
+(`FIXED_POSITIONAL_CAPACITY`, `MULTI_EFFECT_POSITIONAL_CAPACITY`,
+`BROAD_PARTICIPATION`, `TEAM_WIDE`, `SINGLE_POSITION`), per-tier capacity
+groups, and per-match/weekly counts -- purely from the shape of the catalog's
+`TrainingDefinition` plus each canonical formation's maximum position counts.
+Verified against every one of the brief's own worked examples exactly
+(Defending 5/10, Playmaking 3+2/6+4, Scoring 3/6, Goalkeeping 1/2, Winger
+2+2/4+4) with 41 parameterized tests across all 12 training types. The wizard
+(`ht_coach_app/widgets/training_priority_wizard.py`) generates one step per
+capacity group -- skipped entirely for TEAM_WIDE/BROAD_PARTICIPATION training,
+which has no fixed quota to force -- and never blocks on a theoretical target
+the squad can't actually reach (`min(weekly_capacity, available_players)`). The
+Planner's filter combo simplified from 7 granular options down to the requested
+3 (Training Players / Not Training / All Players, defaulting to Training
+Players), with rows defaulting to Full Priority / Partial Priority / Remaining
+order.
+
+**Match workflow.** Match's "Import Official Summary" button and its underlying
+import logic (parsing, automatic match-ID linking, PRE/POST replace
+confirmation) are unchanged from Alpha 0.5.9.0/UX-02. What changed is what Match
+displays afterward: a single "Official summary imported successfully. [OK]"
+confirmation, nothing else -- ratings, metadata, timestamps and comparisons all
+moved to the new Match Intelligence page.
+
+**Match Intelligence.** A new page
+(`ht_coach_app/views/match_intelligence_page.py`) owns Official PRE, Official
+POST, the HT Coach diagnostic comparison and sector analysis, all reusing
+Alpha 0.5.9.0/UX-02's existing formatting and import service rather than
+duplicating anything. It auto-refreshes whenever the tab becomes visible. See
+docs/OFFICIAL_MATCH_INTELLIGENCE.md, including a real naming collision found
+and fixed while building this: the first draft used a `match_intelligence.*`
+localization namespace that was already in use by an unrelated, pre-existing
+"tactical focus" section inside Match's own results panel, silently
+overwriting two of its keys until an existing regression test caught it. The
+new page's content now lives under `official_match_intelligence.*` instead.
+Opponent ratings, official-vs-opponent comparison, and cross-match historical
+insights are explicitly not implemented -- there's no confirmed sample of what
+an opponent's ratings export looks like yet, and the page states this plainly
+rather than guessing.
+
+**Squad usability.** Added Role / Status / Training Fit filter combos to the
+Squad player table (combinable with existing filters), backed by a real batch
+`SquadIntelligenceAppService.generate_squad_reports()` call -- not a mock.
+Wrapped the player-detail panel in a scroll area with a minimum width so long
+Squad Intelligence content (added in Alpha 0.5.9.1) scrolls instead of
+truncating.
+
+**Role calibration -- a real bug found and fixed.** Investigating "too many
+players marked as starters" found the actual root cause:
+`candidates_in_best_position` was always the *entire roster size* regardless of
+position, because `PlayerAnalyzer.rank_players()` ranks every player for every
+position (even ones they're barely competent at). A squad's second goalkeeper
+showed up as "rank 2 of 19" instead of "rank 2 of 2", inflating an ordinary
+backup's current-performance almost to the level of the starter. Fixed by
+computing rank and candidate count only among genuine peers (players whose own
+best position matches). A second refinement made `current_performance` aware of
+how many players a position's formation slots actually calls for
+(`PositionEvidence.formation_slots`, reusing the same
+`formation_position_maximums()` helper built for the training wizard): a
+position that only ever fields one player (goalkeeper) treats its second choice
+very differently from one that regularly fields three (central defender). On
+the real 19-player roster this was developed against, "starter"-tier roles
+dropped from 12/19 (63%) to 9/19 (47%), and the second goalkeeper correctly
+stopped being classified as a starter. Fully backward compatible --
+`formation_slots` defaults to 0 and falls back to the original flat formula.
+
+Not shipped in this pass:
+
+- Splitter-size persistence across sessions (the splitter is named for future
+  wiring, but nothing currently saves/restores its position).
+- Any further status-wording review beyond what shipped in Alpha 0.5.9.1 --
+  the management statuses (`KEEP`, `TRAIN`, `MONITOR`, etc.) are unchanged.
+
+Testing: 41 new training-policy tests, 26 wizard tests, 9 Squad filter tests, 5
+role-calibration regression tests, 16 Match Intelligence tests, plus fixes to
+pre-existing tests whose assumptions this sprint intentionally changed (the old
+7-option Planner filter, Match's detailed post-import summary). Full suite
+re-verified at 1467 passed / 0 failed.
+
 ### Epic 2: State And Services
 
 Goal: introduce application state and use-case services.

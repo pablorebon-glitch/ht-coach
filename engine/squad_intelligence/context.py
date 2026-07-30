@@ -11,13 +11,20 @@ class PositionEvidence:
     player-ranking infrastructure (PlayerAnalyzer / SquadService) --
     never a second, parallel Match rating engine. `rank_in_best_position`
     is 1-based among `candidates_in_best_position` current roster
-    players evaluated for that same position."""
+    players evaluated for that same position. `formation_slots` is the
+    maximum number of that position used by any canonical Hattrick
+    formation (e.g. 3 for CENTRAL_DEFENDER) -- when known, current
+    performance uses it so "rank 2 of 5" for a position that regularly
+    fields 3 starters is read as a genuine rotation starter, not
+    conflated with "rank 2 of 2" for a position (like GOALKEEPER) that
+    only ever fields one."""
 
     best_position: str = ""
     best_position_score: float | None = None
     rank_in_best_position: int | None = None
     candidates_in_best_position: int = 0
     alternative_positions: tuple[str, ...] = ()
+    formation_slots: int = 0
 
     @property
     def is_available(self) -> bool:

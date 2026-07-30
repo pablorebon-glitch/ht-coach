@@ -54,6 +54,11 @@ def make_controller(tmp_path):
     controller = MatchController(
         page, match_service, settings_repo, official_rating_service=official_service
     )
+    # show_official_import_success() opens a real modal QMessageBox by
+    # default, which would block indefinitely waiting for user
+    # interaction in an automated test. Default to a no-op here; tests
+    # that specifically want to assert it was called override this.
+    page.show_official_import_success = lambda: None
     return page, controller, official_service
 
 
@@ -63,31 +68,37 @@ def make_controller(tmp_path):
 
 def test_confirmed_verbatim_sample_imports_successfully(tmp_path):
     page, controller, service = make_controller(tmp_path)
-    messages = []
-    page.show_status = lambda msg: messages.append(msg)
+    confirmations = []
+    page.show_official_import_success = lambda: confirmations.append(True)
 
     controller._import_official_ratings(REAL_SAMPLE)
 
-    assert len(messages) == 1
-    assert "importó" in messages[0].lower() or "imported" in messages[0].lower()
+    assert confirmations == [True]
 
 
-def test_successful_import_shows_hattrick_notation_summary(tmp_path):
+def test_successful_import_shows_only_a_simple_confirmation_no_ratings_or_metadata(tmp_path):
+    """Per this sprint's guardrail: Match must not display ratings,
+    metadata, timestamps, or comparisons after an import -- only a
+    plain confirmation. That detailed view now lives in Match
+    Intelligence."""
     page, controller, service = make_controller(tmp_path)
+    assert not hasattr(page, "official_summary_label")
+
+    confirmations = []
+    page.show_official_import_success = lambda: confirmations.append(True)
     controller._import_official_ratings(REAL_SAMPLE)
-
-    text = page.official_summary_label.text()
-    assert "4.25 | 7.00 | 3.75" in text
-    assert "7.75 | 9.75 | 8.00" in text
-    assert "2-5-3" in text
+    assert confirmations == [True]
 
 
-def test_successful_import_shows_match_id_and_source(tmp_path):
+def test_successful_import_does_not_leak_status_text_with_ratings(tmp_path):
     page, controller, service = make_controller(tmp_path)
+    status_messages = []
+    page.show_status = lambda msg: status_messages.append(msg)
+    page.show_official_import_success = lambda: None
+
     controller._import_official_ratings(REAL_SAMPLE)
 
-    text = page.official_summary_label.text()
-    assert "770131822" in text
+    assert status_messages == []
 
 
 # --------------------------------------------------------------------------
@@ -96,15 +107,14 @@ def test_successful_import_shows_match_id_and_source(tmp_path):
 
 def test_first_import_creates_new_record_second_import_links_to_it(tmp_path):
     page, controller, service = make_controller(tmp_path)
-    messages = []
-    page.show_status = lambda msg: messages.append(msg)
+    confirmations = []
+    page.show_official_import_success = lambda: confirmations.append(True)
     page.confirm_official_import_replace = lambda slot: True
 
     controller._import_official_ratings(REAL_SAMPLE)
     controller._import_official_ratings(REAL_SAMPLE)
 
-    assert "creó" in messages[0] or "created" in messages[0].lower()
-    assert "vinculó" in messages[1] or "linked" in messages[1].lower()
+    assert confirmations == [True, True]
 
 
 # --------------------------------------------------------------------------
@@ -183,32 +193,41 @@ def test_confirming_replace_overwrites(tmp_path):
     controller._import_official_ratings(REAL_SAMPLE)
 
     page.confirm_official_import_replace = lambda slot: True
-    messages = []
-    page.show_status = lambda msg: messages.append(msg)
+    confirmations = []
+    page.show_official_import_success = lambda: confirmations.append(True)
 
     controller._import_official_ratings(REAL_SAMPLE)
 
-    assert len(messages) == 1
+    assert len(confirmations) == 1
 
 
 # --------------------------------------------------------------------------
 # Tactic normalization surfaced through the UI
 # --------------------------------------------------------------------------
 
-def test_unknown_tactic_warning_surfaced_in_summary(tmp_path):
+def test_unknown_tactic_does_not_block_import_even_though_match_no_longer_shows_warnings(tmp_path):
+    """Match's simplified confirmation-only UI (this sprint) no longer
+    surfaces warnings itself -- that detail moved to Match
+    Intelligence. This test instead confirms the underlying import
+    still succeeds and the warning is still captured in the stored
+    official rating data, just not rendered inside Match."""
     unknown_tactic_sample = REAL_SAMPLE.replace(
         "Atacar por el centro clase mundial (13)",
         "Una tactica del futuro (9)",
     )
     page, controller, service = make_controller(tmp_path)
+    confirmations = []
+    page.show_official_import_success = lambda: confirmations.append(True)
+
     controller._import_official_ratings(unknown_tactic_sample)
 
-    text = page.official_summary_label.text()
-    assert t_key_shown_or_raw_text_present(text)
-
-
-def t_key_shown_or_raw_text_present(text):
-    return "Avisos" in text or "Warnings" in text
+    assert confirmations == [True]
+    snapshots = [
+        snapshot for snapshot in service._repository.list_all()
+        if snapshot.official_pre is not None
+    ]
+    assert snapshots
+    assert snapshots[0].official_pre.warnings
 
 
 # --------------------------------------------------------------------------

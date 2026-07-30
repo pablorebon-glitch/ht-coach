@@ -59,16 +59,36 @@ def bucket_five_tier(value: float | None, thresholds: ScoringThresholds | None =
 
 
 def match_value(position_evidence) -> float | None:
-    """Squad-relative current-performance score: 1.0 for the top-ranked
-    candidate at the player's best position, decreasing toward 0 for the
-    lowest-ranked. Built entirely from the app's existing positional
-    ranking (never a second rating engine)."""
+    """Squad-relative current-performance score.
+
+    When `formation_slots` is known (the max number of this position
+    used by any canonical formation), rank is read *relative to that
+    demand* rather than flatly against the whole candidate pool: a
+    player within the formation's typical starting slots scores in the
+    0.7-1.0 band (genuinely first-choice-or-close), while a player
+    beyond those slots scores on a separate, lower band scaled by how
+    much depth remains -- so a position that only ever fields one
+    player (goalkeeper) treats its second-choice very differently from
+    a position that regularly fields three (central defender) treating
+    its second and third choices as rotation starters, not bench
+    filler. Falls back to the flat "rank 1 of N" formula when
+    `formation_slots` isn't available, for backward compatibility.
+    """
     if position_evidence is None or not position_evidence.is_available:
         return None
     rank = position_evidence.rank_in_best_position
     total = position_evidence.candidates_in_best_position
     if total <= 0:
         return None
+
+    slots = getattr(position_evidence, "formation_slots", 0)
+    if slots and slots > 0:
+        if rank <= slots:
+            return 1.0 - 0.3 * (rank - 1) / slots
+        remaining = max(total - slots, 1)
+        extra_rank = rank - slots
+        return max(0.0, 0.65 - 0.5 * extra_rank / remaining)
+
     return max(0.0, 1.0 - (rank - 1) / total)
 
 

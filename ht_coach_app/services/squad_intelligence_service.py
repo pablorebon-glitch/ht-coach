@@ -14,6 +14,7 @@ from engine.squad_intelligence.context import (
     TrainingEvidence,
 )
 from engine.weekly_training.player_identity import player_training_id
+from engine.weekly_training.training_priority_policy import formation_position_maximums
 from engine.weekly_training.training_rules import rule_provider_for
 from models.position import Position
 from models.side import Side
@@ -118,13 +119,35 @@ class SquadIntelligenceAppService:
         if not best_position:
             return PositionEvidence()
 
+        # Rank and candidate count are computed only among the player's
+        # real peers -- other players whose *own* best position is the
+        # same one -- not the full roster. Ranking against everyone
+        # (including players who are only marginally competent there)
+        # was the root cause of a real calibration bug: a squad's
+        # second goalkeeper showed up as "rank 2 of 19" instead of
+        # "rank 2 of 2", making an ordinary backup look like a
+        # near-top performer and inflating current-performance far
+        # past what a genuine second-choice goalkeeper should get.
+        peer_ids = set()
+        peers_by_id = {}
+        for candidate in players:
+            candidate_best_position, _candidate_score = PlayerAnalyzer.best_position(candidate)
+            if candidate_best_position == best_position:
+                candidate_id = id(candidate)
+                peer_ids.add(candidate_id)
+                peers_by_id[candidate_id] = candidate
+
         ranking = PlayerAnalyzer.rank_players(players, best_position, Side.CENTER)
+        peer_ranking = [entry for entry in ranking if id(entry.player) in peer_ids]
+
         rank = next(
-            (index + 1 for index, entry in enumerate(ranking) if entry.player is player), None
+            (index + 1 for index, entry in enumerate(peer_ranking) if entry.player is player),
+            None,
         )
         score = next(
-            (entry.score for entry in ranking if entry.player is player), best_score
+            (entry.score for entry in peer_ranking if entry.player is player), best_score
         )
+        candidates_count = len(peer_ranking) or 1
 
         alternatives = []
         for position in Position:
@@ -138,12 +161,19 @@ class SquadIntelligenceAppService:
             if alt_rank is not None and alt_rank <= _ALTERNATIVE_POSITION_RANK_CEILING:
                 alternatives.append(position.value)
 
+        formation_slots = 0
+        for canonical_position, max_count in formation_position_maximums().items():
+            if canonical_position.value == best_position:
+                formation_slots = max_count
+                break
+
         return PositionEvidence(
             best_position=best_position,
             best_position_score=score,
             rank_in_best_position=rank,
-            candidates_in_best_position=len(ranking),
+            candidates_in_best_position=candidates_count,
             alternative_positions=tuple(alternatives),
+            formation_slots=formation_slots,
         )
 
     def _build_training_evidence(self, player, players, active_training_type) -> TrainingEvidence:

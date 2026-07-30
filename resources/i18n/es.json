@@ -65,7 +65,8 @@
     "reports": "Reportes",
     "settings": "Configuración",
     "ready": "{page} listo",
-    "club_advisor": "Asesor del club"
+    "club_advisor": "Asesor del club",
+    "official_match_intelligence": "Inteligencia oficial"
   },
   "settings": {
     "title": "Configuración",
@@ -177,7 +178,10 @@
       "formation_fit": "{formation} encaja con este plantel con un score general de formacion de {score}."
     },
     "recent_csv": "CSV recientes",
-    "recent_csv_placeholder": "Elegir un archivo reciente..."
+    "recent_csv_placeholder": "Elegir un archivo reciente...",
+    "filter_role_all": "Todos los roles",
+    "filter_status_all": "Todos los estados",
+    "filter_training_fit_all": "Todo ajuste"
   },
   "squad_identity": {
     "title": "Identidad del plantel",
@@ -1369,7 +1373,21 @@
       "passing": "Pases",
       "playmaking": "Jugadas",
       "goalkeeping": "Portería"
-    }
+    },
+    "wizard": {
+      "title": "Asistente de prioridades de entrenamiento",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "step_of": "Paso {step} de {total} — {training}",
+      "step_instructions": "Seleccioná {count} jugadores para entrenamiento {effect}.",
+      "no_fixed_quota": "Este tipo de entrenamiento no tiene un cupo posicional fijo — entrena a todo el que juega. No hace falta seleccionar jugadores específicos.",
+      "no_selection": "No se seleccionó ningún jugador.",
+      "confirm_change_title": "¿Cambiar el entrenamiento activo?",
+      "confirm_change_body": "Las prioridades actuales se crearon para un tipo de entrenamiento distinto. ¿Continuar?"
+    },
+    "filter_training_players": "Jugadores en entrenamiento"
   },
   "advisor": {
     "title": "Asesor táctico",
@@ -2042,5 +2060,27 @@
         "depth_players": "Jugadores de profundidad"
       }
     }
+  },
+  "official_match_intelligence": {
+    "title": "Inteligencia oficial del partido",
+    "no_data": "Todavía no se importó ningún resumen oficial. Usá el botón de abajo para importar uno.",
+    "not_imported": "No importado",
+    "official": "Oficial",
+    "scale_limitation": "La escala interna de HT Coach todavía no está confirmada como equivalente a la de Hattrick, así que no se muestra una diferencia numérica.",
+    "import": {
+      "action": "Importar resumen oficial",
+      "title": "Importar resumen oficial",
+      "instructions": "Pegá el texto copiado con el botón \"Copy Ratings\" de Hattrick, y elegí si es PRE o POST partido.",
+      "slot_pre": "PRE-partido",
+      "slot_post": "POST-partido"
+    },
+    "section": {
+      "official_pre": "Oficial PRE",
+      "official_post": "Oficial POST",
+      "ht_coach_comparison": "Estimación de HT Coach",
+      "sector_analysis": "Análisis por sector",
+      "not_yet_available": "Todavía no disponible"
+    },
+    "not_yet_available_body": "Ratings del rival, comparación oficial contra el rival, comparaciones históricas entre partidos, e insights automáticos todavía no están soportados — no hay una fuente de datos confirmada para el rival todavía. Esto es una limitación conocida, no un error."
   }
 }

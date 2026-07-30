@@ -211,6 +211,38 @@ workflow), and no "Generate Lineup" action exists here.
   automatic sale order — those remain explicitly out of scope for a future Club
   Advisor.
 
+## Role calibration fix (Alpha 0.6.1 / UX-03)
+
+A real bug was found and fixed behind the complaint "too many players are
+marked as starters": `PositionEvidence.candidates_in_best_position` was always
+the entire roster size, because `PlayerAnalyzer.rank_players()` ranks every
+player for every position, even ones they're barely competent at. A squad's
+second goalkeeper showed up as "rank 2 of 19" instead of "rank 2 of 2",
+inflating an ordinary backup's current performance far past what a genuine
+second-choice keeper should get.
+
+Fixed in two parts:
+
+1. `SquadIntelligenceAppService._build_position_evidence` now computes rank and
+   candidate count only among genuine peers -- other players whose own best
+   position matches, mirroring how `positional_depth` already counted things.
+2. `PositionEvidence` gained a `formation_slots` field (the max legal count of
+   that position across every canonical Hattrick formation, reusing the same
+   `formation_position_maximums()` helper built for the Training Priority
+   Wizard). `scoring.match_value()` uses it when available: a player within a
+   position's typical starting-slot count scores in a genuinely high band,
+   while one beyond those slots scores on a separate, lower band scaled by
+   remaining depth -- so goalkeeper (1 slot) treats its second choice very
+   differently from central defender (3 slots) treating its second and third
+   choices as real rotation starters. `formation_slots` defaults to `0` and
+   falls back to the original flat rank formula, so this is fully backward
+   compatible with any `PositionEvidence` built before this fix.
+
+On the real 19-player roster this was developed against, starter-tier roles
+(`KEY_STARTER` + `STARTER`) dropped from 12/19 (63%) to 9/19 (47%), and the
+second goalkeeper correctly stopped being classified as a starter at all. See
+`tests/test_squad_intelligence_engine.py`'s calibration regression tests.
+
 ## Future Club Advisor integration
 
 Alpha 0.6.0 (Club Advisor Foundation) is expected to aggregate every player's

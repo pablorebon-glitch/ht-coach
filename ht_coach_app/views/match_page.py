@@ -320,10 +320,6 @@ class MatchPage(BasePage):
         self.official_import_button.clicked.connect(
             self._open_official_import_dialog
         )
-        self.official_summary_label = QLabel("")
-        self.official_summary_label.setWordWrap(True)
-        self.official_summary_label.setObjectName("officialSummaryLabel")
-        self.official_summary_label.setVisible(False)
 
         layout.addWidget(csv_label, 0, 0)
         layout.addWidget(self.recent_csv_combo, 0, 1)
@@ -346,7 +342,6 @@ class MatchPage(BasePage):
         layout.addWidget(self.analyze_button, 9, 3)
         layout.addWidget(self.training_conflict_label, 10, 1, 1, 3)
         layout.addWidget(self.official_import_button, 11, 0)
-        layout.addWidget(self.official_summary_label, 11, 1, 1, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
@@ -567,9 +562,16 @@ class MatchPage(BasePage):
             self, t("match.official_import.error_title"), message
         )
 
-    def set_official_summary_text(self, text):
-        self.official_summary_label.setText(text)
-        self.official_summary_label.setVisible(bool(text))
+    def show_official_import_success(self):
+        """Per this sprint's guardrail: Match shows only a simple
+        confirmation after a successful official-summary import --
+        ratings, metadata, timestamps and comparisons all moved to the
+        dedicated Match Intelligence page."""
+        QMessageBox.information(
+            self,
+            t("match.official_import.action"),
+            t("match.official_import.success"),
+        )
 
     def select_all_formations(self):
         self._set_checked_formations(

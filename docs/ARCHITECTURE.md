@@ -402,6 +402,30 @@ Static-import and structural tests confirm this package never invokes
 `FormationOptimizer` or `TacticOptimizer`, and that `PlayerIntelligenceReport` has
 no `overall_score`/`score` field at all.
 
+### Workflow Consolidation (Alpha 0.6.1 / UX-03)
+
+An integration sprint with two new small engine modules and one new page,
+rather than a new domain layer:
+
+- `engine/weekly_training/training_priority_policy.py`: `build_policy()`
+  derives a `TrainingPriorityPolicy` (policy type + per-tier `CapacityGroup`s)
+  entirely from the shape of a `TrainingDefinition` plus each canonical
+  formation's maximum position counts (`formation_position_maximums()`, also
+  reused by Squad Intelligence's role-calibration fix below) -- never hardcoded
+  per training type. `ht_coach_app/widgets/training_priority_wizard.py`
+  generates its steps directly from this policy.
+- `ht_coach_app/services/match_intelligence_service.py`'s
+  `MatchIntelligenceAppService` and the new
+  `ht_coach_app/views/match_intelligence_page.py` /
+  `ht_coach_app/controllers/match_intelligence_controller.py`: a thin
+  presentation layer over Alpha 0.5.9.0/UX-02's existing
+  `OfficialRatingImportService` and formatting functions -- no new parsing or
+  comparison logic.
+- `SquadIntelligenceContext.ages_by_position` (Alpha 0.6.0) and
+  `PositionEvidence.formation_slots` (this sprint) are both additive fields
+  enabling more accurate depth/performance reasoning without changing any
+  existing dimension's public shape.
+
 ### Club Advisor
 
 `engine/club_advisor/`

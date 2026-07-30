@@ -45,6 +45,8 @@ from ht_coach_app.views.dashboard_page import DashboardPage
 from ht_coach_app.views.match_page import MatchPage
 from ht_coach_app.views.club_advisor_page import ClubAdvisorPage
 from ht_coach_app.controllers.club_advisor_controller import ClubAdvisorController
+from ht_coach_app.views.match_intelligence_page import MatchIntelligencePage
+from ht_coach_app.controllers.match_intelligence_controller import MatchIntelligenceController
 from ht_coach_app.views.opponents_page import OpponentsPage
 from ht_coach_app.views.reports_page import ReportsPage
 from ht_coach_app.views.settings_page import SettingsPage
@@ -58,6 +60,7 @@ class MainWindow(QMainWindow):
         {"key": "squad", "label": lambda: t("nav.squad"), "factory": SquadPage},
         {"key": "opponents", "label": lambda: t("nav.opponents"), "factory": OpponentsPage},
         {"key": "match", "label": lambda: t("nav.match"), "factory": MatchPage},
+        {"key": "match_intelligence", "label": lambda: t("nav.official_match_intelligence"), "factory": MatchIntelligencePage},
         {"key": "club_advisor", "label": lambda: t("nav.club_advisor"), "factory": ClubAdvisorPage},
         {"key": "reports", "label": lambda: t("nav.reports"), "factory": ReportsPage},
         {"key": "settings", "label": lambda: t("nav.settings"), "factory": SettingsPage},
@@ -211,6 +214,11 @@ class MainWindow(QMainWindow):
             )
             widget.set_advisor_verbosity(
                 self._settings.advisor_verbosity
+            )
+
+        if page["key"] == "match_intelligence":
+            self._controllers.append(
+                MatchIntelligenceController(widget, parent=self)
             )
 
         if page["key"] == "club_advisor":
