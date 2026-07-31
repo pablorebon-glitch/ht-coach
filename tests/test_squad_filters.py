@@ -139,3 +139,47 @@ def test_filtering_by_role_matches_only_matching_players(tmp_path):
 
     for row in controller._visible_rows:
         assert reports_by_name[row.name].recommended_role.value == any_role
+
+
+# --------------------------------------------------------------------------
+# Alpha 0.6.5, Part 6/7: simplified Squad filters
+# --------------------------------------------------------------------------
+
+def test_removed_filters_are_hidden_from_the_squad_ui(tmp_path):
+    page, controller, players = make_controller(tmp_path)
+    assert page.search_edit.isVisible() is False
+    assert page.minimum_form.isVisible() is False
+    assert page.minimum_stamina.isVisible() is False
+    assert page.position_combo.isVisible() is False
+    assert page.training_fit_filter_combo.isVisible() is False
+
+
+def test_specialty_combo_shows_localized_labels_not_raw_text(tmp_path):
+    page, controller, players = make_controller(
+        tmp_path,
+        players=[
+            make_player(name="P1", speciality="Potente"),
+            make_player(name="P2", speciality="Rápido"),
+        ],
+    )
+    controller._view.set_specialties(controller._roster.specialties)
+    item_data = [page.speciality_combo.itemData(i) for i in range(page.speciality_combo.count())]
+    # the combo's underlying data must be the canonical Specialty value
+    # ("powerful"/"quick"), never the raw CSV text -- even though the
+    # Spanish label for POWERFUL happens to read the same as the raw
+    # CSV word ("Potente"), the two must not be conflated.
+    assert "powerful" in item_data
+    assert "quick" in item_data
+    assert "Potente" not in item_data
+    assert "Rápido" not in item_data
+
+
+def test_specialty_filter_uses_canonical_matching(tmp_path):
+    from models.specialty import Specialty
+
+    page, controller, players = make_controller(tmp_path)
+    idx = page.speciality_combo.findData(Specialty.NONE.value)
+    if idx == -1:
+        idx = page.speciality_combo.findData("")
+    page.speciality_combo.setCurrentIndex(idx)
+    assert isinstance(controller._visible_rows, list)

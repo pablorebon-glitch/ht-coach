@@ -9,7 +9,7 @@ from engine.club_advisor.models import (
     TrainingSummary,
 )
 from engine.squad_intelligence.enums import RecommendedRole, TrainingFit, TrainingPotential
-from engine.weekly_training.models import TrainingPriority
+from engine.weekly_training.models import CoverageStatus, TrainingPriority
 from models.position import Position
 
 _ROTATION_ROLES = (
@@ -38,23 +38,49 @@ _FUTURE_SHORTAGE_AGE_THRESHOLD = 29
 def build_training_summary(context) -> TrainingSummary:
     priority_rows = getattr(context, "training_priority_rows", ()) or ()
     if priority_rows:
-        required_100 = sum(
-            1 for row in priority_rows
+        full_priority_rows = [
+            row for row in priority_rows
             if getattr(row, "priority", None) == TrainingPriority.REQUIRED_100
-        )
-        required_50 = sum(
-            1 for row in priority_rows
+        ]
+        half_priority_rows = [
+            row for row in priority_rows
             if getattr(row, "priority", None) == TrainingPriority.REQUIRED_50
+        ]
+        full_priority_players = tuple(row.player_name for row in full_priority_rows)
+        half_priority_players = tuple(row.player_name for row in half_priority_rows)
+
+        coverage_by_id = {
+            getattr(row, "player_id", None): row
+            for row in (getattr(context, "coverage_rows", ()) or ())
+        }
+        priority_player_ids = {
+            getattr(row, "player_id", None) for row in full_priority_rows + half_priority_rows
+        }
+        covered_statuses = (CoverageStatus.TARGET_MET, CoverageStatus.TARGET_EXCEEDED)
+        covered_players = tuple(
+            row.player_name for row in full_priority_rows + half_priority_rows
+            if getattr(coverage_by_id.get(getattr(row, "player_id", None)), "target_status", None)
+            in covered_statuses
         )
+        uncovered_priority_players = tuple(
+            row.player_name for row in full_priority_rows + half_priority_rows
+            if getattr(coverage_by_id.get(getattr(row, "player_id", None)), "target_status", None)
+            not in covered_statuses
+        )
+
         return TrainingSummary(
             active_training_type=context.active_training_type,
-            primary_trainee_count=required_100,
-            secondary_trainee_count=required_50,
+            primary_trainee_count=len(full_priority_rows),
+            secondary_trainee_count=len(half_priority_rows),
             players_without_training=max(
                 0,
-                len(priority_rows) - required_100 - required_50,
+                len(priority_rows) - len(full_priority_rows) - len(half_priority_rows),
             ),
             total_players_evaluated=len(priority_rows),
+            full_priority_players=full_priority_players,
+            half_priority_players=half_priority_players,
+            covered_players=covered_players,
+            uncovered_priority_players=uncovered_priority_players,
         )
 
     reports = context.squad_reports

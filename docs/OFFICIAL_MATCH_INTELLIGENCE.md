@@ -123,6 +123,75 @@ moved to a distinct `official_match_intelligence.*` namespace instead — matchi
 this document's own filename and avoiding any future collision with the older,
 narrower "tactical focus" feature that happens to share a similar name.
 
+## HF-02.2: Official PRE as the Primary Rating Source
+
+Root cause fixed this sprint: `MatchWorkspaceService._map_sector_comparisons`
+always hardcoded `our_scale=SOURCE_HT_COACH_INTERNAL`, regardless of whether an
+Official PRE capture existed for the match being analyzed. Since a comparison
+is only ever marked `comparable` when `our_scale == opponent_scale`, "our"
+side was *always* excluded from direct numeric comparison — even with a real
+Official PRE on hand, on the exact same Hattrick scale as the opponent
+estimate.
+
+`engine/ratings/rating_source_policy.py`'s `select_our_ratings()` is the
+single source-selection policy: **Official PRE > calibrated internal estimate
+(not yet confirmed, so this tier never fires today) > internal diagnostic
+estimate**. `MatchWorkspaceService.apply_official_pre_override()` applies this
+as a pure post-processing step over an already-computed `MatchAnalysisResult`
+— it never touches the lineup optimizer, the tactic optimizer, or any rating
+formula. Only the *recommended* formation's ratings are substituted (Official
+PRE was captured for whatever lineup was actually submitted, not every
+candidate formation the optimizer explored); the top-level `match_intelligence`
+result (tactical focuses, matchup classifications, opponent calibration) is
+recomputed from that substitution using the exact same
+`MatchIntelligenceEngine` unchanged.
+
+**A second, smaller duplication was found and fixed alongside this**:
+`engine/match_intelligence/matchup.py` maintained its own left/right
+attack-to-defense pairing dictionaries, separate from
+`engine/ratings/sector_rating.py`'s `MATCHUP_PAIRS` (the mapping the sector
+comparison table already used). Both were consistent by coincidence — `matchup.py`
+now derives its lookups from `MATCHUP_PAIRS` directly, so there is exactly one
+centralized orientation mapping.
+
+**Auto refresh** (already documented above) now also covers this override:
+importing or correcting Official PRE re-applies `apply_official_pre_override`
+to the last analysis result and calls `show_results()` again — no restart, no
+manual re-analysis. A new `AppEvents.official_ratings_changed` signal lets
+Match and Match Intelligence notify each other regardless of which page the
+import happened on.
+
+## HF-02.2: Interpreted PRE/POST Comparison and Conclusions
+
+`engine/history/official_ratings/interpretation.py` classifies every sector's
+PRE→POST change along two independent dimensions — direction
+(`improved`/`stable`/`declined`) and magnitude
+(`stable`/`small`/`moderate`/`large`) — using a typed, configurable
+`InterpretationThresholds` (defaults: <0.25 stable, <0.50 small, <1.00
+moderate, ≥1.00 large, matching the brief's own suggested defaults exactly).
+`generate_conclusions()` then produces deterministic, evidence-only
+observations: largest improvement, largest decline, stable sectors, an
+overall improved/declined split, defensive/attacking/midfield trends (majority
+direction across each sector group; a tie reads as stable rather than
+guessing), and a missing-data limitation when some sectors couldn't be
+compared. **Conclusions never claim a cause** (stamina, weather,
+substitutions) — none of that evidence exists anywhere in this pipeline yet,
+so it's never invented. A regression test pins that "PRE and POST are
+associated by Match ID" alone is never the only output.
+
+## HF-02.2: Layout and the Collapsed Internal Diagnostic
+
+Official PRE and Official POST render in a responsive two-column row on the
+Match Intelligence page, stacking vertically below a configurable width
+breakpoint (720px) — both cards use identical structure so they're easy to
+compare visually. The internal HT Coach estimate section (previously always
+visible, always showing "?" placeholders since scales aren't confirmed
+compatible) now collapses under "Diagnóstico interno" by default: a single
+concise limitation note is shown, with the raw sector-by-sector values
+available only on request (an expand/collapse toggle) for technical
+inspection. Empty sector rows (neither a predicted nor an official value) are
+never rendered.
+
 ## Responsibility boundaries
 
 - Reuses `OfficialRatingImportService` entirely; no new parsing or match-linking

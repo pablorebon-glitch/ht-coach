@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -23,13 +24,17 @@ def _card(title_key, card_key=None, page=None):
     frame.setObjectName("workspacePanel")
     layout = QVBoxLayout(frame)
     layout.setContentsMargins(14, 12, 14, 12)
-    layout.setSpacing(6)
+    layout.setSpacing(8)
     title = QLabel(t(title_key))
     title.setObjectName("sectionTitle")
+    title.setWordWrap(True)
     body = QLabel("")
     body.setWordWrap(True)
+    body.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+    frame.setMinimumHeight(96)
+    frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
     layout.addWidget(title)
-    layout.addWidget(body)
+    layout.addWidget(body, 1)
 
     if card_key and page is not None:
         frame.setCursor(Qt.PointingHandCursor)
@@ -67,6 +72,7 @@ class ClubAdvisorPage(BasePage):
         container = QWidget()
         grid = QGridLayout(container)
         grid.setSpacing(12)
+        grid.setAlignment(Qt.AlignTop)
 
         # 1. Current project status
         self.status_frame, self._status_title, self.status_label = _card(
@@ -133,12 +139,15 @@ class ClubAdvisorPage(BasePage):
         frame = QFrame()
         frame.setObjectName("workspacePanel")
         frame.setMinimumWidth(260)
+        frame.setMinimumHeight(96)
+        frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
 
         title = QLabel(t("club_advisor.panel.season_context"))
         title.setObjectName("sectionTitle")
+        title.setWordWrap(True)
         layout.addWidget(title)
 
         self.season_phase_combo = QComboBox()

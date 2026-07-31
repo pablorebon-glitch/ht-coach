@@ -181,8 +181,43 @@ def test_weekly_training_engine_layer_does_not_import_desktop_app():
 
 
 def test_training_week_handles_year_boundary_and_timezone_aware_datetime():
-    week = active_training_week(datetime(2026, 1, 1, 3, 0))
+    from zoneinfo import ZoneInfo
+
+    # HF: after the HT-week-precise Thursday-21:00 cutoff fix, a bare
+    # "3am" naive datetime is ambiguous about which side of the cutoff
+    # it lands on once converted to Buenos Aires time. Use an explicit
+    # tz-aware moment well after the cutoff so this test keeps
+    # validating its original intent (year-boundary date arithmetic +
+    # timezone-aware input) rather than the since-fixed hour-precision
+    # behavior (covered by test_ht_calendar.py and
+    # test_training_week_respects_hour_precise_training_cutoff below).
+    week = active_training_week(datetime(2026, 1, 1, 22, 0, tzinfo=ZoneInfo("America/Buenos_Aires")))
     assert week.start_date == date(2026, 1, 4)
+
+
+def test_training_week_respects_hour_precise_training_cutoff():
+    """HF: the previous version of this function only ever compared
+    bare `date` objects, so any moment on Thursday counted as
+    "training already processed" -- even 00:01. It must now respect
+    the exact processing hour (21:00 by default) when a full,
+    timezone-aware `datetime` is supplied."""
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("America/Buenos_Aires")
+    before_cutoff = active_training_week(datetime(2026, 7, 23, 20, 59, tzinfo=tz))
+    at_cutoff = active_training_week(datetime(2026, 7, 23, 21, 0, tzinfo=tz))
+
+    assert before_cutoff.start_date == date(2026, 7, 19)  # still last week's cycle
+    assert at_cutoff.start_date == date(2026, 7, 26)  # rolled over
+
+
+def test_bare_date_on_training_day_still_rolls_over_for_backward_compatibility():
+    """A caller that only cares about the date (no time-of-day
+    information at all) keeps the original, coarser date-only
+    comparison -- this is the same behavior `date(2026, 7, 23)` already
+    had before the hour-precision fix, preserved deliberately."""
+    week = active_training_week(date(2026, 7, 23))
+    assert week.start_date == date(2026, 7, 26)
 
 
 def test_rollover_archives_week_and_preserves_training_type():
@@ -1251,3 +1286,50 @@ def test_weekly_priority_filter_survives_sorting_plan_and_localization(tmp_path)
     assert "Se asumen 90 minutos" in page.weekly_warnings_label.text()
     configure_localization("en")
     app.processEvents()
+
+
+def test_training_has_processed_respects_hour_precise_cutoff(tmp_path):
+    """HF (Alpha 0.6.5, Part 3/10): `_training_has_processed` used to
+    be a bare `date.today() >= training_update_date` comparison,
+    treating any moment on Thursday as "training already processed".
+    It must now respect the exact HTCalendarService cutoff hour."""
+    from datetime import date, datetime
+
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.services import ht_week_context_provider
+
+    training_update_date = date(2026, 8, 6)  # a Thursday
+    before_cutoff = datetime(2026, 8, 6, 20, 59)
+    after_cutoff = datetime(2026, 8, 6, 21, 0)
+    next_day = datetime(2026, 8, 7, 8, 0)
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    try:
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: before_cutoff))
+        assert WeeklyTrainingAppService._training_has_processed(training_update_date) is False
+
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: after_cutoff))
+        assert WeeklyTrainingAppService._training_has_processed(training_update_date) is True
+
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: next_day))
+        assert WeeklyTrainingAppService._training_has_processed(training_update_date) is True
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
+
+
+def test_training_has_processed_falls_back_to_date_comparison_on_other_days(tmp_path):
+    """When `now` isn't literally the training-update day itself, a
+    plain date comparison is still correct (e.g. checking a long-stale
+    week doesn't need hour-of-day precision)."""
+    from datetime import date, datetime
+
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    try:
+        far_future = datetime(2026, 9, 1, 8, 0)
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: far_future))
+        assert WeeklyTrainingAppService._training_has_processed(date(2026, 8, 6)) is True
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)

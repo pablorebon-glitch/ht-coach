@@ -71,9 +71,23 @@ class WeeklyTrainingAppService:
                     archived_weeks=state.archived_weeks,
                 )
             )
-        elif date.today() >= state.active_week.training_update_date:
+        elif self._training_has_processed(state.active_week.training_update_date):
             state = self._repository.rollover(state)
         return state
+
+    @staticmethod
+    def _training_has_processed(training_update_date):
+        """Whether this week's Thursday training update has actually
+        run yet -- hour-precise via the shared `HTCalendarService`
+        (Part 3/10), never a bare `date.today() >= ...` comparison,
+        which used to treat any moment on Thursday as "already
+        processed" even 00:01."""
+        from ht_coach_app.services.ht_week_context_provider import get_calendar_service
+
+        now = get_calendar_service().now()
+        if now.date() != training_update_date:
+            return now.date() >= training_update_date
+        return get_calendar_service().is_training_processed(now)
 
     def set_active_training_type(self, training_type):
         """Switches the active training type mid-week. Deliberately does

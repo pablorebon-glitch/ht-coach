@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from engine.history.official_ratings.comparison import compare_official_ratings
+from engine.history.official_ratings.interpretation import (
+    generate_conclusions,
+    interpret_comparison,
+)
 from engine.history.official_ratings.summary import summarize_official_rating_comparison
 from engine.history.repository import HistoricalMatchRepository
 from ht_coach_app.core.paths import historical_match_snapshots_path
 from ht_coach_app.services.official_rating_formatting import (
     SCALES_CONFIRMED_COMPATIBLE,
     format_hattrick_notation,
+    format_official_sector_label,
     format_prediction_vs_official_comparison,
 )
 from ht_coach_app.services.official_rating_service import OfficialRatingImportService
@@ -95,8 +100,67 @@ class MatchIntelligenceAppService:
             pre = "?" if sector.official_pre_value is None else f"{sector.official_pre_value:.2f}"
             post = "?" if sector.official_post_value is None else f"{sector.official_post_value:.2f}"
             delta = "-" if sector.pre_vs_post_delta is None else f"{sector.pre_vs_post_delta:.2f}"
-            rows.append((sector.sector, pre, post, delta))
+            rows.append((format_official_sector_label(sector.sector), pre, post, delta))
         return tuple(rows)
+
+    def interpreted_pre_post_rows(self, snapshot):
+        """HF-02.2, Part 5: one row per sector with the exact PRE/POST
+        values, the signed difference, and a deterministic
+        direction/magnitude classification -- never just raw numbers.
+        Returns (sector_label, pre_text, post_text, delta_text,
+        direction, magnitude) tuples; `direction`/`magnitude` are the
+        stable keys from `interpretation.py`, for the caller to
+        localize."""
+        if snapshot is None:
+            return ()
+        comparison = compare_official_ratings(
+            None, snapshot.official_pre, snapshot.official_post
+        )
+        interpreted = interpret_comparison(comparison)
+        rows = []
+        for item in interpreted:
+            pre = "?" if item.pre_value is None else f"{item.pre_value:.2f}"
+            post = "?" if item.post_value is None else f"{item.post_value:.2f}"
+            delta = "-" if item.delta is None else f"{item.delta:+.2f}"
+            rows.append(
+                (
+                    format_official_sector_label(item.sector),
+                    pre,
+                    post,
+                    delta,
+                    item.direction,
+                    item.magnitude,
+                )
+            )
+        return tuple(rows)
+
+    def pre_post_conclusions(self, snapshot):
+        """HF-02.2, Part 6: deterministic, evidence-only conclusions
+        from the PRE/POST comparison. Returns a tuple of
+        `interpretation.Conclusion` (stable key + params) for the
+        caller to localize -- never invents a cause."""
+        if snapshot is None:
+            return ()
+        comparison = compare_official_ratings(
+            None, snapshot.official_pre, snapshot.official_post
+        )
+        interpreted = interpret_comparison(comparison)
+        conclusions = generate_conclusions(interpreted)
+        return tuple(self._localize_conclusion_sectors(c) for c in conclusions)
+
+    @staticmethod
+    def _localize_conclusion_sectors(conclusion):
+        from engine.history.official_ratings.interpretation import Conclusion
+
+        params = dict(conclusion.params)
+        if "sector" in params:
+            params["sector"] = format_official_sector_label(params["sector"])
+        if "sectors" in params:
+            params["sectors"] = ", ".join(
+                format_official_sector_label(name.strip())
+                for name in params["sectors"].split(",")
+            )
+        return Conclusion(conclusion.key, params)
 
     def prediction_accuracy_summary(self, snapshot):
         if snapshot is None or snapshot.official_pre is None:

@@ -4,6 +4,68 @@
 
 ### Added
 
+- Added Alpha 0.6.5 Hattrick Weekly Cycle, Squad UX Simplification and
+  Training Timeline: architecture-first, no new analytical engines.
+  `engine/calendar/` is now the single canonical source of truth for "what
+  HT week is this?" -- `HTWeekday`/`HTWeekState` typed enums, an
+  `HT_DAY_ACTIVITY` table (the one place "Thursday means training" is
+  defined), and `HTCalendarService` with `current_state()`,
+  `next_transition()`, `days_until_training()/finances()/match()` and
+  `week_snapshot()`. All eight `HTWeekState` values are reachable, mapped
+  directly onto the day-to-activity table. Fixed the core bug this sprint
+  targets in two separate places (`engine/weekly_training/training_week.py`
+  and `weekly_training_service.py`'s `load_state()`): both used to compare
+  bare `date` objects against the training-update date, so any moment on
+  Thursday counted as "already processed" hours before the real 21:00
+  server update -- both now respect the exact hour via
+  `HTCalendarService.is_training_processed()` whenever a full `datetime` is
+  available, falling back to the original date-only comparison only for
+  backward compatibility with callers that never passed time-of-day
+  information. Added pure, unimplemented `FinancialWeekSnapshot` and
+  `YouthWeekSnapshot` contracts (every field defaults to `None`, never a
+  fabricated zero) for a future Finance/Youth module. Verified the
+  already-built Squad UX simplification (Role/State/Specialty filters only,
+  positioned immediately above the player table), the official `Specialty`
+  enum (all six Hattrick specialties, accent/case-insensitive parsing,
+  full localization), the single week-context provider
+  (`ht_week_context_provider.py`), and the compact "Current HT Week" header
+  in the Weekly Planner -- all already wired correctly, confirmed end-to-end
+  with real data. Swept Club Advisor and Match Intelligence for direct
+  `datetime.now()`/`date.today()` calls (clean) and fixed the one remaining
+  violation found. 33 new tests; full suite re-verified at 1708 passed / 0
+  failed. See docs/HT_WEEK_CALENDAR.md for the full write-up.
+
+### Fixed
+
+- Fixed HF-02.2 Official Match Intelligence Integration and Advisor Modal
+  Polish: found and fixed the root cause of Official PRE never reaching
+  Match's tactical intelligence -- `MatchWorkspaceService._map_sector_comparisons`
+  hardcoded `our_scale=SOURCE_HT_COACH_INTERNAL` unconditionally, so "our"
+  side was always excluded from direct comparison even with a real Official
+  PRE on the same Hattrick scale as the opponent estimate. Added a source-
+  selection policy (Official PRE > calibrated internal, not yet confirmed >
+  internal diagnostic) applied as a pure post-processing step over the
+  recommended formation only -- the lineup optimizer, tactic optimizer, and
+  every rating formula are completely untouched. Unified a second, independent
+  left/right orientation mapping that had been duplicating the one in
+  `sector_rating.py`. Added an `AppEvents.official_ratings_changed` signal so
+  Match and Match Intelligence auto-refresh each other after an import from
+  either page, with no restart or manual re-analysis. Added deterministic
+  direction/magnitude interpretation and evidence-only conclusion generation
+  for the PRE/POST comparison (verified against the brief's own worked example
+  character-for-character), a responsive two-column PRE/POST layout, and a
+  collapsed-by-default "Diagnóstico interno" section instead of always-visible
+  "?" placeholder rows. Fixed two Club Advisor UI bugs: the drill-down modal's
+  panel had no CSS rule of its own and inherited the overlay's translucent
+  grey background instead of showing opaque white; and the Training drill-down
+  showed player counts instead of the actual names, now derived directly from
+  the Weekly Planner's own priority records. ~85 new/updated tests; full suite
+  re-verified at 1656 passed / 0 failed. No optimizer, financial, or transfer-
+  market logic was added. See docs/OFFICIAL_MATCH_INTELLIGENCE.md and
+  docs/CLUB_ADVISOR.md for the full write-up.
+
+### Added
+
 - Added Alpha 0.6.4 UX Polish & Data Integrity stabilization. Official PRE
   and POST imports now keep independent parser/validator entry points because
   they are different Hattrick documents even though both feed the same internal

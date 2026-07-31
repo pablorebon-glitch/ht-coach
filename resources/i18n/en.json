@@ -183,7 +183,8 @@
     "recent_csv_placeholder": "Select a recent file...",
     "filter_role_all": "All roles",
     "filter_status_all": "All statuses",
-    "filter_training_fit_all": "All fits"
+    "filter_training_fit_all": "All fits",
+    "filter_specialty_all": "All Specialties"
   },
   "squad_identity": {
     "title": "Squad Identity",
@@ -2031,6 +2032,22 @@
       "excess_players": "Excess players",
       "future_shortage": "Future shortage"
     },
+    "position": {
+      "goalkeeper": "Goalkeeper",
+      "central_defender": "Central defender",
+      "wing_back": "Wing back",
+      "inner_midfielder": "Inner midfielder",
+      "winger": "Winger",
+      "forward": "Forward"
+    },
+    "domain": {
+      "training": "Training",
+      "depth": "Depth",
+      "squad": "Squad",
+      "goalkeeper": "Goalkeeper",
+      "central_defense": "Central defense",
+      "training_utilization": "Training utilization"
+    },
     "sporting": {
       "midfield_concentrated": "Midfield strength is concentrated in few players.",
       "attack_relies_on_few_players": "Attack relies on very few players.",
@@ -2041,6 +2058,11 @@
       "goalkeeper_depth": "Available goalkeepers",
       "no_replacement_position": "Position without replacement",
       "key_starter_count": "Key starters",
+      "primary_trainee_count": "Primary trainees",
+      "trainee_count": "Trainees",
+      "goalkeeper_count": "Goalkeepers",
+      "tactical_specialist_count": "Tactical specialists",
+      "position": "Position",
       "players_without_training": "Players without training",
       "secondary_trainee_count": "Secondary trainees",
       "full_effect_slots_used": "Full-effect slots in use",
@@ -2078,7 +2100,15 @@
         "active_type": "Active training",
         "primary_trainees": "Primary trainees",
         "secondary_trainees": "Secondary trainees",
-        "without_training": "Without training"
+        "without_training": "Without training",
+        "no_training": "No training",
+        "players_count": "{count} players",
+        "full_effect_reason": "These players receive full training effect from the Weekly Training Planner.",
+        "half_effect_reason": "These players receive partial training effect from the Weekly Training Planner.",
+        "no_effect_reason": "These players are outside the current Weekly Training Planner training slots.",
+        "covered": "Covered",
+        "uncovered": "Uncovered Priority",
+        "uncovered_reason": "These players have a training priority assigned but have not yet reached the weekly target per the Weekly Planner."
       },
       "squad": {
         "key_starters": "Key starters",
@@ -2108,12 +2138,23 @@
       "notes": "Notes",
       "save_context": "Save Context",
       "unknown": "Unknown",
+      "causes": "Causes",
+      "not_available_detail": "No specific detail available.",
+      "no_players_involved": "No specific players listed.",
+      "squad_group_reason": "These players are grouped by the current Squad Intelligence classification.",
+      "squad_group_impact": "This group explains how the roster shape affects current planning.",
+      "depth_impact": "Depth affects whether the position is structurally covered or exposed this week.",
+      "strength_impact": "This strength supports the current project state.",
+      "limitation_impact": "This limitation can reduce readiness until the underlying squad condition changes.",
+      "review_roster_after_changes": "Review after roster, availability or role changes.",
+      "review_weekly_training_plan": "Review after updating the Weekly Training Planner.",
       "structural_status": "Structural Status",
       "operational_status": "Operational Status",
       "driven_by": "Driven By",
       "impact": "Impact",
       "affected_players": "Affected Players",
-      "temporary_availability": "Temporary Availability"
+      "temporary_availability": "Temporary Availability",
+      "no_players_in_group": "No players in this group right now."
     },
     "season_phase": {
       "preseason": "Preseason",
@@ -2255,6 +2296,8 @@
     "no_data": "No official summary has been imported yet. Use the button below to import one.",
     "not_imported": "Not imported",
     "official": "Official",
+    "post_missing": "The POST summary has not been imported yet.",
+    "pre_missing": "The PRE summary has not been imported yet.",
     "scale_limitation": "HT Coach's internal scale isn't yet confirmed to align with Hattrick's official scale, so no numeric difference is shown.",
     "import": {
       "action": "Import Official Summary",
@@ -2263,18 +2306,96 @@
       "slot_pre": "PRE-match",
       "slot_post": "POST-match"
     },
-        "section": {
-            "official_pre": "Official PRE",
-            "official_post": "Official POST",
-            "ht_coach_comparison": "Supporting HT Coach Estimate",
-            "sector_analysis": "Comparison",
-            "not_yet_available": "Conclusions"
-        },
-        "conclusion": {
-            "pre_post_available": "PRE and POST are associated by Match ID. Review the official sector changes before drawing tactical conclusions.",
-            "awaiting_post": "Official PRE is imported. Import POST after the match to complete the official comparison.",
-            "post_without_pre": "Official POST is imported without PRE. Import PRE to compare the planned official state against the final official state."
-        },
-    "not_yet_available_body": "Opponent ratings, official comparison against the opponent, cross-match historical comparisons, and automatic insights aren't supported yet -- there's no confirmed data source for the opponent's ratings yet. This is a known limitation, not a bug."
+    "section": {
+      "official_pre": "Official PRE",
+      "official_post": "Official POST",
+      "ht_coach_comparison": "Supporting HT Coach Estimate",
+      "sector_analysis": "Comparison",
+      "not_yet_available": "Conclusions",
+      "conclusions": "Conclusions",
+      "internal_diagnostic": "Internal Diagnostic",
+      "expand": "Show technical detail",
+      "collapse": "Hide technical detail"
+    },
+    "conclusion": {
+      "pre_post_available": "PRE and POST are associated by Match ID. Review the official sector changes before drawing tactical conclusions.",
+      "awaiting_post": "Official PRE is imported. Import POST after the match to complete the official comparison.",
+      "post_without_pre": "Official POST is imported without PRE. Import PRE to compare the planned official state against the final official state.",
+      "no_data": "Not enough data to compare PRE and POST.",
+      "largest_improvement": "The largest improvement was in {sector}: {delta:+.2f}.",
+      "largest_decline": "The largest decline was in {sector}: {delta:+.2f}.",
+      "stable_sectors": "{count} sector(s) stayed stable: {sectors}.",
+      "overall_split": "{improved} sector(s) improved and {declined} declined.",
+      "defensive_trend": {
+        "improved": "Defense improved overall.",
+        "stable": "Defense stayed stable.",
+        "declined": "Defense shows an overall decline."
+      },
+      "attacking_trend": {
+        "improved": "Attack improved overall.",
+        "stable": "Attack stayed stable.",
+        "declined": "POST shows an overall decline in attack."
+      },
+      "midfield_trend": {
+        "improved": "Midfield improved.",
+        "stable": "Midfield stayed stable.",
+        "declined": "Midfield declined."
+      },
+      "missing_data": "Could not compare {count} sector(s) due to missing data."
+    },
+    "summary": {
+      "defense": "Defense",
+      "midfield": "Midfield",
+      "attack": "Attack",
+      "formation": "Formation",
+      "tactic": "Tactic",
+      "team_attitude": "Team Attitude"
+    },
+    "sector": {
+      "midfield": "Midfield",
+      "right_defense": "Right defense",
+      "central_defense": "Central defense",
+      "left_defense": "Left defense",
+      "right_attack": "Right attack",
+      "central_attack": "Central attack",
+      "left_attack": "Left attack"
+    },
+    "not_yet_available_body": "Opponent ratings, official comparison against the opponent, cross-match historical comparisons, and automatic insights aren't supported yet -- there's no confirmed data source for the opponent's ratings yet. This is a known limitation, not a bug.",
+    "direction": {
+      "improved": "Improved",
+      "stable": "No Change",
+      "declined": "Declined"
+    },
+    "magnitude": {
+      "stable": "No Change",
+      "small": "Small Change",
+      "moderate": "Moderate Change",
+      "large": "Significant Decline",
+      "large_improvement": "Significant Improvement"
+    },
+    "internal_diagnostic_limitation": "HT Coach's internal estimate isn't yet confirmed on the same scale as the Official PRE, so it doesn't add a numeric comparison here.",
+    "missing_data_short": "not enough data",
+    "change_label": "Change"
+  },
+  "specialty": {
+    "quick": "Quick",
+    "technical": "Technical",
+    "powerful": "Powerful",
+    "unpredictable": "Unpredictable",
+    "head": "Head",
+    "resilient": "Resilient",
+    "none": "No Specialty"
+  },
+  "ht_week": {
+    "training": "Training",
+    "friendly": "Friendly",
+    "league": "League",
+    "financial_update": "Financial Update",
+    "youth_scout": "Youth Scout",
+    "pending": "Pending",
+    "processed": "Processed",
+    "played": "Played",
+    "completed": "Completed",
+    "title": "Current HT Week"
   }
 }

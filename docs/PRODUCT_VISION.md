@@ -184,6 +184,24 @@ when HT Coach's own predicted ratings and an imported official value are shown
 together, and the two scales aren't yet confirmed to align, HT Coach says so
 plainly instead of showing a number that implies more precision than it has.
 
+## One Real Calendar, Not Five Guesses (Alpha 0.6.5)
+
+Every module that has ever asked "is it too early to move to next week's
+training?" was answering that question a little differently -- and, in at
+least two real places, answering it wrong: treating any moment on Thursday as
+"training already processed," hours before Hattrick's own 21:00 update
+actually runs. A manager who checked the Weekly Planner Thursday morning
+could see next week's plan already active, before the club had even trained.
+
+Hattrick doesn't run on a Monday-to-Sunday week, and it doesn't process
+things at midnight. It has its own rhythm -- match Sunday, recovery Monday,
+a friendly Wednesday, training Thursday night, finances Friday morning, youth
+scouting Saturday -- and every module that cares "what week is this" now asks
+the same single, precise source rather than approximating it five different
+ways. Getting the club's own calendar right is unglamorous, foundational
+work, but a coach who can't correctly tell you whether this week's training
+has actually happened yet isn't ready to advise on anything else.
+
 ## Match ID Integrity (Alpha 0.6.4)
 
 PRE and POST official summaries must share the same Hattrick Match ID before HT Coach

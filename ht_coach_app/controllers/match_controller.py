@@ -114,6 +114,9 @@ class MatchController(QObject):
             self._app_events.roster_changed.connect(
                 self._sync_roster
             )
+            self._app_events.official_ratings_changed.connect(
+                self._refresh_after_official_import
+            )
 
     def refresh(self):
         self._refresh_opponents()
@@ -403,6 +406,7 @@ class MatchController(QObject):
             self._view.set_workspace_processing(False)
         else:
             self._view.set_processing(False)
+        result = self._apply_official_pre_if_available(result)
         self._settings_repository.save_last_result(
             result
         )
@@ -419,6 +423,42 @@ class MatchController(QObject):
         self._view.show_status(
             "Match analysis complete."
         )
+
+    def _apply_official_pre_if_available(self, result):
+        official_pre_ratings = self._latest_official_pre_ratings()
+        if official_pre_ratings is None:
+            return result
+        try:
+            return self._service.apply_official_pre_override(
+                result, official_pre_ratings
+            )
+        except Exception:
+            # Never let a source-selection issue break the underlying
+            # analysis -- fall back to whatever was already computed.
+            return result
+
+    def _latest_official_pre_ratings(self):
+        service = self._match_intelligence_service()
+        if service is None:
+            return None
+        snapshot = service.latest_snapshot_with_official_data()
+        if snapshot is None or snapshot.official_pre is None:
+            return None
+        return snapshot.official_pre.ratings
+
+    def _match_intelligence_service(self):
+        if self._official_rating_service is None:
+            return None
+        if getattr(self, "_cached_match_intelligence_service", None) is None:
+            from ht_coach_app.services.match_intelligence_service import (
+                MatchIntelligenceAppService,
+            )
+
+            self._cached_match_intelligence_service = MatchIntelligenceAppService(
+                repository=getattr(self._official_rating_service, "_repository", None),
+                import_service=self._official_rating_service,
+            )
+        return self._cached_match_intelligence_service
 
     def _analysis_failed(self, message):
         if self._pending_workspace_state is not None and hasattr(
@@ -772,6 +812,24 @@ class MatchController(QObject):
             return
 
         self._show_official_import_success(outcome)
+        self._refresh_after_official_import()
+        if self._app_events is not None:
+            self._app_events.official_ratings_changed.emit()
+
+    def _refresh_after_official_import(self):
+        """HF-02.2, Part 3: importing or correcting Official PRE must
+        refresh Match Intelligence automatically -- no restart or manual
+        re-analysis required. Re-applies the source-selection override
+        to whatever result is already on hand; never re-runs the
+        optimizer/analysis worker, since only the rating *source* used
+        for comparison changed, not the underlying player/formation
+        data."""
+        result = self._settings_repository.load_last_result()
+        if result is None:
+            return
+        result = self._apply_official_pre_if_available(result)
+        self._settings_repository.save_last_result(result)
+        self._view.show_results(result, workspace_state=None)
 
     def _show_official_import_error(self, exc):
         reason = str(exc)

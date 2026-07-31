@@ -86,6 +86,8 @@ class SquadServiceTest(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_load_roster_maps_players(self):
+        from models.specialty import Specialty
+
         roster = self.service.load_roster(
             self.csv_path
         )
@@ -93,7 +95,7 @@ class SquadServiceTest(unittest.TestCase):
         self.assertEqual(roster.player_count, 3)
         self.assertEqual(roster.rows[0].name, "Alice")
         self.assertEqual(roster.rows[0].tsi, 1234)
-        self.assertEqual(roster.specialties, ["Powerful", "Quick"])
+        self.assertEqual(roster.specialties, (Specialty.QUICK, Specialty.POWERFUL))
 
     def test_missing_csv_raises_user_safe_error(self):
         with self.assertRaises(SquadValidationError):

@@ -6,3 +6,4 @@ class AppEvents(QObject):
     roster_changed = Signal(str, int)
     language_changed = Signal(str)
     advisor_verbosity_changed = Signal(str)
+    official_ratings_changed = Signal()

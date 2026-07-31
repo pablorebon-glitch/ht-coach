@@ -11,6 +11,13 @@ from ht_coach_app.services.club_advisor_formatting import (
     strength_label_key,
     warning_label_key,
 )
+from ht_coach_app.services.club_advisor_presentation import (
+    advisor_display_value,
+    advisor_evidence_label,
+    advisor_position_label,
+    advisor_text,
+    advisor_training_type_label,
+)
 from ht_coach_app.services.season_plan_formatting import (
     action_label_key,
     horizon_label_key,
@@ -18,6 +25,14 @@ from ht_coach_app.services.season_plan_formatting import (
     readiness_label_key,
     urgency_label_key,
 )
+
+
+def _not_available():
+    return t("club_advisor.panel.not_available_detail")
+
+
+def _message(key, params=None):
+    return advisor_text(key, **(params or {})) if key else _not_available()
 
 
 class ClubAdvisorController(QObject):
@@ -83,33 +98,120 @@ class ClubAdvisorController(QObject):
         for label, players in groups:
             if not players:
                 continue
-            detail = "\n".join(f"• {name}" for name in players)
+            player_list = ", ".join(players)
+            detail = (
+                f"{t('club_advisor.panel.explanation')}: {label}\n"
+                f"{t('club_advisor.panel.players_involved')}: {player_list}\n"
+                f"{t('club_advisor.panel.reason')}: "
+                f"{t('club_advisor.panel.squad_group_reason')}\n"
+                f"{t('club_advisor.panel.impact')}: "
+                f"{t('club_advisor.panel.squad_group_impact')}\n"
+                f"{t('club_advisor.panel.review')}: "
+                f"{t('club_advisor.panel.review_roster_after_changes')}"
+            )
             rows.append((f"{label} ({len(players)})", detail))
         return rows
 
     @staticmethod
     def _training_drilldown_rows(report):
         ts = report.training_summary
+        active_training = (
+            advisor_training_type_label(ts.active_training_type)
+            if ts.active_training_type
+            else _not_available()
+        )
         rows = [
             (
                 t("club_advisor.panel.training.active_type"),
-                ts.active_training_type or "-",
-            ),
-            (
-                "100%",
-                str(ts.primary_trainee_count),
-            ),
-            (
-                "50%",
-                str(ts.secondary_trainee_count),
-            ),
-            (
-                "No training",
-                str(ts.players_without_training),
+                (
+                    f"{t('club_advisor.panel.explanation')}: "
+                    f"{t('club_advisor.panel.training.active_type')}\n"
+                    f"{t('club_advisor.panel.reason')}: {active_training}\n"
+                    f"{t('club_advisor.panel.review')}: "
+                    f"{t('club_advisor.panel.review_weekly_training_plan')}"
+                ),
             ),
         ]
+
+        def _players_or_none(players):
+            return ", ".join(players) if players else t("club_advisor.panel.no_players_in_group")
+
+        rows.append(
+            (
+                "100%",
+                (
+                    f"{t('club_advisor.panel.explanation')}: 100%\n"
+                    f"{t('club_advisor.panel.players_involved')}: "
+                    f"{_players_or_none(ts.full_priority_players)}\n"
+                    f"{t('club_advisor.panel.reason')}: "
+                    f"{t('club_advisor.panel.training.full_effect_reason')}\n"
+                    f"{t('club_advisor.panel.review')}: "
+                    f"{t('club_advisor.panel.review_weekly_training_plan')}"
+                ),
+            )
+        )
+        rows.append(
+            (
+                "50%",
+                (
+                    f"{t('club_advisor.panel.explanation')}: 50%\n"
+                    f"{t('club_advisor.panel.players_involved')}: "
+                    f"{_players_or_none(ts.half_priority_players)}\n"
+                    f"{t('club_advisor.panel.reason')}: "
+                    f"{t('club_advisor.panel.training.half_effect_reason')}\n"
+                    f"{t('club_advisor.panel.review')}: "
+                    f"{t('club_advisor.panel.review_weekly_training_plan')}"
+                ),
+            )
+        )
+        rows.append(
+            (
+                t("club_advisor.panel.training.covered"),
+                (
+                    f"{t('club_advisor.panel.explanation')}: "
+                    f"{t('club_advisor.panel.training.covered')}\n"
+                    f"{t('club_advisor.panel.players_involved')}: "
+                    f"{_players_or_none(ts.covered_players)}\n"
+                    f"{t('club_advisor.panel.review')}: "
+                    f"{t('club_advisor.panel.review_weekly_training_plan')}"
+                ),
+            )
+        )
+        if ts.uncovered_priority_players:
+            rows.append(
+                (
+                    t("club_advisor.panel.training.uncovered"),
+                    (
+                        f"{t('club_advisor.panel.explanation')}: "
+                        f"{t('club_advisor.panel.training.uncovered')}\n"
+                        f"{t('club_advisor.panel.players_involved')}: "
+                        f"{_players_or_none(ts.uncovered_priority_players)}\n"
+                        f"{t('club_advisor.panel.reason')}: "
+                        f"{t('club_advisor.panel.training.uncovered_reason')}\n"
+                        f"{t('club_advisor.panel.review')}: "
+                        f"{t('club_advisor.panel.review_weekly_training_plan')}"
+                    ),
+                )
+            )
+        if ts.players_without_training:
+            rows.append(
+                (
+                    t("club_advisor.panel.training.no_training"),
+                    (
+                        f"{t('club_advisor.panel.explanation')}: "
+                        f"{t('club_advisor.panel.training.no_training')}\n"
+                        f"{t('club_advisor.panel.players_involved')}: "
+                        f"{t('club_advisor.panel.training.players_count', count=ts.players_without_training)}\n"
+                        f"{t('club_advisor.panel.reason')}: "
+                        f"{t('club_advisor.panel.training.no_effect_reason')}\n"
+                        f"{t('club_advisor.panel.review')}: "
+                        f"{t('club_advisor.panel.review_weekly_training_plan')}"
+                    ),
+                )
+            )
+
         warning_lines = "\n".join(
-            f"• {t(warning_label_key(w.warning_type))}: {t(w.reason_key, **w.reason_params)}"
+            f"{t(warning_label_key(w.warning_type))}: {_message(w.reason_key, w.reason_params)}"
             for w in report.warnings
             if w.warning_type.value
             in ("priority_trainees_missing_training", "training_slot_competition",
@@ -123,31 +225,41 @@ class ClubAdvisorController(QObject):
     def _depth_drilldown_rows(report):
         rows = []
         for item in report.depth_summary.positions:
-            lines = [
-                f"{t('club_advisor.panel.depth')}: {t(depth_status_label_key(item.status))}",
-                f"{t('club_advisor.panel.structural_status')}: {item.player_count}",
-            ]
+            position = advisor_position_label(item.position)
+            temporary = _not_available()
             if item.temporary_count is not None:
-                lines.append(
-                    f"{t('club_advisor.panel.temporary_availability')}: "
+                temporary = (
                     f"{item.temporary_count} "
                     f"({t(depth_status_label_key(item.temporary_status))})"
                     if item.temporary_status
-                    else f"{t('club_advisor.panel.temporary_availability')}: {item.temporary_count}"
+                    else str(item.temporary_count)
                 )
-            rows.append((item.position, "\n".join(lines)))
+            lines = [
+                f"{t('club_advisor.panel.explanation')}: {position}",
+                f"{t('club_advisor.panel.structural_status')}: {item.player_count}",
+                f"{t('club_advisor.panel.temporary_availability')}: {temporary}",
+                f"{t('club_advisor.panel.reason')}: {t(depth_status_label_key(item.status))}",
+                f"{t('club_advisor.panel.impact')}: {t('club_advisor.panel.depth_impact')}",
+                f"{t('club_advisor.panel.review')}: {t('club_advisor.panel.review_roster_after_changes')}",
+            ]
+            rows.append((position, "\n".join(lines)))
         return rows
 
     @staticmethod
     def _risks_drilldown_rows(report):
         rows = []
         for risk in report.risks:
-            reason = t(risk.reason_key, **risk.reason_params) if risk.reason_key else "-"
-            impact = t(f"club_advisor.impact.{risk.impact}") if risk.impact else "-"
-            urgency = t(f"club_advisor.impact.{risk.urgency}") if risk.urgency else "-"
-            review = t(risk.review_condition_key) if risk.review_condition_key else "-"
-            affected = ", ".join(risk.affected_players) if risk.affected_players else "-"
+            reason = _message(risk.reason_key, risk.reason_params)
+            impact = t(f"club_advisor.impact.{risk.impact}") if risk.impact else _not_available()
+            urgency = t(f"club_advisor.impact.{risk.urgency}") if risk.urgency else _not_available()
+            review = t(risk.review_condition_key) if risk.review_condition_key else _not_available()
+            affected = (
+                ", ".join(risk.affected_players)
+                if risk.affected_players
+                else t("club_advisor.panel.no_players_involved")
+            )
             detail = (
+                f"{t('club_advisor.panel.explanation')}: {t(risk_label_key(risk.risk_type))}\n"
                 f"{t('club_advisor.panel.reason')}: {reason}\n"
                 f"{t('club_advisor.panel.impact')}: {impact}\n"
                 f"{t('club_advisor.panel.urgency')}: {urgency}\n"
@@ -161,21 +273,39 @@ class ClubAdvisorController(QObject):
     def _strengths_drilldown_rows(report):
         rows = []
         for strength in report.strengths:
-            evidence_lines = "\n".join(
-                f"• {item.label_key or item.evidence_type}: {item.value}"
+            evidence_lines = "; ".join(
+                f"{advisor_evidence_label(item.label_key or item.evidence_type)}: "
+                f"{advisor_display_value(item.value)}"
                 for item in strength.evidence
-            ) or "-"
-            rows.append((t(strength_label_key(strength.strength_type)), evidence_lines))
+            ) or _not_available()
+            label = t(strength_label_key(strength.strength_type))
+            detail = (
+                f"{t('club_advisor.panel.explanation')}: {label}\n"
+                f"{t('club_advisor.panel.reason')}: {evidence_lines}\n"
+                f"{t('club_advisor.panel.impact')}: {t('club_advisor.panel.strength_impact')}\n"
+                f"{t('club_advisor.panel.review')}: "
+                f"{t('club_advisor.panel.review_roster_after_changes')}"
+            )
+            rows.append((label, detail))
         return rows
 
     @staticmethod
     def _limitations_drilldown_rows(report):
         rows = []
         for limitation in report.limitations:
+            label = t(limitation_label_key(limitation))
             rows.append(
                 (
-                    t(limitation_label_key(limitation)),
-                    t("club_advisor.drilldown.future_integration_note"),
+                    label,
+                    (
+                        f"{t('club_advisor.panel.explanation')}: {label}\n"
+                        f"{t('club_advisor.panel.reason')}: "
+                        f"{t('club_advisor.drilldown.future_integration_note')}\n"
+                        f"{t('club_advisor.panel.impact')}: "
+                        f"{t('club_advisor.panel.limitation_impact')}\n"
+                        f"{t('club_advisor.panel.review')}: "
+                        f"{t('club_advisor.panel.review_roster_after_changes')}"
+                    ),
                 )
             )
         return rows
@@ -234,19 +364,19 @@ class ClubAdvisorController(QObject):
 
     @staticmethod
     def _format_priority_line(priority):
-        need = t(need_label_key(priority.strategic_need)) if priority.strategic_need else "-"
+        need = t(need_label_key(priority.strategic_need)) if priority.strategic_need else _not_available()
         urgency = (
             t(urgency_label_key(priority.operational_urgency))
             if priority.operational_urgency
-            else "-"
+            else _not_available()
         )
-        action = t(action_label_key(priority.action_type)) if priority.action_type else "-"
+        action = t(action_label_key(priority.action_type)) if priority.action_type else _not_available()
         horizon = (
             t(horizon_label_key(priority.recommendation_horizon))
             if priority.recommendation_horizon
-            else "-"
+            else _not_available()
         )
-        reason = t(priority.reason_key, **priority.reason_params) if priority.reason_key else ""
+        reason = _message(priority.reason_key, priority.reason_params) if priority.reason_key else ""
         return (
             f"{t(priority_label_key(priority.priority_type))}\n"
             f"  {t('club_advisor.panel.need')}: {need} | "
@@ -258,14 +388,14 @@ class ClubAdvisorController(QObject):
 
     @classmethod
     def _format_priority_list(cls, priorities):
-        return "\n\n".join(cls._format_priority_line(p) for p in priorities) or "-"
+        return "\n\n".join(cls._format_priority_line(p) for p in priorities) or _not_available()
 
     @staticmethod
     def _format_promotion_readiness(assessment):
         if assessment is None:
-            return "-"
+            return _not_available()
         readiness_text = t(readiness_label_key(assessment.readiness))
-        reason_text = t(assessment.reason_key, **assessment.reason_params) if assessment.reason_key else ""
+        reason_text = _message(assessment.reason_key, assessment.reason_params) if assessment.reason_key else ""
         confidence_text = t(confidence_label_key(assessment.confidence))
         limitations_text = ", ".join(
             t(limitation_label_key(item)) for item in assessment.limitations
@@ -290,7 +420,7 @@ class ClubAdvisorController(QObject):
             dimension_labels = ", ".join(
                 t(f"club_advisor.status_dimension.{name}")
                 for name in explanation.driving_dimensions
-            ) or "-"
+            ) or _not_available()
             lines.append(
                 f"{t('club_advisor.panel.structural_status')}: "
                 f"{t(project_status_label_key(explanation.structural_status))}\n"
@@ -300,32 +430,38 @@ class ClubAdvisorController(QObject):
             )
             lines.append(
                 f"{t('club_advisor.panel.reason')}: "
-                f"{t(explanation.reason_key, **explanation.reason_params)}"
+                f"{_message(explanation.reason_key, explanation.reason_params)}"
             )
         causes = []
         for risk in report.risks[:3]:
             label = t(risk_label_key(risk.risk_type))
-            reason = t(risk.reason_key, **risk.reason_params) if risk.reason_key else ""
-            causes.append(f"- {label}: {reason}" if reason else f"- {label}")
+            reason = _message(risk.reason_key, risk.reason_params) if risk.reason_key else ""
+            urgency = t(f"club_advisor.impact.{risk.urgency}") if risk.urgency else ""
+            suffix = f" ({t('club_advisor.panel.urgency')}: {urgency})" if urgency else ""
+            causes.append(f"{label}: {reason}{suffix}" if reason else f"{label}{suffix}")
         for warning in report.warnings[:2]:
             label = t(warning_label_key(warning.warning_type))
-            reason = t(warning.reason_key, **warning.reason_params)
-            causes.append(f"- {label}: {reason}")
+            reason = _message(warning.reason_key, warning.reason_params)
+            causes.append(f"{label}: {reason}")
         if causes:
-            lines.append("Reasons\n" + "\n".join(causes))
+            lines.append(f"{t('club_advisor.panel.causes')}\n" + "\n".join(causes))
         return "\n\n".join(lines)
 
     @staticmethod
     def _format_risks_list(risks):
         if not risks:
-            return "-"
+            return _not_available()
         blocks = []
         for risk in risks:
-            reason = t(risk.reason_key, **risk.reason_params) if risk.reason_key else ""
-            affected = ", ".join(risk.affected_players) if risk.affected_players else "-"
-            impact = t(f"club_advisor.impact.{risk.impact}") if risk.impact else "-"
-            urgency = t(f"club_advisor.impact.{risk.urgency}") if risk.urgency else "-"
-            review = t(risk.review_condition_key) if risk.review_condition_key else "-"
+            reason = _message(risk.reason_key, risk.reason_params) if risk.reason_key else ""
+            affected = (
+                ", ".join(risk.affected_players)
+                if risk.affected_players
+                else t("club_advisor.panel.no_players_involved")
+            )
+            impact = t(f"club_advisor.impact.{risk.impact}") if risk.impact else _not_available()
+            urgency = t(f"club_advisor.impact.{risk.urgency}") if risk.urgency else _not_available()
+            review = t(risk.review_condition_key) if risk.review_condition_key else _not_available()
             blocks.append(
                 f"{t(risk_label_key(risk.risk_type))}\n"
                 f"  {t('club_advisor.panel.reason')}: {reason}\n"
@@ -340,10 +476,10 @@ class ClubAdvisorController(QObject):
     def _format_warnings_list(warnings):
         return (
             "\n".join(
-                f"• {t(warning_label_key(w.warning_type))}: {t(w.reason_key, **w.reason_params)}"
+                f"{t(warning_label_key(w.warning_type))}: {_message(w.reason_key, w.reason_params)}"
                 for w in warnings
             )
-            or "-"
+            or _not_available()
         )
 
     @classmethod
@@ -351,8 +487,8 @@ class ClubAdvisorController(QObject):
         status_text = cls._format_status_section(report)
 
         strengths_text = (
-            "\n".join(f"• {t(strength_label_key(s.strength_type))}" for s in report.strengths)
-            or "-"
+            "\n".join(t(strength_label_key(s.strength_type)) for s in report.strengths)
+            or _not_available()
         )
         risks_text = cls._format_risks_list(report.risks)
         warnings_text = cls._format_warnings_list(report.warnings)
@@ -360,10 +496,13 @@ class ClubAdvisorController(QObject):
         ts = report.training_summary
         training_text = (
             f"{t('club_advisor.panel.training.active_type')}\n"
-            f"{ts.active_training_type or '-'}\n\n"
-            f"100%\n{ts.primary_trainee_count} players\n\n"
-            f"50%\n{ts.secondary_trainee_count} players\n\n"
-            f"No training\n{ts.players_without_training} players"
+            f"{advisor_training_type_label(ts.active_training_type) if ts.active_training_type else _not_available()}\n\n"
+            f"100%\n"
+            f"{t('club_advisor.panel.training.players_count', count=ts.primary_trainee_count)}\n\n"
+            f"50%\n"
+            f"{t('club_advisor.panel.training.players_count', count=ts.secondary_trainee_count)}\n\n"
+            f"{t('club_advisor.panel.training.no_training')}\n"
+            f"{t('club_advisor.panel.training.players_count', count=ts.players_without_training)}"
         )
 
         ss = report.squad_summary
@@ -378,12 +517,14 @@ class ClubAdvisorController(QObject):
         )
 
         depth_text = "\n".join(
-            f"{item.position}: {t(depth_status_label_key(item.status))} ({item.player_count})"
+            f"{advisor_position_label(item.position)}: "
+            f"{t(depth_status_label_key(item.status))} ({item.player_count})"
             for item in report.depth_summary.positions
         )
 
         limitations_text = (
-            "\n".join(f"• {t(limitation_label_key(item))}" for item in report.limitations) or "-"
+            "\n".join(t(limitation_label_key(item)) for item in report.limitations)
+            or _not_available()
         )
 
         return {

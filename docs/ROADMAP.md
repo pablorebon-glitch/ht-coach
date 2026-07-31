@@ -20,6 +20,74 @@ The roadmap protects the engine and moves product work into the application laye
 
 ## Alpha 0.2 Milestones
 
+### Alpha 0.6.5: Hattrick Weekly Cycle, Squad UX Simplification and Training Timeline
+
+Goal: architecture-first, no new analytical engines. Establish one canonical
+Hattrick weekly timeline every future module (Training, History, Finance,
+Advisor, Match Intelligence, Evolution) shares, and simplify Squad UX.
+
+**Canonical HT week (`engine/calendar/`).** `HTWeekday` and `HTWeekState` are
+strongly typed; `HT_DAY_ACTIVITY` is the single place "Thursday means
+training" is ever defined. `HTCalendarService` provides `current_state()`,
+`next_transition()`, `days_until_training()/finances()/match()`, and
+`week_snapshot()`. All eight `HTWeekState` values are reachable, mapped
+directly onto the brief's own day-to-activity table (Monday/Recovery reads as
+`POST_LEAGUE_MATCH`, Tuesday/Preparation as `PRE_FRIENDLY`, etc.).
+`HTWeekScheduleConfig` makes every processing hour (21:00 for training, per
+the brief; the others are documented best-effort defaults) an overridable
+field, never a hardcoded weekday again.
+
+**The core fix: training weeks no longer roll over too early.** Two separate
+places (`engine/weekly_training/training_week.py` and
+`ht_coach_app/services/weekly_training_service.py`'s `load_state()`) used to
+compare bare `date` objects against the training-update date, so *any* moment
+on Thursday counted as "already processed" -- hours before the real 21:00
+server update. Both now delegate to `HTCalendarService.is_training_processed()`
+whenever a time-of-day-aware `datetime` is available, falling back to the
+original date-only comparison only for callers that explicitly pass a bare
+`date` (backward compatible with existing call sites that never cared about
+the hour).
+
+**Financial and Youth contracts, no implementation.** `FinancialWeekSnapshot`
+and `YouthWeekSnapshot` are pure dataclasses with every numeric/boolean field
+defaulting to `None` (unknown, never a fabricated zero) -- architecture for a
+future Finance/Youth module, nothing computed here.
+
+**Squad UX simplification and the official Specialty filter.** The player
+table's filter row was simplified to exactly Role / State / Specialty,
+positioned immediately above the table (Search, Min Form, Min Stamina,
+Training Fit and Position filter removed from view; Weekly Planner remains
+the sole owner of training-related filtering). `models/specialty.py`'s
+`Specialty` enum covers all six official Hattrick specialties (Quick,
+Technical, Powerful, Unpredictable, Head, Resilient), parsed
+accent/case-insensitively from either Spanish or English raw CSV text, with
+full localization -- the filter combo shows translated labels
+("Rápido"/"Quick") while filtering on the canonical value underneath.
+
+**Single week-context provider, no duplication.**
+`ht_coach_app/services/ht_week_context_provider.py`'s `get_calendar_service()`
+is the one shared `HTCalendarService` instance the whole app reads from;
+`current_week_snapshot()` is the shortcut most callers use.
+`ht_coach_app/services/ht_week_formatting.py`'s `format_ht_week_status()`
+renders the compact "Current HT Week" header (Training/Friendly/League/
+Financial update/Youth scout, each Pending/Processed-equivalent) already
+wired into the Weekly Planner tab -- no large widgets, no raw enum values.
+
+**Architecture audit (Part 10).** Swept `engine/club_advisor`,
+`ht_coach_app/services/club_advisor_service.py` and
+`ht_coach_app/services/match_intelligence_service.py` for direct
+`datetime.now()`/`date.today()` calls -- clean. Found and fixed one real
+remaining violation in `weekly_training_service.py`'s rollover check (the
+same class of bug as the core training-timeline fix above).
+
+Testing: 31 calendar-service tests, 2 hour-precision rollover tests, plus
+pre-existing (already-implemented ahead of this pass) coverage for the week
+header, Specialty parsing, and simplified Squad filters. Full suite
+re-verified at 1708 passed / 0 failed.
+
+Not shipped (explicitly out of scope): any Finance or Youth calculation,
+CHPP/API integration, League Intelligence.
+
 ### Alpha 0.6.4: UX Polish & Data Integrity
 
 Goal: stabilize the Alpha 0.6 product before adding more capability.
@@ -836,6 +904,57 @@ project-status-explanation tests, 14 drill-down UI tests, plus fixes to
 pre-existing tests whose assumptions this sprint intentionally changed (formation
 validation, players-without-training reclassified from risk to warning). Full
 suite re-verified at 1567 passed / 0 failed.
+
+### HF-02.2: Official Match Intelligence Integration and Advisor Modal Polish
+
+Goal: not more rules -- close the loop on Alpha 0.6.3's own work. The real
+POST imported and PRE/POST comparison technically worked, but Official PRE
+still never reached Match's tactical intelligence, the comparison showed only
+raw differences, and two Club Advisor UI bugs (grey modal, placeholder detail)
+remained.
+
+**Root cause found and fixed**: `MatchWorkspaceService._map_sector_comparisons`
+hardcoded `our_scale=SOURCE_HT_COACH_INTERNAL` unconditionally, so "our" side
+was *always* excluded from direct comparison even with a real Official PRE on
+the same scale as the opponent estimate. `engine/ratings/rating_source_policy.py`
+implements the requested priority order (Official PRE > calibrated internal,
+not yet confirmed > internal diagnostic); `MatchWorkspaceService.apply_official_pre_override()`
+applies it as a pure post-processing step over the recommended formation only
+-- the lineup optimizer, tactic optimizer, and every rating formula are
+completely untouched. A second duplication (two independent left/right
+orientation mappings) was found alongside this and unified into the one that
+already existed in `engine/ratings/sector_rating.py`. A new
+`AppEvents.official_ratings_changed` signal lets Match and Match Intelligence
+auto-refresh each other's tactical intelligence after an import from either
+page -- no restart, no manual re-analysis.
+
+`engine/history/official_ratings/interpretation.py` adds deterministic
+direction (`improved`/`stable`/`declined`) and magnitude
+(`stable`/`small`/`moderate`/`large`) classification per sector, with typed,
+configurable thresholds matching the brief's own suggested defaults exactly,
+plus evidence-only conclusion generation (largest improvement/decline, stable
+sectors, defensive/attacking/midfield trends, missing-data limitations) that
+never claims a cause. Verified against the brief's own worked example
+character-for-character ("Ataque central... Cambio -2.00... Caída
+importante") and its own sample conclusion ("El POST muestra una caída
+general del ataque"). PRE and POST now render in a responsive two-column row
+(stacking below 720px), and the internal HT Coach estimate collapses under
+"Diagnóstico interno" by default instead of always showing "?" placeholder
+rows.
+
+Two Club Advisor bugs fixed: the drill-down modal's white panel had no CSS
+rule of its own and silently inherited the overlay's translucent grey; and the
+Training drill-down showed player counts instead of actual names --
+`TrainingSummary` gained real name lists derived directly from the Weekly
+Planner's own priority records, cross-referenced against training coverage.
+
+Testing: 11 source-policy/override tests, 5 auto-refresh integration tests, 20
+interpretation tests, 4 service-wiring tests, 10 PRE/POST UI tests, 9 visual
+regression tests, 6 training-name tests, plus fixes to 2 pre-existing tests
+whose assumptions this sprint intentionally changed. Full suite re-verified at
+1656 passed / 0 failed. No optimizer, financial, or transfer-market logic was
+added -- confirmed by static-import guardrail tests carried over from prior
+sprints and by direct inspection of every touched call site.
 
 ### Epic 2: State And Services
 

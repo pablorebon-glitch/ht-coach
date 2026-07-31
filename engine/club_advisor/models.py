@@ -117,6 +117,10 @@ class TrainingSummary:
     full_effect_slots_used: int = 0
     reduced_effect_slots_used: int = 0
     total_players_evaluated: int = 0
+    full_priority_players: tuple = ()
+    half_priority_players: tuple = ()
+    covered_players: tuple = ()
+    uncovered_priority_players: tuple = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -127,6 +131,10 @@ class TrainingSummary:
             "full_effect_slots_used": self.full_effect_slots_used,
             "reduced_effect_slots_used": self.reduced_effect_slots_used,
             "total_players_evaluated": self.total_players_evaluated,
+            "full_priority_players": list(self.full_priority_players),
+            "half_priority_players": list(self.half_priority_players),
+            "covered_players": list(self.covered_players),
+            "uncovered_priority_players": list(self.uncovered_priority_players),
         }
 
 

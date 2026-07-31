@@ -380,6 +380,20 @@ players/review trigger per risk; Squad shows the actual player list per
 category), reusing the exact same report data already shown on the card —
 never a second calculation.
 
+**HF-02.2 fixes.** Two real bugs, found and fixed: (1) `#drillDownPanel` had
+no CSS rule of its own at all, so it silently inherited the translucent grey
+overlay behind it instead of showing an opaque white surface — the stylesheet
+now explicitly styles the panel, its list, and its detail area as solid white,
+with a subtle drop shadow and a small × close control (never a large "Cerrar"
+button). (2) the Training drill-down showed player *counts*
+(`"3 players"`) instead of actual names. `TrainingSummary` gained
+`full_priority_players`/`half_priority_players`/`covered_players`/
+`uncovered_priority_players` — real name tuples derived directly from
+`ClubAdvisorContext.training_priority_rows` (the Weekly Planner's own priority
+records) cross-referenced against `coverage_rows` for the covered/uncovered
+split. Groups with no players show an explicit "no players in this group"
+message rather than a generic "no detail available" placeholder.
+
 ## Project Status Explanation
 
 Never show "Critical" (or any status) without saying why.

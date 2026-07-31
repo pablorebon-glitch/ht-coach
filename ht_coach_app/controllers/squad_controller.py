@@ -358,6 +358,11 @@ class SquadController:
     def _show_weekly_training(self):
         if not hasattr(self._view, "show_weekly_training"):
             return
+        if hasattr(self._view, "set_ht_week_status"):
+            from ht_coach_app.services.ht_week_context_provider import current_week_snapshot
+            from ht_coach_app.services.ht_week_formatting import format_ht_week_status
+
+            self._view.set_ht_week_status(format_ht_week_status(current_week_snapshot()))
         if self._roster is None:
             self._view.show_weekly_training_empty()
             return

@@ -2,12 +2,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QFrame,
+    QGraphicsDropShadowEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QPushButton,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -30,10 +31,13 @@ class DrillDownOverlay(QWidget):
         super().__init__(parent)
         self._rows = rows
 
-        self.setAutoFillBackground(True)
-        palette = self.palette()
+        self.setAutoFillBackground(False)
+        self.backdrop = QFrame(self)
+        self.backdrop.setObjectName("drillDownBackdrop")
+        self.backdrop.setAutoFillBackground(True)
+        palette = self.backdrop.palette()
         palette.setColor(QPalette.Window, QColor(0, 0, 0, 140))
-        self.setPalette(palette)
+        self.backdrop.setPalette(palette)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -45,8 +49,12 @@ class DrillDownOverlay(QWidget):
         self.panel = QFrame(self)
         self.panel.setObjectName("drillDownPanel")
         self.panel.setAutoFillBackground(True)
+        panel_palette = self.panel.palette()
+        panel_palette.setColor(QPalette.Window, QColor("#ffffff"))
+        self.panel.setPalette(panel_palette)
         self.panel.setMinimumSize(560, 360)
         self.panel.setMaximumSize(820, 560)
+        self._apply_panel_shadow()
         panel_layout = QVBoxLayout(self.panel)
         panel_layout.setContentsMargins(16, 14, 16, 14)
         panel_layout.setSpacing(10)
@@ -54,7 +62,12 @@ class DrillDownOverlay(QWidget):
         header_row = QHBoxLayout()
         title_label = QLabel(title)
         title_label.setObjectName("sectionTitle")
-        self.close_button = QPushButton(t("club_advisor.drilldown.close"))
+        self.close_button = QToolButton()
+        self.close_button.setObjectName("drillDownCloseButton")
+        self.close_button.setText("×")
+        self.close_button.setToolTip(t("club_advisor.drilldown.close"))
+        self.close_button.setAccessibleName(t("club_advisor.drilldown.close"))
+        self.close_button.setFixedSize(28, 28)
         self.close_button.clicked.connect(self.close_overlay)
         header_row.addWidget(title_label, 1)
         header_row.addWidget(self.close_button)
@@ -124,17 +137,33 @@ class DrillDownOverlay(QWidget):
 
         if rows:
             self.list_widget.setCurrentRow(0)
+        self.backdrop.lower()
         self.panel.raise_()
+
+    def _apply_panel_shadow(self):
+        shadow = QGraphicsDropShadowEffect(self.panel)
+        shadow.setBlurRadius(32)
+        shadow.setXOffset(0)
+        shadow.setYOffset(8)
+        shadow.setColor(QColor(0, 0, 0, 90))
+        self.panel.setGraphicsEffect(shadow)
+
+    def resizeEvent(self, event):
+        self.backdrop.setGeometry(self.rect())
+        self.backdrop.lower()
+        self.panel.raise_()
+        super().resizeEvent(event)
 
     def _show_detail_for_row(self, index):
         if 0 <= index < len(self._rows):
             detail = self._rows[index][1]
             fields = self._detail_fields(detail)
+            missing = t("club_advisor.panel.not_available_detail")
             self.explanation_label.setText(fields.get("explanation", self._rows[index][0]))
-            self.players_label.setText(fields.get("players involved", "-"))
-            self.reason_label.setText(fields.get("reason", "-"))
-            self.impact_label.setText(fields.get("impact", "-"))
-            self.review_label.setText(fields.get("review", "-"))
+            self.players_label.setText(fields.get("players involved", missing))
+            self.reason_label.setText(fields.get("reason", missing))
+            self.impact_label.setText(fields.get("impact", missing))
+            self.review_label.setText(fields.get("review", missing))
             self.detail_label.setText(fields.get("other", ""))
 
     @staticmethod

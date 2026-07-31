@@ -1,9 +1,11 @@
 import pytest
 
-QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
+QtWidgets = pytest.importorskip("PySide6.QtWidgets")
+QApplication = QtWidgets.QApplication
+QLabel = QtWidgets.QLabel
 
 from ht_coach_app.controllers.club_advisor_controller import ClubAdvisorController
-from ht_coach_app.core.localization import configure_localization
+from ht_coach_app.core.localization import configure_localization, t
 from ht_coach_app.persistence.match_workspace_repository import MatchWorkspaceRepository
 from ht_coach_app.services.club_advisor_service import ClubAdvisorAppService
 from ht_coach_app.services.squad_service import SquadService
@@ -85,7 +87,9 @@ def test_drilldown_first_row_selected_by_default(tmp_path):
     controller._open_drilldown("squad")
     overlay = _find_overlay(page)
     assert overlay.list_widget.currentRow() == 0
-    assert overlay.detail_label.text()
+    assert overlay.explanation_label.text()
+    assert overlay.players_label.text()
+    assert overlay.reason_label.text()
 
 
 def test_drilldown_selecting_row_updates_detail(tmp_path):
@@ -95,7 +99,8 @@ def test_drilldown_selecting_row_updates_detail(tmp_path):
     overlay = _find_overlay(page)
     if overlay.list_widget.count() > 1:
         overlay.list_widget.setCurrentRow(1)
-        assert overlay.detail_label.text()
+        assert overlay.explanation_label.text()
+        assert overlay.reason_label.text()
 
 
 def test_drilldown_modal_is_single_elevated_surface(tmp_path):
@@ -105,8 +110,15 @@ def test_drilldown_modal_is_single_elevated_surface(tmp_path):
     overlay = _find_overlay(page)
     if overlay is not None:
         assert overlay.panel.parent() is overlay
+        assert overlay.backdrop.parent() is overlay
+        assert overlay.list_widget.parent() is overlay.panel
         assert overlay.panel.autoFillBackground()
+        assert overlay.backdrop.autoFillBackground()
         assert overlay.panel.geometry().isValid()
+        overlay.resize(900, 600)
+        overlay.show()
+        QApplication.processEvents()
+        assert overlay.childAt(overlay.panel.geometry().center()) is not overlay.backdrop
 
 
 def test_risks_drilldown_shows_full_detail(tmp_path):
@@ -202,7 +214,7 @@ def test_training_drilldown_rows_built(tmp_path):
     labels = [label for label, _detail in rows]
     assert "100%" in labels
     assert "50%" in labels
-    assert "No training" in labels
+    assert t("club_advisor.panel.training.no_training") in labels
 
 
 def test_training_card_uses_percentage_buckets_not_primary_secondary_labels(tmp_path):
@@ -212,7 +224,9 @@ def test_training_card_uses_percentage_buckets_not_primary_secondary_labels(tmp_
 
     assert "100%" in sections["training"]
     assert "50%" in sections["training"]
-    assert "No training" in sections["training"]
+    assert t("club_advisor.panel.training.no_training") in sections["training"]
+    assert "Jugadas" in sections["training"]
+    assert "PLAYMAKING" not in sections["training"]
     assert "Primary trainees" not in sections["training"]
     assert "Secondary trainees" not in sections["training"]
 
@@ -245,8 +259,23 @@ def test_critical_project_status_includes_immediate_causes():
 
     text = ClubAdvisorController._format_status_section(report)
 
-    assert "Reasons" in text
+    assert t("club_advisor.panel.causes") in text
     assert "central" in text.lower()
+
+
+def test_drilldown_uses_localized_missing_detail_instead_of_dash(tmp_path):
+    page, controller = make_controller(tmp_path)
+    controller._generate_report()
+    controller._open_drilldown("risks")
+    overlay = _find_overlay(page)
+    if overlay is not None:
+        visible_fields = (
+            overlay.players_label.text(),
+            overlay.reason_label.text(),
+            overlay.impact_label.text(),
+            overlay.review_label.text(),
+        )
+        assert "-" not in visible_fields
 
 
 def test_depth_drilldown_rows_built(tmp_path):
@@ -254,6 +283,9 @@ def test_depth_drilldown_rows_built(tmp_path):
     controller._generate_report()
     rows = controller._depth_drilldown_rows(controller._last_report)
     assert len(rows) == 6
+    labels = "\n".join(label for label, _detail in rows)
+    assert "CENTRAL_DEFENDER" not in labels
+    assert "Defensa central" in labels
 
 
 def test_limitations_drilldown_rows_built(tmp_path):
@@ -261,3 +293,38 @@ def test_limitations_drilldown_rows_built(tmp_path):
     controller._generate_report()
     rows = controller._limitations_drilldown_rows(controller._last_report)
     assert len(rows) == len(controller._last_report.limitations)
+
+
+def test_rendered_advisor_text_has_no_raw_internal_keys(tmp_path):
+    page, controller = make_controller(tmp_path)
+    controller._generate_report()
+    controller._open_drilldown("depth")
+    overlay = _find_overlay(page)
+
+    rendered = "\n".join(label.text() for label in page.findChildren(QLabel))
+    if overlay is not None:
+        rendered += "\n" + "\n".join(
+            item.text() for item in (
+                overlay.explanation_label,
+                overlay.players_label,
+                overlay.reason_label,
+                overlay.impact_label,
+                overlay.review_label,
+                overlay.detail_label,
+            )
+        )
+
+    forbidden = (
+        "primary_trainee_count",
+        "veteran_count",
+        "trainee_count",
+        "CENTRAL_DEFENDER",
+        "WING_BACK",
+        "INNER_MIDFIELDER",
+        "GOALKEEPER",
+        "FORWARD",
+        "PLAYMAKING",
+    )
+    for value in forbidden:
+        assert value not in rendered
+    assert "_" not in rendered

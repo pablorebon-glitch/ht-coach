@@ -412,6 +412,45 @@ Static-import and structural tests confirm this package never invokes
 `FormationOptimizer` or `TacticOptimizer`, and that `PlayerIntelligenceReport` has
 no `overall_score`/`score` field at all.
 
+### HT Weekly Calendar (Alpha 0.6.5)
+
+`engine/calendar/`
+
+The single canonical source of truth for "what Hattrick week is this?" --
+strongly typed, Qt-independent, and deliberately the *only* place any module
+does `datetime`/`date` arithmetic tied to HT's own weekly rhythm.
+
+- `enums.py`: `HTWeekday` (Sunday-first, matching HT's own week -- not
+  Python's Monday-first `weekday()`), `HT_DAY_ACTIVITY` (the one place
+  "Thursday means training" is defined), `HTWeekState` (8 values, all
+  reachable, mapped directly onto the day-activity table).
+- `schedule.py`: `HTWeekScheduleConfig` -- every event's processing hour as
+  an overridable dataclass field, never a magic number.
+- `models.py`: `HTWeekSnapshot` (the one-call shape most consumers want);
+  `FinancialWeekSnapshot`/`YouthWeekSnapshot` -- pure, unimplemented
+  contracts for a future Finance/Youth module (every field defaults to
+  `None`, never a fabricated zero).
+- `service.py`: `HTCalendarService` -- `current_state()`,
+  `next_transition()`, `days_until_training()/finances()/match()`,
+  `training_week_id()`, `is_training_processed()`, `week_snapshot()`. `now`
+  is always an explicit, injectable parameter (or falls back to a
+  configurable clock) -- every method is deterministic and testable.
+
+`ht_coach_app/services/ht_week_context_provider.py`'s `get_calendar_service()`
+is the one shared instance the whole app reads from (Weekly Planner, Club
+Advisor, Match Intelligence, Evolution, History) -- `set_calendar_service()`
+is the test-only override hook. `ht_coach_app/services/ht_week_formatting.py`
+renders the compact "Current HT Week" header from a snapshot.
+
+**The core fix.** `engine/weekly_training/training_week.py` and
+`weekly_training_service.py`'s `load_state()` both used to decide "has this
+week's training processed?" by comparing bare `date` objects -- discarding
+whatever hour was actually available, so any moment on Thursday counted as
+processed. Both now delegate to `HTCalendarService.is_training_processed()`
+whenever a full `datetime` is available, with the original date-only
+comparison preserved as a fallback for callers that only ever pass a bare
+`date` (no time-of-day information at all).
+
 ### Workflow Consolidation (Alpha 0.6.1 / UX-03)
 
 An integration sprint with two new small engine modules and one new page,
@@ -1030,6 +1069,27 @@ does not display direct matchup margins, advantage classes or difference-based t
 signals from Match Intelligence. It keeps within-team profile context and possession
 signals, and the Opponent Rating Calibration table continues to show the raw values with
 their source scales. No conversion factor is introduced.
+
+**Source-selection policy (HF-02.2).** `matchup.py`'s own left/right pairing
+dictionaries are now derived from `engine/ratings/sector_rating.py`'s
+`MATCHUP_PAIRS` directly (previously an independent, coincidentally-identical
+copy). `engine/ratings/rating_source_policy.py`'s `select_our_ratings()` is the
+single policy deciding which "our" ratings feed the comparison and tactical
+intelligence: Official PRE (when present for the match) beats a calibrated
+internal estimate (not yet confirmed comparable, so this tier is currently
+unreachable) beats the internal diagnostic estimate. Root cause this fixed:
+`MatchWorkspaceService._map_sector_comparisons` previously hardcoded
+`our_scale=SOURCE_HT_COACH_INTERNAL` unconditionally, so a comparison was
+*never* marked comparable for "our" side even when a real Official PRE existed
+on the same scale as the opponent estimate.
+`MatchWorkspaceService.apply_official_pre_override()` applies the policy as a
+pure post-processing step over an already-computed `MatchAnalysisResult` --
+substituting only the *recommended* formation's ratings and recomputing its
+`sector_rating_comparisons` and the top-level `match_intelligence` result via
+the unchanged `MatchIntelligenceEngine`. It never touches TeamRater,
+LineupOptimizer, TacticOptimizer, probabilities, xG or any rating formula.
+`AppEvents.official_ratings_changed` lets Match and Match Intelligence
+auto-refresh each other after an import from either page.
 
 ### Rating Validation
 

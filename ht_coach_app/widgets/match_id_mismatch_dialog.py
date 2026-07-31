@@ -13,6 +13,7 @@ from ht_coach_app.core.localization import t
 class MatchIdMismatchDialog(QDialog):
     def __init__(self, pre_match_id, post_match_id, parent=None):
         super().__init__(parent)
+        self._accepted = False
         self.setWindowTitle(t("match.official_import.match_id_mismatch.title"))
         self.setMinimumWidth(460)
 
@@ -46,7 +47,7 @@ class MatchIdMismatchDialog(QDialog):
         self.back_button = self.buttons.button(QDialogButtonBox.Cancel)
         self.apply_button.setText(t("common.apply"))
         self.back_button.setText(t("common.back"))
-        self.buttons.accepted.connect(self.accept)
+        self.apply_button.clicked.connect(self._apply)
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
 
@@ -64,6 +65,13 @@ class MatchIdMismatchDialog(QDialog):
         pre_id = self.pre_match_id_edit.text().strip()
         post_id = self.post_match_id_edit.text().strip()
         return pre_id if pre_id and pre_id == post_id else ""
+
+    def _apply(self):
+        if self._accepted or not self.match_id():
+            return
+        self._accepted = True
+        self.apply_button.setEnabled(False)
+        self.accept()
 
     @staticmethod
     def request_match_id(pre_match_id, post_match_id, parent=None):

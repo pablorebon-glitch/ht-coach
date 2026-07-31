@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from types import SimpleNamespace
 from pathlib import Path
@@ -744,6 +744,69 @@ class MatchWorkspaceService:
             player_name=lineup_player.player.name
         )
 
+    def apply_official_pre_override(self, result, official_pre_ratings):
+        """HF-02.2 source-selection policy, applied as a pure
+        post-processing step over an already-computed `MatchAnalysisResult`
+        -- never touches the optimizer, the rating formulas, or how the
+        other candidate formations were computed. Only the *recommended*
+        formation's "our" ratings are substituted (Official PRE was
+        captured for whatever lineup was actually submitted, not for
+        every candidate formation the optimizer explored), and only its
+        `sector_rating_comparisons` and the top-level `match_intelligence`
+        result are recomputed from that substitution.
+
+        Returns `result` unchanged if there's no recommended formation or
+        no usable Official PRE ratings.
+        """
+        from engine.ratings.rating_source_policy import select_our_ratings
+
+        recommended = result.recommended_formation
+        if recommended is None:
+            return result
+
+        selection = select_our_ratings(
+            recommended.team_ratings, official_pre_ratings
+        )
+        if not selection.is_official:
+            return result
+
+        official_team_ratings = self._map_team_ratings(selection.ratings)
+        sector_rating_comparisons = [
+            _sector_rating_comparison_from_domain(comparison)
+            for comparison in build_sector_comparisons(
+                official_team_ratings,
+                recommended.opponent_ratings,
+                our_scale=selection.scale,
+            )
+        ]
+
+        updated_formations = [
+            (
+                self._with_official_ratings(
+                    formation, official_team_ratings, sector_rating_comparisons
+                )
+                if formation is recommended
+                else formation
+            )
+            for formation in result.formations
+        ]
+        updated_result = replace(result, formations=updated_formations)
+
+        try:
+            match_intelligence = MatchIntelligenceEngine().analyze(updated_result)
+        except Exception:
+            match_intelligence = result.match_intelligence
+
+        return replace(updated_result, match_intelligence=match_intelligence)
+
+    @staticmethod
+    def _with_official_ratings(formation, official_team_ratings, sector_rating_comparisons):
+        return replace(
+            formation,
+            team_ratings=official_team_ratings,
+            sector_rating_comparisons=sector_rating_comparisons,
+        )
+
     def _with_decision_lab(self, result):
         try:
             decision_lab = DecisionLab().analyze(result)
@@ -776,28 +839,21 @@ class MatchWorkspaceService:
         if ratings is None:
             return TeamRatingsResult()
 
+        def _required(sector):
+            # HF-02.2: a sector attribute may exist but hold None (e.g. a
+            # partial Official PRE capture) -- "or 0.0" catches that,
+            # unlike a getattr default (which only applies when the
+            # attribute is missing entirely). Never fail on optional data.
+            return float(getattr(ratings, sector, 0.0) or 0.0)
+
         return TeamRatingsResult(
-            left_defense=float(
-                getattr(ratings, "left_defense", 0.0)
-            ),
-            central_defense=float(
-                getattr(ratings, "central_defense", 0.0)
-            ),
-            right_defense=float(
-                getattr(ratings, "right_defense", 0.0)
-            ),
-            midfield=float(
-                getattr(ratings, "midfield", 0.0)
-            ),
-            left_attack=float(
-                getattr(ratings, "left_attack", 0.0)
-            ),
-            central_attack=float(
-                getattr(ratings, "central_attack", 0.0)
-            ),
-            right_attack=float(
-                getattr(ratings, "right_attack", 0.0)
-            ),
+            left_defense=_required("left_defense"),
+            central_defense=_required("central_defense"),
+            right_defense=_required("right_defense"),
+            midfield=_required("midfield"),
+            left_attack=_required("left_attack"),
+            central_attack=_required("central_attack"),
+            right_attack=_required("right_attack"),
             indirect_defense=_optional_float(
                 getattr(ratings, "indirect_defense", None)
             ),

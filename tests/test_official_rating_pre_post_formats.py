@@ -28,6 +28,38 @@ REAL_SAMPLE_PRE = """[b]Hit'em up - Torres Futbol Club[/b] [matchid=770131822]
 [b]Actitud del equipo[/b]: Normal
 [b]Estilo de juego[/b]: 100% ofensivo"""
 
+REAL_HF02_PRE = """[b]Hit'em up - Santa Cruz Club[/b] [matchid=770918226]
+
+[table][tr][th]Defensa[/th][td align=center]3.25[/td][td align=center]4.5[/td][td align=center]3.25[/td][/tr][tr][th]Mediocampo[/th][td colspan=3 align=center]7.5[/td][/tr][tr][th]Ataque[/th][td align=center]6.75[/td][td align=center]9.5[/td][td align=center]8.5[/td][/tr][/table]
+[b]FormaciÃ³n[/b]: 2-5-3 formidable (9)
+[b]TÃ¡cticas[/b]: Atacar por el centro clase mundial (13)
+[b]Actitud del equipo[/b]: Normal
+[b]Estilo de juego[/b]: 100% ofensivo"""
+
+REAL_HF02_POST = """[table][tr][th][matchid=770725689][/th][th colspan=2]Hit'em up [teamid=2819540][/th][/tr]
+[tr][th]Mediocampo[/th][td]aceptable - muy bajo[/td][td align=right]6,00[/td][/tr]
+[tr][th]Defensa derecha[/th][td]pobre - bajo[/td][td align=right]3,25[/td][/tr]
+[tr][th]Defensa central[/th][td]dÃ©bil - muy alto[/td][td align=right]4,75[/td][/tr]
+[tr][th]Defensa izquierda[/th][td]pobre - alto[/td][td align=right]3,50[/td][/tr]
+[tr][th]Ataque derecho[/th][td]insuficiente - alto[/td][td align=right]5,50[/td][/tr]
+[tr][th]Ataque central[/th][td]bueno - alto[/td][td align=right]7,50[/td][/tr]
+[tr][th]Ataque izquierdo[/th][td]aceptable - muy alto[/td][td align=right]6,75[/td][/tr]
+[tr][th colspan=3]Tiro indirecto[/th][/tr]
+[tr][th]Defensa[/th][td]aceptable - muy bajo[/td][td align=right]6,00[/td][/tr]
+[tr][th]Ataque[/th][td]insuficiente - bajo[/td][td align=right]5,25[/td][/tr]
+[tr][th colspan=3]Plan de juego[/th][/tr]
+[tr][th]Actitud del equipo[/th][td colspan=2](Oculta)[/td][/tr]
+[tr][th]TÃ¡ctica[/th][td colspan=2]Atacar por el centro[/td][/tr]
+[tr][th]Nivel de tÃ¡ctica[/th][td]clase mundial[/td][td align=right]13[/td][/tr]
+[tr][th]Estilo de juego[/th][td colspan=2]100% ofensivo[/td][/tr]
+[tr][th colspan=3]Calificaciones medias[/th][/tr]
+[tr][th]Experiencia total de los jugadores[/th][td]pobre - muy bajo[/td][td align=right]3,00[/td][/tr]
+[tr][th]Mediocampo promedio[/th][td]aceptable - muy bajo[/td][td align=right]6,00[/td][/tr]
+[tr][th]Defensa promedio[/th][td]pobre - muy alto[/td][td align=right]3,75[/td][/tr]
+[tr][th]Ataque promedio[/th][td]aceptable - alto[/td][td align=right]6,50[/td][/tr]
+[tr][th]Promedio total[/th][td]insuficiente - alto[/td][td align=right]5,50[/td][/tr]
+[/table]"""
+
 SYNTHETIC_POST_SAMPLE = """
 [b]Hit'em up - Torres Futbol Club[/b] [matchid=770131822]
 Midfield: 7.50
@@ -64,6 +96,10 @@ def test_detect_format_recognizes_detailed_post():
     assert detect_format(SYNTHETIC_POST_SAMPLE) == DETAILED_POST
 
 
+def test_detect_format_recognizes_real_detailed_post_table():
+    assert detect_format(REAL_HF02_POST) == DETAILED_POST
+
+
 def test_parser_still_recognizes_real_pre_sample_after_post_support_added():
     result = parse_official_pre_ratings(REAL_SAMPLE_PRE)
     assert result.detected_format == COMPACT_PRE
@@ -82,6 +118,52 @@ def test_post_sample_extracts_all_seven_sectors():
     assert result.ratings.right_attack == 8.00
     assert result.ratings.central_attack == 9.75
     assert result.ratings.left_attack == 7.75
+
+
+def test_real_hf02_post_extracts_all_seven_core_sectors():
+    result = parse_official_post_ratings(REAL_HF02_POST)
+
+    assert result.detected_format == DETAILED_POST
+    assert result.hattrick_match_id == "770725689"
+    assert result.team_name == "Hit'em up"
+    assert result.ratings.midfield == 6.00
+    assert result.ratings.right_defense == 3.25
+    assert result.ratings.central_defense == 4.75
+    assert result.ratings.left_defense == 3.50
+    assert result.ratings.right_attack == 5.50
+    assert result.ratings.central_attack == 7.50
+    assert result.ratings.left_attack == 6.75
+    validate_official_post_rating_snapshot(result)
+
+
+def test_real_hf02_post_preserves_secondary_ratings_without_overwriting_core_sectors():
+    result = parse_official_post_ratings(REAL_HF02_POST)
+
+    assert result.ratings.indirect_defense == 6.00
+    assert result.ratings.indirect_attack == 5.25
+    assert result.average_rating == 5.50
+    assert result.ratings.right_defense == 3.25
+    assert result.ratings.central_attack == 7.50
+
+
+def test_real_hf02_post_preserves_plan_fields_and_allows_hidden_attitude():
+    result = parse_official_post_ratings(REAL_HF02_POST)
+
+    assert result.formation.label == ""
+    assert result.team_attitude == "(Oculta)"
+    assert result.tactic.label == "Atacar por el centro"
+    assert result.tactic.quality == "clase mundial"
+    assert result.tactic.level == 13.0
+    assert result.style == "100% ofensivo"
+
+
+def test_real_hf02_pre_behavior_remains_compact_pre():
+    result = parse_official_pre_ratings(REAL_HF02_PRE)
+
+    assert result.detected_format == COMPACT_PRE
+    assert result.hattrick_match_id == "770918226"
+    assert result.formation.label == "2-5-3"
+    assert result.ratings.midfield == 7.5
 
 
 def test_post_sample_extracts_indirect_set_pieces():

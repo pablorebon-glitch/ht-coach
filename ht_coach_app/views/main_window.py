@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
 
         if page["key"] == "match_intelligence":
             self._controllers.append(
-                MatchIntelligenceController(widget, parent=self)
+                MatchIntelligenceController(widget, app_events=self._app_events, parent=self)
             )
 
         if page["key"] == "club_advisor":

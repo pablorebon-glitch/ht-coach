@@ -1040,9 +1040,14 @@ class SquadPage(BasePage):
         self.weekly_week_label_v2 = QLabel(t("planner.no_active_week"))
         self.weekly_week_label_v2.setWordWrap(True)
 
+        self.ht_week_status_label = QLabel("")
+        self.ht_week_status_label.setObjectName("htWeekStatusLabel")
+        self.ht_week_status_label.setWordWrap(True)
+
         controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
         controls_layout.addWidget(self.weekly_training_type_combo_v2, 0, 1)
         controls_layout.addWidget(self.weekly_week_label_v2, 1, 0, 1, 2)
+        controls_layout.addWidget(self.ht_week_status_label, 2, 0, 1, 2)
         controls_layout.setColumnStretch(1, 1)
         layout.addWidget(controls)
 
@@ -1580,15 +1585,18 @@ class SquadPage(BasePage):
                     break
 
     def set_specialties(self, specialties):
-        current = self.speciality_combo.currentText()
+        from models.specialty import Specialty
+
+        current = self.speciality_combo.currentData()
         self.speciality_combo.blockSignals(True)
         self.speciality_combo.clear()
-        self.speciality_combo.addItem("")
+        self.speciality_combo.addItem(t("squad_builder.filter_specialty_all"), "")
 
-        for speciality in specialties:
-            self.speciality_combo.addItem(speciality)
+        for specialty in specialties:
+            value = specialty.value if isinstance(specialty, Specialty) else specialty
+            self.speciality_combo.addItem(t(f"specialty.{value}"), value)
 
-        index = self.speciality_combo.findText(current)
+        index = self.speciality_combo.findData(current)
         self.speciality_combo.setCurrentIndex(index if index >= 0 else 0)
         self.speciality_combo.blockSignals(False)
 
@@ -1597,7 +1605,7 @@ class SquadPage(BasePage):
             "search_text": "",
             "minimum_form": 0,
             "minimum_stamina": 0,
-            "speciality": self.speciality_combo.currentText(),
+            "speciality": self.speciality_combo.currentData() or "",
             "selected_position": "",
             "availability": "all",
             "role": self.role_filter_combo.currentData() or "all",
@@ -1750,6 +1758,9 @@ class SquadPage(BasePage):
         self.weekly_cost_label.setText("")
         self.weekly_explanations_label.setText("")
         self._weekly_plan_board = None
+
+    def set_ht_week_status(self, text):
+        self.ht_week_status_label.setText(text)
 
     def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
         self._clear_weekly_training_plan()
