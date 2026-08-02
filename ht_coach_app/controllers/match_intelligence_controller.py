@@ -23,7 +23,19 @@ class MatchIntelligenceController(QObject):
             self._view.record_navigation_requested.connect(self._navigate_record)
         if hasattr(self._view, "record_selected"):
             self._view.record_selected.connect(self._select_record)
+        if (
+            self._app_events is not None
+            and hasattr(self._app_events, "match_records_changed")
+        ):
+            self._app_events.match_records_changed.connect(
+                self._handle_match_records_changed
+            )
 
+        self.refresh()
+
+    def _handle_match_records_changed(self, snapshot_id):
+        if snapshot_id:
+            self._selected_snapshot_id = snapshot_id
         self.refresh()
 
     def _populate_history_navigation(self, service):

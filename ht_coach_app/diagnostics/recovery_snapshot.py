@@ -16,7 +16,10 @@ class RecoverySnapshotStore:
         self._directory = directory or recovery_snapshot_directory()
 
     def _path_for(self, match_record_id):
-        safe_id = "".join(c if c.isalnum() or c in "-_:" else "_" for c in match_record_id)
+        safe_id = "".join(
+            c if c.isalnum() or c in "-_" else "_"
+            for c in match_record_id
+        )
         return self._directory / f"{safe_id}.json"
 
     def save(self, match_record_id, tactic="", team_attitude="", formation_name="", lineup_summary=None):

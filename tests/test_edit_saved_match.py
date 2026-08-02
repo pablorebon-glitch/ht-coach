@@ -51,6 +51,30 @@ def test_edit_record_restores_opponent(tmp_path):
     assert page.selected_opponent_name() == "CA Chaco"
 
 
+def test_edit_record_restores_opponent_even_if_not_in_opponent_manager(tmp_path):
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=[])
+    record = find_or_create_provisional_record(
+        hist_repo, opponent_name="CA Chaco", match_date="2026-08-09", competition_type="league"
+    )
+    controller.edit_record(record.snapshot_id)
+    assert page.selected_opponent_name() == "CA Chaco"
+
+
+def test_edit_record_opens_preparation_section_and_marks_edit_mode(tmp_path):
+    from ht_coach_app.core.localization import t
+
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["CA Chaco"])
+    record = find_or_create_provisional_record(
+        hist_repo, opponent_name="CA Chaco", match_date="2026-08-09", competition_type="league"
+    )
+    page.collapse_analysis_inputs()
+
+    controller.edit_record(record.snapshot_id)
+
+    assert page.analysis_inputs_expanded()
+    assert page.analysis_setup_title.text() == t("match.editing_saved_match")
+
+
 def test_edit_record_restores_competition_type(tmp_path):
     page, controller, hist_repo = make_controller(tmp_path, known_opponents=["CA Chaco"])
     record = find_or_create_provisional_record(
@@ -212,3 +236,80 @@ def test_edit_with_cached_result_for_a_different_opponent_does_not_restore(tmp_p
     controller.edit_record(record.snapshot_id)
 
     assert page.status_label.text() == t("match.edit_requires_reanalysis")
+
+
+def test_editing_metadata_marks_workspace_dirty_and_saves_without_reanalysis(tmp_path):
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["CA Chaco", "Torres FC"])
+    record = find_or_create_provisional_record(
+        hist_repo, opponent_name="CA Chaco", match_date="2026-09-15", competition_type="league"
+    )
+
+    controller.edit_record(record.snapshot_id)
+    page.opponent_combo.setCurrentText("Torres FC")
+    page.set_match_type("CUP")
+    page.set_venue_role("away")
+    controller._save_formation()
+
+    updated = hist_repo.get(record.snapshot_id)
+    assert updated.match_context.opponent.opponent_name == "Torres FC"
+    assert updated.match_context.competition_type.value == "cup"
+    assert updated.match_context.home_away.value == "away"
+    assert page.is_workspace_dirty() is False
+
+
+def test_editing_metadata_with_official_evidence_shows_warning_and_preserves_match_id(tmp_path):
+    from engine.history.official_ratings.models import OfficialRatingSnapshot
+    from engine.history.provisional_record import consolidate_with_official_pre
+    from ht_coach_app.core.localization import t
+
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["CA Chaco", "Torres FC"])
+    record = find_or_create_provisional_record(
+        hist_repo, opponent_name="CA Chaco", match_date="2026-09-15", competition_type="league"
+    )
+    record = consolidate_with_official_pre(
+        hist_repo, record, OfficialRatingSnapshot(), "770918226"
+    )
+
+    controller.edit_record(record.snapshot_id)
+    page.opponent_combo.setCurrentText("Torres FC")
+
+    assert page.metadata_evidence_warning_label.text() == t(
+        "match.metadata_official_evidence_warning"
+    )
+
+    controller._save_formation()
+    updated = hist_repo.get(record.snapshot_id)
+    assert updated.match_context.official_match_id == "770918226"
+    assert updated.official_pre is not None
+
+
+def test_weekly_save_button_labels_are_compact(tmp_path):
+    from ht_coach_app.core.localization import t
+    from ht_coach_app.services.match_workspace_service import (
+        FormationAnalysisResult,
+        LineupPlayerResult,
+        MatchAnalysisResult,
+        TeamRatingsResult,
+    )
+
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["CA Chaco"])
+    lineup = [
+        LineupPlayerResult(
+            number=i, position="INNER_MIDFIELDER", side="CENTER",
+            order="Normal", order_side="", player_name=f"P{i}",
+        )
+        for i in range(1, 12)
+    ]
+    formation = FormationAnalysisResult(
+        formation_name="3-5-2", recommended_tactic="Normal", tactic_level=5,
+        win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
+        possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
+        is_recommended=True, team_ratings=TeamRatingsResult(), lineup=lineup,
+    )
+    page.show_results(
+        MatchAnalysisResult(player_count=18, opponent_name="CA Chaco", formations=[formation])
+    )
+
+    board = page._formation_board_widget
+    assert board.save_as_first_match_button.text() == t("match.save_as_first_match")
+    assert board.save_as_second_match_button.text() == t("match.save_as_second_match")

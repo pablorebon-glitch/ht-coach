@@ -102,6 +102,8 @@ class MatchPage(BasePage):
         self._last_workspace_state = None
         self._advisor_verbosity = "detailed"
         self._analysis_inputs_collapsed = False
+        self._editing_saved_match = False
+        self._metadata_dirty = False
         self._match_section_states = dict(self.MATCH_SECTION_DEFAULTS)
         self._match_sections = {}
         self._match_section_body_roots = {}
@@ -241,6 +243,7 @@ class MatchPage(BasePage):
         opponent_label = QLabel(t("match.opponent"))
         self.opponent_label = opponent_label
         self.opponent_combo = QComboBox()
+        self.opponent_combo.setEditable(True)
         self.opponent_combo.currentTextChanged.connect(
             self._emit_workspace_changed
         )
@@ -344,6 +347,14 @@ class MatchPage(BasePage):
         )
         self.training_conflict_label.setVisible(False)
 
+        self.metadata_evidence_warning_label = QLabel("")
+        self.metadata_evidence_warning_label.setWordWrap(True)
+        self.metadata_evidence_warning_label.setProperty(
+            "state",
+            "warning"
+        )
+        self.metadata_evidence_warning_label.setVisible(False)
+
         self.status_label = QLabel(t("match.ready"))
         self.status_label.setWordWrap(True)
 
@@ -385,6 +396,7 @@ class MatchPage(BasePage):
         layout.addWidget(self.season_preview_label, 12, 1, 1, 3)
         layout.addWidget(venue_role_label, 13, 0)
         layout.addWidget(self.venue_role_combo, 13, 1, 1, 3)
+        layout.addWidget(self.metadata_evidence_warning_label, 14, 1, 1, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
@@ -408,11 +420,14 @@ class MatchPage(BasePage):
             if selected_name is None
             else selected_name
         )
+        names = list(opponent_names or [])
+        if current and current not in names:
+            names.append(current)
         self.opponent_combo.blockSignals(True)
         self.opponent_combo.clear()
         self.opponent_combo.addItem("")
 
-        for name in opponent_names:
+        for name in names:
             self.opponent_combo.addItem(name)
 
         index = self.opponent_combo.findText(current)
@@ -422,6 +437,29 @@ class MatchPage(BasePage):
             self.opponent_combo.setCurrentIndex(0)
 
         self.opponent_combo.blockSignals(False)
+
+    def enter_saved_match_edit_mode(self, title=None):
+        self._editing_saved_match = True
+        self._metadata_dirty = False
+        self.analysis_setup_title.setText(title or t("match.editing_saved_match"))
+        self.expand_analysis_inputs()
+        self._update_save_action_labels()
+
+    def exit_saved_match_edit_mode(self):
+        self._editing_saved_match = False
+        self._metadata_dirty = False
+        self.analysis_setup_title.setText(t("match.analysis_setup"))
+        self.set_metadata_evidence_warning("")
+        self._update_save_action_labels()
+
+    def clear_metadata_dirty(self):
+        self._metadata_dirty = False
+        self._update_save_action_labels()
+
+    def set_metadata_evidence_warning(self, message):
+        text = (message or "").strip()
+        self.metadata_evidence_warning_label.setText(text)
+        self.metadata_evidence_warning_label.setVisible(bool(text))
 
     def set_supported_formations(
         self,
@@ -591,7 +629,7 @@ class MatchPage(BasePage):
         """Alpha 0.6.7 HF-03, Part 12: whether the currently open
         formation has unsaved changes."""
         board = self._formation_board_widget
-        return board is not None and board.is_dirty()
+        return self._metadata_dirty or (board is not None and board.is_dirty())
 
     def set_training_conflict_warning(self, message):
         text = (message or "").strip()
@@ -1578,6 +1616,7 @@ class MatchPage(BasePage):
                 board.save_formation_requested.connect(
                     self.save_formation_requested
                 )
+                self._update_save_action_labels()
                 board.tactic_changed.connect(
                     self.tactic_changed
                 )
@@ -2420,7 +2459,11 @@ class MatchPage(BasePage):
             t("match.title"),
             t("match.subtitle"),
         )
-        self.analysis_setup_title.setText(t("match.analysis_setup"))
+        self.analysis_setup_title.setText(
+            t("match.editing_saved_match")
+            if self._editing_saved_match
+            else t("match.analysis_setup")
+        )
         self.csv_label.setText(t("match.players_csv"))
         self.players_path_edit.setPlaceholderText(t("match.select_players_csv"))
         self.browse_button.setText(t("match.browse"))
@@ -2431,6 +2474,10 @@ class MatchPage(BasePage):
         self.clear_all_button.setText(t("match.clear_all"))
         self.favorites_button.setText(t("match.favorites"))
         self.analyze_button.setText(t("match.analyze"))
+        self.match_type_label.setText(t("match.match_type"))
+        self.match_date_label.setText(t("match.match_date"))
+        self.venue_role_label.setText(t("match.venue_role"))
+        self._update_save_action_labels()
         self._sync_analysis_setup_toggle()
         self._update_formation_warning()
         self._retranslate_match_sections()
@@ -2671,7 +2718,24 @@ class MatchPage(BasePage):
         self._update_availability_warning()
 
         if not self._applying_settings:
+            if self._editing_saved_match:
+                self._metadata_dirty = True
+                self._update_save_action_labels()
             self.workspace_changed.emit()
+
+    def _update_save_action_labels(self):
+        board = getattr(self, "_formation_board_widget", None)
+        if board is None:
+            return
+        board.save_as_first_match_button.setText(t("match.save_as_first_match"))
+        board.save_as_second_match_button.setText(t("match.save_as_second_match"))
+        if self._editing_saved_match:
+            board.save_formation_button.setText(t("match.save_changes"))
+            board.save_formation_button.setEnabled(
+                self._metadata_dirty or board.is_dirty()
+            )
+        else:
+            board.save_formation_button.setText(t("match.save_formation"))
 
     def _update_availability_warning(self):
         if not hasattr(self, "availability_warning_label"):

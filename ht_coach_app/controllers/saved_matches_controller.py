@@ -9,13 +9,14 @@ from ht_coach_app.services.match_record_status_formatting import (
 class SavedMatchesController(QObject):
     def __init__(
         self, view, repository=None, weekly_repository=None,
-        workspace_repository=None, parent=None,
+        workspace_repository=None, app_events=None, parent=None,
     ):
         super().__init__(parent)
         self._view = view
         self._repository = repository
         self._weekly_repository = weekly_repository
         self._workspace_repository = workspace_repository
+        self._app_events = app_events
 
         if hasattr(self._view, "refresh_requested"):
             self._view.refresh_requested.connect(self.refresh)
@@ -23,6 +24,13 @@ class SavedMatchesController(QObject):
             self._view.delete_requested.connect(self._delete_record)
         if hasattr(self._view, "find_duplicates_requested"):
             self._view.find_duplicates_requested.connect(self._find_duplicates)
+        if (
+            self._app_events is not None
+            and hasattr(self._app_events, "match_records_changed")
+        ):
+            self._app_events.match_records_changed.connect(
+                lambda _snapshot_id: self.refresh()
+            )
 
     def _find_duplicates(self):
         """Alpha 0.6.7 HF-02, Part 10: safe duplicates merge

@@ -243,6 +243,7 @@ class MainWindow(QMainWindow):
                 HistoricalMatchRepository(historical_match_snapshots_path()),
                 WeeklyTrainingRepository(user_data_dir() / "weekly_training_planner.json"),
                 workspace_repository=MatchWorkspaceRepository(),
+                app_events=self._app_events,
                 parent=self,
             )
             self._controllers.append(saved_matches_controller)

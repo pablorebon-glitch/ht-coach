@@ -111,7 +111,7 @@ class MatchController(QObject):
             )
             self._update_season_preview(self._current_match_date())
         self._view.workspace_changed.connect(
-            self._save_current_settings
+            self._handle_workspace_changed
         )
         if hasattr(self._view, "match_section_toggled"):
             self._view.match_section_toggled.connect(
@@ -446,7 +446,57 @@ class MatchController(QObject):
             )
             self._view.set_venue_role(venue_value or "unknown")
 
+        if hasattr(self._view, "enter_saved_match_edit_mode"):
+            self._view.enter_saved_match_edit_mode(
+                t("match.editing_saved_match")
+            )
+        self._update_season_preview(record.match_context.match_date)
+        self._update_metadata_evidence_warning()
         self._restore_full_workspace_if_available(record, opponent_name)
+
+    def _handle_workspace_changed(self):
+        self._save_current_settings()
+        self._update_metadata_evidence_warning()
+
+    def _update_metadata_evidence_warning(self):
+        if not hasattr(self._view, "set_metadata_evidence_warning"):
+            return
+        record = self._current_workspace_record()
+        if record is None or not (record.official_pre or record.official_post):
+            self._view.set_metadata_evidence_warning("")
+            return
+        if self._metadata_differs_from_record(record):
+            self._view.set_metadata_evidence_warning(
+                t("match.metadata_official_evidence_warning")
+            )
+        else:
+            self._view.set_metadata_evidence_warning("")
+
+    def _metadata_differs_from_record(self, record):
+        current_opponent = (
+            self._view.selected_opponent_name()
+            if hasattr(self._view, "selected_opponent_name")
+            else ""
+        )
+        current_date = self._current_match_date() or ""
+        current_type = (
+            self._view.match_type().lower()
+            if hasattr(self._view, "match_type")
+            else ""
+        )
+        record_type = str(
+            getattr(
+                record.match_context.competition_type,
+                "value",
+                record.match_context.competition_type,
+            )
+            or ""
+        ).lower()
+        return (
+            current_opponent != (record.match_context.opponent.opponent_name or "")
+            or current_date != (record.match_context.match_date or "")
+            or current_type != record_type
+        )
 
     def _restore_full_workspace_if_available(self, record, opponent_name):
         """Alpha 0.6.7, Part 8's remaining piece. `HistoricalMatchSnapshot`
@@ -817,9 +867,14 @@ class MatchController(QObject):
         if record is None:
             return
 
-        from engine.history.models import MatchContext
+        from engine.history.models import MatchContext, OpponentReference
 
         match_date = self._current_match_date() or record.match_context.match_date
+        opponent_name = (
+            self._view.selected_opponent_name()
+            if hasattr(self._view, "selected_opponent_name")
+            else ""
+        ) or record.match_context.opponent.opponent_name
         competition_type = (
             self._view.match_type().lower()
             if hasattr(self._view, "match_type")
@@ -842,11 +897,32 @@ class MatchController(QObject):
                 match_type=record.match_context.match_type,
                 home_away=venue_role,
                 team_type=record.match_context.team_type,
-                opponent=record.match_context.opponent,
+                opponent=replace(
+                    record.match_context.opponent
+                    if record.match_context.opponent is not None
+                    else OpponentReference(),
+                    opponent_name=opponent_name,
+                ),
                 venue=record.match_context.venue,
                 snapshot_stage=record.match_context.snapshot_stage,
             )
-            repository.save(record.with_updates(match_context=updated_context))
+            season_week = self._resolve_season_week(match_date)
+            training_cycle_id = self._resolve_training_cycle_id(match_date)
+            repository.save(
+                record.with_updates(
+                    match_context=updated_context,
+                    training_cycle_id=training_cycle_id,
+                    ht_season_number=season_week.season_number,
+                    ht_season_week=season_week.season_week,
+                )
+            )
+            if hasattr(self._view, "clear_metadata_dirty"):
+                self._view.clear_metadata_dirty()
+            if (
+                self._app_events is not None
+                and hasattr(self._app_events, "match_records_changed")
+            ):
+                self._app_events.match_records_changed.emit(snapshot_id)
         except Exception:
             # Never let a best-effort metadata correction break the
             # actual save flow it's attached to.
@@ -1382,6 +1458,15 @@ class MatchController(QObject):
         when genuinely none exists yet for this opponent+date+type."""
         result = self._settings_repository.load_last_result()
         if result is None or not getattr(result, "formations", None):
+            if self._editing_snapshot_id:
+                self._persist_metadata_corrections_to_canonical_record(
+                    self._editing_snapshot_id
+                )
+                self._update_metadata_evidence_warning()
+                if hasattr(self._view, "show_status"):
+                    self._view.show_status(t("match.metadata_saved"))
+                self._record_app_event("save_metadata", self._editing_snapshot_id)
+                return
             self._view.show_error(
                 t("match.save_as_first_match_no_result")
             )
@@ -1419,9 +1504,15 @@ class MatchController(QObject):
         self._persist_lineup_to_canonical_record(record.snapshot_id, result)
         self._record_app_event("save_formation", record.snapshot_id)
         self._discard_recovery_snapshot(record.snapshot_id)
+        if (
+            self._app_events is not None
+            and hasattr(self._app_events, "match_records_changed")
+        ):
+            self._app_events.match_records_changed.emit(record.snapshot_id)
 
         if hasattr(self._view, "show_status"):
             self._view.show_status(t("match.formation_saved"))
+        self._update_metadata_evidence_warning()
 
     def _save_as_second_match(self):
         result = self._settings_repository.load_last_result()
