@@ -70,6 +70,16 @@ class OfficialRatingSnapshot:
     canonical_tactic: str = ""
     warnings: tuple[str, ...] = ()
     detected_format: str = ""
+    # Alpha 0.6.6, Parts 16-17: official vs. retrospective PRE. Never
+    # set by the parser itself -- always decided by the app layer at
+    # the point of import, based on whether the manager confirmed this
+    # capture belongs to the current match or is a later reconstruction.
+    source_type: str = ""
+    source_match_id: str = ""
+    linked_match_id: str = ""
+    captured_after_match: bool = False
+    confidence: str = ""
+    limitation: str = ""
 
     def __post_init__(self):
         if self.ratings.source != HistoricalRatingSource.HATTRICK_OFFICIAL:
@@ -109,6 +119,12 @@ class OfficialRatingSnapshot:
             "canonical_tactic": self.canonical_tactic,
             "warnings": list(self.warnings),
             "detected_format": self.detected_format,
+            "source_type": self.source_type,
+            "source_match_id": self.source_match_id,
+            "linked_match_id": self.linked_match_id,
+            "captured_after_match": self.captured_after_match,
+            "confidence": self.confidence,
+            "limitation": self.limitation,
         }
 
     @classmethod
@@ -132,4 +148,10 @@ class OfficialRatingSnapshot:
             canonical_tactic=data.get("canonical_tactic", ""),
             warnings=tuple(data.get("warnings", ()) or ()),
             detected_format=data.get("detected_format", ""),
+            source_type=data.get("source_type", ""),
+            source_match_id=data.get("source_match_id", ""),
+            linked_match_id=data.get("linked_match_id", ""),
+            captured_after_match=bool(data.get("captured_after_match", False)),
+            confidence=data.get("confidence", ""),
+            limitation=data.get("limitation", ""),
         )

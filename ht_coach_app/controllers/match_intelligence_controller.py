@@ -10,13 +10,152 @@ class MatchIntelligenceController(QObject):
         self._view = view
         self._service = service
         self._app_events = app_events
+        self._season_filter = None
+        self._selected_snapshot_id = None
 
         if hasattr(self._view, "import_requested"):
             self._view.import_requested.connect(self._open_import_dialog)
         if hasattr(self._view, "refresh_requested"):
             self._view.refresh_requested.connect(self.refresh)
+        if hasattr(self._view, "season_filter_changed"):
+            self._view.season_filter_changed.connect(self._change_season_filter)
+        if hasattr(self._view, "record_navigation_requested"):
+            self._view.record_navigation_requested.connect(self._navigate_record)
+        if hasattr(self._view, "record_selected"):
+            self._view.record_selected.connect(self._select_record)
 
         self.refresh()
+
+    def _populate_history_navigation(self, service):
+        if not hasattr(self._view, "set_available_seasons"):
+            return
+        self._view.set_available_seasons(service.available_seasons())
+
+        records = service.history_records(season_number=self._season_filter)
+        options = [
+            (record.snapshot_id, self._format_record_option(record))
+            for record in records
+        ]
+        self._view.set_record_options(options, self._selected_snapshot_id)
+
+        context = service.navigate_history(records, self._selected_snapshot_id, "current")
+        if hasattr(self._view, "show_record_navigation_state"):
+            self._view.show_record_navigation_state(
+                context.can_go_previous, context.can_go_next
+            )
+
+    @staticmethod
+    def _format_record_option(record):
+        """Alpha 0.6.7, Part 14/HF-02 Part 6: the selector shows *only*
+        the match identity, built through the one central formatter
+        used everywhere a match needs to be named -- never a
+        one-off string built here, which is exactly how duplicated
+        fragments crept in before."""
+        from ht_coach_app.services.match_display_formatter import (
+            format_match_selector_option,
+        )
+
+        opponent = record.match_context.opponent.opponent_name or "?"
+        our_team_name = (
+            (record.official_pre.team_name if record.official_pre else "")
+            or (record.official_post.team_name if record.official_post else "")
+            or (record.retrospective_pre.team_name if record.retrospective_pre else "")
+        )
+        if our_team_name:
+            return format_match_selector_option(our_team_name, opponent)
+        # No team name known yet -- fall back to the date as the
+        # next-best identity anchor, never a status word.
+        return format_match_selector_option(
+            record.match_context.match_date or "?", opponent
+        )
+
+    @staticmethod
+    def _format_record_identity(snapshot):
+        from ht_coach_app.services.dual_week_formatting import format_season_week
+        from ht_coach_app.services.match_record_status_formatting import (
+            match_record_status_label,
+        )
+
+        opponent = snapshot.match_context.opponent.opponent_name or "?"
+        date_text = snapshot.match_context.match_date or "?"
+        competition = t(
+            f"official_match_intelligence.history.competition.{getattr(snapshot.match_context.competition_type, 'value', snapshot.match_context.competition_type)}"
+        )
+        lines = [
+            t("official_match_intelligence.history.identity_vs", opponent=opponent),
+            format_season_week(snapshot.season_week),
+            f"{date_text} · {competition}",
+            t(
+                "official_match_intelligence.history.status_line",
+                status=match_record_status_label(snapshot.status),
+            ),
+        ]
+        if snapshot.match_context.official_match_id:
+            lines.append(
+                t(
+                    "official_match_intelligence.history.match_id_line",
+                    match_id=snapshot.match_context.official_match_id,
+                )
+            )
+        return "\n".join(lines)
+
+    def _change_season_filter(self, season_number):
+        self._season_filter = season_number
+        self._selected_snapshot_id = None
+        self.refresh()
+
+    def _navigate_record(self, direction):
+        records = self._get_service().history_records(season_number=self._season_filter)
+        context = self._get_service().navigate_history(
+            records, self._selected_snapshot_id, direction
+        )
+        self._selected_snapshot_id = context.record.snapshot_id if context.record else None
+        self.refresh()
+
+    def _select_record(self, snapshot_id):
+        self._selected_snapshot_id = snapshot_id
+        self.refresh()
+
+    def _offer_retrospective_pre_if_applicable(self, text):
+        """Alpha 0.6.6, Part 17: before treating a PRE-shaped import as
+        a normal PRE, check whether it looks like a formation
+        reproduced *after* an already-played, still-PRE-less match --
+        if so, offer it as a retrospective simulation instead. Returns
+        True when this path fully handled the import (whether the user
+        confirmed or declined), False to let the normal import flow
+        proceed unchanged."""
+        from engine.history.retrospective_pre import (
+            detect_retrospective_pre_candidate,
+            save_as_retrospective_simulation,
+        )
+        from ht_coach_app.services.official_rating_service import (
+            OfficialRatingImportError,
+            OfficialRatingImportService,
+            PRE,
+        )
+
+        if not hasattr(self._view, "confirm_retrospective_pre"):
+            return False
+
+        try:
+            parsed = OfficialRatingImportService._parse_and_validate(text, "", PRE)
+        except OfficialRatingImportError:
+            # Not parseable as PRE at all -- let the normal import path
+            # raise and surface the real error message.
+            return False
+
+        service = self._get_service()
+        candidate = detect_retrospective_pre_candidate(service._repository, parsed)
+        if candidate is None:
+            return False
+
+        if not self._view.confirm_retrospective_pre():
+            return True
+
+        save_as_retrospective_simulation(service._repository, candidate, parsed)
+        self._selected_snapshot_id = candidate.snapshot_id
+        self._refresh_and_notify()
+        return True
 
     def _get_service(self):
         if self._service is None:
@@ -29,10 +168,21 @@ class MatchIntelligenceController(QObject):
 
     def refresh(self):
         service = self._get_service()
-        snapshot = service.latest_snapshot_with_official_data()
+        self._populate_history_navigation(service)
+
+        snapshot = None
+        if self._selected_snapshot_id is not None:
+            snapshot = service._repository.get(self._selected_snapshot_id)
+        if snapshot is None:
+            snapshot = service.latest_snapshot_with_official_data()
+            if snapshot is not None:
+                self._selected_snapshot_id = snapshot.snapshot_id
         if snapshot is None:
             self._view.show_empty_state()
             return
+
+        if hasattr(self._view, "set_record_identity"):
+            self._view.set_record_identity(self._format_record_identity(snapshot))
 
         pre_text = service.format_official_summary(snapshot.official_pre)
         post_text = service.format_official_summary(snapshot.official_post)
@@ -103,16 +253,58 @@ class MatchIntelligenceController(QObject):
             MatchIntelligenceImportDialog,
         )
 
-        result = MatchIntelligenceImportDialog.request_import(self._view)
+        default_slot, hint_text = self._import_dialog_defaults()
+
+        result = MatchIntelligenceImportDialog.request_import(
+            self._view, default_slot=default_slot, hint_text=hint_text
+        )
         if result is None:
             return
         text, slot = result
         self._import(text, slot)
 
+    def _import_dialog_defaults(self):
+        """Alpha 0.6.7, Part 13: the pre-selected slot (and an
+        optional explanatory hint) reflect the currently selected
+        record's own state -- never a fixed default regardless of
+        context. The existing replace-confirmation dialog
+        (`OfficialRatingReplaceConfirmationRequired`) still runs
+        afterward for a Complete record; this only sets a sensible
+        starting choice, it never bypasses that confirmation."""
+        service = self._get_service()
+        snapshot = None
+        if self._selected_snapshot_id is not None:
+            snapshot = service._repository.get(self._selected_snapshot_id)
+
+        has_pre = snapshot is not None and snapshot.official_pre is not None
+        has_post = snapshot is not None and snapshot.official_post is not None
+
+        if has_pre and has_post:
+            return "pre", t("official_match_intelligence.import.hint_complete")
+        if has_pre and not has_post:
+            return "post", t("official_match_intelligence.import.hint_post_priority")
+        if has_post and not has_pre:
+            from datetime import date as _date
+
+            match_date_text = snapshot.match_context.match_date
+            is_future = False
+            if match_date_text:
+                try:
+                    is_future = _date.fromisoformat(match_date_text[:10]) > _date.today()
+                except ValueError:
+                    is_future = False
+            hint_key = (
+                "official_match_intelligence.import.hint_pre_missing_future"
+                if is_future
+                else "official_match_intelligence.import.hint_pre_missing_past"
+            )
+            return "pre", t(hint_key)
+        return "pre", ""
+
     def _refresh_and_notify(self):
         self.refresh()
         if self._app_events is not None:
-            self._app_events.official_ratings_changed.emit()
+            self._app_events.official_ratings_changed.emit(self._selected_snapshot_id or "")
 
     def _import(self, text, slot, confirm_replace=False):
         from ht_coach_app.services.official_rating_service import (
@@ -125,9 +317,13 @@ class MatchIntelligenceController(QObject):
             MatchIdMismatchDialog,
         )
 
+        if slot == "pre" and self._offer_retrospective_pre_if_applicable(text):
+            return
+
         service = self._get_service()
         try:
-            service.import_ratings(text, slot=slot, confirm_replace=confirm_replace)
+            outcome = service.import_ratings(text, slot=slot, confirm_replace=confirm_replace)
+            self._selected_snapshot_id = outcome.snapshot.snapshot_id
         except OfficialRatingMatchIdMismatch as exc:
             match_id = MatchIdMismatchDialog.request_match_id(
                 exc.pre_match_id,

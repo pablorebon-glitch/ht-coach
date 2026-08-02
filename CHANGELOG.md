@@ -2,7 +2,111 @@
 
 ## Unreleased
 
+### Fixed
+
+- Fixed Alpha 0.6.7 HF-02 (Match Record Integrity, Season Calendar and
+  Match UX Completion) -- a repair sprint over Alpha 0.6.7's own real-use
+  regressions, found through manual verification. Root causes and fixes:
+  deleting a Match Record left orphaned Official PRE data behind in a
+  separate, un-invalidated cache (`MatchWorkspaceRepository`'s "last
+  analyzed result" slot) -- added `clear_last_result()`, wired into
+  deletion, verified with the brief's own exact 6-step scenario. Individual
+  player orders had no editing control anywhere in the real Formation
+  Board UI despite the underlying service already supporting it since
+  Alpha 0.6.6 -- added an order selector to the player inspector, reusing
+  the exact recalculation pipeline the existing replacement flow already
+  used. Match date wasn't threaded from the New Match date field into
+  Weekly Planner saves at all; fixed the controller wiring and the
+  replace-confirmation dialog to name the actually-affected week -- an
+  initial deeper fix (making the weekly match_id itself date-aware) broke
+  9 pre-existing tests built around an "active week is the only identity"
+  assumption throughout weekly_training_service.py, so that part was
+  reverted and documented as a known, explicitly tested limitation rather
+  than shipped broken. Metadata corrections (date/competition type/venue)
+  made while editing a saved match were silently discarded -- only the
+  lineup was ever persisted back; fixed to also persist match_context
+  corrections onto the same canonical record. VenueRole reused the
+  existing (but previously unwired) HomeAway enum rather than inventing a
+  parallel one, added the New Match selector, and built one central
+  match-display formatter (used by Official Intelligence's own selector)
+  to reduce the risk of the reported duplicated-name-fragment bug. Added a
+  Venue column to Saved Matches (was missing entirely) and added venue to
+  the weaker duplicate-detection signal so a two-leg cup tie's home/away
+  legs are never mistaken for the same duplicated record. Built the full
+  HT Season Calendar stack (configuration, deterministic
+  anchor-based resolution that still never guesses without a configured
+  season, and recalculation that never overwrites manual corrections
+  unless explicitly requested) and wired its live preview into New Match's
+  date field. Found and fixed a genuine test-isolation bug of my own along
+  the way: a new test that didn't isolate `WeeklyTrainingAppService`'s
+  repository fell back to the shared, real user-data path, letting state
+  leak across test runs and triggering a real, unmocked confirmation
+  dialog that hung headless test execution. ~150 new/updated tests across
+  the hotfix; full suite re-verified at 2093 passed / 0 failed. See
+  docs/UNIFIED_MATCH_WORKFLOW.md and docs/HT_SEASON_CALENDAR.md.
+
+- Fixed Alpha 0.6.7 (partial) Unified Match Workflow's own explicitly
+  flagged bug: Official Match History's previous/next navigation
+  (Alpha 0.6.6) sorted newest-first but treated raw array-index
+  direction as the button semantics, so "Partido anterior" (should mean
+  chronologically older) did nothing from the newest record and
+  "Partido siguiente" (should mean newer) actually moved to an older
+  one -- exactly backwards. Fixed the index arithmetic to match the
+  labeled meaning, fixed deterministic ordering for records with an
+  unknown date (always after dated ones, never randomly reordered
+  between runs), and rewrote every affected test to assert on actual
+  dates rather than array positions, per the brief's own explicit
+  instruction -- the wrong code and the wrong test previously agreed
+  with each other. Made the "COMPLETE requires official_post" status
+  invariant an explicit, always-checked assertion rather than an
+  implicit property of the derivation function's control flow, and
+  verified provisional-identity collision safety against the brief's
+  own numeric concatenation example. ~10 new/updated tests; full suite
+  re-verified at 1877 passed / 0 failed. See
+  docs/UNIFIED_MATCH_WORKFLOW.md. The larger scope of this sprint (New
+  Match / Saved Matches screens, PRE import relocated beside the pitch,
+  duplicate reconciliation) remains for a future pass.
+
 ### Added
+
+- Added Alpha 0.6.6 Match Decision Memory, Weekly Planning Navigation and
+  Official Match History. Manual lineup replacement was already correctly
+  preserving slot/side and never resetting unrelated players' orders;
+  `WorkspaceService.set_manual_order()` closed the one real gap (no way to
+  directly pick any valid order after a replacement). New
+  `engine/lineup_memory/` compares a previously planned lineup against a new
+  recommendation, classifies how meaningful the difference actually is
+  (CLEAR_IMPROVEMENT/MODERATE_IMPROVEMENT/MARGINAL_CHANGE/EQUIVALENT/
+  TRADE_OFF, combining win-probability, xG, and whether sectors moved in
+  opposite directions -- never one arbitrary player score), and builds a
+  structured, evidence-grounded change explanation -- verified against the
+  brief's own worked example (Bassedas/Alvarez, midfield gain vs. central-
+  defense loss) character-for-character. Found and fixed a real scale-
+  compatibility bug in Match's own sector-comparison check (optional
+  indirect-set-piece sectors with no data were blocking otherwise-fully-
+  comparable Official PRE vs. opponent comparisons) and removed a genuinely
+  duplicated technical matchup table from the main Match Intelligence
+  section, relocating it to the existing technical/diagnostic section.
+  Weekly Planner gained previous/current/next week navigation (never
+  unrestricted history -- that's what Official Match History is for) and
+  immediate cross-page refresh when a lineup is saved from Match. Built the
+  full `OfficialMatchRecord` foundation: a strict distinction between
+  training cycles and Hattrick's own competitive season/week numbering
+  (never computed from a date -- always explicit or unknown), typed record
+  statuses always derived fresh from actual PRE/POST/retrospective-PRE
+  evidence (never persisted separately), the progressive provisional ->
+  consolidated -> completed record lifecycle (verified end-to-end to never
+  duplicate a record), full official-match-history navigation wired into
+  the real Match Intelligence page (season filter, previous/current/next,
+  record identity header reproducing the brief's own layout example
+  character-for-character), record editability rules, and the missed-PRE
+  retrospective-simulation workflow (detection, save, and comparison
+  labeling all engine-tested; the confirmation dialog widget itself is the
+  one remaining UI piece). `HistoricalMatchSnapshot` was extended rather
+  than duplicated as a parallel model, verified with a hand-written legacy
+  payload to migrate without any data loss. ~150 new/updated tests across
+  the whole sprint; full suite re-verified at 1864 passed / 0 failed. See
+  docs/MATCH_DECISION_MEMORY.md and docs/OFFICIAL_MATCH_HISTORY.md.
 
 - Added Alpha 0.6.5 Hattrick Weekly Cycle, Squad UX Simplification and
   Training Timeline: architecture-first, no new analytical engines.

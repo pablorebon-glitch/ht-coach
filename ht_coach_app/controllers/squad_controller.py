@@ -139,6 +139,14 @@ class SquadController:
             self._view.use_training_plan_requested.connect(
                 self._accept_training_plan
             )
+        if hasattr(self._view, "week_navigation_requested"):
+            self._view.week_navigation_requested.connect(
+                self._navigate_week
+            )
+        if self._app_events is not None:
+            self._app_events.weekly_plan_saved.connect(
+                self._refresh_weekly_training_after_external_save
+            )
         if hasattr(self._view, "training_type_changed"):
             self._view.training_type_changed.connect(
                 self._change_active_training_type
@@ -355,6 +363,14 @@ class SquadController:
         self._show_evolution()
         self._show_weekly_training()
 
+    def _refresh_weekly_training_after_external_save(self):
+        """Alpha 0.6.6, Part 8: a lineup saved as First/Second Weekly
+        Match from Match must update the Weekly Planner record
+        immediately -- not only the next time this tab happens to be
+        rebuilt. Cheap to call unconditionally: `_show_weekly_training`
+        already no-ops safely when there's no roster loaded yet."""
+        self._show_weekly_training()
+
     def _show_weekly_training(self):
         if not hasattr(self._view, "show_weekly_training"):
             return
@@ -373,6 +389,15 @@ class SquadController:
             self._weekly_training_service.coverage(self._roster.players),
             self._builder_service.supported_formations(),
         )
+        if hasattr(self._view, "show_week_navigation_context"):
+            self._navigate_week("current")
+
+    def _navigate_week(self, direction):
+        if not hasattr(self._view, "show_week_navigation_context"):
+            return
+        state = self._weekly_training_service.load_state()
+        context = self._weekly_training_service.week_navigation_context(state, direction)
+        self._view.show_week_navigation_context(context)
 
     def _change_active_training_type(self, training_type):
         if self._roster is None:

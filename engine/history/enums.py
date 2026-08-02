@@ -75,3 +75,29 @@ class SnapshotSource(_StableEnum):
     IMPORTED = "imported"
     USER_ENTERED = "user_entered"
     UNKNOWN = "unknown"
+
+
+class MatchRecordStatus(_StableEnum):
+    """Alpha 0.6.6, Part 12. Never stored redundantly -- always
+    *derived* from a snapshot's existing fields
+    (`derive_match_record_status()` in
+    `engine/history/match_record_status.py`), so it can never drift out
+    of sync with the data it describes."""
+
+    PLANNED = "planned"
+    PRE_OFFICIAL_IMPORTED = "pre_official_imported"
+    PLAYED_POST_PENDING = "played_post_pending"
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+    RETROSPECTIVE_PRE_AVAILABLE = "retrospective_pre_available"
+
+
+class OfficialRatingSourceType(_StableEnum):
+    """Alpha 0.6.6, Part 16. An official PRE captured before the match
+    and a formation recreated afterward are not equivalent evidence --
+    this is the field that keeps that distinction explicit everywhere
+    an `OfficialRatingSnapshot` is used."""
+
+    OFFICIAL_PRE = "official_pre"
+    RETROSPECTIVE_PRE = "retrospective_pre"
+    OFFICIAL_POST = "official_post"

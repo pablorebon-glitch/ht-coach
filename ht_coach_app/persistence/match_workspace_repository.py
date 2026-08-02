@@ -179,4 +179,14 @@ class MatchWorkspaceRepository:
                 indent=2
             )
 
-        return result
+    def clear_last_result(self):
+        """Alpha 0.6.7 HF-02, Part 1: the cached "last analyzed
+        result" can carry official PRE data already merged into its
+        sector comparisons (`apply_official_pre_override`). If the
+        canonical record that PRE came from gets deleted, this stale
+        cache must not resurrect it on the next app load -- there is
+        no reliable way to "un-merge" already-baked-in official data,
+        so the safest fix is dropping the cache entirely rather than
+        risking showing outdated evidence."""
+        if self.result_storage_path.exists():
+            self.result_storage_path.unlink()

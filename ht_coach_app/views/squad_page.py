@@ -74,6 +74,7 @@ class SquadPage(BasePage):
     delete_first_match_requested = Signal()
     delete_second_match_requested = Signal()
     use_training_plan_requested = Signal()
+    week_navigation_requested = Signal(str)
     training_type_changed = Signal(str)
 
     HEADERS = [
@@ -842,6 +843,22 @@ class SquadPage(BasePage):
         self.weekly_week_label = QLabel(t("planner.no_active_week"))
         self.weekly_week_label.setWordWrap(True)
 
+        self.week_nav_previous_button = QPushButton(t("planner.week_nav.previous"))
+        self.week_nav_previous_button.clicked.connect(
+            lambda: self.week_navigation_requested.emit("previous")
+        )
+        self.week_nav_current_button = QPushButton(t("planner.week_nav.current"))
+        self.week_nav_current_button.clicked.connect(
+            lambda: self.week_navigation_requested.emit("current")
+        )
+        self.week_nav_next_button = QPushButton(t("planner.week_nav.next"))
+        self.week_nav_next_button.clicked.connect(
+            lambda: self.week_navigation_requested.emit("next")
+        )
+        self.week_nav_summary_label = QLabel("")
+        self.week_nav_summary_label.setWordWrap(True)
+        self.week_nav_summary_label.setObjectName("weekNavSummaryLabel")
+
         controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
         controls_layout.addWidget(self.weekly_training_type_combo, 0, 1)
         controls_layout.addWidget(QLabel(t("planner.fixed_formation")), 0, 2)
@@ -851,6 +868,14 @@ class SquadPage(BasePage):
         controls_layout.addWidget(self.weekly_cancel_edit_button, 0, 6)
         controls_layout.addWidget(self.weekly_use_button, 0, 7)
         controls_layout.addWidget(self.weekly_week_label, 1, 0, 1, 8)
+
+        week_nav_row = QHBoxLayout()
+        week_nav_row.addWidget(self.week_nav_previous_button)
+        week_nav_row.addWidget(self.week_nav_current_button)
+        week_nav_row.addWidget(self.week_nav_next_button)
+        week_nav_row.addWidget(self.week_nav_summary_label, 1)
+        controls_layout.addLayout(week_nav_row, 2, 0, 1, 8)
+
         controls_layout.setColumnStretch(3, 1)
         layout.addWidget(controls)
 
@@ -1761,6 +1786,44 @@ class SquadPage(BasePage):
 
     def set_ht_week_status(self, text):
         self.ht_week_status_label.setText(text)
+
+    def show_week_navigation_context(self, context):
+        """Alpha 0.6.6, Part 7: renders whichever of the three
+        navigable contexts (previous/current/next) the user just
+        requested -- canonical HT training-cycle range, first/second
+        match, and planned/played status. A planned lineup is shown
+        even before the match is played."""
+        self.week_nav_previous_button.setEnabled(context.can_go_previous)
+        self.week_nav_next_button.setEnabled(context.can_go_next)
+
+        if context.week is None:
+            self.week_nav_summary_label.setText(t("planner.week_nav.no_data"))
+            return
+
+        lines = [
+            t(
+                f"planner.week_nav.range_{'preview' if context.is_preview else 'label'}",
+                start=context.week.start_date.isoformat(),
+                end=context.week.end_date.isoformat(),
+            )
+        ]
+        for label_key, match in (
+            ("planner.week_nav.first_match", context.first_match),
+            ("planner.week_nav.second_match", context.second_match),
+        ):
+            if match is None:
+                lines.append(f"{t(label_key)}: {t('planner.week_nav.not_saved')}")
+                continue
+            status_key = (
+                "planner.week_nav.status_played"
+                if getattr(match.planned_or_played, "value", match.planned_or_played) == "PLAYED"
+                else "planner.week_nav.status_planned"
+            )
+            lines.append(
+                f"{t(label_key)}: {match.opponent_name} "
+                f"({match.formation}) — {t(status_key)}"
+            )
+        self.week_nav_summary_label.setText("\n".join(lines))
 
     def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
         self._clear_weekly_training_plan()

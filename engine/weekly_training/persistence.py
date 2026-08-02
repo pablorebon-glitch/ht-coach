@@ -301,6 +301,7 @@ def _match_to_dict(record):
             _exposure_to_dict(exposure)
             for exposure in record.training_exposure_entries
         ],
+        "linked_match_record_id": record.linked_match_record_id,
     }
 
 
@@ -321,4 +322,5 @@ def _match_from_dict(data):
             _exposure_from_dict(exposure)
             for exposure in data.get("training_exposure_entries", [])
         ),
+        linked_match_record_id=str(data.get("linked_match_record_id", "")),
     )

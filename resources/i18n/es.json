@@ -68,7 +68,9 @@
     "settings": "Configuración",
     "ready": "{page} listo",
     "club_advisor": "Asesor del club",
-    "official_match_intelligence": "Inteligencia oficial"
+    "official_match_intelligence": "Inteligencia oficial",
+    "new_match": "Nuevo partido",
+    "saved_matches": "Partidos guardados"
   },
   "settings": {
     "title": "Configuración",
@@ -82,7 +84,22 @@
     "advisor_verbosity_help": "Simple muestra título e impacto. Detallado también muestra la explicación.",
     "verbosity_simple": "Simple",
     "verbosity_detailed": "Detallado",
-    "advisor_saved": "Preferencia del asesor guardada."
+    "advisor_saved": "Preferencia del asesor guardada.",
+    "season_calendar": {
+      "title": "Calendario de temporada HT",
+      "explanation": "La semana competitiva de Hattrick va de lunes a domingo. Este calendario es independiente del ciclo de entrenamiento.",
+      "season_number": "Temporada HT actual",
+      "start_date": "Fecha de inicio de la temporada",
+      "total_weeks": "Semanas competitivas totales",
+      "timezone": "Zona horaria",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "recalculate": "Recalcular partidos existentes",
+      "recalculate_confirm": "Esto va a actualizar la temporada/semana de {count} partido(s) guardado(s). ¿Continuar?",
+      "saved": "Calendario de temporada guardado.",
+      "not_configured": "Configurá la temporada antes de recalcular.",
+      "recalculated": "Se actualizaron {count} partido(s)."
+    }
   },
   "dashboard": {
     "title": "Panel",
@@ -769,7 +786,6 @@
     "secure_draw": "Asegurar empate",
     "avoid_defeat": "Evitar derrota",
     "formation_comparison": "Comparación de formaciones",
-    "tactic": "Táctica",
     "win_draw_loss": "Victoria / Empate / Derrota",
     "win_diff": "Dif. victoria",
     "xg_diff": "Dif. xG",
@@ -835,6 +851,74 @@
         "title": "Estimación de HT Coach vs. Oficial Hattrick PRE",
         "scale_limitation": "Los ratings predichos por HT Coach usan una escala interna que todavía no está confirmada como equivalente a la oficial de Hattrick, así que no se muestra una diferencia numérica acá."
       }
+    },
+    "existing_match": {
+      "title": "Análisis existente",
+      "message": "Ya existe un análisis para este partido.\n\n¿Querés editar el análisis existente?"
+    },
+    "conflict": {
+      "title": "Posible partido duplicado",
+      "message": "Ya existe un partido contra {opponent} en esta semana, guardado como {existing_competition}.\n\nAhora seleccionaste {new_competition}.",
+      "cancel": "Cancelar",
+      "correct": "Corregir registro existente",
+      "create_new": "Crear otro partido"
+    },
+    "pre_status": {
+      "missing": "Falta importar el PRE oficial",
+      "loaded": "PRE oficial cargado"
+    },
+    "compact_ratings": {
+      "title": "Calificaciones",
+      "defense": "Defensa",
+      "attack": "Ataque",
+      "left": "Izquierda",
+      "central": "Central",
+      "right": "Derecha",
+      "midfield": "Mediocampo",
+      "tactic": "Táctica",
+      "tactic_level": "Nivel táctico",
+      "formation": "Formación",
+      "team_attitude": "Actitud del equipo",
+      "not_loaded": "No cargadas"
+    },
+    "match_date": "Fecha",
+    "edit_requires_reanalysis": "Este partido no tiene un análisis reciente en memoria. Presioná Analizar para reconstruir la formación y alineación guardadas.",
+    "venue_role": "Localía",
+    "venue_role_home": "Local",
+    "venue_role_away": "Visitante",
+    "venue_role_neutral": "Cancha neutral",
+    "venue_role_unknown": "Desconocido",
+    "season_preview": {
+      "not_configured": "Temporada HT: sin configurar"
+    },
+    "save_formation": "Guardar formación",
+    "formation_saved": "Formación guardada",
+    "team_attitude": {
+      "normal": "Normal",
+      "play_it_cool": "PIC / Jugar relajados",
+      "match_of_the_season": "MOTS / Partido de la temporada"
+    },
+    "tactic_option": {
+      "normal": "Normal",
+      "attack_in_middle": "Atacar por el centro",
+      "attack_on_wings": "Atacar por las bandas",
+      "pressing": "Presión",
+      "counter_attacks": "Contraataques",
+      "play_creatively": "Jugar creativamente",
+      "long_shots": "Tiros lejanos"
+    },
+    "tactic": "Táctica",
+    "tactic_mismatch": {
+      "warning": "La táctica del plan actual no coincide con el PRE importado.",
+      "current_plan": "Plan actual: {tactic}",
+      "official_pre": "PRE oficial: {tactic}"
+    },
+    "unsaved_changes": {
+      "title": "Cambios sin guardar",
+      "message": "Hay cambios sin guardar en esta formación.",
+      "cancel": "Cancelar",
+      "discard": "Descartar cambios",
+      "save": "Guardar formación"
     }
   },
   "decision_lab": {
@@ -1170,7 +1254,8 @@
       "diff": "Dif.",
       "classification": "Clase",
       "our_attack": "Nuestro ataque",
-      "opponent_attack": "Ataque rival"
+      "opponent_attack": "Ataque rival",
+      "title": "Matriz de matchups"
     },
     "interpretation": {
       "our_attack": {
@@ -1397,7 +1482,22 @@
       "confirm_change_title": "¿Cambiar el entrenamiento activo?",
       "confirm_change_body": "Las prioridades actuales se crearon para un tipo de entrenamiento distinto. ¿Continuar?"
     },
-    "filter_training_players": "Jugadores en entrenamiento"
+    "filter_training_players": "Jugadores en entrenamiento",
+    "week_nav": {
+      "previous": "◀ Semana anterior",
+      "current": "Semana actual",
+      "next": "Semana siguiente ▶",
+      "no_data": "No hay datos para esta semana.",
+      "range_label": "Ciclo de entrenamiento: {start} a {end}",
+      "range_preview": "Vista previa del próximo ciclo: {start} a {end}",
+      "first_match": "Primer partido",
+      "second_match": "Segundo partido",
+      "not_saved": "Sin guardar",
+      "status_played": "Jugado",
+      "status_planned": "Planificado"
+    },
+    "replace_first_match_confirm_dated": "Ya existe un Partido 1 en la semana del {start} al {end}.",
+    "replace_second_match_confirm_dated": "Ya existe un Partido 2 en la semana del {start} al {end}."
   },
   "advisor": {
     "title": "Asesor táctico",
@@ -2302,7 +2402,11 @@
       "title": "Importar resumen oficial",
       "instructions": "Pegá el texto copiado con el botón \"Copy Ratings\" de Hattrick, y elegí si es PRE o POST partido.",
       "slot_pre": "PRE-partido",
-      "slot_post": "POST-partido"
+      "slot_post": "POST-partido",
+      "hint_complete": "Este registro ya está completo. Reemplazar el PRE o el POST requerirá confirmación y puede sobrescribir evidencia histórica.",
+      "hint_post_priority": "Ya tenés el PRE oficial de este partido — probablemente quieras importar el POST.",
+      "hint_pre_missing_future": "Todavía no jugaste este partido: podés importar el PRE oficial normalmente.",
+      "hint_pre_missing_past": "Este partido ya se jugó y no tiene PRE oficial. Si pegás una formación reproducida ahora, se te va a ofrecer guardarla como simulación retrospectiva."
     },
     "section": {
       "official_pre": "PRE oficial",
@@ -2375,7 +2479,39 @@
     },
     "internal_diagnostic_limitation": "La estimación interna de HT Coach todavía no está confirmada en la misma escala que el PRE Oficial, así que no aporta una comparación numérica adicional aquí.",
     "missing_data_short": "sin datos suficientes",
-    "change_label": "Cambio"
+    "change_label": "Cambio",
+    "history": {
+      "season_label": "Temporada:",
+      "all_seasons": "Todas",
+      "season_item": "Temporada HT {number}",
+      "previous_record": "◀ Partido anterior",
+      "next_record": "Partido siguiente ▶",
+      "record_option": "{opponent} - {identity}",
+      "identity_vs": "Hit'em up vs. {opponent}",
+      "status_line": "Estado: {status}",
+      "match_id_line": "Match ID: {match_id}",
+      "competition": {
+        "league": "Liga",
+        "cup": "Copa",
+        "friendly": "Amistoso",
+        "qualification": "Clasificación",
+        "tournament": "Torneo",
+        "other": "Otro",
+        "unknown": "Desconocido"
+      }
+    },
+    "comparison_label": {
+      "official": "PRE oficial vs. POST oficial",
+      "retrospective": "Simulación retrospectiva vs. POST oficial",
+      "unavailable": "Comparación no disponible"
+    },
+    "retrospective": {
+      "limitation": "La simulación fue generada después del partido y puede no reproducir exactamente las condiciones originales.",
+      "dialog_title": "PRE de otro Match ID",
+      "dialog_message": "Este PRE fue generado para otro Match ID y después del partido original.\n\n¿Querés asociarlo como una simulación retrospectiva?",
+      "dialog_back": "Volver",
+      "dialog_save": "Guardar como simulación retrospectiva"
+    }
   },
   "specialty": {
     "quick": "Rápido",
@@ -2397,5 +2533,90 @@
     "played": "Jugado",
     "completed": "Completado",
     "title": "Semana HT actual"
+  },
+  "match_decision": {
+    "objective": {
+      "improve_sector": "Aumentar el rendimiento en {sector}.",
+      "no_clear_gain": "No hay una mejora clara y significativa en ningún sector."
+    },
+    "improves": {
+      "sector_gain": "Mejora {sector} en {delta:+.2f}.",
+      "none": "No se detecta una mejora significativa."
+    },
+    "weakens": {
+      "sector_loss": "Debilita {sector} en {delta:+.2f}.",
+      "none": "No se detecta una debilidad significativa."
+    },
+    "recommendation": {
+      "no_previous_plan": "No hay una alineación previa guardada para comparar.",
+      "equivalent": "Ambos jugadores producen un resultado de partido prácticamente equivalente. Elegí según prioridad de entrenamiento o continuidad.",
+      "marginal": "La diferencia es marginal. Mantener la alineación anterior es una opción válida.",
+      "trade_off": "El cambio implica un intercambio: mejora un aspecto pero debilita otro. Evaluá cuál prioridad táctica pesa más para este rival.",
+      "moderate_improvement": "El cambio ofrece una mejora moderada frente a la alineación anterior.",
+      "clear_improvement": "El cambio ofrece una mejora clara frente a la alineación anterior."
+    }
+  },
+  "dual_week": {
+    "season_unknown": "Temporada HT: desconocida",
+    "season_label": "Temporada HT {number}",
+    "season_week_label": "Semana competitiva {week}",
+    "training_cycle_label": "Ciclo de entrenamiento {cycle_id}"
+  },
+  "match_record_status": {
+    "planned": "Planificado",
+    "pre_official_imported": "PRE oficial importado",
+    "played_post_pending": "Jugado — POST pendiente",
+    "complete": "Completo",
+    "incomplete": "Incompleto",
+    "retrospective_pre_available": "PRE retrospectivo disponible"
+  },
+  "saved_matches": {
+    "title": "Partidos guardados",
+    "subtitle": "Gestioná los análisis de partido ya guardados.",
+    "empty": "Todavía no guardaste ningún análisis de partido.",
+    "edit": "Editar",
+    "delete": "Borrar",
+    "date_unknown": "Fecha desconocida",
+    "column": {
+      "opponent": "Rival",
+      "competition": "Tipo",
+      "date": "Fecha",
+      "season_week": "Temporada/Semana",
+      "status": "Estado",
+      "venue": "Localía"
+    },
+    "delete_dialog": {
+      "title": "Eliminar análisis",
+      "message": "¿Eliminar definitivamente este análisis?",
+      "explanation": "Esto puede eliminar: planificación, alineación y órdenes, PRE, PRE retrospectivo, POST, Match ID, comparaciones, conclusiones, historial de revisiones y el vínculo con Inteligencia oficial.",
+      "cancel": "Cancelar",
+      "delete": "Eliminar",
+      "weekly_title": "También está en el Planificador semanal",
+      "weekly_message": "Este partido también está registrado en el Planificador semanal.",
+      "analysis_only": "Borrar solo análisis",
+      "analysis_and_weekly": "Borrar análisis y registro semanal"
+    },
+    "find_duplicates": "Buscar duplicados",
+    "reconciliation_summary": "Se fusionaron {merged} duplicado(s) seguro(s). Quedan {unresolved} conflicto(s) por resolver.",
+    "resolve_duplicate": {
+      "title": "Resolver duplicado",
+      "keep_selected": "Mantener el seleccionado",
+      "skip": "Omitir por ahora",
+      "has_pre": "tiene PRE",
+      "has_post": "tiene POST"
+    },
+    "resolve_duplicate_intro": "Estos registros parecen ser el mismo partido, pero tienen evidencia distinta. Elegí cuál conservar; los datos que no entren en conflicto del otro se van a preservar igual."
+  },
+  "formation_board": {
+    "order_selector": {
+      "label": "Orden individual:"
+    }
+  },
+  "crash": {
+    "title": "Error inesperado",
+    "message": "HT Coach encontró un error inesperado.",
+    "log_saved": "Se guardó un informe de diagnóstico en:",
+    "copy_path": "Copiar ruta",
+    "close": "Cerrar"
   }
 }

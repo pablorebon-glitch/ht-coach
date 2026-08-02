@@ -81,6 +81,22 @@ def player(
     )
 
 
+def _dates_within_current_week():
+    """Alpha 0.6.7 HF-02, Part 3: several fixtures below need a
+    match date that is genuinely "this week" and a `today` that is
+    genuinely "the day after" -- computed relative to the *real*
+    active week (whatever it happens to be when the suite actually
+    runs), rather than a hardcoded date that drifts into the past as
+    real time moves forward. Returns (match_date, today) both safely
+    inside the currently active training week."""
+    from datetime import timedelta
+
+    week = active_training_week()
+    match_date = week.start_date + timedelta(days=2)
+    today = match_date + timedelta(days=1)
+    return match_date, today
+
+
 def roster():
     return [
         player("Keeper", goalkeeper=12),
@@ -291,6 +307,7 @@ def test_first_match_past_played_counts_as_already_trained(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
@@ -299,9 +316,9 @@ def test_first_match_past_played_counts_as_already_trained(tmp_path):
     service.record_first_match(
         board,
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
     row = coverage_row_for_player(
         service.coverage(players),
@@ -316,6 +333,7 @@ def test_first_match_past_planned_counts_only_as_planned(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
@@ -323,9 +341,9 @@ def test_first_match_past_planned_counts_only_as_planned(tmp_path):
     service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLANNED,
-        today=date(2026, 7, 22),
+        today=today,
     )
     row = coverage_row_for_player(
         service.coverage(players),
@@ -362,6 +380,7 @@ def test_first_match_today_played_with_confirmation_counts_as_played(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, _ = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
@@ -369,10 +388,10 @@ def test_first_match_today_played_with_confirmation_counts_as_played(tmp_path):
     saved = service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 22),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
         played_confirmed=True,
-        today=date(2026, 7, 22),
+        today=match_date,
     )
 
     assert saved.match_records[0].planned_or_played == MatchStatus.PLAYED
@@ -425,24 +444,28 @@ def test_future_played_strict_validation_returns_clear_error(tmp_path):
 
 
 def test_edit_past_played_record_to_future_invalidates_played_status(tmp_path):
+    from datetime import timedelta
+
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
+    future_date = today + timedelta(days=1)
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
     service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     saved = service.update_first_match_metadata(
-        match_date=date(2026, 7, 23),
+        match_date=future_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
@@ -458,15 +481,16 @@ def test_delete_first_match_removes_confirmed_exposure(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
     service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     service.delete_first_match()
@@ -545,15 +569,16 @@ def test_updating_recorded_lineup_replaces_same_record_and_preserves_metadata(tm
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     plan = service.generate_plan(players, "3-5-2")
     saved = service.record_first_match(
         service.board_for_plan(plan),
         opponent_name="Rival FC",
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
     original = saved.match_records[0]
     board = service.board_for_record(original)
@@ -577,7 +602,7 @@ def test_updating_recorded_lineup_replaces_same_record_and_preserves_metadata(tm
         roster_players=players,
         requested_status=original.planned_or_played,
         played_confirmed=True,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     assert len(updated.match_records) == 1

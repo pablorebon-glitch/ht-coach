@@ -131,6 +131,10 @@ def test_official_ratings_changed_event_emitted_on_import(tmp_path):
 
 
 def test_match_intelligence_controller_import_also_notifies_match(tmp_path):
+    """Alpha 0.6.7 HF-03, Part 17: the cross-controller notification
+    must carry the touched record's own ID, and the Match workspace
+    must only refresh when that record is the one it actually has
+    open -- never blindly on any import anywhere."""
     from ht_coach_app.controllers.match_intelligence_controller import (
         MatchIntelligenceController,
     )
@@ -153,10 +157,49 @@ def test_match_intelligence_controller_import_also_notifies_match(tmp_path):
     calls = []
     match_page.show_results = lambda result, workspace_state=None: calls.append(result)
 
-    mi_service.import_ratings(REAL_SAMPLE, slot="pre")
-    app_events.official_ratings_changed.emit()
+    outcome = mi_service.import_ratings(REAL_SAMPLE, slot="pre")
+    # Simulate the Match workspace already having this exact record
+    # open -- the common real case is editing a saved match while
+    # Official Intelligence also touches it.
+    match_controller._editing_snapshot_id = outcome.snapshot.snapshot_id
+
+    app_events.official_ratings_changed.emit(outcome.snapshot.snapshot_id)
 
     assert len(calls) == 1
     assert any(
         c.comparable for c in calls[0].recommended_formation.sector_rating_comparisons
     )
+
+
+def test_official_ratings_changed_for_a_different_record_is_ignored(tmp_path):
+    """Part 17: receivers must ignore events for other records --
+    importing evidence for an unrelated match must never refresh (or
+    silently apply data to) a workspace that has a different record
+    open."""
+    from ht_coach_app.controllers.match_intelligence_controller import (
+        MatchIntelligenceController,
+    )
+    from ht_coach_app.services.match_intelligence_service import MatchIntelligenceAppService
+    from ht_coach_app.views.match_intelligence_page import MatchIntelligencePage
+
+    historical_repo = HistoricalMatchRepository(tmp_path / "snapshots2.json")
+    mi_service = MatchIntelligenceAppService(repository=historical_repo)
+    mi_page = MatchIntelligencePage()
+    app_events = AppEvents()
+    MatchIntelligenceController(mi_page, service=mi_service, app_events=app_events)
+
+    match_page, match_controller, settings_repo = make_controller(tmp_path, app_events=app_events)
+    _seed_last_result(settings_repo)
+    match_controller._official_rating_service = OfficialRatingImportService(
+        repository=historical_repo
+    )
+    match_page.show_official_import_success = lambda: None
+    match_controller._editing_snapshot_id = "some-other-record-entirely"
+
+    calls = []
+    match_page.show_results = lambda result, workspace_state=None: calls.append(result)
+
+    outcome = mi_service.import_ratings(REAL_SAMPLE, slot="pre")
+    app_events.official_ratings_changed.emit(outcome.snapshot.snapshot_id)
+
+    assert calls == []

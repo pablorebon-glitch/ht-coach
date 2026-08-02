@@ -43,6 +43,24 @@ class MatchIntelligenceAppService:
             return None
         return max(candidates, key=lambda snapshot: snapshot.updated_at or "")
 
+    def available_seasons(self):
+        from engine.history.record_navigation import available_seasons
+
+        return available_seasons(self._repository)
+
+    def history_records(self, season_number=None, status=None, competition_type=None):
+        from engine.history.record_navigation import list_records
+
+        return list_records(
+            self._repository, season_number=season_number,
+            status=status, competition_type=competition_type,
+        )
+
+    def navigate_history(self, records, current_snapshot_id=None, direction="current"):
+        from engine.history.record_navigation import navigate_records
+
+        return navigate_records(records, current_snapshot_id, direction)
+
     def import_ratings(self, raw_text, slot="pre", confirm_replace=False):
         return self._import_service.import_and_link(
             raw_text, slot=slot, confirm_replace=confirm_replace

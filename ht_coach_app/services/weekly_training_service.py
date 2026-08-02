@@ -1,5 +1,5 @@
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, timedelta
 
 from engine.weekly_training.coverage import WeeklyTrainingCoverageService
 from engine.weekly_training.models import (
@@ -59,6 +59,21 @@ class WeeklyTrainingAppService:
         self._mapper = FormationBoardMapper()
         self._workspace_service = workspace_service or WorkspaceService()
 
+    def week_start_date_for(self, match_date):
+        """Alpha 0.6.7 HF-02, Part 3: the public entry point for
+        "which training cycle would this date's Match 1/2 slot belong
+        to" -- used by the UI to describe the *actual* week about to
+        be affected (the replace-confirmation dialog), without
+        duplicating `_week_id_for_target_date`'s own anchor logic."""
+        state = self.load_state()
+        if state.active_week is None:
+            return None
+        target = self._date(match_date)
+        week_id = self._week_id_for_target_date(
+            state.active_week, target, state.active_training_type
+        )
+        return date.fromisoformat(week_id.split(":")[0])
+
     def load_state(self):
         state = self._repository.load()
         if state.active_week is None:
@@ -88,6 +103,19 @@ class WeeklyTrainingAppService:
         if now.date() != training_update_date:
             return now.date() >= training_update_date
         return get_calendar_service().is_training_processed(now)
+
+    def week_navigation_context(self, state, direction="current"):
+        """Alpha 0.6.6, Part 7: exactly three navigable contexts --
+        previous / current / next. Never unrestricted historical
+        navigation here; that's what Official Match History (a future
+        part) is for. `direction` is one of "previous"/"current"/"next".
+        `next` is always a preview (this training cycle hasn't started
+        yet, so nothing is persisted for it) -- everything else is
+        drawn from `state` as-is.
+        """
+        from ht_coach_app.services.week_navigation import build_week_navigation_context
+
+        return build_week_navigation_context(state, direction)
 
     def set_active_training_type(self, training_type):
         """Switches the active training type mid-week. Deliberately does
@@ -381,6 +409,7 @@ class WeeklyTrainingAppService:
         requested_status=MatchStatus.PLAYED,
         played_confirmed=False,
         today=None,
+        linked_match_record_id="",
     ):
         state = self.load_state()
         record = self._first_match_record_for_board(
@@ -393,6 +422,10 @@ class WeeklyTrainingAppService:
             played_confirmed=played_confirmed,
             today=today,
         )
+        if linked_match_record_id:
+            from dataclasses import replace as _dc_replace
+
+            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
         return self._repository.add_match_record(state, record)
 
     @staticmethod
@@ -428,6 +461,7 @@ class WeeklyTrainingAppService:
         requested_status=MatchStatus.PLAYED,
         played_confirmed=False,
         today=None,
+        linked_match_record_id="",
     ):
         state = self.load_state()
         record = self._second_match_record_for_board(
@@ -440,6 +474,10 @@ class WeeklyTrainingAppService:
             played_confirmed=played_confirmed,
             today=today,
         )
+        if linked_match_record_id:
+            from dataclasses import replace as _dc_replace
+
+            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
         return self._repository.add_match_record(state, record)
 
     def replace_second_match(
@@ -451,6 +489,7 @@ class WeeklyTrainingAppService:
         requested_status=MatchStatus.PLAYED,
         played_confirmed=False,
         today=None,
+        linked_match_record_id="",
     ):
         state = self.load_state()
         record = self._second_match_record_for_board(
@@ -462,7 +501,12 @@ class WeeklyTrainingAppService:
             requested_status=requested_status,
             played_confirmed=played_confirmed,
             today=today,
+            existing_match_id=self._existing_match_id_for_role(state, MatchRole.SECOND_WEEKLY_MATCH),
         )
+        if linked_match_record_id:
+            from dataclasses import replace as _dc_replace
+
+            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
         return self._repository.replace_match_record(state, record)
 
     def delete_second_match(self):
@@ -502,6 +546,7 @@ class WeeklyTrainingAppService:
         requested_status=MatchStatus.PLAYED,
         played_confirmed=False,
         today=None,
+        existing_match_id=None,
     ):
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
@@ -511,8 +556,11 @@ class WeeklyTrainingAppService:
             for slot in board.slots
             if slot.player is not None
         )
-        match_id = f"{state.active_week.week_id}:second"
-        target_date = match_date or state.active_week.second_match_date
+        target_date = self._date(match_date) if match_date else state.active_week.second_match_date
+        if existing_match_id:
+            match_id = existing_match_id
+        else:
+            match_id = f"{self._week_id_for_target_date(state.active_week, target_date, state.active_training_type)}:second"
         status, temporal, warning = self.validate_match_status(
             target_date,
             requested_status,
@@ -550,6 +598,7 @@ class WeeklyTrainingAppService:
         requested_status=MatchStatus.PLAYED,
         played_confirmed=False,
         today=None,
+        linked_match_record_id="",
     ):
         state = self.load_state()
         record = self._first_match_record_for_board(
@@ -561,8 +610,59 @@ class WeeklyTrainingAppService:
             requested_status=requested_status,
             played_confirmed=played_confirmed,
             today=today,
+            existing_match_id=self._existing_match_id_for_role(state, MatchRole.FIRST_WEEKLY_MATCH),
         )
+        if linked_match_record_id:
+            from dataclasses import replace as _dc_replace
+
+            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
         return self._repository.replace_match_record(state, record)
+
+    @staticmethod
+    def _week_id_for_target_date(active_week, target_date, training_type):
+        """Alpha 0.6.7 HF-02, Part 3 -- the real fix. Deriving a week
+        identity for `target_date` reuses the *exact same*
+        rollover-aware algorithm `active_week` itself was computed
+        with (`active_training_week`), rather than a hand-rolled
+        calendar-range check against `active_week`'s own boundaries.
+        This matters specifically around the Thursday training-update
+        cutoff: `active_week` can already represent "next week" while
+        a calendar date like "today" still falls in what would look
+        like the previous week's Sun-Sat span. Using the same
+        algorithm for both sides means this never disagrees with what
+        `active_week` itself already represents for the common
+        "today's match" case (verified: `active_training_week()` and
+        `active_training_week(today=<today>)` always agree, since both
+        evaluate the identical rollover rule against the same
+        effective date), while still correctly resolving a genuinely
+        different (historical or future) week's identity when the
+        date actually is one -- without ever depending on which day
+        the test suite (or the app) happens to run on.
+
+        `active_week` itself isn't read here -- it's accepted for
+        documentation/API-shape continuity with earlier revisions of
+        this fix and because callers already have it on hand from
+        `state.active_week`.
+        """
+        target_week = active_training_week(today=target_date, training_type=training_type)
+        return target_week.week_id
+
+    @staticmethod
+    def _existing_match_id_for_role(state, match_role):
+        """Alpha 0.6.7 HF-02, Part 3: `replace_*_match` must update
+        whatever record it's actually replacing, never silently
+        re-target a different training cycle just because the date was
+        also corrected in the same call. When there's ambiguity (more
+        than one existing record with this role -- shouldn't normally
+        happen, but never guessed at), this returns None and lets the
+        date-derived identity apply instead, matching the create-path
+        behavior rather than risking picking the wrong one."""
+        candidates = tuple(
+            record for record in state.match_records if record.match_role == match_role
+        )
+        if len(candidates) == 1:
+            return candidates[0].match_id
+        return None
 
     def update_first_match_metadata(
         self,
@@ -670,6 +770,7 @@ class WeeklyTrainingAppService:
         requested_status=MatchStatus.PLAYED,
         played_confirmed=False,
         today=None,
+        existing_match_id=None,
     ):
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
@@ -679,8 +780,11 @@ class WeeklyTrainingAppService:
             for slot in board.slots
             if slot.player is not None
         )
-        match_id = f"{state.active_week.week_id}:first"
-        target_date = match_date or state.active_week.first_match_date
+        target_date = self._date(match_date) if match_date else state.active_week.first_match_date
+        if existing_match_id:
+            match_id = existing_match_id
+        else:
+            match_id = f"{self._week_id_for_target_date(state.active_week, target_date, state.active_training_type)}:first"
         status, temporal, warning = self.validate_match_status(
             target_date,
             requested_status,

@@ -19,3 +19,7 @@ build/
 
 coverage.xml
 htmlcov/
+
+# Alpha 0.6.7 HF-03: crash logs and recovery snapshots (Parts 13, 16) --
+# generated at runtime, never committed.
+logs/

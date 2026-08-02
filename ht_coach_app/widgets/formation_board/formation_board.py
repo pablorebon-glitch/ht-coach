@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
 )
 
 from ht_coach_app.core.localization import t
+from ht_coach_app.core.order_formatting import format_order
+from ht_coach_app.core.side_formatting import format_side
 from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.ui.design_system.collapsible_side_panel import CollapsibleSidePanel
@@ -50,6 +52,9 @@ class FormationBoard(QWidget):
     recalculate_requested = Signal(object)
     workspace_modified = Signal(object)
     save_as_first_match_requested = Signal()
+    save_formation_requested = Signal()
+    tactic_changed = Signal(str)
+    team_attitude_changed = Signal(str)
     save_as_second_match_requested = Signal()
 
     def __init__(self, parent=None):
@@ -90,6 +95,25 @@ class FormationBoard(QWidget):
         self.formation_combo.currentTextChanged.connect(self._on_formation_changed)
         header_layout.addWidget(self.formation_combo)
 
+        from ht_coach_app.core.tactic_formatting import canonical_tactic_choices
+        from ht_coach_app.core.team_attitude_formatting import canonical_team_attitude_choices
+
+        self.tactic_combo = QComboBox()
+        self.tactic_combo.setObjectName("tacticSelector")
+        self.tactic_combo.setMinimumWidth(150)
+        for tactic, label in canonical_tactic_choices():
+            self.tactic_combo.addItem(label, tactic.value)
+        self.tactic_combo.currentIndexChanged.connect(self._on_tactic_changed)
+        header_layout.addWidget(self.tactic_combo)
+
+        self.team_attitude_combo = QComboBox()
+        self.team_attitude_combo.setObjectName("teamAttitudeSelector")
+        self.team_attitude_combo.setMinimumWidth(150)
+        for attitude, label in canonical_team_attitude_choices():
+            self.team_attitude_combo.addItem(label, attitude.value)
+        self.team_attitude_combo.currentIndexChanged.connect(self._on_team_attitude_changed)
+        header_layout.addWidget(self.team_attitude_combo)
+
         self.meta_label = QLabel("")
         self.meta_label.setObjectName("formationBoardMeta")
         header_layout.addWidget(self.meta_label)
@@ -110,6 +134,13 @@ class FormationBoard(QWidget):
             self.reset_workspace
         )
         header_layout.addWidget(self.reset_workspace_button)
+
+        self.save_formation_button = QPushButton(t("match.save_formation"))
+        self.save_formation_button.setObjectName("workspaceAction")
+        self.save_formation_button.clicked.connect(
+            self.save_formation_requested
+        )
+        header_layout.addWidget(self.save_formation_button)
 
         self.save_as_first_match_button = QPushButton(
             t("match.save_as_first_match")
@@ -245,6 +276,8 @@ class FormationBoard(QWidget):
         roster_players=None,
         workspace_state=None,
         preserve_input_orders=False,
+        default_tactic="",
+        default_team_attitude="",
     ):
         self._details_by_name = player_details_by_name or {}
         self._roster_players = list(roster_players or [])
@@ -295,6 +328,25 @@ class FormationBoard(QWidget):
             )
             self._sync_boards_cache()
         self._render_current_board()
+
+        if default_tactic:
+            self.tactic_combo.blockSignals(True)
+            index = self.tactic_combo.findData(default_tactic)
+            if index >= 0:
+                self.tactic_combo.setCurrentIndex(index)
+            self.tactic_combo.blockSignals(False)
+        if default_team_attitude:
+            self.team_attitude_combo.blockSignals(True)
+            index = self.team_attitude_combo.findData(default_team_attitude)
+            if index >= 0:
+                self.team_attitude_combo.setCurrentIndex(index)
+            self.team_attitude_combo.blockSignals(False)
+
+    def is_dirty(self):
+        """Alpha 0.6.7 HF-03, Part 12: whether this workspace has
+        unsaved changes -- the same signal that already enables/
+        disables "Guardar formación" and "Restaurar"."""
+        return self._workspace_state is not None and self._workspace_state.dirty
 
     def current_board(self):
         if self._workspace_state is None:
@@ -478,6 +530,43 @@ class FormationBoard(QWidget):
         self.formation_changed.emit(self._current_name)
         self._render_current_board()
 
+    def _on_tactic_changed(self):
+        """Alpha 0.6.7 HF-03, Part 7: changing the canonical tactic
+        selector marks the workspace dirty and notifies the controller
+        -- it never touches player selection, individual orders, or
+        Official PRE evidence, all deliberately untouched here."""
+        new_tactic = self.tactic_combo.currentData() or ""
+        self._mark_dirty_for_plan_change("tactic_change", new_tactic)
+        self.tactic_changed.emit(new_tactic)
+
+    def _on_team_attitude_changed(self):
+        """Part 8: same isolation guarantee -- marks dirty, notifies
+        the controller, never mutates Official PRE."""
+        new_attitude = self.team_attitude_combo.currentData() or ""
+        self._mark_dirty_for_plan_change("team_attitude_change", new_attitude)
+        self.team_attitude_changed.emit(new_attitude)
+
+    def _mark_dirty_for_plan_change(self, kind, new_value):
+        if self._workspace_state is None:
+            return
+        from ht_coach_app.workspace.workspace_models import WorkspaceModification
+
+        modification = WorkspaceModification(
+            formation_name=self._current_name,
+            slot_id="",
+            role="",
+            original_player_name="",
+            replacement_player_name=new_value,
+            score_difference=0.0,
+            kind=kind,
+        )
+        self._workspace_state = replace(
+            self._workspace_state,
+            history=self._workspace_state.history + (modification,),
+            evaluation_state="pending",
+        )
+        self._update_workspace_toolbar()
+
     def _render_current_board(self):
         board = self.current_board()
         revision = (
@@ -519,6 +608,69 @@ class FormationBoard(QWidget):
             parts.append(f"Selected order {order}")
         self.footer_label.setText("  |  ".join(parts))
 
+    def _build_order_selector(self, intelligence, board):
+        """Alpha 0.6.7 HF-02, Part 2 (blocking): every eligible on-pitch
+        player slot must expose the canonical individual-order
+        selector -- this was displaying the current order as read-only
+        text with no way to change it. Reuses
+        `WorkspaceService.set_manual_order()` (Alpha 0.6.6) end to
+        end -- never a second order system."""
+        if board is None or board.selected_player is None:
+            return
+        selected = board.selected_player
+        if selected.player_id != intelligence.player_id:
+            # The inspector is showing a bench-player preview, not an
+            # actual on-pitch slot -- nothing to edit here.
+            return
+
+        configurations = self._workspace_service.valid_order_configurations_for_position(
+            selected.position
+        )
+        if not configurations:
+            return
+
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+        row_layout.addWidget(QLabel(t("formation_board.order_selector.label")))
+
+        combo = QComboBox()
+        combo.setObjectName("playerOrderCombo")
+        current_index = 0
+        for index, configuration in enumerate(configurations):
+            order_value = getattr(configuration.order, "value", configuration.order)
+            side_value = (
+                getattr(configuration.order_side, "value", configuration.order_side)
+                if configuration.order_side is not None
+                else None
+            )
+            label = format_order(order_value)
+            if side_value:
+                label = f"{label} ({format_side(side_value)})"
+            combo.addItem(label, (order_value, side_value))
+            if (
+                order_value == selected.individual_order
+                and (side_value or "") == (selected.order_side or "")
+            ):
+                current_index = index
+        combo.setCurrentIndex(current_index)
+        combo.currentIndexChanged.connect(
+            lambda index, player_id=selected.player_id: self._handle_order_selection_changed(
+                player_id, combo.itemData(index)
+            )
+        )
+        row_layout.addWidget(combo, 1)
+        self.inspector_layout.addWidget(row)
+
+    def _handle_order_selection_changed(self, player_id, order_and_side):
+        order_value, side_value = order_and_side
+        self._workspace_state = self._workspace_service.set_manual_order(
+            self._workspace_state, player_id, order_value, side_value
+        )
+        self._render_current_board()
+        self.workspace_modified.emit(self._workspace_state)
+
     def _render_intelligence(self, intelligence, board=None):
         self._clear_inspector()
 
@@ -549,6 +701,8 @@ class FormationBoard(QWidget):
         subtitle.setWordWrap(True)
         header_layout.addWidget(subtitle, 1, 0, 1, 2)
         self.inspector_layout.addWidget(header)
+
+        self._build_order_selector(intelligence, board)
 
         if (
             self._workspace_state is not None
@@ -852,6 +1006,7 @@ class FormationBoard(QWidget):
             self.workspace_status_label
         )
         self.reset_workspace_button.setEnabled(is_dirty)
+        self.save_formation_button.setEnabled(is_dirty)
 
     def _emit_recalculate_requested(self):
         if self._workspace_state is not None:
