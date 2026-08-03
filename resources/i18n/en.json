@@ -1145,6 +1145,8 @@
     "current_assigned_position": "Current assigned position",
     "automatically_selected_order": "Automatically selected order",
     "order_automatically_optimized": "Order automatically optimized: {before} -> {after}",
+    "invalid_order_adjusted": "The previous order is not valid in the new position and was adjusted to Normal.",
+    "lineup_update_failed": "The lineup update failed. The previous valid lineup was restored.",
     "no_order_change_required": "No order change required.",
     "expected_impact": "Expected impact",
     "affected_sectors": "Affected sectors",

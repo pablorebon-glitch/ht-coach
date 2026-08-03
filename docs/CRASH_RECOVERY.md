@@ -80,3 +80,16 @@ The "on next launch, offer to restore if a newer snapshot exists" UI flow
 yet connected to MainWindow's own startup sequence -- the storage layer
 and the save points are built and tested, but the startup-time offer-restore
 dialog itself remains for a future pass.
+
+## HF-05 Formation Board crash
+
+Alpha 0.6.7 HF-05 fixed a PySide6 access violation in the Formation Board order
+selector. The crash was caused by rebuilding the player inspector immediately
+from the order combo's `currentIndexChanged` handler, which cleared the inspector
+and deleted/reparented widgets while the combo was still dispatching its signal.
+
+The repaired flow blocks combo signals during population, applies the manual
+order through the workspace service using stable slot identity, emits the normal
+workspace-modified event, and defers the visual rebuild to the next Qt event-loop
+turn. This keeps the crash fix in the UI layer and does not change optimizer or
+rating behavior.

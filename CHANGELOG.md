@@ -4,6 +4,16 @@
 
 ### Fixed
 
+- Fixed Alpha 0.6.7 HF-05 Formation Board stability and slot integrity:
+  manual starter swaps now preserve slot-owned valid orders instead of rerunning
+  automatic order selection, manual order edits are applied by stable slot id plus
+  workspace revision, the PySide6 order selector defers inspector rebuilds until
+  after the combo signal returns to avoid access violations, and the Match
+  Formation Board header now keeps actions reachable in restored windows. Added
+  regression coverage for inner-midfield/winger swaps, slot-based order edits
+  after swaps, and responsive Match layout behavior. No optimizer, rating,
+  probability or official-evidence parser formulas changed.
+
 - Fixed Alpha 0.6.7 HF-02 (Match Record Integrity, Season Calendar and
   Match UX Completion) -- a repair sprint over Alpha 0.6.7's own real-use
   regressions, found through manual verification. Root causes and fixes:

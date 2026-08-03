@@ -122,9 +122,14 @@ class MatchPage(BasePage):
         self._build_results()
 
     def resizeEvent(self, event):
+        viewport_state = (
+            self._capture_viewport_state()
+            if hasattr(self, "scroll_area")
+            else None
+        )
         super().resizeEvent(event)
         if hasattr(self, "scroll_area"):
-            self._schedule_deferred_geometry_refresh()
+            self._schedule_deferred_geometry_refresh(viewport_state)
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -1283,10 +1288,11 @@ class MatchPage(BasePage):
             current_target_width = self.scroll_area.viewport().width()
             target = int(viewport_state.get("vertical_scroll", 0))
             if abs(current_target_width - source_width) > 8:
-                target = int(
+                ratio_target = int(
                     vertical.maximum()
                     * float(viewport_state.get("vertical_scroll_ratio", 0.0))
                 )
+                target = min(target, ratio_target)
             vertical.setValue(max(0, min(target, vertical.maximum())))
             self.scroll_area.horizontalScrollBar().setValue(
                 int(viewport_state.get("horizontal_scroll", 0))
@@ -1304,10 +1310,10 @@ class MatchPage(BasePage):
         QTimer.singleShot(0, restore_scrollbars)
         QTimer.singleShot(25, restore_scrollbars)
 
-    def _schedule_deferred_geometry_refresh(self):
+    def _schedule_deferred_geometry_refresh(self, viewport_state=None):
         self._geometry_refresh_revision += 1
         revision = self._geometry_refresh_revision
-        viewport_state = self._capture_viewport_state()
+        viewport_state = viewport_state or self._capture_viewport_state()
 
         def refresh():
             if revision != self._geometry_refresh_revision:

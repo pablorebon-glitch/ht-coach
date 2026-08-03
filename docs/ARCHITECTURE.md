@@ -1154,9 +1154,10 @@ Modules:
 Workspace rules:
 
 - the original recommendation is immutable;
-- slots own tactical position, side and pitch coordinates; players move between slots
-  without carrying the old slot's tactical assignment, then receive an automatic valid
-  order for the assigned slot;
+- slots own tactical position, side, pitch coordinates and user-edited order intent;
+  players move between slots without carrying the old slot's tactical assignment;
+  starter swaps preserve each affected slot's current valid order, and only an
+  invalid affected slot is normalized back to `Normal`;
 - Bench is derived from loaded roster players minus the displayed Workspace Lineup and
   is never an independent source of truth;
 - valid click and drag edits commit immediately to the Workspace Lineup;
@@ -1172,6 +1173,9 @@ Workspace rules:
 - manual state uses neutral manual-adjusted language and does not imply the lineup is
   wrong;
 - manual position choices are not contradicted by persistent position recommendations;
+- manual order edits are resolved by stable `slot_id` plus workspace revision, not
+  by player identity alone, so a stale inspector control cannot rewrite the wrong
+  occupant after a swap;
 - automatic orders enumerate existing `OrderOptimizer.ALLOWED_CONFIGURATIONS`, compare
   internal contribution totals and preserve the current valid order on ties;
 - Workspace creation applies the same automatic-order operation to every starter before

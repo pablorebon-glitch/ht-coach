@@ -72,3 +72,21 @@ the interactive board's own in-memory state, `MatchWorkspaceRepository`'s
 a genuine architectural change beyond this hotfix's safe scope; the
 isolation fix above solves the reported bug (leakage across records)
 without requiring it.
+
+## Formation Board local edits
+
+The editable Formation Board uses `WorkspaceState.revision` plus stable tactical
+slot ids to make local edits deterministic. Manual order controls capture the
+selected `slot_id` and the current revision when the combo is built. The service
+then validates that the same workspace revision is still active before applying
+the order to the slot's current occupant.
+
+Starter swaps preserve slot-owned orders where those orders remain valid. They do
+not rerun `OrderOptimizer` or rewrite unrelated slots. If a moved player makes an
+affected slot's current order invalid, only that affected slot is normalized to
+`Normal`.
+
+The view applies the model change first, emits the normal workspace-modified event
+for controller recalculation, and schedules the visual rebuild for the next Qt
+event-loop turn. This keeps PySide6 from deleting the active order combo while its
+own `currentIndexChanged` signal is still executing.

@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSignalBlocker, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -69,6 +69,7 @@ class FormationBoard(QWidget):
         self._current_name = ""
         self._selected_bench_player_id = ""
         self._state_namespace = "formation_board"
+        self._manual_order_refresh_pending = False
         self.setMinimumHeight(BOARD_MINIMUM_HEIGHT)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setStyleSheet(formation_board_stylesheet())
@@ -81,49 +82,62 @@ class FormationBoard(QWidget):
 
         header = QFrame()
         header.setObjectName("formationBoardPanel")
-        header_layout = QHBoxLayout(header)
+        header_layout = QVBoxLayout(header)
         header_layout.setContentsMargins(10, 6, 10, 6)
-        header_layout.setSpacing(8)
+        header_layout.setSpacing(6)
+
+        selector_row = QHBoxLayout()
+        selector_row.setContentsMargins(0, 0, 0, 0)
+        selector_row.setSpacing(8)
 
         title = QLabel(t("workspace.formation_board"))
         self.title_label = title
         title.setObjectName("formationBoardTitle")
-        header_layout.addWidget(title)
+        selector_row.addWidget(title)
 
         self.formation_combo = QComboBox()
-        self.formation_combo.setMinimumWidth(150)
+        self.formation_combo.setMinimumWidth(120)
+        self.formation_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.formation_combo.currentTextChanged.connect(self._on_formation_changed)
-        header_layout.addWidget(self.formation_combo)
+        selector_row.addWidget(self.formation_combo, 2)
 
         from ht_coach_app.core.tactic_formatting import canonical_tactic_choices
         from ht_coach_app.core.team_attitude_formatting import canonical_team_attitude_choices
 
         self.tactic_combo = QComboBox()
         self.tactic_combo.setObjectName("tacticSelector")
-        self.tactic_combo.setMinimumWidth(150)
+        self.tactic_combo.setMinimumWidth(120)
+        self.tactic_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         for tactic, label in canonical_tactic_choices():
             self.tactic_combo.addItem(label, tactic.value)
         self.tactic_combo.currentIndexChanged.connect(self._on_tactic_changed)
-        header_layout.addWidget(self.tactic_combo)
+        selector_row.addWidget(self.tactic_combo, 2)
 
         self.team_attitude_combo = QComboBox()
         self.team_attitude_combo.setObjectName("teamAttitudeSelector")
-        self.team_attitude_combo.setMinimumWidth(150)
+        self.team_attitude_combo.setMinimumWidth(120)
+        self.team_attitude_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         for attitude, label in canonical_team_attitude_choices():
             self.team_attitude_combo.addItem(label, attitude.value)
         self.team_attitude_combo.currentIndexChanged.connect(self._on_team_attitude_changed)
-        header_layout.addWidget(self.team_attitude_combo)
+        selector_row.addWidget(self.team_attitude_combo, 2)
 
         self.meta_label = QLabel("")
         self.meta_label.setObjectName("formationBoardMeta")
-        header_layout.addWidget(self.meta_label)
+        self.meta_label.setWordWrap(True)
+        selector_row.addWidget(self.meta_label, 1)
 
         self.workspace_status_label = QLabel(t("workspace.original"))
         self.workspace_status_label.setObjectName("workspaceStatusBadge")
         self.workspace_status_label.setProperty("state", "clean")
-        header_layout.addWidget(self.workspace_status_label)
+        self.workspace_status_label.setWordWrap(True)
+        selector_row.addWidget(self.workspace_status_label, 1)
+        header_layout.addLayout(selector_row)
 
-        header_layout.addStretch(1)
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 0)
+        action_row.setSpacing(8)
+        action_row.addStretch(1)
 
         self.reset_workspace_button = QPushButton(t("workspace.reset"))
         self.reset_workspace_button.setObjectName("workspaceAction")
@@ -133,14 +147,14 @@ class FormationBoard(QWidget):
         self.reset_workspace_button.clicked.connect(
             self.reset_workspace
         )
-        header_layout.addWidget(self.reset_workspace_button)
+        action_row.addWidget(self.reset_workspace_button)
 
         self.save_formation_button = QPushButton(t("match.save_formation"))
         self.save_formation_button.setObjectName("workspaceAction")
         self.save_formation_button.clicked.connect(
             self.save_formation_requested
         )
-        header_layout.addWidget(self.save_formation_button)
+        action_row.addWidget(self.save_formation_button)
 
         self.save_as_first_match_button = QPushButton(
             t("match.save_as_first_match")
@@ -150,7 +164,7 @@ class FormationBoard(QWidget):
         self.save_as_first_match_button.clicked.connect(
             self.save_as_first_match_requested
         )
-        header_layout.addWidget(self.save_as_first_match_button)
+        action_row.addWidget(self.save_as_first_match_button)
 
         self.save_as_second_match_button = QPushButton(
             t("match.save_as_second_match")
@@ -160,7 +174,8 @@ class FormationBoard(QWidget):
         self.save_as_second_match_button.clicked.connect(
             self.save_as_second_match_requested
         )
-        header_layout.addWidget(self.save_as_second_match_button)
+        action_row.addWidget(self.save_as_second_match_button)
+        header_layout.addLayout(action_row)
         layout.addWidget(header)
 
         self.splitter = QSplitter(Qt.Horizontal)
@@ -622,6 +637,17 @@ class FormationBoard(QWidget):
             # The inspector is showing a bench-player preview, not an
             # actual on-pitch slot -- nothing to edit here.
             return
+        selected_slot = next(
+            (
+                slot
+                for slot in board.slots
+                if slot.player is not None
+                and slot.player.player_id == selected.player_id
+            ),
+            None,
+        )
+        if selected_slot is None:
+            return
 
         configurations = self._workspace_service.valid_order_configurations_for_position(
             selected.position
@@ -638,38 +664,73 @@ class FormationBoard(QWidget):
         combo = QComboBox()
         combo.setObjectName("playerOrderCombo")
         current_index = 0
-        for index, configuration in enumerate(configurations):
-            order_value = getattr(configuration.order, "value", configuration.order)
-            side_value = (
-                getattr(configuration.order_side, "value", configuration.order_side)
-                if configuration.order_side is not None
-                else None
-            )
-            label = format_order(order_value)
-            if side_value:
-                label = f"{label} ({format_side(side_value)})"
-            combo.addItem(label, (order_value, side_value))
-            if (
-                order_value == selected.individual_order
-                and (side_value or "") == (selected.order_side or "")
-            ):
-                current_index = index
-        combo.setCurrentIndex(current_index)
+        blocker = QSignalBlocker(combo)
+        try:
+            for index, configuration in enumerate(configurations):
+                order_value = getattr(configuration.order, "value", configuration.order)
+                side_value = (
+                    getattr(configuration.order_side, "value", configuration.order_side)
+                    if configuration.order_side is not None
+                    else None
+                )
+                label = format_order(order_value)
+                if side_value:
+                    label = f"{label} ({format_side(side_value)})"
+                combo.addItem(label, (order_value, side_value))
+                if (
+                    order_value == selected.individual_order
+                    and (side_value or "") == (selected.order_side or "")
+                ):
+                    current_index = index
+            combo.setCurrentIndex(current_index)
+        finally:
+            del blocker
         combo.currentIndexChanged.connect(
-            lambda index, player_id=selected.player_id: self._handle_order_selection_changed(
-                player_id, combo.itemData(index)
+            lambda index, slot_id=selected_slot.slot_id, revision=(
+                self._workspace_state.revision
+                if self._workspace_state is not None
+                else 0
+            ): self._handle_order_selection_changed(
+                slot_id,
+                combo.itemData(index),
+                revision,
             )
         )
         row_layout.addWidget(combo, 1)
         self.inspector_layout.addWidget(row)
 
-    def _handle_order_selection_changed(self, player_id, order_and_side):
+    def _handle_order_selection_changed(
+        self,
+        slot_id,
+        order_and_side,
+        expected_revision=None,
+    ):
+        if self._workspace_state is None or order_and_side is None:
+            return
+        if not slot_id:
+            return
         order_value, side_value = order_and_side
-        self._workspace_state = self._workspace_service.set_manual_order(
-            self._workspace_state, player_id, order_value, side_value
+        self._workspace_state = self._workspace_service.set_manual_order_for_slot(
+            self._workspace_state,
+            slot_id,
+            order_value,
+            side_value,
+            expected_revision=expected_revision,
         )
+        self._update_workspace_toolbar()
+        should_emit = not self._workspace_state.last_error
+        if self._manual_order_refresh_pending:
+            return
+        self._manual_order_refresh_pending = True
+        if should_emit:
+            self.workspace_modified.emit(self._workspace_state)
+        QTimer.singleShot(0, self._finish_manual_order_change)
+
+    def _finish_manual_order_change(self):
+        self._manual_order_refresh_pending = False
+        if self._workspace_state is None:
+            return
         self._render_current_board()
-        self.workspace_modified.emit(self._workspace_state)
 
     def _render_intelligence(self, intelligence, board=None):
         self._clear_inspector()
