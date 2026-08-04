@@ -360,6 +360,11 @@ class MatchPage(BasePage):
         )
         self.training_conflict_label.setVisible(False)
 
+        self.training_context_label = QLabel("")
+        self.training_context_label.setWordWrap(True)
+        self.training_context_label.setObjectName("compactDecisionText")
+        self.training_context_label.setVisible(False)
+
         self.metadata_evidence_warning_label = QLabel("")
         self.metadata_evidence_warning_label.setWordWrap(True)
         self.metadata_evidence_warning_label.setProperty(
@@ -407,9 +412,10 @@ class MatchPage(BasePage):
         layout.addWidget(formation_actions_widget, 10, 1, 1, 3)
         layout.addWidget(self.formation_warning_label, 11, 1, 1, 3)
         layout.addWidget(self.training_conflict_label, 12, 1, 1, 3)
-        layout.addWidget(self.metadata_evidence_warning_label, 13, 1, 1, 3)
-        layout.addWidget(self.status_label, 14, 0, 1, 3)
-        layout.addWidget(self.analyze_button, 14, 3)
+        layout.addWidget(self.training_context_label, 13, 1, 1, 3)
+        layout.addWidget(self.metadata_evidence_warning_label, 14, 1, 1, 3)
+        layout.addWidget(self.status_label, 15, 0, 1, 3)
+        layout.addWidget(self.analyze_button, 15, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
@@ -742,6 +748,17 @@ class MatchPage(BasePage):
         text = (message or "").strip()
         self.training_conflict_label.setText(text)
         self.training_conflict_label.setVisible(bool(text))
+
+    def set_training_context_summary(self, message, stale=False):
+        text = (message or "").strip()
+        self.training_context_label.setText(text)
+        self.training_context_label.setProperty(
+            "state",
+            "warning" if stale else "",
+        )
+        self.training_context_label.style().unpolish(self.training_context_label)
+        self.training_context_label.style().polish(self.training_context_label)
+        self.training_context_label.setVisible(bool(text))
 
     def confirm_unsaved_changes(self):
         """Alpha 0.6.7 HF-03, Part 12: when leaving or switching a

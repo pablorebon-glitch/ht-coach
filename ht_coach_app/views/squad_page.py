@@ -52,6 +52,11 @@ from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 from ht_coach_app.widgets.sortable_table_item import SortableTableItem
 
 
+class NoWheelComboBox(QComboBox):
+    def wheelEvent(self, event):
+        event.ignore()
+
+
 class SquadPage(BasePage):
     browse_requested = Signal()
     load_requested = Signal()
@@ -76,6 +81,7 @@ class SquadPage(BasePage):
     use_training_plan_requested = Signal()
     week_navigation_requested = Signal(str)
     training_type_changed = Signal(str)
+    weekly_cycle_changed = Signal(str)
 
     HEADERS = [
         "Name",
@@ -1062,6 +1068,10 @@ class SquadPage(BasePage):
         self.weekly_training_type_combo_v2.currentIndexChanged.connect(
             self._emit_training_type_changed
         )
+        self.weekly_cycle_combo_v2 = NoWheelComboBox()
+        self.weekly_cycle_combo_v2.currentIndexChanged.connect(
+            self._emit_weekly_cycle_changed
+        )
         self.weekly_week_label_v2 = QLabel(t("planner.no_active_week"))
         self.weekly_week_label_v2.setWordWrap(True)
 
@@ -1071,9 +1081,12 @@ class SquadPage(BasePage):
 
         controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
         controls_layout.addWidget(self.weekly_training_type_combo_v2, 0, 1)
-        controls_layout.addWidget(self.weekly_week_label_v2, 1, 0, 1, 2)
-        controls_layout.addWidget(self.ht_week_status_label, 2, 0, 1, 2)
+        controls_layout.addWidget(QLabel(t("planner.week_selector_label")), 0, 2)
+        controls_layout.addWidget(self.weekly_cycle_combo_v2, 0, 3)
+        controls_layout.addWidget(self.weekly_week_label_v2, 1, 0, 1, 4)
+        controls_layout.addWidget(self.ht_week_status_label, 2, 0, 1, 4)
         controls_layout.setColumnStretch(1, 1)
+        controls_layout.setColumnStretch(3, 2)
         layout.addWidget(controls)
 
         self.weekly_record_card_v2 = QFrame()
@@ -1357,6 +1370,51 @@ class SquadPage(BasePage):
         training_type = self.weekly_training_type_combo_v2.currentData()
         if training_type:
             self.training_type_changed.emit(training_type)
+
+    def _emit_weekly_cycle_changed(self, _index):
+        if not hasattr(self, "weekly_cycle_combo_v2"):
+            return
+        data = self.weekly_cycle_combo_v2.currentData() or {}
+        cycle_id = data.get("cycle_id") if isinstance(data, dict) else ""
+        if cycle_id:
+            self.weekly_cycle_changed.emit(cycle_id)
+
+    def selected_weekly_cycle_id(self):
+        if not hasattr(self, "weekly_cycle_combo_v2"):
+            return ""
+        data = self.weekly_cycle_combo_v2.currentData() or {}
+        return data.get("cycle_id", "") if isinstance(data, dict) else ""
+
+    def set_weekly_cycle_options(self, options, selected_cycle_id=""):
+        if not hasattr(self, "weekly_cycle_combo_v2"):
+            return
+        combo = self.weekly_cycle_combo_v2
+        combo.blockSignals(True)
+        combo.clear()
+        for option in options or ():
+            label_key = (
+                "planner.week_selector_current"
+                if getattr(option, "is_current", False)
+                else "planner.week_selector_future"
+            )
+            label = t(
+                label_key,
+                start=option.start_date.strftime("%d/%m/%Y"),
+                end=option.end_date.strftime("%d/%m/%Y"),
+            )
+            combo.addItem(label, option.to_item_data())
+        index = combo.findData(
+            selected_cycle_id,
+            role=Qt.UserRole,
+        )
+        if index < 0:
+            for item_index in range(combo.count()):
+                data = combo.itemData(item_index) or {}
+                if isinstance(data, dict) and data.get("cycle_id") == selected_cycle_id:
+                    index = item_index
+                    break
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        combo.blockSignals(False)
 
     def confirm_training_type_change(self):
         return QMessageBox.question(
@@ -1825,9 +1883,18 @@ class SquadPage(BasePage):
             )
         self.week_nav_summary_label.setText("\n".join(lines))
 
-    def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
+    def show_weekly_training(
+        self,
+        state,
+        priority_rows,
+        coverage_rows,
+        formations,
+        cycle_options=(),
+        selected_cycle_id="",
+    ):
         self._clear_weekly_training_plan()
         self.set_active_training_type(state.active_training_type)
+        self.set_weekly_cycle_options(cycle_options, selected_cycle_id)
         self._weekly_priority_rows = list(priority_rows)
         self._weekly_coverage_rows = list(coverage_rows)
         self._weekly_priority_by_player_id = {

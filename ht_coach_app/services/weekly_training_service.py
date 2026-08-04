@@ -1,5 +1,6 @@
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
+from hashlib import sha1
 
 from engine.weekly_training.coverage import WeeklyTrainingCoverageService
 from engine.weekly_training.models import (
@@ -45,6 +46,36 @@ class TrainingPriorityRow:
     availability: str
 
 
+@dataclass(frozen=True)
+class WeeklyCycleOption:
+    cycle_id: str
+    start_date: date
+    end_date: date
+    relative_offset: int
+    is_current: bool = False
+
+    def to_item_data(self):
+        return {
+            "cycle_id": self.cycle_id,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "relative_offset": self.relative_offset,
+        }
+
+
+@dataclass(frozen=True)
+class MatchTrainingContext:
+    training_cycle_id: str = ""
+    start_date: date | None = None
+    end_date: date | None = None
+    suggested_role: str = ""
+    weekly_cycle_revision: str = ""
+    required_player_ids: frozenset[str] = frozenset()
+    full_covered_count: int = 0
+    half_covered_count: int = 0
+    pending_count: int = 0
+
+
 class TemporalStatus:
     PAST = "PAST"
     TODAY = "TODAY"
@@ -86,13 +117,100 @@ class WeeklyTrainingAppService:
         )
         return date.fromisoformat(week_id.split(":")[0])
 
+    def visible_cycle_options(self, state=None):
+        state = state or self.load_state()
+        active_type = state.active_training_type
+        current_week = state.active_week or self._current_training_week(active_type)
+        return tuple(
+            self._cycle_option_for_offset(current_week, offset, active_type)
+            for offset in range(3)
+        )
+
+    def training_week_for_cycle(self, cycle_id, state=None):
+        state = state or self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        start_text = cycle_id.split(":", 1)[0]
+        start = date.fromisoformat(start_text)
+        return active_training_week(today=start, training_type=state.active_training_type)
+
+    def training_week_for_match_date(self, match_date, state=None):
+        state = state or self.load_state()
+        target = self._date(match_date)
+        cycle_id = self._week_id_for_target_date(
+            state.active_week,
+            target,
+            state.active_training_type,
+        )
+        return self.training_week_for_cycle(cycle_id, state=state)
+
+    def cycle_id_for_match_date(self, match_date):
+        state = self.load_state()
+        week = self.training_week_for_match_date(match_date, state=state)
+        return week.week_id
+
+    def weekly_cycle_revision(self, cycle_id=None):
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        parts = [cycle_id, state.active_training_type]
+        for key in sorted(state.priorities):
+            record = state.priorities[key]
+            parts.append(f"p:{key}:{record.priority.value}:{record.player_name}")
+        for record in sorted(
+            self._weekly_match_records_for_cycle(state, cycle_id),
+            key=lambda item: item.match_id,
+        ):
+            status = getattr(record.planned_or_played, "value", record.planned_or_played)
+            parts.append(
+                f"m:{record.match_id}:{record.match_date.isoformat()}:{record.match_role.value}:"
+                f"{status}:{record.formation}:{record.linked_match_record_id}:"
+                f"{','.join(entry.player_id + '@' + entry.slot_id for entry in record.lineup)}"
+            )
+        return sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+    def match_training_context(self, match_date, players=()):
+        from decimal import Decimal
+
+        state = self.load_state()
+        week = self.training_week_for_match_date(match_date, state=state)
+        cycle_id = week.week_id
+        coverage_rows = self.coverage(players, cycle_id)
+        full = half = pending = 0
+        for row in coverage_rows:
+            priority = getattr(row.weekly_target, "value", row.weekly_target)
+            total = (
+                Decimal(str(row.confirmed_exposure))
+                + Decimal(str(row.assumed_exposure))
+                + Decimal(str(row.planned_exposure))
+            )
+            if priority == TrainingPriority.REQUIRED_100.value:
+                if total >= Decimal("100"):
+                    full += 1
+                else:
+                    pending += 1
+            elif priority == TrainingPriority.REQUIRED_50.value:
+                if total >= Decimal("50"):
+                    half += 1
+                else:
+                    pending += 1
+        return MatchTrainingContext(
+            training_cycle_id=cycle_id,
+            start_date=week.start_date,
+            end_date=week.start_date + timedelta(days=6),
+            suggested_role=self._suggested_role_for_match_date(week, self._date(match_date)),
+            weekly_cycle_revision=self.weekly_cycle_revision(cycle_id),
+            required_player_ids=self.required_player_ids_for_match(cycle_id),
+            full_covered_count=full,
+            half_covered_count=half,
+            pending_count=pending,
+        )
+
     def load_state(self):
         state = self._repository.load()
         if state.active_week is None:
             state = self._repository.save(
                 state.__class__(
                     active_training_type=state.active_training_type,
-                    active_week=active_training_week(training_type=state.active_training_type),
+                    active_week=self._current_training_week(state.active_training_type),
                     priorities=state.priorities,
                     match_records=state.match_records,
                     archived_weeks=state.archived_weeks,
@@ -102,6 +220,25 @@ class WeeklyTrainingAppService:
             state = self._repository.rollover(state)
         state = self._repair_linked_weekly_record_cycles(state)
         return self._repair_duplicate_weekly_records(state)
+
+    @staticmethod
+    def _current_training_week(training_type):
+        from ht_coach_app.services.ht_week_context_provider import get_calendar_service
+
+        now = get_calendar_service().now()
+        return active_training_week(today=now, training_type=training_type)
+
+    @staticmethod
+    def _cycle_option_for_offset(current_week, offset, training_type):
+        start = current_week.start_date + timedelta(days=7 * offset)
+        week = active_training_week(today=start, training_type=training_type)
+        return WeeklyCycleOption(
+            cycle_id=week.week_id,
+            start_date=week.start_date,
+            end_date=week.start_date + timedelta(days=6),
+            relative_offset=offset,
+            is_current=offset == 0,
+        )
 
     def active_cycle_id(self):
         state = self.load_state()
@@ -340,7 +477,7 @@ class WeeklyTrainingAppService:
         if state.active_week is not None:
             new_week = replace(state.active_week, active_training_type=training_type)
         else:
-            new_week = active_training_week(training_type=training_type)
+            new_week = self._current_training_week(training_type)
         new_state = replace(
             state, active_training_type=training_type, active_week=new_week
         )
@@ -400,7 +537,7 @@ class WeeklyTrainingAppService:
         state = self.load_state()
         return rule_provider_for(state.active_training_type)
 
-    def required_player_ids_for_match(self):
+    def required_player_ids_for_match(self, cycle_id=None):
         """Stable player_training_id values for players who still owe
         weekly training minutes under a Required 100%/50% priority,
         counting whatever has already been logged this week (e.g. a
@@ -417,7 +554,7 @@ class WeeklyTrainingAppService:
             return frozenset()
 
         counted = {}
-        cycle_id = self._coerce_cycle_id(state, None)
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
         for record in self._weekly_match_records_for_cycle(state, cycle_id):
             for exposure in record.training_exposure_entries:
                 counted[exposure.player_id] = (
@@ -503,8 +640,10 @@ class WeeklyTrainingAppService:
             self._weekly_match_records_for_cycle(state, cycle_id),
         )
 
-    def generate_plan(self, players, formation_name):
+    def generate_plan(self, players, formation_name, cycle_id=None):
         state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        week = self.training_week_for_cycle(cycle_id, state=state)
         priorities = {
             key: record.priority
             for key, record in state.priorities.items()
@@ -516,11 +655,11 @@ class WeeklyTrainingAppService:
         ]
         plan = self._planner.plan(
             players,
-            state.active_week,
+            week,
             priorities,
             self._weekly_match_records_for_cycle(
                 state,
-                state.active_week.week_id,
+                cycle_id,
             ),
             formation_name=formation_name,
             training_type=state.active_training_type,
@@ -664,6 +803,17 @@ class WeeklyTrainingAppService:
     def first_match_record(self):
         state = self.load_state()
         return self._current_first_match_record(state)
+
+    def first_match_record_for_cycle(self, cycle_id):
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        return next(
+            (
+                record for record in self._weekly_match_records_for_cycle(state, cycle_id)
+                if record.match_role == MatchRole.FIRST_WEEKLY_MATCH
+            ),
+            None,
+        )
 
     def record_second_match(
         self,
@@ -937,6 +1087,17 @@ class WeeklyTrainingAppService:
         state = self.load_state()
         return self._current_second_match_record(state)
 
+    def second_match_record_for_cycle(self, cycle_id):
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        return next(
+            (
+                record for record in self._weekly_match_records_for_cycle(state, cycle_id)
+                if record.match_role == MatchRole.SECOND_WEEKLY_MATCH
+            ),
+            None,
+        )
+
     def _second_match_record_for_board(
         self,
         state,
@@ -1165,6 +1326,20 @@ class WeeklyTrainingAppService:
             return state
         return self._repository.delete_match_record(state, record.match_id)
 
+    def delete_first_match_for_cycle(self, cycle_id):
+        state = self.load_state()
+        record = self.first_match_record_for_cycle(cycle_id)
+        if record is None:
+            return state
+        return self._repository.delete_match_record(state, record.match_id)
+
+    def delete_second_match_for_cycle(self, cycle_id):
+        state = self.load_state()
+        record = self.second_match_record_for_cycle(cycle_id)
+        if record is None:
+            return state
+        return self._repository.delete_match_record(state, record.match_id)
+
     def _first_match_record_for_board(
         self,
         state,
@@ -1262,6 +1437,14 @@ class WeeklyTrainingAppService:
         if target > current:
             return TemporalStatus.FUTURE
         return TemporalStatus.TODAY
+
+    @staticmethod
+    def _suggested_role_for_match_date(week, match_date):
+        if match_date == week.first_match_date:
+            return "first"
+        if match_date == week.second_match_date:
+            return "second"
+        return ""
 
     @staticmethod
     def _record_notes(status, minutes_known, temporal, warning=""):

@@ -20,6 +20,23 @@ The roadmap protects the engine and moves product work into the application laye
 
 ## Alpha 0.2 Milestones
 
+### Alpha 0.6.8: Future Weekly Training Planning
+
+Goal: let the manager plan near-future training cycles and analyze future matches
+against the correct weekly context without adding analytical features.
+
+Deliverables:
+
+- Weekly Planner selector for current cycle, current + 1 and current + 2.
+- Structured week selector item data with `cycle_id`, date range and relative offset.
+- Cycle-scoped coverage, Match 1/Match 2 lookup, generated plan and empty states.
+- Match analysis resolves training context from scheduled date and persists the weekly
+  revision used by the result.
+- Restored Match results can be marked stale when the relevant Weekly Planner cycle
+  changes after analysis.
+
+No optimizer, rating, probability, official parser or calendar formula changes.
+
 ### Alpha 0.6.7 HF-07: Match Identity, Calendar and Weekly Planning Repair
 
 Goal: stabilize historical match identity and date-driven planning before

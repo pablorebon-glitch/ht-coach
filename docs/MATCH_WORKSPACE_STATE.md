@@ -189,3 +189,15 @@ The view applies the model change first, emits the normal workspace-modified eve
 for controller recalculation, and schedules the visual rebuild for the next Qt
 event-loop turn. This keeps PySide6 from deleting the active order combo while its
 own `currentIndexChanged` signal is still executing.
+
+## Alpha 0.6.8 Training Context
+
+Match analysis now records the Weekly Planner context used at analysis time. The
+serialized result stores the training cycle id, the weekly revision hash, a timestamp,
+a short localized summary and a stale flag. These fields are view-model data only; no
+engine objects are persisted.
+
+When the Weekly Planner emits a save event, Match compares the current revision for the
+stored `training_cycle_id` with the revision used by the visible analysis. A mismatch
+marks the training context stale so the manager knows to analyze again before saving a
+lineup whose training assumptions may have changed.

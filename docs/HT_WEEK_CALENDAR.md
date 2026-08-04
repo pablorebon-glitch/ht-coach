@@ -91,3 +91,11 @@ The Weekly Planner header (`ht_coach_app/services/ht_week_formatting.py`'s
 `format_ht_week_status()`) renders all five weekly milestones as
 Pending/Processed(-equivalent) pairs on one compact line -- never a large
 widget, never a raw enum value or `snake_case` string leaking into the UI.
+
+## Match-Date Planning Context
+
+Alpha 0.6.8 keeps Match and Weekly Planner aligned by resolving the training cycle
+from the selected match date before analysis or weekly save. This keeps future matches
+from reading the currently visible planner cycle by accident. The visible cycle range
+shown to the user is Sunday through Saturday, while the existing training-update cutoff
+logic remains the canonical implementation for cycle identity.

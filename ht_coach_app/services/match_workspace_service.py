@@ -182,6 +182,11 @@ class MatchAnalysisResult:
     training_conflict_warning: str = ""
     analysis_owner_type: str = ""
     analysis_owner_id: str = ""
+    training_cycle_id: str = ""
+    weekly_cycle_revision_used: str = ""
+    training_context_timestamp: str = ""
+    training_context_summary: str = ""
+    training_context_stale: bool = False
 
     @property
     def recommended_formation(self):
@@ -331,6 +336,11 @@ class MatchWorkspaceService:
             unavailable_players_count=self._unavailable_count(all_players),
             match_type=match_type,
             training_conflict_warning=training_conflict_warning,
+            training_cycle_id="",
+            weekly_cycle_revision_used="",
+            training_context_timestamp="",
+            training_context_summary="",
+            training_context_stale=False,
         )
 
         return self._with_decision_lab(
@@ -850,6 +860,11 @@ class MatchWorkspaceService:
             training_conflict_warning=result.training_conflict_warning,
             analysis_owner_type=result.analysis_owner_type,
             analysis_owner_id=result.analysis_owner_id,
+            training_cycle_id=result.training_cycle_id,
+            weekly_cycle_revision_used=result.weekly_cycle_revision_used,
+            training_context_timestamp=result.training_context_timestamp,
+            training_context_summary=result.training_context_summary,
+            training_context_stale=result.training_context_stale,
         )
         return with_tactical_advisor(enriched)
 
@@ -957,6 +972,11 @@ def match_analysis_result_from_dict(data):
         unavailable_players_count=int(data.get("unavailable_players_count", 0)),
         match_type=data.get("match_type", MATCH_TYPE_LEAGUE),
         training_conflict_warning=data.get("training_conflict_warning", ""),
+        training_cycle_id=data.get("training_cycle_id", ""),
+        weekly_cycle_revision_used=data.get("weekly_cycle_revision_used", ""),
+        training_context_timestamp=data.get("training_context_timestamp", ""),
+        training_context_summary=data.get("training_context_summary", ""),
+        training_context_stale=bool(data.get("training_context_stale", False)),
         formations=[
             FormationAnalysisResult(
                 formation_name=item.get("formation_name", ""),
@@ -1084,6 +1104,11 @@ def match_analysis_result_from_dict(data):
             training_conflict_warning=result.training_conflict_warning,
             analysis_owner_type=result.analysis_owner_type,
             analysis_owner_id=result.analysis_owner_id,
+            training_cycle_id=result.training_cycle_id,
+            weekly_cycle_revision_used=result.weekly_cycle_revision_used,
+            training_context_timestamp=result.training_context_timestamp,
+            training_context_summary=result.training_context_summary,
+            training_context_stale=result.training_context_stale,
         )
 
     return result
@@ -1113,6 +1138,11 @@ def with_tactical_advisor(result):
         training_conflict_warning=result.training_conflict_warning,
         analysis_owner_type=result.analysis_owner_type,
         analysis_owner_id=result.analysis_owner_id,
+        training_cycle_id=result.training_cycle_id,
+        weekly_cycle_revision_used=result.weekly_cycle_revision_used,
+        training_context_timestamp=result.training_context_timestamp,
+        training_context_summary=result.training_context_summary,
+        training_context_stale=result.training_context_stale,
     )
 
 

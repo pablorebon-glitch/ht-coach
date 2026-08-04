@@ -84,6 +84,7 @@ class MatchController(QObject):
         self._worker = None
         self._roster_players = []
         self._pending_workspace_state = None
+        self._pending_training_context = None
         self._queued_workspace_state = None
         self._latest_workspace_revision = None
         self._workspace_recalc_timer = QTimer(self)
@@ -160,6 +161,10 @@ class MatchController(QObject):
             self._app_events.official_ratings_changed.connect(
                 self._handle_external_official_ratings_changed
             )
+            if hasattr(self._app_events, "weekly_plan_saved"):
+                self._app_events.weekly_plan_saved.connect(
+                    self._handle_weekly_plan_saved_for_match_context
+                )
 
     def _handle_external_official_ratings_changed(self, changed_snapshot_id):
         """Alpha 0.6.7 HF-03, Part 17: a signal carrying match-scoped
@@ -192,6 +197,7 @@ class MatchController(QObject):
         last_result = self._current_workspace_result()
 
         if last_result is not None:
+            self._show_training_context_from_result(last_result)
             self._view.show_results(
                 last_result,
                 restored=True
@@ -887,6 +893,7 @@ class MatchController(QObject):
         )
         if matches_this_record:
             self._pending_workspace_state = None
+            self._show_training_context_from_result(last_result)
             self._view.show_results(last_result, restored=True)
             self._restore_tactical_controls_from_record(record)
             self._update_pre_status_and_ratings_panel()
@@ -896,6 +903,7 @@ class MatchController(QObject):
         if restored_result is not None:
             self._pending_workspace_state = None
             self._settings_repository.save_last_result(restored_result)
+            self._show_training_context_from_result(restored_result)
             self._view.show_results(restored_result, restored=True)
             self._restore_tactical_controls_from_record(record)
             self._update_pre_status_and_ratings_panel()
@@ -1084,6 +1092,9 @@ class MatchController(QObject):
         if match_type is None:
             return
 
+        training_context = self._training_context_for_current_match()
+        self._pending_training_context = training_context
+        self._show_training_context(training_context)
         required_player_ids = None
         training_rules = None
         if match_type == MATCH_TYPE_CUP:
@@ -1094,7 +1105,9 @@ class MatchController(QObject):
                 )
                 return
             required_player_ids = (
-                self._weekly_training_service.required_player_ids_for_match()
+                training_context.required_player_ids
+                if training_context is not None
+                else self._weekly_training_service.required_player_ids_for_match()
             )
 
         if hasattr(self._view, "set_training_conflict_warning"):
@@ -1105,6 +1118,7 @@ class MatchController(QObject):
 
         self._save_current_settings()
         self._pending_workspace_state = None
+        self._pending_training_context = None
         self._view.set_processing(
             True
         )
@@ -1192,6 +1206,7 @@ class MatchController(QObject):
 
         self._save_current_settings()
         self._pending_workspace_state = workspace_state
+        self._pending_training_context = None
         if hasattr(self._view, "set_workspace_processing"):
             self._view.set_workspace_processing(True)
         else:
@@ -1286,6 +1301,7 @@ class MatchController(QObject):
             self._view.set_processing(False)
         previous_result = self._current_workspace_result()
         result = self._apply_official_pre_if_available(result)
+        result = self._stamp_training_context(result)
         result = self._stamp_result_owner(result)
         self._compute_and_show_plan_revision(previous_result, result)
         self._update_pre_status_and_ratings_panel()
@@ -1302,8 +1318,100 @@ class MatchController(QObject):
             workspace_state=self._pending_workspace_state,
         )
         self._pending_workspace_state = None
+        self._pending_training_context = None
         self._view.show_status(
             "Match analysis complete."
+        )
+
+    def _training_context_for_current_match(self):
+        match_date = self._current_match_date()
+        if not match_date:
+            return None
+        try:
+            return self._weekly_training_service.match_training_context(
+                match_date,
+                self._roster_players,
+            )
+        except Exception:
+            return None
+
+    def _stamp_training_context(self, result):
+        context = self._pending_training_context
+        if context is None:
+            return result
+        try:
+            from ht_coach_app.services.ht_week_context_provider import (
+                get_calendar_service,
+            )
+
+            timestamp = get_calendar_service().now().isoformat(timespec="seconds")
+        except Exception:
+            timestamp = ""
+        return replace(
+            result,
+            training_cycle_id=context.training_cycle_id,
+            weekly_cycle_revision_used=context.weekly_cycle_revision,
+            training_context_timestamp=timestamp,
+            training_context_summary=self._format_training_context_summary(context),
+            training_context_stale=False,
+        )
+
+    def _show_training_context(self, context, stale=False):
+        if not hasattr(self._view, "set_training_context_summary"):
+            return
+        if context is None:
+            self._view.set_training_context_summary("", stale=False)
+            return
+        self._view.set_training_context_summary(
+            self._format_training_context_summary(context),
+            stale=stale,
+        )
+
+    @staticmethod
+    def _format_training_context_summary(context):
+        start = context.start_date.strftime("%d/%m/%Y") if context.start_date else ""
+        end = context.end_date.strftime("%d/%m/%Y") if context.end_date else ""
+        role_key = {
+            "first": "match.training_context_role_first",
+            "second": "match.training_context_role_second",
+        }.get(
+            context.suggested_role,
+            "match.training_context_role_unassigned",
+        )
+        return t(
+            "match.training_context_summary",
+            cycle=context.training_cycle_id,
+            start=start,
+            end=end,
+            role=t(role_key),
+            full=context.full_covered_count,
+            half=context.half_covered_count,
+            pending=context.pending_count,
+        )
+
+    def _handle_weekly_plan_saved_for_match_context(self):
+        result = self._current_workspace_result()
+        if result is None or not getattr(result, "training_cycle_id", ""):
+            return
+        current_revision = self._weekly_training_service.weekly_cycle_revision(
+            result.training_cycle_id
+        )
+        if current_revision == getattr(result, "weekly_cycle_revision_used", ""):
+            self._show_training_context_from_result(result)
+            return
+        stale_result = replace(result, training_context_stale=True)
+        self._settings_repository.save_last_result(stale_result)
+        self._show_training_context_from_result(stale_result)
+
+    def _show_training_context_from_result(self, result):
+        if not hasattr(self._view, "set_training_context_summary"):
+            return
+        summary = getattr(result, "training_context_summary", "")
+        if getattr(result, "training_context_stale", False) and summary:
+            summary = f"{summary}\n{t('match.training_context_stale')}"
+        self._view.set_training_context_summary(
+            summary,
+            stale=getattr(result, "training_context_stale", False),
         )
 
     def _compute_and_show_plan_revision(self, previous_result, new_result):
@@ -1824,14 +1932,14 @@ class MatchController(QObject):
                 players_csv_path=path,
                 recent_players_csv_paths=recent,
                 opponent_name=self._view.selected_opponent_name(),
-            selected_formations=self._view.selected_formations(),
-            squad_availability_mode=self._availability_mode(),
-            match_section_states=(
-                self._view.match_section_states()
-                if hasattr(self._view, "match_section_states")
-                else {}
-            ),
-        )
+                selected_formations=self._view.selected_formations(),
+                squad_availability_mode=self._availability_mode(),
+                match_section_states=(
+                    self._view.match_section_states()
+                    if hasattr(self._view, "match_section_states")
+                    else {}
+                ),
+            )
         )
         if hasattr(self._view, "set_recent_csv_paths"):
             self._view.set_recent_csv_paths(recent)
@@ -2467,6 +2575,7 @@ class MatchController(QObject):
             result, snapshot_id_override=imported_snapshot_id
         )
         self._settings_repository.save_last_result(result)
+        self._show_training_context_from_result(result)
         self._view.show_results(result, workspace_state=None)
         self._update_pre_status_and_ratings_panel(snapshot_id_override=imported_snapshot_id)
 

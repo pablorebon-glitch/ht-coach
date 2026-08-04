@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Added Alpha 0.6.8 future Weekly Training planning. The Squad Weekly Planner
+  now shows the current cycle plus the next two cycles, with structured
+  `cycle_id` item data, cycle-scoped coverage and no accidental mouse-wheel
+  changes on the week selector. Match analysis now resolves training context
+  from the selected match date, persists the weekly revision used by the result
+  and can mark a restored analysis stale when the Weekly Planner changes. No
+  optimizer, rating, probability, PRE/POST parser or calendar formula code
+  changed.
+
 ### Fixed
 
 - Fixed Alpha 0.6.7 HF-10.7 duplicate saved-match record creation after

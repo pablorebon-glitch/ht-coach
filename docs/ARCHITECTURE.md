@@ -112,6 +112,13 @@ existing player analyzer, formation catalog, Formation Board mapper and automati
 optimization, and it must not retune ratings, probabilities, tactics, orders or
 optimizer formulas.
 
+Alpha 0.6.8 extends the desktop application around future Weekly Planner cycles without
+changing that engine layer. `WeeklyTrainingAppService` is the application boundary for
+current/+1/+2 cycle options, explicit `cycle_id` coverage queries, match-date training
+context and weekly revision hashing. Squad renders the selectable cycles and Match
+stores only serializable context metadata on `MatchAnalysisResult`; views never call
+the optimizer or planner engine directly.
+
 ## Target Layers
 
 ```text

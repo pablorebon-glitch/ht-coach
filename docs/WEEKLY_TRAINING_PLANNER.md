@@ -370,3 +370,15 @@ shown to the user.
   extension.
 - Best-effort priority selection is intentionally heuristic. It reuses the existing
   ranking and order behavior rather than introducing a new exhaustive training optimizer.
+
+## Alpha 0.6.8 Future Cycles
+
+The visible Weekly Planner selector is intentionally bounded to the current training
+cycle and the next two cycles. It defaults to the current cycle when Squad opens, and
+stores structured combo data (`cycle_id`, `start_date`, `end_date`,
+`relative_offset`) instead of deriving state from visible labels.
+
+All visible planner data is scoped by the selected `cycle_id`: coverage, first and
+second match records, generated plans, empty states and record actions. Future cycles
+can be empty without pulling Match 1 or Match 2 from another cycle. Training type alone
+is never enough to merge records across weeks.
