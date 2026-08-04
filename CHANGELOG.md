@@ -4,6 +4,156 @@
 
 ### Fixed
 
+- Fixed Alpha 0.6.7 HF-10.7 duplicate saved-match record creation after
+  importing Official PRE from a Saved Match editor. PRE/POST imports in
+  `EDIT_SAVED_MATCH` now require the active canonical Match Record ID and attach
+  evidence to that exact record instead of using the automatic import path that
+  can create minimal official-evidence records. Explicit PRE imports now stamp
+  the official Match ID/provenance onto the target record, repeated saves keep
+  Weekly Planner links unchanged, and duplicate reconciliation can safely merge
+  older partial PRE-only records with the single complete planned match for the
+  same opponent while leaving ambiguous cases unresolved. No optimizer, rating,
+  probability, PRE/POST parser, season-calendar, Formation Board order or weekly
+  participation formula code changed.
+
+- Fixed Alpha 0.6.7 HF-10.6 saved-match restoration and weekly-link continuity.
+  Saved Match edit now restores competition type from canonical item data without
+  converting missing values to Liga, restores venue from canonical `HomeAway`,
+  reloads the persisted players CSV into the Match workspace, and can rebuild a
+  visible Formation Board directly from the saved `HistoricalMatchSnapshot`
+  lineup/tactical setup when the last-result cache is absent. Weekly saves from
+  a Saved Match editor keep `EDIT_SAVED_MATCH`, preserve the active record ID,
+  write Partido 1/2 against that same canonical record and leave the editor
+  visible. Result enrichment now preserves match type and analysis ownership so
+  Copa/Amistoso no longer turns into Liga through serialization. No optimizer,
+  rating, probability, PRE/POST parser, Formation Board slot/order, season
+  calendar or weekly participation formula code changed.
+
+- Fixed Alpha 0.6.7 HF-10.5 Match save workflow isolation. `Guardar
+  formacion`, `Guardar como Partido 1` and `Guardar como Partido 2` now share
+  one canonical workspace save transaction before any Weekly Planner link is
+  written. The transaction persists structured metadata plus lineup, switches
+  New Match into saved-edit mode, keeps the board/results visible, emits saved
+  match refresh events and reports actionable errors instead of silently
+  swallowing persistence failures. Weekly saves now link to the same canonical
+  Match Record ID and leave the workspace open; if the weekly link fails, the
+  canonical save remains available for retry. Reopening saved records also
+  reconciles old formatted opponent titles back to a clean managed opponent
+  name when the match is unambiguous. No optimizer, rating, probability,
+  PRE/POST parser, calendar, Formation Board order or weekly participation
+  formula code changed.
+
+- Fixed Alpha 0.6.7 HF-10.4 canonical Match metadata persistence when saving
+  formations. `Guardar formación`, `Guardar cambios` and weekly save linking
+  now read one structured workspace metadata snapshot for opponent identity,
+  competition type, venue, scheduled date, HT season/week and training cycle.
+  New Match formation saves create one complete canonical Match Record instead
+  of a partial duplicate, then switch into saved-edit mode. Saved Matches now
+  renders the title through `MatchDisplayFormatter`, keeps `opponent_name`
+  canonical, formats saved dates for users, and preserves Copa/Amistoso,
+  Local/Visitante/Neutral/Unknown and configured season/week on reopen. Added
+  migration repair for malformed opponent names that contain formatted match
+  identities such as `Hit'em up - Santa Cruz Club`. No optimizer, rating,
+  probability, PRE/POST parser, evidence ownership, Formation Board order,
+  calendar calculation or training participation formulas changed.
+
+- Fixed Alpha 0.6.7 HF-10.3 Match competition-type synchronization. The Match
+  workspace now treats the selector's structured item data as the canonical
+  match type for analysis, saved Match Records, Formation Board weekly saves
+  and `WeeklyMatchRecord.competition_type`. Invalid selector data blocks
+  analysis instead of falling back to Liga. Changing the match type after an
+  analysis marks that analysis stale and disables Guardar como Partido 1/2 until
+  reanalysis, so weekly slot number no longer implies Liga or Copa/Amistoso. No
+  optimizer, rating, probability, PRE/POST parser, Formation Board order,
+  calendar or training participation formulas changed.
+
+- Fixed Weekly Planner coverage isolation by training cycle. Coverage,
+  participation provenance and `explain_weekly_player_state` now scope Match 1
+  and Match 2 to the requested `cycle_id`, so records from older or future
+  cycles can only appear in the diagnostic `Other cycles` section and always
+  contribute zero minutes to the visible cycle. Linked weekly records with an
+  invalid cycle are repaired from the canonical Match Record date when that is
+  unambiguous; otherwise they are quarantined outside weekly coverage. Added
+  regression coverage for the Bassedas cross-cycle leak, cycle switching,
+  on-disk reload after repair and quarantine behavior. No optimizer, rating,
+  probability, training percentage or PRE/POST parser formulas changed.
+
+- Fixed Alpha 0.6.7 HF-10.1 stale Weekly Planner participation after lineup
+  replacement. Coverage, plan generation and diagnostics now read a canonical
+  weekly-record view that keeps at most one active Partido 1 and one active
+  Partido 2 per training cycle, with duplicate/superseded slot records repaired
+  on load. This closes the remaining source where an old Match 1 projection
+  could still contribute a removed player such as Bassedas even after the linked
+  record was replaced. Added `explain_weekly_player_state` diagnostics and
+  regression coverage for disk reload, duplicate active Match 1 records,
+  replacement, deletion, priority-only rows and table symbol semantics. Clarified
+  that `○` means planned training from a lineup not yet counted as played. No
+  training percentage rules, optimizers, ratings, probabilities, priorities or
+  PRE/POST parsers changed.
+
+- Fixed Alpha 0.6.7 HF-10 training participation integrity and Match
+  preparation ordering. Weekly Training can now replace a linked saved match's
+  current lineup by recomputing the complete weekly record from the final saved
+  board, removing the previous record's exposure entries before inserting the
+  new ones. This prevents removed players from continuing to count as played or
+  trained after editing a saved match. Added participation provenance for
+  diagnostics. Reordered Match preparation to Rival, Match Type, Venue, Match
+  Date, Formations, formation actions, Analyze; Analyze is disabled until CSV,
+  opponent and at least one formation are selected. The match date label now
+  reads "Fecha del partido" / "Match date", and New Match defaults to the
+  injected application calendar date instead of an accidental stale year. No
+  training percentage rules, optimizer formulas, rating formulas, probability
+  formulas or PRE/POST parsers changed.
+
+- Fixed Alpha 0.6.7 HF-09 Match workspace isolation between New Match and
+  Saved Match editing. Match analysis results now carry a serializable owner
+  (`NEW_MATCH_DRAFT` or `SAVED_MATCH` plus ID), and the controller only
+  restores, copies or saves a result when that owner matches the active
+  workspace mode. Opening a saved match clears stale lower results before
+  restoring only that record's own cached analysis; opening New Match creates a
+  fresh draft context with no inherited Formation Board, comparison or lineup
+  from the previous flow. Editing from Saved Matches keeps saved-match context
+  instead of selecting the New Match navigation item. No optimizer, rating,
+  probability, PRE/POST parser or tactical calculation code changed.
+
+- Fixed Alpha 0.6.7 HF-08 official evidence ownership and saved-opponent
+  restoration. POST imports from an actively selected historical record are now
+  scoped to that record instead of being redirected by a global/latest Match ID
+  lookup. Official PRE/POST mismatch rules remain strict, while retrospective
+  PRE source IDs are not treated as real historical POST IDs. POST replacement
+  updates only the active record and preserves retrospective PRE, opponent,
+  date, competition, venue and lineup identity. Saved Match editing now restores
+  opponent selector identity from structured combo data; if the opponent is no
+  longer in Opponent Manager, Match shows a synthetic saved-opponent entry and
+  blocks analysis instead of falling back to another rival. No optimizer,
+  rating, probability or PRE/POST parser code changed.
+
+- Fixed Alpha 0.6.7 HF-07 retrospective match identity, season calendar and
+  historical Weekly Planner targeting. Retrospective PRE evidence is now read
+  for Official Intelligence when no official PRE exists, but its source
+  opponent and source Match ID never rename the canonical historical match.
+  The Official Intelligence selector/header use canonical record metadata so
+  Torres remains `Hit'em up vs. Torres Futbol Club` even when the supporting
+  retrospective PRE was captured from Santa Cruz. Added safe migration repair
+  for duplicated display strings and retrospective-source contamination, with
+  ambiguous records reported instead of guessed. Season calendar persistence is
+  schema-versioned with canonical fields, validation, timestamping and the
+  `America/Argentina/Buenos_Aires` timezone option. Saving Match records as
+  Weekly Planner Partido 1/2 now requires an actual match date and targets the
+  Sunday-Saturday training cycle containing that historical date rather than
+  silently falling back to the current week. No optimizer, rating, probability
+  or PRE/POST parser formulas changed.
+
+- Fixed Alpha 0.6.7 HF-06 page-only mouse-wheel behavior in the Match
+  workspace: closed combo boxes, tab bars, date/spin controls and Formation
+  Board selectors no longer change values from hover-wheel scrolling. Wheel
+  input is redirected to the page scroll area where possible, while open combo
+  popups and genuine inner scroll areas keep their normal scrolling behavior.
+  Added regression coverage for Match inputs, formation/tactic/attitude
+  selectors, the individual player-order selector, result tabs and scroll-limit
+  safety. No analytical, optimizer, rating, probability, persistence or
+  official-evidence parser behavior changed.
+
 - Fixed Alpha 0.6.7 HF-05 Formation Board stability and slot integrity:
   manual starter swaps now preserve slot-owned valid orders instead of rerunning
   automatic order selection, manual order edits are applied by stable slot id plus

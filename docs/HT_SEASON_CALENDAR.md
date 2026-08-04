@@ -30,10 +30,27 @@ uncertainty across guessed season boundaries.
 
 ## `SeasonCalendarConfig` (Part 11)
 
-`season_number`, `season_start_date` (an ISO date, normalized to the Monday
-on/before it if the user picks a different weekday), `total_weeks` (default
-16), `timezone`. Persisted via `SeasonCalendarRepository` to
-`season_calendar.json` in the user data directory.
+The persisted configuration is schema-versioned so future calendar changes
+can migrate deliberately:
+
+- `current_season_number`;
+- `current_season_start_date`;
+- `competitive_weeks`;
+- `timezone`;
+- `updated_at`;
+- `schema_version`.
+
+`SeasonCalendarConfig` still reads the older `season_number`,
+`season_start_date` and `total_weeks` keys for backward compatibility, and
+still writes those aliases while the app has existing user data in the wild.
+`SeasonCalendarRepository.save()` stamps `updated_at` in UTC. The canonical
+timezone shown in Settings is `America/Argentina/Buenos_Aires`; the older
+`America/Buenos_Aires` value remains accepted as a compatibility alias.
+
+Validation is intentionally user-facing rather than magical: season number
+and competitive weeks must be positive, the timezone must be valid, and a
+non-Monday start date produces a warning (`season_start_date_not_monday`)
+instead of a silent correction.
 
 ## `resolve_season_context(match_date, config)` (Part 12)
 
@@ -81,6 +98,10 @@ explanation text word-for-word, season number/start date/total weeks/
 timezone fields, and Guardar/Cancelar/Recalcular partidos existentes
 actions. "Recalcular" shows a confirmation naming exactly how many records
 will change before applying, via `preview_recalculation()`.
+
+HF-07 keeps the two calendars explicit in this UI: the competitive Hattrick
+season week is Monday-Sunday, while the Weekly Planner training cycle stays
+Sunday-Saturday.
 
 ## Wired into New Match (Part 14)
 

@@ -7,6 +7,7 @@ from ht_coach_app.core.constants import APP_NAME
 from ht_coach_app.diagnostics.crash_dialog import show_crash_dialog
 from ht_coach_app.diagnostics.crash_reporter import install_crash_handler
 from ht_coach_app.ui.design_system.styles import application_stylesheet
+from ht_coach_app.ui.input_behavior import install_page_only_wheel_policy
 from ht_coach_app.views.main_window import MainWindow
 
 
@@ -16,6 +17,7 @@ def create_application(argv=None):
     app.setOrganizationName("HT Coach")
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(application_stylesheet())
+    install_page_only_wheel_policy(app)
     return app
 
 

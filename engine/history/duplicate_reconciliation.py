@@ -10,7 +10,7 @@ merged -- they come back in the report for explicit resolution.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from engine.history.models import MatchContext
 
@@ -53,9 +53,45 @@ def find_duplicate_groups(repository):
             grouped_ids.update(r.snapshot_id for r in group)
 
     remaining = [r for r in records if r.snapshot_id not in grouped_ids]
+    partial_grouped_ids = set()
+    partials = [
+        record for record in remaining
+        if _is_partial_official_import_record(record)
+    ]
+    for partial in partials:
+        opponent = _normalized_opponent_name(partial)
+        if not opponent:
+            continue
+        candidates = [
+            record for record in remaining
+            if record.snapshot_id != partial.snapshot_id
+            and not _is_partial_official_import_record(record)
+            and _normalized_opponent_name(record) == opponent
+            and _has_canonical_match_metadata(record)
+        ]
+        if len(candidates) == 1:
+            group = (candidates[0], partial)
+            groups.append(_build_group("partial_official_import", group))
+            partial_grouped_ids.update(r.snapshot_id for r in group)
+        elif len(candidates) > 1:
+            group = tuple(candidates) + (partial,)
+            groups.append(
+                DuplicateGroup(
+                    kind="partial_official_import",
+                    records=group,
+                    can_auto_merge=False,
+                    conflict_reason="ambiguous_partial_official_import",
+                )
+            )
+            partial_grouped_ids.update(r.snapshot_id for r in group)
+
+    remaining = [
+        r for r in remaining
+        if r.snapshot_id not in partial_grouped_ids
+    ]
     by_opponent_week = {}
     for record in remaining:
-        opponent = (record.match_context.opponent.opponent_name or "").strip().lower()
+        opponent = _normalized_opponent_name(record).lower()
         if not opponent:
             continue
         venue = getattr(
@@ -105,6 +141,51 @@ def _check_mergeable(records):
     return True, ""
 
 
+def _normalized_opponent_name(record):
+    from engine.history.match_identity import extract_opponent_name_from_match_identity
+
+    opponent = record.match_context.opponent
+    raw_name = opponent.opponent_name if opponent is not None else ""
+    return extract_opponent_name_from_match_identity(raw_name, "Hit'em up").strip()
+
+
+def _is_partial_official_import_record(record):
+    has_official_evidence = (
+        record.official_pre is not None
+        or record.official_post is not None
+        or record.retrospective_pre is not None
+    )
+    if not has_official_evidence:
+        return False
+    competition = getattr(
+        record.match_context.competition_type,
+        "value",
+        record.match_context.competition_type,
+    )
+    venue = getattr(
+        record.match_context.home_away,
+        "value",
+        record.match_context.home_away,
+    )
+    return (
+        not record.lineup
+        and not record.match_context.match_date
+        and str(competition or "unknown").lower() == "unknown"
+        and str(venue or "unknown").lower() == "unknown"
+    )
+
+
+def _has_canonical_match_metadata(record):
+    return bool(
+        record.match_context.match_date
+        or record.lineup
+        or record.provisional_identity
+        or record.training_cycle_id
+        or record.ht_season_number is not None
+        or record.ht_season_week is not None
+    )
+
+
 def merge_duplicate_group(repository, group):
     if not group.can_auto_merge:
         raise ValueError(f"cannot auto-merge: {group.conflict_reason}")
@@ -138,10 +219,29 @@ def _merge_two(primary, other):
         changes["training_cycle_id"] = other.training_cycle_id
     if not primary.provisional_identity and other.provisional_identity:
         changes["provisional_identity"] = other.provisional_identity
+    if not primary.provenance.imported_match_id and other.provenance.imported_match_id:
+        changes["provenance"] = replace(
+            changes.get("provenance", primary.provenance),
+            imported_match_id=other.provenance.imported_match_id,
+        )
 
-    if not primary.match_context.official_match_id and other.match_context.official_match_id:
+    official_match_id = (
+        other.match_context.official_match_id
+        or other.provenance.imported_match_id
+        or (
+            other.official_pre.hattrick_match_id
+            if other.official_pre is not None
+            else ""
+        )
+        or (
+            other.official_post.hattrick_match_id
+            if other.official_post is not None
+            else ""
+        )
+    )
+    if not primary.match_context.official_match_id and official_match_id:
         changes["match_context"] = MatchContext(
-            official_match_id=other.match_context.official_match_id,
+            official_match_id=official_match_id,
             match_date=primary.match_context.match_date or other.match_context.match_date,
             kickoff_time=primary.match_context.kickoff_time or other.match_context.kickoff_time,
             season=primary.match_context.season or other.match_context.season,

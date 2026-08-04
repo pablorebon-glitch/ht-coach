@@ -63,7 +63,7 @@ def test_row_identity_matches_briefs_own_example_format(tmp_path):
 
     opponents = [page.table.item(row, 0).text() for row in range(page.table.rowCount())]
     types = [page.table.item(row, 1).text() for row in range(page.table.rowCount())]
-    assert "CA Chaco" in opponents
+    assert "Hit'em up vs. CA Chaco" in opponents
     assert "Liga" in types
 
 
@@ -84,7 +84,7 @@ def test_status_column_is_populated_separately(tmp_path):
     _seed(repository)
     controller.refresh()
 
-    statuses = [page.table.item(row, 4).text() for row in range(page.table.rowCount())]
+    statuses = [page.table.item(row, 5).text() for row in range(page.table.rowCount())]
     assert all(status for status in statuses)
 
 

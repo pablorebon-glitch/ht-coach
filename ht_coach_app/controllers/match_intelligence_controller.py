@@ -64,22 +64,10 @@ class MatchIntelligenceController(QObject):
         one-off string built here, which is exactly how duplicated
         fragments crept in before."""
         from ht_coach_app.services.match_display_formatter import (
-            format_match_selector_option,
+            format_match_record_identity,
         )
 
-        opponent = record.match_context.opponent.opponent_name or "?"
-        our_team_name = (
-            (record.official_pre.team_name if record.official_pre else "")
-            or (record.official_post.team_name if record.official_post else "")
-            or (record.retrospective_pre.team_name if record.retrospective_pre else "")
-        )
-        if our_team_name:
-            return format_match_selector_option(our_team_name, opponent)
-        # No team name known yet -- fall back to the date as the
-        # next-best identity anchor, never a status word.
-        return format_match_selector_option(
-            record.match_context.match_date or "?", opponent
-        )
+        return format_match_record_identity(record)
 
     @staticmethod
     def _format_record_identity(snapshot):
@@ -88,13 +76,17 @@ class MatchIntelligenceController(QObject):
             match_record_status_label,
         )
 
-        opponent = snapshot.match_context.opponent.opponent_name or "?"
+        from ht_coach_app.services.match_display_formatter import (
+            format_match_record_identity,
+        )
+
+        identity = format_match_record_identity(snapshot)
         date_text = snapshot.match_context.match_date or "?"
         competition = t(
             f"official_match_intelligence.history.competition.{getattr(snapshot.match_context.competition_type, 'value', snapshot.match_context.competition_type)}"
         )
         lines = [
-            t("official_match_intelligence.history.identity_vs", opponent=opponent),
+            identity,
             format_season_week(snapshot.season_week),
             f"{date_text} · {competition}",
             t(
@@ -196,15 +188,36 @@ class MatchIntelligenceController(QObject):
         if hasattr(self._view, "set_record_identity"):
             self._view.set_record_identity(self._format_record_identity(snapshot))
 
-        pre_text = service.format_official_summary(snapshot.official_pre)
+        effective_pre = service.effective_pre(snapshot)
+        pre_text = service.format_official_summary(effective_pre)
+        if snapshot.official_pre is None and snapshot.retrospective_pre is not None:
+            pre_text = "\n".join(
+                text
+                for text in (
+                    t("official_match_intelligence.retrospective.pre_label"),
+                    pre_text,
+                    t("official_match_intelligence.retrospective.limitation"),
+                )
+                if text
+            )
         post_text = service.format_official_summary(snapshot.official_post)
 
         # Part 5: interpreted comparison -- exact values plus a
         # deterministic direction/magnitude classification, never just
         # raw numbers.
         comparison_lines = []
-        if snapshot.official_pre is not None and snapshot.official_post is not None:
+        if effective_pre is not None and snapshot.official_post is not None:
+            from ht_coach_app.services.retrospective_comparison_formatting import (
+                comparison_label,
+            )
+
             interpreted_rows = service.interpreted_pre_post_rows(snapshot)
+            comparison_lines.append(
+                comparison_label(
+                    snapshot.official_pre is not None,
+                    snapshot.retrospective_pre is not None,
+                )
+            )
             for sector, pre, post, delta, direction, magnitude in interpreted_rows:
                 if direction is None:
                     comparison_lines.append(
@@ -224,7 +237,7 @@ class MatchIntelligenceController(QObject):
                     f"{t('official_match_intelligence.change_label')} {delta}\n"
                     f"{direction_label} — {magnitude_label}"
                 )
-        elif snapshot.official_pre is not None:
+        elif effective_pre is not None:
             comparison_lines = [t("official_match_intelligence.post_missing")]
         elif snapshot.official_post is not None:
             comparison_lines = [t("official_match_intelligence.pre_missing")]
@@ -334,7 +347,17 @@ class MatchIntelligenceController(QObject):
 
         service = self._get_service()
         try:
-            outcome = service.import_ratings(text, slot=slot, confirm_replace=confirm_replace)
+            active_snapshot_id = (
+                self._selected_snapshot_id
+                if slot == "post" and self._selected_snapshot_id
+                else None
+            )
+            outcome = service.import_ratings(
+                text,
+                slot=slot,
+                confirm_replace=confirm_replace,
+                active_snapshot_id=active_snapshot_id,
+            )
             self._selected_snapshot_id = outcome.snapshot.snapshot_id
         except OfficialRatingMatchIdMismatch as exc:
             match_id = MatchIdMismatchDialog.request_match_id(

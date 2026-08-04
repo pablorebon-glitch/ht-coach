@@ -48,14 +48,19 @@ def _lineup():
     ]
 
 
-def _result(opponent="Rival", tactic="Normal"):
+def _result(opponent="Rival", tactic="Normal", match_type="LEAGUE"):
     formation = FormationAnalysisResult(
         formation_name="2-5-3", recommended_tactic=tactic, tactic_level=5,
         win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
         possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=_lineup(),
     )
-    return MatchAnalysisResult(player_count=18, opponent_name=opponent, formations=[formation])
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name=opponent,
+        formations=[formation],
+        match_type=match_type,
+    )
 
 
 def make_controller(tmp_path, known_opponents=()):
@@ -73,6 +78,7 @@ def make_controller(tmp_path, known_opponents=()):
     controller = MatchController(
         page, match_service, settings_repo, official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, hist_repo
 
 
@@ -111,26 +117,30 @@ def test_tactic_selector_defaults_to_the_recommended_tactic(tmp_path):
 
 
 def test_changing_tactic_marks_workspace_dirty(tmp_path):
-    page, controller, hist_repo = make_controller(tmp_path)
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["Rival"])
+    page.opponent_combo.setCurrentText("Rival")
     page.show_results(_result())
     board = page._formation_board_widget
-    assert board.save_formation_button.isEnabled() is False
+    assert board.save_formation_button.isEnabled() is True
 
     index = board.tactic_combo.findData("Pressing")
     board.tactic_combo.setCurrentIndex(index)
 
+    assert board.is_dirty() is True
     assert board.save_formation_button.isEnabled() is True
 
 
 def test_changing_team_attitude_marks_workspace_dirty(tmp_path):
-    page, controller, hist_repo = make_controller(tmp_path)
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["Rival"])
+    page.opponent_combo.setCurrentText("Rival")
     page.show_results(_result())
     board = page._formation_board_widget
-    assert board.save_formation_button.isEnabled() is False
+    assert board.save_formation_button.isEnabled() is True
 
     index = board.team_attitude_combo.findData("Play it Cool")
     board.team_attitude_combo.setCurrentIndex(index)
 
+    assert board.is_dirty() is True
     assert board.save_formation_button.isEnabled() is True
 
 

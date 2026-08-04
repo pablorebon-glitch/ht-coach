@@ -20,6 +20,24 @@ optimization logic, tactic math, probability calculations, or formation scoring.
 The Tactical Advisor lives under `engine/advisor`, but it is an expert-system layer over
 already evaluated result data. It does not alter engine formulas or optimizer behavior.
 
+Alpha 0.6.7 HF-07 adds two stabilization boundaries. Match identity is structured
+canonical history data, never a persisted display label: the record owns opponent,
+date, competition, venue and official Match ID, and views render titles through the
+application-level `MatchDisplayFormatter`. Retrospective PRE imports remain
+evidence/provenance only and cannot rename the historical record. Calendar behavior is
+also split deliberately: HT competitive season/week resolution uses the
+schema-versioned `SeasonCalendarConfig` and Monday-Sunday weeks, while Weekly Planner
+targeting remains the Sunday-Saturday training cycle and is driven by the match's own
+scheduled date.
+
+Alpha 0.6.7 HF-08 tightens official-evidence ownership. POST import is automatic
+only when no active historical record is being edited/viewed; once a record is
+active, POST evidence is attached or replaced on that record only. Official PRE/POST
+Match ID mismatch semantics remain strict, while retrospective PRE source IDs stay
+provenance-only. Match opponent selectors now carry structured identity data so a
+Saved Match whose opponent disappeared from Opponent Manager cannot silently analyze
+against another rival.
+
 Match Intelligence lives under `engine/match_intelligence`. It is a deterministic
 interpretation layer over already evaluated match results. It profiles both teams,
 classifies attack-versus-defense matchups, detects opportunities and risks, generates
@@ -1197,6 +1215,20 @@ Assisted Lineup deliberately defers constraint-based lineup optimization. It doe
 implement mandatory players, rest lists, training-priority players, locked positions,
 minimum win probability, automatic formation changes or new optimizer scoring.
 
+### Input Behavior
+
+`ht_coach_app/ui/input_behavior.py`
+
+The desktop UI installs one centralized page-only mouse-wheel policy. Closed
+combo boxes, tab bars, spin boxes, date/time edits and sliders do not mutate from
+hover-wheel scrolling. Their wheel events are redirected to the nearest page
+scroll area, with the Match workspace scroll area preferred for Match controls.
+
+Explicitly open combo popups and genuine inner scroll areas keep native wheel
+scrolling. Keyboard navigation and deliberate clicks are unchanged. This layer is
+pure UI input handling and does not call or alter engine, optimizer, probability,
+persistence or official-evidence parsing code.
+
 ### Player Intelligence
 
 `ht_coach_app/player_intelligence/`
@@ -1440,7 +1472,11 @@ User clicks Analyze Match
   -> Decision Lab creates deterministic explanations from those view models
   -> Match Intelligence creates tactical profiles, matchup classifications,
      opportunities, risks, three focuses, a summary and a matrix
-  -> MatchWorkspaceRepository persists the last successful result
+  -> MatchController stamps the result owner as either NEW_MATCH_DRAFT or
+     SAVED_MATCH before persistence
+  -> MatchWorkspaceRepository persists the last successful serializable result
+     and MatchController restores it only when that owner matches the active
+     workspace mode
   -> MatchPage renders Decision Lab, recommended summary, Formation Board,
      comparison table and detailed XI
   -> FormationBoard creates an editable Workspace Lineup copy for one-click
@@ -1455,6 +1491,36 @@ User clicks Analyze Match
 ```
 
 The engine remains unaware of the desktop application.
+
+When a saved Match workspace is linked to Weekly Planner, explicit save follows this
+additional app-layer flow:
+
+```text
+User saves edited saved match
+  -> MatchController persists the final lineup to the canonical Match Record
+  -> WeeklyTrainingAppService finds the weekly record by linked_match_record_id
+  -> WeeklyTrainingAppService rebuilds that weekly record from the final board
+  -> WeeklyTrainingRepository removes the old linked record and saves the replacement
+  -> Weekly coverage is recomputed from current Partido 1 + current Partido 2
+  -> AppEvents.weekly_plan_saved refreshes Squad/Weekly Planner views
+```
+
+HF-10.5 generalizes this into one controller transaction for all Match saves:
+`Guardar formacion`, `Guardar como Partido 1` and `Guardar como Partido 2` first
+persist the active workspace metadata and lineup to one canonical
+`HistoricalMatchSnapshot`, then weekly saves attach Partido 1/2 to that returned
+record ID. The view never reconstructs metadata from display labels, and a
+weekly-link failure leaves the saved Match workspace intact for retry.
+
+HF-10.6 adds the reverse path: Saved Match edit can rebuild a displayable Match
+workspace from the canonical snapshot when the transient last-result cache is
+missing. The controller maps persisted lineup/tactical setup into a restored
+view model, reloads the saved CSV source when available, preserves
+`EDIT_SAVED_MATCH` mode through Weekly Planner saves, and never asks the engine
+to recalculate just to show the saved formation.
+
+This is a persistence/source-integrity update only. Training factors, capacity rules,
+rating calculations, optimizer formulas and probability calculations are not touched.
 
 ## View Models
 

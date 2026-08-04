@@ -17,10 +17,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from engine.calendar.ht_season import HTSeasonWeek
 
 DEFAULT_TOTAL_WEEKS = 16
+SEASON_CALENDAR_SCHEMA_VERSION = 1
+DEFAULT_TIMEZONE = "America/Argentina/Buenos_Aires"
+TIMEZONE_ALIASES = {
+    "America/Buenos_Aires": DEFAULT_TIMEZONE,
+}
 
 
 @dataclass(frozen=True)
@@ -28,7 +34,9 @@ class SeasonCalendarConfig:
     season_number: int | None = None
     season_start_date: str = ""
     total_weeks: int = DEFAULT_TOTAL_WEEKS
-    timezone: str = "America/Buenos_Aires"
+    timezone: str = DEFAULT_TIMEZONE
+    updated_at: str = ""
+    schema_version: int = SEASON_CALENDAR_SCHEMA_VERSION
 
     @property
     def is_configured(self) -> bool:
@@ -43,24 +51,67 @@ class SeasonCalendarConfig:
         except ValueError:
             return None
 
+    @property
+    def current_season_number(self):
+        return self.season_number
+
+    @property
+    def current_season_start_date(self):
+        return self.season_start_date
+
+    @property
+    def competitive_weeks(self):
+        return self.total_weeks
+
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
+            "current_season_number": self.season_number,
+            "current_season_start_date": self.season_start_date,
+            "competitive_weeks": self.total_weeks,
             "season_number": self.season_number,
             "season_start_date": self.season_start_date,
             "total_weeks": self.total_weeks,
             "timezone": self.timezone,
+            "updated_at": self.updated_at,
         }
 
     @classmethod
     def from_dict(cls, data):
         if not data:
             return cls()
-        return cls(
-            season_number=data.get("season_number"),
-            season_start_date=data.get("season_start_date", ""),
-            total_weeks=int(data.get("total_weeks", DEFAULT_TOTAL_WEEKS)),
-            timezone=data.get("timezone", "America/Buenos_Aires"),
+        season_number = data.get("current_season_number", data.get("season_number"))
+        start_date = data.get(
+            "current_season_start_date", data.get("season_start_date", "")
         )
+        total_weeks = data.get("competitive_weeks", data.get("total_weeks", DEFAULT_TOTAL_WEEKS))
+        return cls(
+            season_number=season_number,
+            season_start_date=start_date,
+            total_weeks=int(total_weeks),
+            timezone=data.get("timezone", DEFAULT_TIMEZONE),
+            updated_at=data.get("updated_at", ""),
+            schema_version=int(data.get("schema_version", SEASON_CALENDAR_SCHEMA_VERSION)),
+        )
+
+
+def validate_season_calendar_config(config):
+    errors = []
+    warnings = []
+    if config.season_number is None or int(config.season_number) <= 0:
+        errors.append("season_number_must_be_positive")
+    if int(config.total_weeks or 0) <= 0:
+        errors.append("competitive_weeks_must_be_positive")
+    start = config.start_date_value
+    if start is None:
+        errors.append("season_start_date_invalid")
+    elif start.weekday() != 0:
+        warnings.append("season_start_date_not_monday")
+    try:
+        ZoneInfo(TIMEZONE_ALIASES.get(config.timezone, config.timezone))
+    except ZoneInfoNotFoundError:
+        errors.append("timezone_invalid")
+    return tuple(errors), tuple(warnings)
 
 
 @dataclass(frozen=True)

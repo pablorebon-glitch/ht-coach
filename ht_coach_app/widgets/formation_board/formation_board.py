@@ -23,6 +23,7 @@ from ht_coach_app.core.side_formatting import format_side
 from ht_coach_app.player_intelligence.service import PlayerIntelligenceService
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.ui.design_system.collapsible_side_panel import CollapsibleSidePanel
+from ht_coach_app.ui.input_behavior import install_page_only_wheel_policy
 from ht_coach_app.ui.responsive import set_splitter_proportions
 from ht_coach_app.widgets.formation_board.bench_panel import BenchPanel
 from ht_coach_app.widgets.formation_board.formation_board_models import (
@@ -63,6 +64,8 @@ class FormationBoard(QWidget):
         self._intelligence_service = PlayerIntelligenceService()
         self._workspace_service = WorkspaceService()
         self._workspace_state = None
+        self._save_action_enabled_override = None
+        self._save_action_disabled_reason = ""
         self._boards = {}
         self._details_by_name = {}
         self._roster_players = []
@@ -70,6 +73,7 @@ class FormationBoard(QWidget):
         self._selected_bench_player_id = ""
         self._state_namespace = "formation_board"
         self._manual_order_refresh_pending = False
+        install_page_only_wheel_policy()
         self.setMinimumHeight(BOARD_MINIMUM_HEIGHT)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setStyleSheet(formation_board_stylesheet())
@@ -362,6 +366,23 @@ class FormationBoard(QWidget):
         unsaved changes -- the same signal that already enables/
         disables "Guardar formación" and "Restaurar"."""
         return self._workspace_state is not None and self._workspace_state.dirty
+
+    def mark_clean(self):
+        if self._workspace_state is None:
+            return
+        self._workspace_state = replace(
+            self._workspace_state,
+            history=(),
+            redo_stack=(),
+            replacement_preview=None,
+            swap_preview=None,
+        )
+        self._update_workspace_toolbar()
+
+    def set_save_action_validation(self, enabled, reason=""):
+        self._save_action_enabled_override = bool(enabled)
+        self._save_action_disabled_reason = "" if enabled else (reason or "")
+        self._update_workspace_toolbar()
 
     def current_board(self):
         if self._workspace_state is None:
@@ -1067,7 +1088,18 @@ class FormationBoard(QWidget):
             self.workspace_status_label
         )
         self.reset_workspace_button.setEnabled(is_dirty)
-        self.save_formation_button.setEnabled(is_dirty)
+        if self._save_action_enabled_override is None:
+            can_save = is_dirty
+            reason = ""
+        else:
+            can_save = self._save_action_enabled_override
+            reason = self._save_action_disabled_reason
+        self.save_formation_button.setEnabled(can_save)
+        self.save_formation_button.setToolTip(reason)
+        self.save_as_first_match_button.setEnabled(can_save)
+        self.save_as_first_match_button.setToolTip(reason)
+        self.save_as_second_match_button.setEnabled(can_save)
+        self.save_as_second_match_button.setToolTip(reason)
 
     def _emit_recalculate_requested(self):
         if self._workspace_state is not None:

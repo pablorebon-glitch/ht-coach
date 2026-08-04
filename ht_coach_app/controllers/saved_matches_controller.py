@@ -1,6 +1,8 @@
 from PySide6.QtCore import QObject
 
 from ht_coach_app.core.localization import t
+from ht_coach_app.services.dual_week_formatting import format_season_week
+from ht_coach_app.services.match_display_formatter import format_match_record_identity
 from ht_coach_app.services.match_record_status_formatting import (
     match_record_status_label,
 )
@@ -141,19 +143,19 @@ class SavedMatchesController(QObject):
 
     @staticmethod
     def _format_row(record):
-        opponent = record.match_context.opponent.opponent_name or "?"
+        opponent = format_match_record_identity(record)
         competition_key = getattr(
             record.match_context.competition_type,
             "value",
             record.match_context.competition_type,
         )
-        competition = t(f"official_match_intelligence.history.competition.{competition_key}")
-        date_text = record.match_context.match_date or t("saved_matches.date_unknown")
-        season_week_text = (
-            f"{record.season_week.season_number} / {record.season_week.season_week}"
-            if record.season_week.is_known
-            else t("dual_week.season_unknown")
+        competition = (
+            t("match.match_type_cup")
+            if str(competition_key).lower() == "cup"
+            else t(f"official_match_intelligence.history.competition.{competition_key}")
         )
+        date_text = SavedMatchesController._format_date(record.match_context.match_date)
+        season_week_text = format_season_week(record.season_week).replace("\n", " · ")
         venue_key = getattr(
             record.match_context.home_away, "value", record.match_context.home_away
         ) or "unknown"
@@ -167,3 +169,15 @@ class SavedMatchesController(QObject):
             "venue": venue_text,
             "status": match_record_status_label(record.status),
         }
+
+    @staticmethod
+    def _format_date(iso_date):
+        if not iso_date:
+            return t("saved_matches.date_unknown")
+        try:
+            from datetime import date
+
+            parsed = date.fromisoformat(str(iso_date)[:10])
+            return parsed.strftime("%d/%m/%Y")
+        except ValueError:
+            return str(iso_date)

@@ -2,7 +2,11 @@ from datetime import date
 
 import pytest
 
-from engine.calendar.season_calendar import SeasonCalendarConfig, resolve_season_context
+from engine.calendar.season_calendar import (
+    SeasonCalendarConfig,
+    resolve_season_context,
+    validate_season_calendar_config,
+)
 from engine.calendar.season_calendar_repository import SeasonCalendarRepository
 from engine.calendar.season_recalculation import (
     preview_recalculation,
@@ -97,6 +101,71 @@ def test_config_roundtrips_through_repository(tmp_path):
     assert loaded.season_number == 95
     assert loaded.season_start_date == "2026-07-27"
     assert loaded.total_weeks == 16
+    assert loaded.schema_version == 1
+    assert loaded.updated_at
+
+
+def test_config_writes_schema_versioned_canonical_fields(tmp_path):
+    repository = SeasonCalendarRepository(tmp_path / "season.json")
+    repository.save(_config())
+
+    import json
+
+    payload = json.loads((tmp_path / "season.json").read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert payload["current_season_number"] == 95
+    assert payload["current_season_start_date"] == "2026-07-27"
+    assert payload["competitive_weeks"] == 16
+
+
+def test_config_loads_canonical_field_names(tmp_path):
+    import json
+
+    path = tmp_path / "season.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "current_season_number": 95,
+                "current_season_start_date": "2026-07-27",
+                "competitive_weeks": 16,
+                "timezone": "America/Argentina/Buenos_Aires",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = SeasonCalendarRepository(path).load()
+
+    assert loaded.current_season_number == 95
+    assert loaded.current_season_start_date == "2026-07-27"
+    assert loaded.competitive_weeks == 16
+    assert loaded.timezone == "America/Argentina/Buenos_Aires"
+
+
+def test_validate_config_warns_when_start_date_is_not_monday():
+    errors, warnings = validate_season_calendar_config(
+        SeasonCalendarConfig(
+            season_number=95,
+            season_start_date="2026-07-28",
+            total_weeks=16,
+            timezone="America/Argentina/Buenos_Aires",
+        )
+    )
+    assert errors == ()
+    assert warnings == ("season_start_date_not_monday",)
+
+
+def test_validate_config_rejects_invalid_timezone():
+    errors, warnings = validate_season_calendar_config(
+        SeasonCalendarConfig(
+            season_number=95,
+            season_start_date="2026-07-27",
+            total_weeks=16,
+            timezone="Nowhere/Invalid",
+        )
+    )
+    assert "timezone_invalid" in errors
 
 
 def test_repository_returns_unconfigured_when_nothing_saved(tmp_path):

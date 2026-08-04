@@ -140,10 +140,11 @@ def make_match_controller(tmp_path):
         page, match_service, settings_repo, weekly_training_service=weekly_service,
         official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, hist_repo, weekly_repo
 
 
-def _analysis_result(opponent="CA Chaco"):
+def _analysis_result(opponent="CA Chaco", match_type="LEAGUE"):
     from ht_coach_app.services.match_workspace_service import (
         FormationAnalysisResult,
         LineupPlayerResult,
@@ -164,7 +165,12 @@ def _analysis_result(opponent="CA Chaco"):
             for i in range(1, 12)
         ],
     )
-    return MatchAnalysisResult(player_count=18, opponent_name=opponent, formations=[formation])
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name=opponent,
+        formations=[formation],
+        match_type=match_type,
+    )
 
 
 def test_saving_first_match_populates_the_canonical_link(tmp_path):
@@ -178,6 +184,8 @@ def test_saving_first_match_populates_the_canonical_link(tmp_path):
     linked_id = weekly_state.match_records[0].linked_match_record_id
     assert linked_id
     assert hist_repo.get(linked_id) is not None
+    assert controller._active_match_record_id == linked_id
+    assert controller._editing_snapshot_id == linked_id
 
 
 def test_saving_first_match_never_creates_a_second_canonical_record_on_repeat_save(tmp_path):
@@ -190,6 +198,42 @@ def test_saving_first_match_never_creates_a_second_canonical_record_on_repeat_sa
     controller._save_as_first_match()
 
     assert len(hist_repo.list_all()) == 1
+
+
+def test_weekly_save_keeps_workspace_open_and_uses_same_canonical_record(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    controller._roster_players = []
+    controller._analysis_finished(_analysis_result())
+
+    controller._save_as_first_match()
+
+    weekly_state = weekly_repo.load()
+    linked_id = weekly_state.match_records[0].linked_match_record_id
+    assert linked_id == controller._active_match_record_id
+    assert linked_id == controller._editing_snapshot_id
+    assert page._formation_board_widget is not None
+    assert page._state == "success"
+    assert len(hist_repo.list_all()) == 1
+
+
+def test_weekly_link_failure_keeps_canonical_save_and_workspace_intact(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    controller._roster_players = []
+    controller._analysis_finished(_analysis_result())
+
+    def fail_record_first_match(*args, **kwargs):
+        raise RuntimeError("planner storage unavailable")
+
+    controller._weekly_training_service.record_first_match = fail_record_first_match
+
+    controller._save_as_first_match()
+
+    records = hist_repo.list_all()
+    assert len(records) == 1
+    assert controller._active_match_record_id == records[0].snapshot_id
+    assert page._formation_board_widget is not None
+    assert page._state == "error"
+    assert weekly_repo.load().match_records == ()
 
 
 def test_editing_record_links_saved_match_to_the_record_being_edited(tmp_path):
@@ -206,3 +250,124 @@ def test_editing_record_links_saved_match_to_the_record_being_edited(tmp_path):
     weekly_state = weekly_repo.load()
     assert weekly_state.match_records[0].linked_match_record_id == record.snapshot_id
     assert len(hist_repo.list_all()) == 1
+
+
+def test_cup_analysis_saved_as_second_match_preserves_cup_metadata(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("CUP")
+    page.confirm_save_match_type_mismatch = lambda *args: pytest.fail(
+        "slot save must not ask for a match-type override"
+    )
+    controller._roster_players = []
+    controller._analysis_finished(_analysis_result(match_type="CUP"))
+
+    controller._save_as_second_match()
+
+    weekly_state = weekly_repo.load()
+    record = weekly_state.match_records[0]
+    assert record.match_role == MatchRole.SECOND_WEEKLY_MATCH
+    assert record.competition_type == CompetitionType.CUP
+    linked = hist_repo.get(record.linked_match_record_id)
+    assert linked.match_context.competition_type.value == "cup"
+
+
+def test_league_analysis_saved_as_first_match_preserves_league_metadata(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("LEAGUE")
+    controller._roster_players = []
+    controller._analysis_finished(_analysis_result(match_type="LEAGUE"))
+
+    controller._save_as_first_match()
+
+    record = weekly_repo.load().match_records[0]
+    assert record.match_role == MatchRole.FIRST_WEEKLY_MATCH
+    assert record.competition_type == CompetitionType.LEAGUE
+
+
+def test_cup_analysis_saved_as_first_match_is_not_forced_to_league(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("CUP")
+    controller._roster_players = []
+    controller._analysis_finished(_analysis_result(match_type="CUP"))
+
+    controller._save_as_first_match()
+
+    record = weekly_repo.load().match_records[0]
+    assert record.match_role == MatchRole.FIRST_WEEKLY_MATCH
+    assert record.competition_type == CompetitionType.CUP
+
+
+def test_changing_match_type_after_analysis_marks_result_stale(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("LEAGUE")
+    controller._analysis_finished(_analysis_result(match_type="LEAGUE"))
+
+    page.set_match_type("CUP")
+
+    assert page._analysis_stale is True
+    assert page._formation_board_widget.save_as_first_match_button.isEnabled() is False
+    assert page._formation_board_widget.save_as_second_match_button.isEnabled() is False
+    controller._save_as_second_match()
+    assert weekly_repo.load().match_records == ()
+
+
+def test_reanalysis_refreshes_match_type_provenance_after_stale_change(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("LEAGUE")
+    controller._analysis_finished(_analysis_result(match_type="LEAGUE"))
+    page.set_match_type("CUP")
+
+    controller._analysis_finished(_analysis_result(match_type="CUP"))
+    controller._save_as_second_match()
+
+    assert page._analysis_stale is False
+    saved_result = controller._settings_repository.load_last_result()
+    assert saved_result.match_type == "CUP"
+    assert weekly_repo.load().match_records[0].competition_type == CompetitionType.CUP
+
+
+def test_new_match_clears_inherited_match_type_and_results(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("LEAGUE")
+    controller._analysis_finished(_analysis_result(match_type="LEAGUE"))
+    page.confirm_unsaved_changes = lambda: "discard"
+
+    assert controller.start_new_match() is True
+
+    assert page.match_type() == ""
+    assert page._last_result is None
+    assert page._analysis_stale is False
+
+
+def test_saved_match_restores_its_canonical_match_type(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("LEAGUE")
+    record = find_or_create_provisional_record(
+        hist_repo,
+        opponent_name="CA Chaco",
+        match_date="2026-08-09",
+        competition_type="cup",
+    )
+
+    controller.edit_record(record.snapshot_id)
+
+    assert page.match_type() == "CUP"
+
+
+def test_match_type_uses_combo_item_data_not_visible_label(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    index = page.match_type_combo.findData("CUP")
+    page.match_type_combo.setItemText(index, "Liga visual")
+    page.match_type_combo.setCurrentIndex(index)
+
+    assert page.match_type() == "CUP"
+    assert controller._current_match_type() == "CUP"
+
+
+def test_invalid_match_type_item_data_does_not_default_to_league(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.match_type_combo.addItem("Valor invalido", "BROKEN")
+    page.match_type_combo.setCurrentIndex(page.match_type_combo.count() - 1)
+
+    assert controller._current_match_type() is None
+    assert "valid" in page.status_label.text().lower() or "válido" in page.status_label.text().lower()

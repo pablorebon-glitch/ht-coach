@@ -40,14 +40,19 @@ def _lineup():
     ]
 
 
-def _result(opponent="CA Chaco"):
+def _result(opponent="CA Chaco", match_type="LEAGUE"):
     formation = FormationAnalysisResult(
         formation_name="2-5-3", recommended_tactic="Normal", tactic_level=5,
         win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
         possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=_lineup(),
     )
-    return MatchAnalysisResult(player_count=18, opponent_name=opponent, formations=[formation])
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name=opponent,
+        formations=[formation],
+        match_type=match_type,
+    )
 
 
 def make_controller(tmp_path, known_opponents=()):
@@ -72,6 +77,7 @@ def make_controller(tmp_path, known_opponents=()):
         page, match_service, settings_repo, weekly_training_service=weekly_service,
         official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, hist_repo
 
 
@@ -91,7 +97,7 @@ def test_correcting_competition_type_persists_to_canonical_record(tmp_path):
         hist_repo, opponent_name="CA Chaco", match_date="2026-08-09", competition_type="league"
     )
     controller.edit_record(record.snapshot_id)
-    controller._settings_repository.save_last_result(_result())
+    controller._settings_repository.save_last_result(_result(match_type="CUP"))
 
     page.set_match_type("CUP")
     controller._save_as_first_match()
@@ -165,10 +171,11 @@ def test_correcting_metadata_never_touches_the_opponent_identity(tmp_path):
     assert updated.match_context.opponent.opponent_name == "CA Chaco"
 
 
-def test_not_editing_any_record_never_triggers_metadata_correction(tmp_path):
+def test_weekly_save_from_new_match_enters_saved_edit_mode(tmp_path):
     page, controller, hist_repo = make_controller(tmp_path, known_opponents=["CA Chaco"])
     controller._settings_repository.save_last_result(_result())
 
     controller._save_as_first_match()
 
-    assert controller._editing_snapshot_id is None
+    assert controller._editing_snapshot_id
+    assert hist_repo.get(controller._editing_snapshot_id) is not None

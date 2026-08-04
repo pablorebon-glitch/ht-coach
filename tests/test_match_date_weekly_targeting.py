@@ -4,6 +4,7 @@ from datetime import date
 
 QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
 
+from engine.history.repository import HistoricalMatchRepository
 from engine.weekly_training.persistence import WeeklyTrainingRepository
 from ht_coach_app.controllers.match_controller import MatchController
 from ht_coach_app.core.localization import configure_localization
@@ -17,6 +18,7 @@ from ht_coach_app.services.match_workspace_service import (
     TeamRatingsResult,
 )
 from ht_coach_app.services.opponent_service import OpponentService
+from ht_coach_app.services.official_rating_service import OfficialRatingImportService
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from ht_coach_app.views.match_page import MatchPage
 
@@ -39,14 +41,19 @@ def _lineup():
     ]
 
 
-def _result(opponent="CA Chaco"):
+def _result(opponent="CA Chaco", match_type="LEAGUE"):
     formation = FormationAnalysisResult(
         formation_name="2-5-3", recommended_tactic="Normal", tactic_level=5,
         win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
         possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=_lineup(),
     )
-    return MatchAnalysisResult(player_count=18, opponent_name=opponent, formations=[formation])
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name=opponent,
+        formations=[formation],
+        match_type=match_type,
+    )
 
 
 def make_controller(tmp_path):
@@ -59,10 +66,15 @@ def make_controller(tmp_path):
     weekly_service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    hist_repo = HistoricalMatchRepository(tmp_path / "snapshots.json")
+    official_service = OfficialRatingImportService(repository=hist_repo)
     page = MatchPage()
     controller = MatchController(
-        page, match_service, settings_repo, weekly_training_service=weekly_service,
+        page, match_service, settings_repo,
+        weekly_training_service=weekly_service,
+        official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, weekly_service
 
 

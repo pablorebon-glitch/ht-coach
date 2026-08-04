@@ -20,6 +20,26 @@ The roadmap protects the engine and moves product work into the application laye
 
 ## Alpha 0.2 Milestones
 
+### Alpha 0.6.7 HF-07: Match Identity, Calendar and Weekly Planning Repair
+
+Goal: stabilize historical match identity and date-driven planning before
+continuing product work.
+
+Deliverables:
+
+- Retrospective PRE stays as provenance/evidence and no longer contaminates
+  the canonical opponent, title, venue, competition, date or official Match ID.
+- Official Intelligence can render `PRE retrospectivo + POST oficial` and
+  populate comparison/conclusions without weakening normal official Match ID
+  rules.
+- Central match display formatting is used for canonical record identity.
+- HT season configuration is schema-versioned and validated, with explicit
+  Monday-Sunday competitive week semantics.
+- Historical Weekly Planner saves use the match date to choose the
+  Sunday-Saturday training cycle and block when the date is missing.
+
+No optimizer, rating, probability or official parser formula changes.
+
 ### Alpha 0.6.5: Hattrick Weekly Cycle, Squad UX Simplification and Training Timeline
 
 Goal: architecture-first, no new analytical engines. Establish one canonical

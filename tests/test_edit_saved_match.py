@@ -2,6 +2,7 @@ import pytest
 
 QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
 
+from engine.history.models import MatchContext, OpponentReference
 from engine.history.provisional_record import find_or_create_provisional_record
 from engine.history.repository import HistoricalMatchRepository
 from ht_coach_app.controllers.match_controller import MatchController
@@ -58,6 +59,40 @@ def test_edit_record_restores_opponent_even_if_not_in_opponent_manager(tmp_path)
     )
     controller.edit_record(record.snapshot_id)
     assert page.selected_opponent_name() == "CA Chaco"
+
+
+def test_edit_record_relinks_saved_opponent_by_clean_unique_name(tmp_path):
+    page, controller, hist_repo = make_controller(
+        tmp_path,
+        known_opponents=["Santa Cruz Club"],
+    )
+    record = find_or_create_provisional_record(
+        hist_repo,
+        opponent_name="Hit'em up - Santa Cruz Club",
+        match_date="2026-08-05",
+        competition_type="cup",
+    )
+    hist_repo.save(
+        record.with_updates(
+            match_context=MatchContext(
+                match_date=record.match_context.match_date,
+                competition_type=record.match_context.competition_type,
+                home_away=record.match_context.home_away,
+                opponent=OpponentReference(
+                    opponent_id="old-synthetic",
+                    opponent_name="Hit'em up - Santa Cruz Club",
+                ),
+            ),
+        )
+    )
+
+    controller.edit_record(record.snapshot_id)
+
+    assert page.selected_opponent_name() == "Santa Cruz Club"
+    assert page.opponent_combo.currentData()["source"] == "OPPONENT_MANAGER"
+    reloaded = hist_repo.get(record.snapshot_id)
+    assert reloaded.match_context.opponent.opponent_name == "Santa Cruz Club"
+    assert reloaded.match_context.opponent.opponent_id == "Santa Cruz Club"
 
 
 def test_edit_record_opens_preparation_section_and_marks_edit_mode(tmp_path):
@@ -194,6 +229,13 @@ def test_edit_with_matching_cached_result_restores_full_workspace(tmp_path):
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=lineup,
     )
     cached_result = MatchAnalysisResult(player_count=18, opponent_name="CA Chaco", formations=[formation])
+    cached_result = cached_result.__class__(
+        **{
+            **cached_result.__dict__,
+            "analysis_owner_type": "SAVED_MATCH",
+            "analysis_owner_id": record.snapshot_id,
+        }
+    )
 
     controller._settings_repository.save_last_result(cached_result)
 

@@ -33,7 +33,7 @@ def make_controller(tmp_path):
     return page, controller, repository
 
 
-def test_selector_shows_briefs_own_worked_example_format(tmp_path):
+def test_selector_shows_canonical_match_identity(tmp_path):
     page, controller, repository = make_controller(tmp_path)
     record = find_or_create_provisional_record(
         repository, opponent_name="CA Chaco", match_date="2026-08-09",
@@ -45,7 +45,7 @@ def test_selector_shows_briefs_own_worked_example_format(tmp_path):
     controller.refresh()
 
     options = [page.record_selector_combo.itemText(i) for i in range(page.record_selector_combo.count())]
-    assert "CA Chaco - Hit'em up" in options
+    assert "Hit'em up vs. CA Chaco" in options
 
 
 def test_selector_never_includes_a_status_word(tmp_path):
@@ -69,7 +69,7 @@ def test_selector_never_includes_a_status_word(tmp_path):
             assert word not in option
 
 
-def test_selector_falls_back_to_date_when_team_name_unknown(tmp_path):
+def test_selector_uses_default_team_identity_when_team_name_unknown(tmp_path):
     page, controller, repository = make_controller(tmp_path)
     find_or_create_provisional_record(
         repository, opponent_name="Torres FC", match_date="2026-08-16",
@@ -78,7 +78,7 @@ def test_selector_falls_back_to_date_when_team_name_unknown(tmp_path):
     controller.refresh()
 
     options = [page.record_selector_combo.itemText(i) for i in range(page.record_selector_combo.count())]
-    assert "Torres FC - 2026-08-16" in options
+    assert "Hit'em up vs. Torres FC" in options
 
 
 def test_metadata_shown_separately_below_the_selector(tmp_path):

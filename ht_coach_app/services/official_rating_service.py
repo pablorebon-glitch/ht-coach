@@ -130,7 +130,19 @@ class OfficialRatingImportService:
         if existing is not None and not confirm_replace:
             raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
 
-        updated = snapshot.with_updates(**{field_name: parsed})
+        updates = {field_name: parsed}
+        if parsed.hattrick_match_id:
+            updates["match_context"] = replace(
+                snapshot.match_context,
+                official_match_id=parsed.hattrick_match_id,
+            )
+            updates["provenance"] = SnapshotProvenance.from_dict(
+                {
+                    **snapshot.provenance.to_dict(),
+                    "imported_match_id": parsed.hattrick_match_id,
+                }
+            )
+        updated = snapshot.with_updates(**updates)
         saved = self._repository.save(updated)
         return ImportOutcome(
             snapshot=saved,
@@ -206,7 +218,13 @@ class OfficialRatingImportService:
         if existing is not None and not confirm_replace:
             raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
 
-        updated = snapshot.with_updates(**{field_name: parsed})
+        updates = {field_name: parsed}
+        if parsed.hattrick_match_id:
+            updates["match_context"] = replace(
+                snapshot.match_context,
+                official_match_id=parsed.hattrick_match_id,
+            )
+        updated = snapshot.with_updates(**updates)
         saved = self._repository.save(updated)
         return ImportOutcome(
             snapshot=saved,
@@ -256,6 +274,10 @@ class OfficialRatingImportService:
             snapshot.with_updates(
                 official_pre=updated_pre,
                 official_post=parsed,
+                match_context=replace(
+                    snapshot.match_context,
+                    official_match_id=normalized_match_id,
+                ),
                 provenance=provenance,
             )
         )

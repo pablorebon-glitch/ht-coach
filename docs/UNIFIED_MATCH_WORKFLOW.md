@@ -91,6 +91,27 @@ character-for-character) -- status lives in its own column, never appended
 to the identity text (verified explicitly: no status word ever appears in
 the opponent cell). Edit/Delete stay disabled until a row is selected.
 
+HF-09 makes the edit flow explicitly isolated from New Match preparation.
+Selecting "Partido nuevo" creates a fresh draft workspace and clears any
+previous result area. Editing a row from Saved Matches opens the same Match
+workspace shell, but the active analysis owner is the saved record's
+`snapshot_id`; cached results are restored only when they were saved for that
+exact record. A previous New Match analysis can no longer remain visible under
+saved-match metadata.
+
+HF-10 extends this to Weekly Planner participation. If a saved match is linked to
+Partido 1 or Partido 2 and the manager saves a changed final lineup, the linked
+weekly record is replaced from that final lineup. The previous participation
+projection is removed before the new one is applied, so removed players no longer
+count as played/trained. Reanalysis alone does not update Weekly Planner; the
+change takes effect only when the saved match is explicitly saved.
+
+Match preparation now follows the fixed match-specific order: Rival, Tipo de
+partido, Localia, Fecha del partido, Formaciones, formation action buttons,
+Analizar partido. CSV and availability remain above that block as global
+preparation inputs. New Match dates come from the injected application calendar;
+Saved Match edit restores the exact saved date.
+
 ## Create-or-open-existing detection, and duplicate conflicts (Parts 5-6)
 
 `engine/history/match_lookup.py`'s `find_existing_or_conflicting_record()`
@@ -625,8 +646,25 @@ built for editing. Creates a fresh provisional record on the spot when
 none exists yet (the common case for a genuinely new historical match).
 Never touches `WeeklyTrainingAppService` -- verified explicitly that saving
 a formation leaves the weekly planner's own match records untouched.
-Enabled/disabled in sync with the workspace's own dirty flag, matching
-"Restaurar"'s existing pattern.
+HF-10.5 changed the enablement rule from "dirty only" to "valid saveable
+workspace": a save requires opponent metadata, match type, match date, a
+non-stale analysis result and a recommended lineup. Disabled buttons expose
+the blocking reason as a tooltip.
+
+HF-10.5 also centralizes the write path. `Guardar formacion`, `Guardar como
+Partido 1` and `Guardar como Partido 2` first call the same canonical save
+transaction, which persists structured match metadata plus the lineup to one
+`HistoricalMatchSnapshot` and returns the saved ID/revision. Weekly saves then
+link Partido 1/2 to that ID. If the weekly write fails after the canonical
+record was saved, the Match page remains in saved-edit mode with the same
+board/results visible and reports the link error so the user can retry.
+
+HF-10.6 closes the matching read path. Editing a Saved Match restores the
+competition selector from canonical item data, venue from canonical
+`HomeAway`, the saved CSV source into the roster loader, and the Formation Board
+from the persisted lineup/tactical setup when no matching cached analysis result
+exists. This shows "Formacion guardada restaurada" instead of requiring Analyze
+only to view the saved XI.
 
 Verified end-to-end against Part 11's exact scenario: create a historical
 match, save its formation, reopen from a brand-new controller instance
@@ -693,3 +731,39 @@ snapshot store). Installed the crash handler in `ht_coach_app/app.py`'s own
 `run()` -- the real GUI entry point. Verified end-to-end with a simulated
 exception that the crash log contains every field the brief requires. Full
 details in docs/CRASH_RECOVERY.md and docs/MATCH_WORKSPACE_STATE.md.
+
+### HF-07: retrospective evidence cannot rename the match
+
+The canonical Match Record owns the historical opponent, date, competition,
+venue, official Match ID and team identity. A retrospective PRE owns only
+source/provenance details from the later reconstruction. The UI now resolves
+main match labels through `MatchDisplayFormatter`, so the Official
+Intelligence dropdown and selected-record header are generated from
+structured canonical fields at render time. Source opponents such as Santa
+Cruz can appear only in technical provenance, never in the primary Torres
+title.
+
+When no official PRE exists, Official Intelligence may use
+`record.retrospective_pre` as the effective PRE for display and comparison,
+but it labels it as retrospective and preserves the visible limitation. This
+does not relax normal official PRE/POST Match ID rules: only the explicitly
+linked retrospective simulation is allowed to differ from POST.
+
+Saving a historical match into Weekly Planner now requires a match date. The
+destination training cycle is resolved from that match date using the existing
+Sunday-Saturday training-cycle calendar. The current computer date is not a
+fallback for historical records.
+
+### HF-08: one active record owns official evidence
+
+POST import and replacement now respect the active Match Record. If the manager
+is viewing/editing Torres, the pasted POST is attached to Torres or rejected by
+Torres' own replacement/mismatch rules; another record with the pasted Match ID
+does not steal selection or trigger a replacement prompt for the wrong record.
+Official PRE plus POST still requires matching Hattrick Match IDs. Retrospective
+PRE plus POST does not compare against the retrospective source ID because that
+ID belongs to the later simulation, not the historical match.
+
+Saved Match editing also restores the opponent from structured identity. Missing
+Opponent Manager entries are shown as saved snapshots and block analysis until
+the opponent is restored or deliberately changed.

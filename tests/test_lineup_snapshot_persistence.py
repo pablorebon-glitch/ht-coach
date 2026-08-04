@@ -47,8 +47,13 @@ def _formation():
     )
 
 
-def _result(opponent="CA Chaco"):
-    return MatchAnalysisResult(player_count=18, opponent_name=opponent, formations=[_formation()])
+def _result(opponent="CA Chaco", match_type="LEAGUE"):
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name=opponent,
+        formations=[_formation()],
+        match_type=match_type,
+    )
 
 
 def make_controller(tmp_path):
@@ -64,6 +69,7 @@ def make_controller(tmp_path):
     controller = MatchController(
         page, match_service, settings_repo, official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, hist_repo
 
 
@@ -123,7 +129,10 @@ def test_editing_persists_lineup_to_the_record_being_edited(tmp_path):
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=_lineup(),
     )
     updated_result = MatchAnalysisResult(
-        player_count=18, opponent_name="CA Chaco", formations=[updated_formation]
+        player_count=18,
+        opponent_name="CA Chaco",
+        formations=[updated_formation],
+        match_type="LEAGUE",
     )
 
     resolved_id = controller._linked_canonical_record_id(updated_result)

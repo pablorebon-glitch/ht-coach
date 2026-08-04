@@ -1,4 +1,4 @@
-from PySide6.QtCore import QDate, QEvent, Qt, QTimer, Signal
+from PySide6.QtCore import QDate, QEvent, QSignalBlocker, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import t
 from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
 from ht_coach_app.ui.design_system.empty_state import EmptyState
+from ht_coach_app.ui.input_behavior import install_page_only_wheel_policy
 from ht_coach_app.ui.responsive import (
     restore_splitter_geometry,
     splitter_ratios_from_sizes,
@@ -100,10 +101,12 @@ class MatchPage(BasePage):
         self._last_result = None
         self._last_restored = False
         self._last_workspace_state = None
+        self._last_workspace_match_type = None
         self._advisor_verbosity = "detailed"
         self._analysis_inputs_collapsed = False
         self._editing_saved_match = False
         self._metadata_dirty = False
+        self._analysis_stale = False
         self._match_section_states = dict(self.MATCH_SECTION_DEFAULTS)
         self._match_sections = {}
         self._match_section_body_roots = {}
@@ -115,6 +118,7 @@ class MatchPage(BasePage):
         self._tactic_mismatch_label = None
         self._compact_ratings_container = None
         self._geometry_refresh_revision = 0
+        install_page_only_wheel_policy()
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
         self._build_scroll_content()
@@ -304,6 +308,10 @@ class MatchPage(BasePage):
         self.match_type_label = match_type_label
         self.match_type_combo = QComboBox()
         self.match_type_combo.addItem(
+            t("match.match_type_select"),
+            "",
+        )
+        self.match_type_combo.addItem(
             t("match.match_type_league"),
             MATCH_TYPE_LEAGUE,
         )
@@ -320,7 +328,7 @@ class MatchPage(BasePage):
         self.match_date_edit = QDateEdit()
         self.match_date_edit.setCalendarPopup(True)
         self.match_date_edit.setDisplayFormat("yyyy-MM-dd")
-        self.match_date_edit.setDate(QDate.currentDate())
+        self.match_date_edit.setDate(self._default_match_qdate())
         self.match_date_edit.dateChanged.connect(
             self._emit_workspace_changed
         )
@@ -387,26 +395,37 @@ class MatchPage(BasePage):
         layout.addWidget(self.availability_warning_label, 3, 1, 1, 3)
         layout.addWidget(opponent_label, 4, 0)
         layout.addWidget(self.opponent_combo, 4, 1, 1, 3)
-        layout.addWidget(formation_label, 5, 0)
-        layout.addWidget(formation_actions_widget, 5, 1, 1, 3)
-        layout.addWidget(self.formations_container, 6, 1, 1, 3)
-        layout.addWidget(match_type_label, 7, 0)
-        layout.addWidget(self.match_type_combo, 7, 1, 1, 3)
-        layout.addWidget(self.formation_warning_label, 8, 1, 1, 3)
-        layout.addWidget(self.status_label, 9, 0, 1, 3)
-        layout.addWidget(self.analyze_button, 9, 3)
-        layout.addWidget(self.training_conflict_label, 10, 1, 1, 3)
-        layout.addWidget(match_date_label, 11, 0)
-        layout.addWidget(self.match_date_edit, 11, 1, 1, 3)
-        layout.addWidget(self.season_preview_label, 12, 1, 1, 3)
-        layout.addWidget(venue_role_label, 13, 0)
-        layout.addWidget(self.venue_role_combo, 13, 1, 1, 3)
-        layout.addWidget(self.metadata_evidence_warning_label, 14, 1, 1, 3)
+        layout.addWidget(match_type_label, 5, 0)
+        layout.addWidget(self.match_type_combo, 5, 1, 1, 3)
+        layout.addWidget(venue_role_label, 6, 0)
+        layout.addWidget(self.venue_role_combo, 6, 1, 1, 3)
+        layout.addWidget(match_date_label, 7, 0)
+        layout.addWidget(self.match_date_edit, 7, 1, 1, 3)
+        layout.addWidget(self.season_preview_label, 8, 1, 1, 3)
+        layout.addWidget(formation_label, 9, 0)
+        layout.addWidget(self.formations_container, 9, 1, 1, 3)
+        layout.addWidget(formation_actions_widget, 10, 1, 1, 3)
+        layout.addWidget(self.formation_warning_label, 11, 1, 1, 3)
+        layout.addWidget(self.training_conflict_label, 12, 1, 1, 3)
+        layout.addWidget(self.metadata_evidence_warning_label, 13, 1, 1, 3)
+        layout.addWidget(self.status_label, 14, 0, 1, 3)
+        layout.addWidget(self.analyze_button, 14, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
         self.match_content_layout.addWidget(self.analysis_setup_panel, 0)
         self._sync_analysis_setup_toggle()
+        self._update_analyze_button_state()
+
+    @staticmethod
+    def _default_match_qdate():
+        try:
+            from ht_coach_app.services.ht_week_context_provider import get_calendar_service
+
+            current = get_calendar_service().now().date()
+            return QDate(current.year, current.month, current.day)
+        except Exception:
+            return QDate.currentDate()
 
     def _build_results(self):
         self.results_host = QWidget()
@@ -426,22 +445,49 @@ class MatchPage(BasePage):
             else selected_name
         )
         names = list(opponent_names or [])
-        if current and current not in names:
-            names.append(current)
+        saved_snapshot_name = current if current and current not in names else ""
         self.opponent_combo.blockSignals(True)
         self.opponent_combo.clear()
-        self.opponent_combo.addItem("")
+        self.opponent_combo.addItem("", None)
 
         for name in names:
-            self.opponent_combo.addItem(name)
+            self.opponent_combo.addItem(
+                name,
+                {
+                    "opponent_id": name,
+                    "opponent_name": name,
+                    "source": "OPPONENT_MANAGER",
+                },
+            )
+        if saved_snapshot_name:
+            self.opponent_combo.addItem(
+                t(
+                    "match.saved_opponent_missing_label",
+                    opponent=saved_snapshot_name,
+                ),
+                {
+                    "opponent_id": saved_snapshot_name,
+                    "opponent_name": saved_snapshot_name,
+                    "source": "SAVED_MATCH_SNAPSHOT",
+                },
+            )
 
-        index = self.opponent_combo.findText(current)
+        index = self._find_opponent_index_by_name(current)
         if index >= 0:
             self.opponent_combo.setCurrentIndex(index)
         else:
             self.opponent_combo.setCurrentIndex(0)
 
         self.opponent_combo.blockSignals(False)
+
+    def _find_opponent_index_by_name(self, opponent_name):
+        for index in range(self.opponent_combo.count()):
+            data = self.opponent_combo.itemData(index)
+            if isinstance(data, dict) and data.get("opponent_name") == opponent_name:
+                return index
+            if self.opponent_combo.itemText(index) == opponent_name:
+                return index
+        return -1
 
     def enter_saved_match_edit_mode(self, title=None):
         self._editing_saved_match = True
@@ -495,6 +541,7 @@ class MatchPage(BasePage):
 
         self.formations_layout.addStretch(1)
         self._update_formation_warning()
+        self._update_analyze_button_state()
 
     def apply_settings(self, settings):
         self._applying_settings = True
@@ -535,6 +582,7 @@ class MatchPage(BasePage):
 
         self._applying_settings = False
         self._update_formation_warning()
+        self._update_analyze_button_state()
 
     def players_csv_path(self):
         return self.players_path_edit.text().strip()
@@ -571,7 +619,35 @@ class MatchPage(BasePage):
         self.load_players_requested.emit()
 
     def selected_opponent_name(self):
+        data = self.opponent_combo.currentData()
+        if (
+            isinstance(data, dict)
+            and self.opponent_combo.currentIndex() >= 0
+            and self.opponent_combo.currentText() == self.opponent_combo.itemText(
+                self.opponent_combo.currentIndex()
+            )
+        ):
+            return (data.get("opponent_name") or "").strip()
         return self.opponent_combo.currentText().strip()
+
+    def selected_opponent_identity(self):
+        data = self.opponent_combo.currentData()
+        if (
+            isinstance(data, dict)
+            and self.opponent_combo.currentIndex() >= 0
+            and self.opponent_combo.currentText() == self.opponent_combo.itemText(
+                self.opponent_combo.currentIndex()
+            )
+        ):
+            return dict(data)
+        name = self.selected_opponent_name()
+        if not name:
+            return {}
+        return {
+            "opponent_id": name,
+            "opponent_name": name,
+            "source": "MANUAL_TEXT",
+        }
 
     def selected_formations(self):
         return [
@@ -583,12 +659,18 @@ class MatchPage(BasePage):
         return self.availability_combo.currentData() or CURRENT_AVAILABLE
 
     def match_type(self):
-        return self.match_type_combo.currentData() or MATCH_TYPE_LEAGUE
+        return self.match_type_combo.currentData()
 
     def set_match_type(self, match_type):
         index = self.match_type_combo.findData(match_type)
         if index >= 0:
             self.match_type_combo.setCurrentIndex(index)
+
+    def set_analysis_stale(self, stale, message=""):
+        self._analysis_stale = bool(stale)
+        self._update_save_action_labels()
+        if self._analysis_stale and message:
+            self.show_error(message)
 
     def match_date(self):
         return self.match_date_edit.date().toString("yyyy-MM-dd")
@@ -624,11 +706,31 @@ class MatchPage(BasePage):
             return ""
         return board.tactic_combo.currentData() or ""
 
+    def set_tactic(self, tactic):
+        board = self._formation_board_widget
+        if board is None or not tactic:
+            return
+        index = board.tactic_combo.findData(tactic)
+        if index >= 0:
+            blocker = QSignalBlocker(board.tactic_combo)
+            board.tactic_combo.setCurrentIndex(index)
+            del blocker
+
     def team_attitude(self):
         board = self._formation_board_widget
         if board is None:
             return ""
         return board.team_attitude_combo.currentData() or ""
+
+    def set_team_attitude(self, attitude):
+        board = self._formation_board_widget
+        if board is None or not attitude:
+            return
+        index = board.team_attitude_combo.findData(attitude)
+        if index >= 0:
+            blocker = QSignalBlocker(board.team_attitude_combo)
+            board.team_attitude_combo.setCurrentIndex(index)
+            del blocker
 
     def is_workspace_dirty(self):
         """Alpha 0.6.7 HF-03, Part 12: whether the currently open
@@ -797,6 +899,18 @@ class MatchPage(BasePage):
         if hasattr(self, "opponent_combo"):
             self.opponent_combo.setCurrentIndex(-1)
 
+    def reset_new_match_workspace(self):
+        self.exit_saved_match_edit_mode()
+        self.reset_new_match_selectors()
+        if hasattr(self, "set_match_type"):
+            self.set_match_type("")
+        if hasattr(self, "set_venue_role"):
+            self.set_venue_role("unknown")
+        self.clear_metadata_dirty()
+        self.set_analysis_stale(False)
+        self.clear_results()
+        self.expand_analysis_inputs()
+
     def select_all_formations(self):
         self._set_checked_formations(
             set(self._formation_checks)
@@ -820,6 +934,7 @@ class MatchPage(BasePage):
 
         self._applying_settings = False
         self._emit_workspace_changed()
+        self._update_analyze_button_state()
 
     def choose_players_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -840,7 +955,7 @@ class MatchPage(BasePage):
 
     def set_processing(self, is_processing):
         self.analyze_button.setEnabled(
-            not is_processing
+            (not is_processing) and self._can_analyze()
         )
         self.analyze_button.setText(
             t("match.analyzing") if is_processing else t("match.analyze")
@@ -851,7 +966,7 @@ class MatchPage(BasePage):
 
     def set_workspace_processing(self, is_processing):
         self.analyze_button.setEnabled(
-            not is_processing
+            (not is_processing) and self._can_analyze()
         )
         self.analyze_button.setText(
             t("match.updating") if is_processing else t("match.analyze")
@@ -892,6 +1007,11 @@ class MatchPage(BasePage):
         )
 
     def clear_results(self):
+        self._state = "empty"
+        self._last_result = None
+        self._last_restored = False
+        self._last_workspace_state = None
+        self._last_workspace_match_type = None
         self._clear_results_widgets()
         self._show_empty_results()
 
@@ -910,6 +1030,8 @@ class MatchPage(BasePage):
         self._last_result = result
         self._last_restored = restored
         self._last_workspace_state = workspace_state
+        self._last_workspace_match_type = getattr(result, "match_type", None)
+        self.set_analysis_stale(False)
         self._clear_results_widgets()
         self.collapse_analysis_inputs()
         recommended = result.recommended_formation
@@ -1645,6 +1767,7 @@ class MatchPage(BasePage):
                     getattr(recommended, "recommended_tactic", "") if recommended else ""
                 ),
             )
+            self._update_save_action_labels()
 
             container = self._formation_board_tab_container
             if container is None:
@@ -2481,6 +2604,9 @@ class MatchPage(BasePage):
         self.favorites_button.setText(t("match.favorites"))
         self.analyze_button.setText(t("match.analyze"))
         self.match_type_label.setText(t("match.match_type"))
+        self.match_type_combo.setItemText(0, t("match.match_type_select"))
+        self.match_type_combo.setItemText(1, t("match.match_type_league"))
+        self.match_type_combo.setItemText(2, t("match.match_type_cup"))
         self.match_date_label.setText(t("match.match_date"))
         self.venue_role_label.setText(t("match.venue_role"))
         self._update_save_action_labels()
@@ -2720,14 +2846,38 @@ class MatchPage(BasePage):
         return f"{text[:limit - 3].rstrip()}..."
 
     def _emit_workspace_changed(self):
+        previous_match_type = getattr(self, "_last_workspace_match_type", None)
         self._update_formation_warning()
         self._update_availability_warning()
+        self._update_analyze_button_state()
 
         if not self._applying_settings:
             if self._editing_saved_match:
                 self._metadata_dirty = True
-                self._update_save_action_labels()
+            self._update_save_action_labels()
+            if (
+                self._last_result is not None
+                and previous_match_type is not None
+                and self.match_type() != previous_match_type
+            ):
+                self.set_analysis_stale(
+                    True,
+                    t("match.analysis_stale_match_type"),
+                )
             self.workspace_changed.emit()
+        self._last_workspace_match_type = self.match_type()
+
+    def _can_analyze(self):
+        return bool(
+            self.players_csv_path()
+            and self.selected_opponent_name()
+            and self.match_type()
+            and self.selected_formations()
+        )
+
+    def _update_analyze_button_state(self):
+        if hasattr(self, "analyze_button"):
+            self.analyze_button.setEnabled(self._can_analyze())
 
     def _update_save_action_labels(self):
         board = getattr(self, "_formation_board_widget", None)
@@ -2737,11 +2887,28 @@ class MatchPage(BasePage):
         board.save_as_second_match_button.setText(t("match.save_as_second_match"))
         if self._editing_saved_match:
             board.save_formation_button.setText(t("match.save_changes"))
-            board.save_formation_button.setEnabled(
-                self._metadata_dirty or board.is_dirty()
-            )
         else:
             board.save_formation_button.setText(t("match.save_formation"))
+        reason = self._save_action_disabled_reason()
+        if hasattr(board, "set_save_action_validation"):
+            board.set_save_action_validation(not reason, reason)
+
+    def _save_action_disabled_reason(self):
+        if self._analysis_stale:
+            return t("match.analysis_stale_match_type")
+        result = getattr(self, "_last_result", None)
+        if result is None or not getattr(result, "formations", None):
+            return t("match.save_disabled_no_analysis")
+        recommended = getattr(result, "recommended_formation", None)
+        if recommended is None or not getattr(recommended, "lineup", None):
+            return t("match.save_disabled_no_lineup")
+        if not self.selected_opponent_name():
+            return t("match.save_disabled_no_opponent")
+        if not self.match_type():
+            return t("match.save_disabled_no_match_type")
+        if not self.match_date():
+            return t("match.save_disabled_no_match_date")
+        return ""
 
     def _update_availability_warning(self):
         if not hasattr(self, "availability_warning_label"):

@@ -41,6 +41,7 @@ def make_controller(tmp_path, known_opponents=()):
     controller = MatchController(
         page, match_service, settings_repo, official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, hist_repo
 
 

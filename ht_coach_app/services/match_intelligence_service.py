@@ -15,6 +15,9 @@ from ht_coach_app.services.official_rating_formatting import (
     format_prediction_vs_official_comparison,
 )
 from ht_coach_app.services.official_rating_service import OfficialRatingImportService
+from ht_coach_app.services.official_rating_service import (
+    OfficialRatingMatchIdMismatch,
+)
 
 
 class MatchIntelligenceAppService:
@@ -37,7 +40,11 @@ class MatchIntelligenceAppService:
         or POST capture, or None if nothing has been imported yet."""
         candidates = [
             snapshot for snapshot in self._repository.list_all()
-            if snapshot.official_pre is not None or snapshot.official_post is not None
+            if (
+                snapshot.official_pre is not None
+                or snapshot.official_post is not None
+                or snapshot.retrospective_pre is not None
+            )
         ]
         if not candidates:
             return None
@@ -61,7 +68,32 @@ class MatchIntelligenceAppService:
 
         return navigate_records(records, current_snapshot_id, direction)
 
-    def import_ratings(self, raw_text, slot="pre", confirm_replace=False):
+    def import_ratings(
+        self,
+        raw_text,
+        slot="pre",
+        confirm_replace=False,
+        active_snapshot_id=None,
+    ):
+        if active_snapshot_id and slot == "post":
+            snapshot = self._repository.get(active_snapshot_id)
+            if snapshot is not None and snapshot.official_pre is not None:
+                parsed = self._import_service._parse_and_validate(raw_text, "", slot)
+                pre_match_id = snapshot.official_pre.hattrick_match_id
+                post_match_id = parsed.hattrick_match_id
+                if pre_match_id and post_match_id and pre_match_id != post_match_id:
+                    raise OfficialRatingMatchIdMismatch(
+                        pre_match_id,
+                        post_match_id,
+                        active_snapshot_id,
+                        raw_text,
+                    )
+            return self._import_service.import_ratings(
+                active_snapshot_id,
+                raw_text,
+                slot=slot,
+                confirm_replace=confirm_replace,
+            )
         return self._import_service.import_and_link(
             raw_text, slot=slot, confirm_replace=confirm_replace
         )
@@ -94,6 +126,12 @@ class MatchIntelligenceAppService:
             official_rating_snapshot.team_attitude,
         )
 
+    @staticmethod
+    def effective_pre(snapshot):
+        if snapshot is None:
+            return None
+        return snapshot.official_pre or snapshot.retrospective_pre
+
     def prediction_comparison_rows(self, snapshot):
         """(sector, predicted, official_pre, delta_or_none) rows,
         comparing HT Coach's own prediction against official PRE.
@@ -103,7 +141,7 @@ class MatchIntelligenceAppService:
             return ()
         prediction_ratings = snapshot.predictions.ratings if snapshot.predictions else None
         comparison = compare_official_ratings(
-            prediction_ratings, snapshot.official_pre, snapshot.official_post
+            prediction_ratings, self.effective_pre(snapshot), snapshot.official_post
         )
         return format_prediction_vs_official_comparison(comparison)
 
@@ -111,7 +149,7 @@ class MatchIntelligenceAppService:
         if snapshot is None:
             return ()
         comparison = compare_official_ratings(
-            None, snapshot.official_pre, snapshot.official_post
+            None, self.effective_pre(snapshot), snapshot.official_post
         )
         rows = []
         for sector in comparison.sectors:
@@ -132,7 +170,7 @@ class MatchIntelligenceAppService:
         if snapshot is None:
             return ()
         comparison = compare_official_ratings(
-            None, snapshot.official_pre, snapshot.official_post
+            None, self.effective_pre(snapshot), snapshot.official_post
         )
         interpreted = interpret_comparison(comparison)
         rows = []
@@ -160,7 +198,7 @@ class MatchIntelligenceAppService:
         if snapshot is None:
             return ()
         comparison = compare_official_ratings(
-            None, snapshot.official_pre, snapshot.official_post
+            None, self.effective_pre(snapshot), snapshot.official_post
         )
         interpreted = interpret_comparison(comparison)
         conclusions = generate_conclusions(interpreted)
@@ -181,11 +219,11 @@ class MatchIntelligenceAppService:
         return Conclusion(conclusion.key, params)
 
     def prediction_accuracy_summary(self, snapshot):
-        if snapshot is None or snapshot.official_pre is None:
+        if snapshot is None or self.effective_pre(snapshot) is None:
             return None
         prediction_ratings = snapshot.predictions.ratings if snapshot.predictions else None
         comparison = compare_official_ratings(
-            prediction_ratings, snapshot.official_pre, snapshot.official_post
+            prediction_ratings, self.effective_pre(snapshot), snapshot.official_post
         )
         return summarize_official_rating_comparison(comparison, "official_pre")
 

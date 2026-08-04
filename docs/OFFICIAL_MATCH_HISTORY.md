@@ -176,6 +176,32 @@ retrospective one does -- verified never to say "PRE oficial" in the
 retrospective case. `retrospective_limitation_text()` is the brief's own
 visible warning, word-for-word.
 
+## HF-07: canonical identity vs. retrospective source
+
+A retrospective PRE is supporting evidence for a historical record, not new
+canonical metadata. The record keeps the original opponent, date,
+competition, venue and official Match ID established by the real historical
+match/POST. The retrospective PRE stores its own source Match ID and source
+opponent only as provenance. This is what prevents the Torres historical
+record from becoming `Torres Futbol Club - Hit'em up - Santa Cruz Club` after
+the manager reconstructs the old lineup in a later Santa Cruz fixture.
+
+The visible title/selector path uses `MatchDisplayFormatter`, which reads
+only the canonical record context plus the canonical team name. It never
+concatenates already-formatted display strings and never uses
+`retrospective_pre.team_name` as the main opponent. When a record has
+`retrospective_pre + official_post` but no `official_pre`, Official
+Intelligence renders that PRE as `PRE retrospectivo`, shows the limitation,
+and compares it against POST because the user explicitly linked the
+simulation to the historical record. Official PRE/POST Match ID integrity
+remains strict and unchanged.
+
+HF-08 makes that ownership rule operational during import: with an active
+record selected, POST import and replacement stay on that record. A different
+record that happens to share the pasted Match ID is not allowed to provide the
+visible POST card, trigger the replacement dialog, or change the selected
+record. See docs/OFFICIAL_EVIDENCE_OWNERSHIP.md for the full contract.
+
 ## Migration (Part 21)
 
 Verified end-to-end with a hand-written legacy payload (no Part 9/10/16

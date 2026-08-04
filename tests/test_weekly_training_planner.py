@@ -321,7 +321,7 @@ def test_first_match_past_played_counts_as_already_trained(tmp_path):
         today=today,
     )
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(service.first_match_record()),
     )
 
@@ -346,7 +346,7 @@ def test_first_match_past_planned_counts_only_as_planned(tmp_path):
         today=today,
     )
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(service.first_match_record()),
     )
 
@@ -396,7 +396,7 @@ def test_first_match_today_played_with_confirmation_counts_as_played(tmp_path):
 
     assert saved.match_records[0].planned_or_played == MatchStatus.PLAYED
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(service.first_match_record()),
     )
     assert row.assumed_exposure > 0
@@ -408,18 +408,19 @@ def test_first_match_future_played_becomes_planned_and_never_already_trained(tmp
     )
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    week = service.load_state().active_week
     plan = service.generate_plan(players, "3-5-2")
 
     saved = service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 23),
+        match_date=week.second_match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=week.first_match_date,
     )
     record = saved.match_records[0]
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(record),
     )
 
@@ -470,7 +471,7 @@ def test_edit_past_played_record_to_future_invalidates_played_status(tmp_path):
 
     assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(saved.match_records[0]),
     )
     assert row.assumed_exposure == 0
@@ -495,7 +496,7 @@ def test_delete_first_match_removes_confirmed_exposure(tmp_path):
 
     service.delete_first_match()
     row = next(
-        item for item in service.coverage(players)
+        item for item in service.coverage(players, service.active_cycle_id())
         if item.player_id == player_training_id(players[1])
     )
 
@@ -1017,7 +1018,7 @@ def test_weekly_planner_table_has_only_three_visible_columns(tmp_path):
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
 
@@ -1103,13 +1104,14 @@ def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
     )
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    week = service.load_state().active_week
     plan = service.generate_plan(players, "3-5-2")
     saved = service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 23),
+        match_date=week.second_match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=week.first_match_date,
     )
     trained_id = trainable_lineup_player_id(saved.match_records[0])
     trained_name = next(
@@ -1120,7 +1122,7 @@ def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
 
@@ -1156,7 +1158,7 @@ def test_recorded_lineup_edit_mode_restores_interactive_board(tmp_path):
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
     page.show_weekly_record_edit_mode(
@@ -1194,7 +1196,7 @@ def test_weekly_planner_pitch_remains_interactive_after_plan_generation(tmp_path
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
     page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
@@ -1222,7 +1224,7 @@ def test_weekly_priority_filter_uses_visible_priority_and_updates_on_edit(tmp_pa
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
 
@@ -1283,7 +1285,7 @@ def test_weekly_priority_filter_survives_sorting_plan_and_localization(tmp_path)
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
     page.weekly_filter_combo.setCurrentIndex(

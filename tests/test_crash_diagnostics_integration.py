@@ -50,14 +50,19 @@ def _lineup():
     ]
 
 
-def _result(opponent="Rival"):
+def _result(opponent="Rival", match_type="LEAGUE"):
     formation = FormationAnalysisResult(
         formation_name="2-5-3", recommended_tactic="Pressing", tactic_level=5,
         win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
         possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=_lineup(),
     )
-    return MatchAnalysisResult(player_count=18, opponent_name=opponent, formations=[formation])
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name=opponent,
+        formations=[formation],
+        match_type=match_type,
+    )
 
 
 def make_controller(tmp_path, known_opponents=()):
@@ -75,6 +80,7 @@ def make_controller(tmp_path, known_opponents=()):
     controller = MatchController(
         page, match_service, settings_repo, official_rating_service=official_service,
     )
+    page.set_match_type("LEAGUE")
     return page, controller, hist_repo
 
 

@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from engine.weekly_training.coverage import WeeklyTrainingCoverageService
 from engine.weekly_training.models import (
     PLAYMAKING,
+    CompetitionType,
     MatchRole,
     MatchStatus,
     TrainingPriority,
@@ -15,7 +16,7 @@ from engine.weekly_training.player_identity import player_training_id
 from engine.weekly_training.planner import WeeklyTrainingPlanner
 from engine.weekly_training.training_rules import assumed_confidence, rule_provider_for
 from engine.weekly_training.training_week import active_training_week
-from ht_coach_app.core.paths import user_data_dir
+from ht_coach_app.core.paths import historical_match_snapshots_path, user_data_dir
 from ht_coach_app.core.position_formatting import (
     format_position,
     format_position_abbreviation,
@@ -51,13 +52,24 @@ class TemporalStatus:
 
 
 class WeeklyTrainingAppService:
-    def __init__(self, repository=None, planner=None, workspace_service=None):
+    def __init__(
+        self,
+        repository=None,
+        planner=None,
+        workspace_service=None,
+        history_repository=None,
+    ):
+        uses_default_repository = repository is None
         self._repository = repository or WeeklyTrainingRepository(
             user_data_dir() / "weekly_training_planner.json"
         )
         self._planner = planner or WeeklyTrainingPlanner()
         self._mapper = FormationBoardMapper()
         self._workspace_service = workspace_service or WorkspaceService()
+        self._history_repository = history_repository
+        self._use_default_history_repository = (
+            history_repository is None and uses_default_repository
+        )
 
     def week_start_date_for(self, match_date):
         """Alpha 0.6.7 HF-02, Part 3: the public entry point for
@@ -88,7 +100,202 @@ class WeeklyTrainingAppService:
             )
         elif self._training_has_processed(state.active_week.training_update_date):
             state = self._repository.rollover(state)
-        return state
+        state = self._repair_linked_weekly_record_cycles(state)
+        return self._repair_duplicate_weekly_records(state)
+
+    def active_cycle_id(self):
+        state = self.load_state()
+        return state.active_week.week_id if state.active_week is not None else ""
+
+    def _repair_linked_weekly_record_cycles(self, state):
+        if not state.match_records:
+            return state
+        history_repository = self._resolved_history_repository()
+        if history_repository is None:
+            return state
+
+        changed = False
+        records = []
+        reserved_ids = {str(record.match_id) for record in state.match_records}
+        for record in state.match_records:
+            reserved_ids.discard(str(record.match_id))
+            updated = self._record_with_repaired_cycle(
+                state,
+                record,
+                history_repository,
+                reserved_ids,
+            )
+            reserved_ids.add(str(updated.match_id))
+            changed = changed or updated != record
+            records.append(updated)
+        if not changed:
+            return state
+        return self._repository.save(replace(state, match_records=tuple(records)))
+
+    def _resolved_history_repository(self):
+        if self._history_repository is not None:
+            return self._history_repository
+        if not self._use_default_history_repository:
+            return None
+        try:
+            from engine.history.repository import HistoricalMatchRepository
+
+            self._history_repository = HistoricalMatchRepository(
+                historical_match_snapshots_path()
+            )
+        except Exception:
+            self._history_repository = None
+        return self._history_repository
+
+    def _record_with_repaired_cycle(
+        self,
+        state,
+        record,
+        history_repository,
+        existing_ids,
+    ):
+        linked_id = str(getattr(record, "linked_match_record_id", "") or "")
+        if not linked_id:
+            return record
+        role = getattr(record.match_role, "value", record.match_role)
+        if role not in {
+            MatchRole.FIRST_WEEKLY_MATCH.value,
+            MatchRole.SECOND_WEEKLY_MATCH.value,
+        }:
+            return record
+        try:
+            snapshot = history_repository.get(linked_id)
+        except Exception:
+            snapshot = None
+        match_date = self._snapshot_match_date(snapshot)
+        if match_date is None:
+            return self._quarantined_record(
+                record,
+                f"quarantined: linked match record {linked_id} has no safe scheduled date.",
+            )
+
+        suffix = "first" if role == MatchRole.FIRST_WEEKLY_MATCH.value else "second"
+        expected_cycle = self._week_id_for_target_date(
+            state.active_week,
+            match_date,
+            state.active_training_type,
+        )
+        expected_match_id = f"{expected_cycle}:{suffix}"
+        if str(record.match_id) == expected_match_id:
+            return record
+        if expected_match_id in existing_ids:
+            return self._quarantined_record(
+                record,
+                f"quarantined: linked match record {linked_id} resolves to existing weekly slot {expected_match_id}.",
+            )
+        return replace(
+            record,
+            match_id=expected_match_id,
+            match_date=match_date,
+            training_exposure_entries=tuple(
+                replace(exposure, match_id=expected_match_id)
+                for exposure in record.training_exposure_entries
+            ),
+            notes=" ".join(
+                part
+                for part in (
+                    record.notes,
+                    f"Weekly cycle repaired from linked match record {linked_id}.",
+                )
+                if part
+            ),
+        )
+
+    @staticmethod
+    def _snapshot_match_date(snapshot):
+        raw = getattr(getattr(snapshot, "match_context", None), "match_date", "")
+        if not raw:
+            return None
+        try:
+            return date.fromisoformat(str(raw)[:10])
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _quarantined_record(record, note):
+        return replace(
+            record,
+            match_role=MatchRole.OTHER,
+            training_exposure_entries=(),
+            notes=" ".join(part for part in (record.notes, note) if part),
+        )
+
+    def _repair_duplicate_weekly_records(self, state):
+        records = self._deduplicated_weekly_records(state)
+        if records == state.match_records:
+            return state
+        return self._repository.save(replace(state, match_records=records))
+
+    @staticmethod
+    def _deduplicated_weekly_records(state):
+        current_by_slot = {}
+        slot_indexes = {}
+        preserved = []
+        for index, record in enumerate(state.match_records):
+            role = getattr(record.match_role, "value", record.match_role)
+            is_weekly_slot = role in {
+                MatchRole.FIRST_WEEKLY_MATCH.value,
+                MatchRole.SECOND_WEEKLY_MATCH.value,
+            }
+            cycle_id = WeeklyTrainingAppService._cycle_id_for_match_record(record)
+            if is_weekly_slot and cycle_id:
+                key = (cycle_id, role)
+                current_by_slot[key] = record
+                slot_indexes[key] = index
+            else:
+                preserved.append((index, record))
+        canonical = preserved + [
+            (index, current_by_slot[key])
+            for key, index in slot_indexes.items()
+        ]
+        canonical.sort(key=lambda item: item[0])
+        return tuple(record for _index, record in canonical)
+
+    @staticmethod
+    def _cycle_id_for_match_record(record):
+        match_id = str(getattr(record, "match_id", "") or "")
+        if ":" not in match_id:
+            return ""
+        return match_id.rsplit(":", 1)[0]
+
+    @staticmethod
+    def _current_week_match_records(state):
+        if state.active_week is None:
+            return ()
+        return WeeklyTrainingAppService._weekly_match_records_for_cycle(
+            state,
+            state.active_week.week_id,
+        )
+
+    @staticmethod
+    def _weekly_match_records_for_cycle(state, cycle_id):
+        cycle_id = str(cycle_id or "").strip()
+        if not cycle_id:
+            raise ValueError("cycle_id_required")
+        week_prefix = f"{cycle_id}:"
+        return tuple(
+            record
+            for record in WeeklyTrainingAppService._deduplicated_weekly_records(state)
+            if str(record.match_id).startswith(week_prefix)
+            and getattr(record.match_role, "value", record.match_role)
+            in {
+                MatchRole.FIRST_WEEKLY_MATCH.value,
+                MatchRole.SECOND_WEEKLY_MATCH.value,
+            }
+        )
+
+    @staticmethod
+    def _coerce_cycle_id(state, cycle_id):
+        if cycle_id:
+            return str(cycle_id)
+        if state.active_week is not None:
+            return state.active_week.week_id
+        raise ValueError("cycle_id_required")
 
     @staticmethod
     def _training_has_processed(training_update_date):
@@ -210,7 +417,8 @@ class WeeklyTrainingAppService:
             return frozenset()
 
         counted = {}
-        for record in state.match_records:
+        cycle_id = self._coerce_cycle_id(state, None)
+        for record in self._weekly_match_records_for_cycle(state, cycle_id):
             for exposure in record.training_exposure_entries:
                 counted[exposure.player_id] = (
                     counted.get(exposure.player_id, Decimal("0"))
@@ -279,8 +487,9 @@ class WeeklyTrainingAppService:
             for normalized_id, bucket in grouped.items()
         }
 
-    def coverage(self, players):
+    def coverage(self, players, cycle_id):
         state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
             return ()
@@ -291,7 +500,7 @@ class WeeklyTrainingAppService:
         return WeeklyTrainingCoverageService(rules).aggregate(
             players,
             priorities,
-            state.match_records,
+            self._weekly_match_records_for_cycle(state, cycle_id),
         )
 
     def generate_plan(self, players, formation_name):
@@ -309,7 +518,10 @@ class WeeklyTrainingAppService:
             players,
             state.active_week,
             priorities,
-            state.match_records,
+            self._weekly_match_records_for_cycle(
+                state,
+                state.active_week.week_id,
+            ),
             formation_name=formation_name,
             training_type=state.active_training_type,
             unavailable_player_ids=unavailable,
@@ -410,6 +622,7 @@ class WeeklyTrainingAppService:
         played_confirmed=False,
         today=None,
         linked_match_record_id="",
+        competition_type=CompetitionType.UNKNOWN,
     ):
         state = self.load_state()
         record = self._first_match_record_for_board(
@@ -421,6 +634,7 @@ class WeeklyTrainingAppService:
             requested_status=requested_status,
             played_confirmed=played_confirmed,
             today=today,
+            competition_type=competition_type,
         )
         if linked_match_record_id:
             from dataclasses import replace as _dc_replace
@@ -441,9 +655,8 @@ class WeeklyTrainingAppService:
         week_prefix = f"{state.active_week.week_id}:"
         return next(
             (
-                record for record in state.match_records
+                record for record in WeeklyTrainingAppService._current_week_match_records(state)
                 if record.match_role == MatchRole.FIRST_WEEKLY_MATCH
-                and record.match_id.startswith(week_prefix)
             ),
             None,
         )
@@ -462,6 +675,7 @@ class WeeklyTrainingAppService:
         played_confirmed=False,
         today=None,
         linked_match_record_id="",
+        competition_type=CompetitionType.UNKNOWN,
     ):
         state = self.load_state()
         record = self._second_match_record_for_board(
@@ -473,6 +687,7 @@ class WeeklyTrainingAppService:
             requested_status=requested_status,
             played_confirmed=played_confirmed,
             today=today,
+            competition_type=competition_type,
         )
         if linked_match_record_id:
             from dataclasses import replace as _dc_replace
@@ -490,6 +705,7 @@ class WeeklyTrainingAppService:
         played_confirmed=False,
         today=None,
         linked_match_record_id="",
+        competition_type=CompetitionType.UNKNOWN,
     ):
         state = self.load_state()
         record = self._second_match_record_for_board(
@@ -502,6 +718,7 @@ class WeeklyTrainingAppService:
             played_confirmed=played_confirmed,
             today=today,
             existing_match_id=self._existing_match_id_for_role(state, MatchRole.SECOND_WEEKLY_MATCH),
+            competition_type=competition_type,
         )
         if linked_match_record_id:
             from dataclasses import replace as _dc_replace
@@ -516,6 +733,191 @@ class WeeklyTrainingAppService:
             return state
         return self._repository.delete_match_record(state, record.match_id)
 
+    def replace_linked_match_lineup(
+        self,
+        linked_match_record_id,
+        board,
+        opponent_name="",
+        roster_players=(),
+        match_date=None,
+        requested_status=None,
+        played_confirmed=False,
+        today=None,
+        competition_type=None,
+    ):
+        state = self.load_state()
+        record = self._record_linked_to(state, linked_match_record_id)
+        if record is None:
+            return state
+        status = requested_status or record.planned_or_played
+        target_date = match_date or record.match_date
+        replacement_competition_type = (
+            competition_type
+            if competition_type is not None
+            else record.competition_type
+        )
+        if record.match_role == MatchRole.FIRST_WEEKLY_MATCH:
+            updated = self._first_match_record_for_board(
+                state,
+                board,
+                opponent_name=opponent_name or record.opponent_name,
+                roster_players=roster_players,
+                match_date=target_date,
+                requested_status=status,
+                played_confirmed=played_confirmed or record.minutes_known,
+                today=today,
+                competition_type=replacement_competition_type,
+            )
+        elif record.match_role == MatchRole.SECOND_WEEKLY_MATCH:
+            updated = self._second_match_record_for_board(
+                state,
+                board,
+                opponent_name=opponent_name or record.opponent_name,
+                roster_players=roster_players,
+                match_date=target_date,
+                requested_status=status,
+                played_confirmed=played_confirmed or record.minutes_known,
+                today=today,
+                competition_type=replacement_competition_type,
+            )
+        else:
+            return state
+        updated = replace(
+            updated,
+            source=record.source,
+            minutes_known=record.minutes_known,
+            linked_match_record_id=record.linked_match_record_id,
+        )
+        return self._repository.replace_match_record_by_original_id(
+            state,
+            record.match_id,
+            updated,
+        )
+
+    def participation_provenance(self, player_id, cycle_id):
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        sources = []
+        for record in self._weekly_match_records_for_cycle(state, cycle_id):
+            for entry in record.lineup:
+                if entry.player_id != player_id:
+                    continue
+                role = (
+                    "Partido 1"
+                    if record.match_role == MatchRole.FIRST_WEEKLY_MATCH
+                    else "Partido 2"
+                    if record.match_role == MatchRole.SECOND_WEEKLY_MATCH
+                    else "Otro partido"
+                )
+                sources.append(
+                    {
+                        "match_id": record.match_id,
+                        "match_role": record.match_role.value,
+                        "label": f"{role} - {format_position(entry.position)} {format_side(entry.side)}",
+                        "slot_id": entry.slot_id,
+                    }
+                )
+        return tuple(sources)
+
+    def explain_weekly_player_state(
+        self,
+        player_id,
+        cycle_id,
+        players=(),
+        displayed_symbol="",
+    ):
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        coverage = next(
+            (
+                row for row in self.coverage(players, cycle_id)
+                if row.player_id == player_id
+            ),
+            None,
+        )
+        priority = state.priorities.get(player_id)
+        provenance = self.participation_provenance(player_id, cycle_id)
+        return {
+            "player_id": player_id,
+            "cycle_id": cycle_id,
+            "displayed_symbol": displayed_symbol,
+            "priority": (
+                priority.priority.value
+                if priority is not None
+                else TrainingPriority.NO_PRIORITY.value
+            ),
+            "confirmed_exposure": (
+                str(coverage.confirmed_exposure)
+                if coverage is not None
+                else "0"
+            ),
+            "assumed_exposure": (
+                str(coverage.assumed_exposure)
+                if coverage is not None
+                else "0"
+            ),
+            "planned_exposure": (
+                str(coverage.planned_exposure)
+                if coverage is not None
+                else "0"
+            ),
+            "source_matches": (
+                tuple(coverage.source_matches)
+                if coverage is not None
+                else ()
+            ),
+            "participation_provenance": provenance,
+            "match_1": tuple(
+                item for item in provenance
+                if item["match_role"] == MatchRole.FIRST_WEEKLY_MATCH.value
+            ),
+            "match_2": tuple(
+                item for item in provenance
+                if item["match_role"] == MatchRole.SECOND_WEEKLY_MATCH.value
+            ),
+            "other_cycles": self._other_cycle_provenance(
+                player_id,
+                cycle_id,
+                state,
+            ),
+        }
+
+    def _other_cycle_provenance(self, player_id, cycle_id, state):
+        sources = []
+        for record in self._deduplicated_weekly_records(state):
+            if self._cycle_id_for_match_record(record) == cycle_id:
+                continue
+            for entry in record.lineup:
+                if entry.player_id != player_id:
+                    continue
+                sources.append(
+                    {
+                        "match_id": record.match_id,
+                        "cycle_id": self._cycle_id_for_match_record(record),
+                        "match_role": record.match_role.value,
+                        "label": (
+                            f"Other cycles - {format_position(entry.position)} "
+                            f"{format_side(entry.side)}"
+                        ),
+                        "slot_id": entry.slot_id,
+                        "contributes_minutes": "0",
+                    }
+                )
+        return tuple(sources)
+
+    @staticmethod
+    def _record_linked_to(state, linked_match_record_id):
+        if not linked_match_record_id:
+            return None
+        matches = tuple(
+            record
+            for record in state.match_records
+            if record.linked_match_record_id == linked_match_record_id
+        )
+        if len(matches) != 1:
+            return None
+        return matches[0]
+
     @staticmethod
     def _current_second_match_record(state):
         """Same scoping rationale as _current_first_match_record, for
@@ -525,9 +927,8 @@ class WeeklyTrainingAppService:
         week_prefix = f"{state.active_week.week_id}:"
         return next(
             (
-                record for record in state.match_records
+                record for record in WeeklyTrainingAppService._current_week_match_records(state)
                 if record.match_role == MatchRole.SECOND_WEEKLY_MATCH
-                and record.match_id.startswith(week_prefix)
             ),
             None,
         )
@@ -547,6 +948,7 @@ class WeeklyTrainingAppService:
         played_confirmed=False,
         today=None,
         existing_match_id=None,
+        competition_type=CompetitionType.UNKNOWN,
     ):
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
@@ -572,6 +974,7 @@ class WeeklyTrainingAppService:
             match_date=target_date,
             match_role=MatchRole.SECOND_WEEKLY_MATCH,
             opponent_name=opponent_name,
+            competition_type=self._competition_type(competition_type),
             formation=board.formation_name,
             lineup=entries,
             planned_or_played=status,
@@ -599,6 +1002,7 @@ class WeeklyTrainingAppService:
         played_confirmed=False,
         today=None,
         linked_match_record_id="",
+        competition_type=CompetitionType.UNKNOWN,
     ):
         state = self.load_state()
         record = self._first_match_record_for_board(
@@ -611,6 +1015,7 @@ class WeeklyTrainingAppService:
             played_confirmed=played_confirmed,
             today=today,
             existing_match_id=self._existing_match_id_for_role(state, MatchRole.FIRST_WEEKLY_MATCH),
+            competition_type=competition_type,
         )
         if linked_match_record_id:
             from dataclasses import replace as _dc_replace
@@ -771,6 +1176,7 @@ class WeeklyTrainingAppService:
         played_confirmed=False,
         today=None,
         existing_match_id=None,
+        competition_type=CompetitionType.UNKNOWN,
     ):
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
@@ -796,6 +1202,7 @@ class WeeklyTrainingAppService:
             match_date=target_date,
             match_role=MatchRole.FIRST_WEEKLY_MATCH,
             opponent_name=opponent_name,
+            competition_type=self._competition_type(competition_type),
             formation=board.formation_name,
             lineup=entries,
             planned_or_played=status,
@@ -933,6 +1340,21 @@ class WeeklyTrainingAppService:
             return MatchStatus(getattr(value, "value", value))
         except (TypeError, ValueError):
             return MatchStatus.PLANNED
+
+    @staticmethod
+    def _competition_type(value):
+        raw = getattr(value, "value", value)
+        text = str(raw or "").strip()
+        if text.lower() == "league":
+            return CompetitionType.LEAGUE
+        if text.lower() == "cup":
+            return CompetitionType.CUP
+        if text.lower() == "friendly":
+            return CompetitionType.FRIENDLY
+        try:
+            return CompetitionType(text)
+        except (TypeError, ValueError):
+            return CompetitionType.UNKNOWN
 
     @staticmethod
     def _date(value):

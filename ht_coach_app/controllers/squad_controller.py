@@ -383,10 +383,14 @@ class SquadController:
             self._view.show_weekly_training_empty()
             return
         state = self._weekly_training_service.load_state()
+        cycle_id = state.active_week.week_id if state.active_week is not None else ""
         self._view.show_weekly_training(
             state,
             self._weekly_training_service.priority_rows(self._roster.players),
-            self._weekly_training_service.coverage(self._roster.players),
+            self._weekly_training_service.coverage(
+                self._roster.players,
+                cycle_id,
+            ),
             self._builder_service.supported_formations(),
         )
         if hasattr(self._view, "show_week_navigation_context"):

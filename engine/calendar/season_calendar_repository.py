@@ -4,6 +4,8 @@ Part 11).
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from datetime import datetime, timezone
 
 from engine.calendar.season_calendar import SeasonCalendarConfig
 
@@ -20,6 +22,11 @@ class SeasonCalendarRepository:
         return SeasonCalendarConfig.from_dict(data)
 
     def save(self, config):
+        if not getattr(config, "updated_at", ""):
+            config = replace(
+                config,
+                updated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            )
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.storage_path, "w", encoding="utf-8") as file:
             json.dump(config.to_dict(), file, indent=2)

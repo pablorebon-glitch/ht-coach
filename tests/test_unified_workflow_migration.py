@@ -151,6 +151,110 @@ def test_migration_report_serializes_to_dict(repository):
     assert payload["unresolved_duplicate_groups"][0]["conflict_reason"] == "multiple_official_post"
 
 
+def test_migration_repairs_duplicated_chaco_display_string(repository):
+    record = HistoricalMatchSnapshot(
+        snapshot_id="chaco-display",
+        match_context=MatchContext(
+            match_date="2026-08-09",
+            opponent=OpponentReference(
+                opponent_name="CA Chaco - Hit'em up - CA Chaco - Hit'em up"
+            ),
+        ),
+    )
+    repository.save(record)
+
+    report = migrate_to_unified_workflow(repository)
+
+    repaired = repository.get("chaco-display")
+    assert repaired.match_context.opponent.opponent_name == "CA Chaco"
+    assert report.repaired_display_names[0]["reason"] == "duplicated_display_string"
+
+
+def test_migration_repairs_duplicated_pata2008_display_string(repository):
+    record = HistoricalMatchSnapshot(
+        snapshot_id="pata-display",
+        match_context=MatchContext(
+            match_date="2026-08-09",
+            opponent=OpponentReference(
+                opponent_name="pata2008 - Hit'em up - pata2008 - Hit'em up"
+            ),
+        ),
+    )
+    repository.save(record)
+
+    migrate_to_unified_workflow(repository)
+
+    repaired = repository.get("pata-display")
+    assert repaired.match_context.opponent.opponent_name == "pata2008"
+
+
+def test_migration_repairs_retrospective_source_contamination(repository):
+    record = HistoricalMatchSnapshot(
+        snapshot_id="torres-display",
+        match_context=MatchContext(
+            match_date="2026-07-26",
+            opponent=OpponentReference(
+                opponent_name="Torres Futbol Club - Hit'em up - Santa Cruz Club"
+            ),
+        ),
+        retrospective_pre=OfficialRatingSnapshot(team_name="Santa Cruz Club"),
+    )
+    repository.save(record)
+
+    report = migrate_to_unified_workflow(repository)
+
+    repaired = repository.get("torres-display")
+    assert repaired.match_context.opponent.opponent_name == "Torres Futbol Club"
+    assert report.repaired_display_names[0]["reason"] == "retrospective_source_contamination"
+
+
+def test_migration_repairs_home_formatted_match_identity(repository):
+    record = HistoricalMatchSnapshot(
+        snapshot_id="santa-cruz-home-title",
+        match_context=MatchContext(
+            opponent=OpponentReference(opponent_name="Hit'em up vs. Santa Cruz Club")
+        ),
+    )
+    repository.save(record)
+
+    report = migrate_to_unified_workflow(repository)
+
+    repaired = repository.get("santa-cruz-home-title")
+    assert repaired.match_context.opponent.opponent_name == "Santa Cruz Club"
+    assert report.repaired_display_names[0]["reason"] == "formatted_match_identity"
+
+
+def test_migration_repairs_away_formatted_match_identity(repository):
+    record = HistoricalMatchSnapshot(
+        snapshot_id="santa-cruz-away-title",
+        match_context=MatchContext(
+            opponent=OpponentReference(opponent_name="Santa Cruz Club - Hit'em up")
+        ),
+    )
+    repository.save(record)
+
+    migrate_to_unified_workflow(repository)
+
+    repaired = repository.get("santa-cruz-away-title")
+    assert repaired.match_context.opponent.opponent_name == "Santa Cruz Club"
+
+
+def test_migration_reports_ambiguous_display_string_without_guessing(repository):
+    record = HistoricalMatchSnapshot(
+        snapshot_id="ambiguous-display",
+        match_context=MatchContext(
+            opponent=OpponentReference(opponent_name="Alpha - Beta - Gamma")
+        ),
+    )
+    repository.save(record)
+
+    report = migrate_to_unified_workflow(repository)
+
+    preserved = repository.get("ambiguous-display")
+    assert preserved.match_context.opponent.opponent_name == "Alpha - Beta - Gamma"
+    assert report.unresolved_display_names[0]["reason"] == "ambiguous_display_string"
+
+
 def test_migration_finds_no_status_invariant_violations_in_healthy_data(repository):
     record = find_or_create_provisional_record(
         repository, opponent_name="Torres FC", match_date="2026-08-09", competition_type="league"

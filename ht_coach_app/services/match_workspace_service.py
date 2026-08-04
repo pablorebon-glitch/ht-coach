@@ -84,6 +84,8 @@ class MatchWorkspaceValidationError(ValueError):
 
 MATCH_TYPE_LEAGUE = "LEAGUE"
 MATCH_TYPE_CUP = "CUP"
+ANALYSIS_OWNER_NEW_MATCH_DRAFT = "NEW_MATCH_DRAFT"
+ANALYSIS_OWNER_SAVED_MATCH = "SAVED_MATCH"
 
 
 @dataclass(frozen=True)
@@ -178,6 +180,8 @@ class MatchAnalysisResult:
     unavailable_players_count: int = 0
     match_type: str = MATCH_TYPE_LEAGUE
     training_conflict_warning: str = ""
+    analysis_owner_type: str = ""
+    analysis_owner_id: str = ""
 
     @property
     def recommended_formation(self):
@@ -238,6 +242,7 @@ class MatchWorkspaceService:
         required_player_ids=None,
         training_rules=None,
     ):
+        match_type = self._normalize_match_type(match_type)
         self.validate_inputs(
             players_csv_path,
             opponent_name,
@@ -348,10 +353,12 @@ class MatchWorkspaceService:
         opponent_name,
         workspace_state,
         availability_mode=CURRENT_AVAILABLE,
+        match_type=MATCH_TYPE_LEAGUE,
     ):
         formation_names = list(
             workspace_state.workspace_boards.keys()
         )
+        match_type = self._normalize_match_type(match_type)
         self.validate_inputs(
             players_csv_path,
             opponent_name,
@@ -435,6 +442,7 @@ class MatchWorkspaceService:
             availability_mode=mode,
             availability_warning=self._availability_warning(mode),
             unavailable_players_count=self._unavailable_count(all_players),
+            match_type=match_type,
         )
 
         return self._with_decision_lab(
@@ -479,6 +487,13 @@ class MatchWorkspaceService:
             raise MatchWorkspaceValidationError(
                 "Unsupported formation selected."
             )
+
+    @staticmethod
+    def _normalize_match_type(match_type):
+        value = getattr(match_type, "value", match_type)
+        if value in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP}:
+            return value
+        raise MatchWorkspaceValidationError("Select a valid match type.")
 
     def validate_players_csv_path(self, players_csv_path):
         normalized_path = str(players_csv_path).strip()
@@ -831,6 +846,10 @@ class MatchWorkspaceService:
             availability_mode=result.availability_mode,
             availability_warning=result.availability_warning,
             unavailable_players_count=result.unavailable_players_count,
+            match_type=result.match_type,
+            training_conflict_warning=result.training_conflict_warning,
+            analysis_owner_type=result.analysis_owner_type,
+            analysis_owner_id=result.analysis_owner_id,
         )
         return with_tactical_advisor(enriched)
 
@@ -936,6 +955,8 @@ def match_analysis_result_from_dict(data):
         availability_mode=data.get("availability_mode", CURRENT_AVAILABLE),
         availability_warning=data.get("availability_warning", ""),
         unavailable_players_count=int(data.get("unavailable_players_count", 0)),
+        match_type=data.get("match_type", MATCH_TYPE_LEAGUE),
+        training_conflict_warning=data.get("training_conflict_warning", ""),
         formations=[
             FormationAnalysisResult(
                 formation_name=item.get("formation_name", ""),
@@ -1022,6 +1043,8 @@ def match_analysis_result_from_dict(data):
             )
             if recommendation is not None
         ],
+        analysis_owner_type=data.get("analysis_owner_type", ""),
+        analysis_owner_id=data.get("analysis_owner_id", ""),
     )
 
     decision_lab = result.decision_lab
@@ -1057,6 +1080,10 @@ def match_analysis_result_from_dict(data):
             availability_mode=result.availability_mode,
             availability_warning=result.availability_warning,
             unavailable_players_count=result.unavailable_players_count,
+            match_type=result.match_type,
+            training_conflict_warning=result.training_conflict_warning,
+            analysis_owner_type=result.analysis_owner_type,
+            analysis_owner_id=result.analysis_owner_id,
         )
 
     return result
@@ -1082,6 +1109,10 @@ def with_tactical_advisor(result):
         availability_mode=result.availability_mode,
         availability_warning=result.availability_warning,
         unavailable_players_count=result.unavailable_players_count,
+        match_type=result.match_type,
+        training_conflict_warning=result.training_conflict_warning,
+        analysis_owner_type=result.analysis_owner_type,
+        analysis_owner_id=result.analysis_owner_id,
     )
 
 

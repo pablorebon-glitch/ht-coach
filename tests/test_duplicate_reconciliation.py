@@ -5,7 +5,12 @@ from engine.history.duplicate_reconciliation import (
     merge_duplicate_group,
     reconcile_duplicates,
 )
-from engine.history.models import HistoricalMatchSnapshot, MatchContext, OpponentReference
+from engine.history.models import (
+    HistoricalMatchSnapshot,
+    MatchContext,
+    OpponentReference,
+    SnapshotProvenance,
+)
 from engine.history.official_ratings.models import OfficialRatingSnapshot
 from engine.history.provisional_record import find_or_create_provisional_record
 from engine.history.repository import HistoricalMatchRepository
@@ -273,3 +278,96 @@ def test_same_venue_still_correctly_detected_as_duplicate(repository):
     groups = find_duplicate_groups(repository)
     assert len(groups) == 1
     assert groups[0].kind == "opponent_week_evidence"
+
+
+def test_partial_official_pre_duplicate_merges_into_complete_planned_record(repository):
+    complete = HistoricalMatchSnapshot(
+        snapshot_id="santa-cruz-complete",
+        created_at="2026-08-01T09:00:00Z",
+        match_context=MatchContext(
+            match_date="2026-08-05",
+            competition_type="cup",
+            home_away="home",
+            opponent=OpponentReference(opponent_name="Santa Cruz Club"),
+        ),
+        ht_season_number=95,
+        ht_season_week=2,
+        training_cycle_id="2026-08-02:PLAYMAKING",
+        provisional_identity="95:2:2026-08-05:santa cruz club:cup",
+    )
+    partial = HistoricalMatchSnapshot(
+        snapshot_id="santa-cruz-pre-partial",
+        created_at="2026-08-01T10:00:00Z",
+        match_context=MatchContext(
+            opponent=OpponentReference(opponent_name="Hit'em up - Santa Cruz Club"),
+        ),
+        official_pre=OfficialRatingSnapshot(
+            team_name="Hit'em up - Santa Cruz Club",
+            hattrick_match_id="770918226",
+        ),
+        provenance=SnapshotProvenance(
+            imported_match_id="770918226",
+            creation_workflow="official_rating_import",
+        ),
+    )
+    repository.save(complete)
+    repository.save(partial)
+
+    groups = find_duplicate_groups(repository)
+    assert len(groups) == 1
+    assert groups[0].kind == "partial_official_import"
+    assert groups[0].can_auto_merge is True
+
+    report = reconcile_duplicates(repository)
+
+    assert report.merged_count == 1
+    remaining = repository.list_all()
+    assert len(remaining) == 1
+    survivor = remaining[0]
+    assert survivor.snapshot_id == complete.snapshot_id
+    assert survivor.official_pre is not None
+    assert survivor.official_pre.hattrick_match_id == "770918226"
+    assert survivor.match_context.official_match_id == "770918226"
+    assert survivor.provenance.imported_match_id == "770918226"
+    assert survivor.match_context.opponent.opponent_name == "Santa Cruz Club"
+    assert survivor.match_context.match_date == "2026-08-05"
+    assert survivor.match_context.competition_type.value == "cup"
+    assert survivor.match_context.home_away.value == "home"
+
+
+def test_partial_official_pre_duplicate_is_unresolved_when_multiple_matches_fit(repository):
+    for snapshot_id, match_date in (
+        ("santa-cruz-a", "2026-08-05"),
+        ("santa-cruz-b", "2026-08-12"),
+    ):
+        repository.save(
+            HistoricalMatchSnapshot(
+                snapshot_id=snapshot_id,
+                match_context=MatchContext(
+                    match_date=match_date,
+                    competition_type="cup",
+                    home_away="home",
+                    opponent=OpponentReference(opponent_name="Santa Cruz Club"),
+                ),
+            )
+        )
+    repository.save(
+        HistoricalMatchSnapshot(
+            snapshot_id="santa-cruz-pre-partial",
+            match_context=MatchContext(
+                opponent=OpponentReference(opponent_name="Hit'em up - Santa Cruz Club"),
+            ),
+            official_pre=OfficialRatingSnapshot(
+                team_name="Hit'em up - Santa Cruz Club",
+                hattrick_match_id="770918226",
+            ),
+            provenance=SnapshotProvenance(imported_match_id="770918226"),
+        )
+    )
+
+    report = reconcile_duplicates(repository)
+
+    assert report.merged_count == 0
+    assert report.unresolved_count == 1
+    assert report.unresolved_groups[0].conflict_reason == "ambiguous_partial_official_import"
+    assert len(repository.list_all()) == 3

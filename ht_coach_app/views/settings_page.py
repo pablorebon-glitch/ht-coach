@@ -113,6 +113,9 @@ class SettingsPage(BasePage):
         form.addRow(t("settings.season_calendar.total_weeks"), self.season_total_weeks_spin)
 
         self.season_timezone_combo = QComboBox()
+        self.season_timezone_combo.addItem(
+            "America/Argentina/Buenos_Aires", "America/Argentina/Buenos_Aires"
+        )
         self.season_timezone_combo.addItem("America/Buenos_Aires", "America/Buenos_Aires")
         self.season_timezone_combo.addItem("UTC", "UTC")
         form.addRow(t("settings.season_calendar.timezone"), self.season_timezone_combo)

@@ -3,6 +3,7 @@ import pytest
 from engine.history.provisional_record import find_or_create_provisional_record
 from engine.history.repository import HistoricalMatchRepository
 from ht_coach_app.services.match_display_formatter import (
+    extract_opponent_name_from_match_identity,
     format_match_identity,
     format_match_selector_option,
 )
@@ -57,6 +58,27 @@ def test_selector_option_never_produces_the_briefs_own_bug_example():
     result = format_match_selector_option("Hit'em up", "pata2008")
     assert result != "pata2008 - Hit'em up - pata2008 - Hit'em up"
     assert result.count(" - ") == 1
+
+
+def test_extract_opponent_from_home_dash_identity():
+    assert (
+        extract_opponent_name_from_match_identity("Hit'em up - Santa Cruz Club")
+        == "Santa Cruz Club"
+    )
+
+
+def test_extract_opponent_from_home_vs_identity():
+    assert (
+        extract_opponent_name_from_match_identity("Hit'em up vs. Santa Cruz Club")
+        == "Santa Cruz Club"
+    )
+
+
+def test_extract_opponent_from_away_dash_identity():
+    assert (
+        extract_opponent_name_from_match_identity("Santa Cruz Club - Hit'em up")
+        == "Santa Cruz Club"
+    )
 
 
 @pytest.fixture()

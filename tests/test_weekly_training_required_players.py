@@ -108,8 +108,10 @@ def test_required_100_player_already_covered_by_first_match_is_excluded(tmp_path
     service.save_priority(still_needed, TrainingPriority.REQUIRED_100.value)
 
     state = service.load_state()
+    match_id = f"{state.active_week.week_id}:first"
     record = played_record(
-        [entry_for(covered, "INNER_MIDFIELDER", minutes=90)]
+        [entry_for(covered, "INNER_MIDFIELDER", minutes=90, match_id=match_id)],
+        match_id=match_id,
     )
     service._repository.add_match_record(state, record)
 
@@ -129,11 +131,13 @@ def test_required_50_player_partially_covered_still_required(tmp_path):
     service.save_priority(partially_covered, TrainingPriority.REQUIRED_50.value)
 
     state = service.load_state()
+    match_id = f"{state.active_week.week_id}:first"
     # Played as a Winger (factor 0.5): 90 real minutes * 0.5 = 45
     # effective minutes, which exactly meets the 45-minute Required 50%
     # target.
     record = played_record(
-        [entry_for(partially_covered, "WINGER", minutes=90)]
+        [entry_for(partially_covered, "WINGER", minutes=90, match_id=match_id)],
+        match_id=match_id,
     )
     service._repository.add_match_record(state, record)
 
@@ -185,7 +189,7 @@ def test_second_match_record_updates_coverage(tmp_path):
     assert record is not None
     assert record.opponent_name == "Rival Copa"
 
-    coverage = {row.player_name: row for row in service.coverage(roster)}
+    coverage = {row.player_name: row for row in service.coverage(roster, service.active_cycle_id())}
     assert coverage["IM1"].planned_exposure == 100
     assert coverage["WG1"].planned_exposure == 50.0
     assert coverage["FW1"].planned_exposure == 0

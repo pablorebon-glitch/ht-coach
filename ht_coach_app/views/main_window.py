@@ -169,17 +169,23 @@ class MainWindow(QMainWindow):
             )
 
         self.sidebar.navigation_requested.connect(
-            self.navigation_controller.navigate_to
+            self._handle_navigation_requested
         )
         self.setCentralWidget(root)
         self.sidebar.select_first_page()
+
+    def _handle_navigation_requested(self, page_key):
+        if page_key == "match" and hasattr(self, "_match_controller"):
+            if not self._match_controller.start_new_match():
+                return
+        self.navigation_controller.navigate_to(page_key)
 
     def _open_saved_match(self, snapshot_id, saved_matches_controller):
         self.sidebar.select_page("saved_matches")
         saved_matches_controller.open_record(snapshot_id)
 
     def _edit_saved_match(self, snapshot_id):
-        self.sidebar.select_page("match")
+        self.navigation_controller.navigate_to("match")
         if hasattr(self, "_match_controller"):
             self._match_controller.edit_record(snapshot_id)
 
@@ -211,7 +217,12 @@ class MainWindow(QMainWindow):
                     widget,
                     SquadService(),
                     MatchWorkspaceRepository(),
-                    self._app_events
+                    self._app_events,
+                    weekly_training_service=WeeklyTrainingAppService(
+                        history_repository=HistoricalMatchRepository(
+                            historical_match_snapshots_path()
+                        )
+                    ),
                 )
             )
 
@@ -227,7 +238,11 @@ class MainWindow(QMainWindow):
                 service,
                 MatchWorkspaceRepository(),
                 self._app_events,
-                WeeklyTrainingAppService(),
+                WeeklyTrainingAppService(
+                    history_repository=HistoricalMatchRepository(
+                        historical_match_snapshots_path()
+                    )
+                ),
                 OfficialRatingImportService(),
                 SeasonCalendarRepository(user_data_dir() / "season_calendar.json"),
                 self

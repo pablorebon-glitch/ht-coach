@@ -37,6 +37,105 @@ Both `_latest_official_pre_ratings()` (the PRE-application logic) and
 through this exact same function, so they can never disagree with each
 other or with which match is truly open.
 
+HF-07 extends the same principle to Weekly Planner saves. `Guardar como
+Partido 1/2` resolves the destination training cycle from the currently open
+record's match date (or the current form's explicit match date for a new
+record). If no date exists, the action is blocked with a user-facing message
+instead of falling back to the current week.
+
+HF-08 extends it to opponent selection and official POST import. Opening a
+Saved Match clears stale opponent selection and restores the saved record's
+canonical opponent through structured combo item data. If that opponent no
+longer exists in Opponent Manager, a saved-snapshot entry is selected and
+analysis is blocked rather than falling back to another opponent. When POST is
+imported while editing a saved record, the active record owns the import and
+replacement check.
+
+HF-09 extends the same isolation rule to the visible analysis result itself.
+The Match workspace has two explicit modes:
+
+- `NEW_MATCH`: a fresh preparation draft, with a generated draft owner ID.
+- `EDIT_SAVED_MATCH`: an editor for one canonical `HistoricalMatchSnapshot`.
+
+`MatchAnalysisResult` now stores serializable ownership metadata:
+`analysis_owner_type` and `analysis_owner_id`. The repository may still have a
+single persisted "last result" file for startup restoration, but the controller
+must treat that file as usable only when its owner matches the current workspace
+mode. New Match never restores a saved match's Formation Board, comparison or
+lineup. Saved Match edit never restores a New Match draft result, and it only
+restores a saved result when the stored owner ID equals the selected
+`snapshot_id`.
+
+This closes the reported stale-owner bug where the upper form could show saved
+match metadata while the lower analysis area still belonged to a previous new
+match. Opening a saved match clears the lower workspace before conditional
+restore; opening New Match resets to an empty result state. Navigation also
+preserves context: selecting "New Match" starts a new draft, while editing from
+Saved Matches opens the Match workspace without selecting the New Match nav
+entry.
+
+HF-10.3 extends that isolation to competition type. The preparation selector's
+structured item data is the canonical workspace match type. Analyze reads that
+value, validates it, stores it in `MatchAnalysisResult.match_type`, and all
+subsequent saves compare the current workspace type against that result
+provenance. Unknown or missing selector data blocks analysis instead of becoming
+League by default.
+
+The selected weekly slot is never a competition-type source. `Guardar como
+Partido 1` and `Guardar como Partido 2` only identify the planner slot being
+written; they do not imply League or Cup/Friendly. `WeeklyMatchRecord.
+competition_type` is copied from the current analysis provenance once it still
+matches the visible workspace selector.
+
+Policy for metadata changes after analysis: changing competition type marks the
+current analysis stale, marks the workspace dirty, and disables the weekly save
+actions until reanalysis. HT Coach does not offer a "save anyway" override for
+this mismatch because the saved Match Record, Formation Board, Weekly Planner
+record and validation path must all refer to one synchronized competition type.
+
+HF-10.4 makes the persisted Match Record follow the same rule. The active Match
+workspace resolves one structured metadata snapshot before saving: opponent ID
+and name, competition type, venue role, scheduled date, HT season/week when a
+season calendar is configured, and the independent Weekly Training cycle ID.
+`Guardar formación`, `Guardar cambios`, `Guardar como Partido 1` and `Guardar
+como Partido 2` all read from that same snapshot instead of reconstructing
+metadata from labels, slots or stale analysis cache.
+
+When saving an unsaved New Match, the controller validates that opponent,
+competition type, venue role and scheduled date are present, creates one
+canonical `HistoricalMatchSnapshot`, persists the lineup and metadata on that
+same record, switches the workspace into saved-edit mode, and emits
+`match_records_changed`. Reopening that record restores the same controls. Saved
+Matches renders its visible title through `MatchDisplayFormatter`; the stored
+`opponent_name` remains only the canonical rival name, never a title such as
+`Hit'em up - Santa Cruz Club`.
+
+HF-10.5 hardens the save workflow around one controller transaction:
+`save_active_match_workspace`. `Guardar formacion`, `Guardar como Partido 1`
+and `Guardar como Partido 2` all first persist the active workspace to the
+canonical `HistoricalMatchSnapshot` and receive the saved record ID/revision.
+Only after that do the weekly actions create or replace a `WeeklyMatchRecord`
+with `linked_match_record_id` set to that same saved ID. A weekly-link failure
+does not discard the canonical save or reset the Match page; the user remains
+in saved-edit mode with the same board, metadata and results visible so the
+weekly link can be retried.
+
+Save actions are deliberately disabled until the workspace has valid metadata,
+an analysis result, a recommended lineup and non-stale competition-type
+provenance. Disabled buttons carry the reason as a tooltip. Save failures are
+reported through the Match page and logged with the active record context
+instead of being swallowed as a no-op.
+
+HF-10.6 makes saved-match edit restore from the canonical record itself when
+the transient last-analysis cache is missing or no longer belongs to the
+record. `HistoricalMatchSnapshot.lineup` plus `tactical_setup` is enough to
+display a usable restored Formation Board without rerunning optimizers. The
+restored result is explicitly marked as `SAVED_MATCH` ownership for the active
+record. The saved CSV path is kept in snapshot provenance and is loaded back
+into the workspace on edit; if it cannot be loaded, the saved board remains
+visible and the player count is cleared with an explicit warning instead of
+showing a recent CSV label as if players were loaded.
+
 ## Cross-controller event scoping
 
 `AppEvents.official_ratings_changed` carries the touched record's own

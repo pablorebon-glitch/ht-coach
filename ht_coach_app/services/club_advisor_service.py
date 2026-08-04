@@ -35,12 +35,15 @@ class ClubAdvisorAppService:
                 continue
             players_by_position.setdefault(best_position, []).append(player.name)
 
+        state = self._weekly_training_service.load_state()
+        cycle_id = state.active_week.week_id if state.active_week is not None else ""
+
         return ClubAdvisorContext(
             strategy=ClubStrategy.SUSTAINABLE_GROWTH,
             squad_reports=squad_reports,
             squad_context=squad_context,
             active_training_type=squad_context.active_training_type,
-            coverage_rows=self._weekly_training_service.coverage(players),
+            coverage_rows=self._weekly_training_service.coverage(players, cycle_id),
             training_priority_rows=self._weekly_training_service.priority_rows(players),
             has_historical_data=False,
             players_by_position={

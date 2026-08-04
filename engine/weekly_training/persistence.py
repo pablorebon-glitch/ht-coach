@@ -141,6 +141,22 @@ class WeeklyTrainingRepository:
             )
         )
 
+    def replace_match_record_by_original_id(self, state, original_match_id, record):
+        records = tuple(
+            existing
+            for existing in state.match_records
+            if existing.match_id not in {original_match_id, record.match_id}
+        ) + (record,)
+        return self.save(
+            WeeklyTrainingState(
+                active_training_type=state.active_training_type,
+                active_week=state.active_week,
+                priorities=state.priorities,
+                match_records=records,
+                archived_weeks=state.archived_weeks,
+            )
+        )
+
     def delete_match_record(self, state, match_id):
         return self.save(
             WeeklyTrainingState(
