@@ -1,5 +1,12 @@
 # HT Coach Alpha Roadmap
 
+## Alpha 0.6.12
+
+- Support bilateral Official POST imports as calibration and history evidence.
+- Preserve one canonical Match Record per official match.
+- Display actual opponent POST context without inferring opponent formation.
+- Keep PRE as the primary calibration source and POST as validation evidence.
+
 ## Current Position
 
 HT Coach has a stable optimization engine and an early desktop surface. Alpha 0.2 starts

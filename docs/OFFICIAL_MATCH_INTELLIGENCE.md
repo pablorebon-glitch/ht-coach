@@ -1,5 +1,17 @@
 # Official Match Intelligence
 
+## Alpha 0.6.12 Bilateral POST
+
+Official Intelligence now accepts either an individual POST or a full-match
+bilateral POST through the same import action. A bilateral POST is normalized to
+`OfficialMatchPost`: the page continues using `our_team_post` for the main
+PRE/POST comparison and optionally renders a compact **Rival real** section from
+`opponent_team_post`.
+
+The opponent actual side is evidence, not identity formatting. It must not
+overwrite the prepared opponent snapshot or the canonical match title. See
+`docs/BILATERAL_OFFICIAL_POST.md` for parser, enrichment and idempotence rules.
+
 Alpha 0.6.1 (UX-03: Workflow Consolidation & Match Intelligence UI) moves every
 official-rating analysis surface out of Match and into its own dedicated page,
 so Match can stay focused on one job — preparing the next match.

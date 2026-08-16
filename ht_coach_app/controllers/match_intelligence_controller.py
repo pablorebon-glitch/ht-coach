@@ -266,6 +266,9 @@ class MatchIntelligenceController(QObject):
             {
                 "pre": pre_text,
                 "post": post_text,
+                "post_source": service.post_source_indicator(snapshot),
+                "opponent_actual": service.opponent_actual_summary(snapshot),
+                "scenario_drift": service.scenario_drift_summary(snapshot),
                 "comparison": "\n\n".join(comparison_lines),
                 "conclusions": "\n".join(conclusion_lines),
                 "prediction": "\n".join(prediction_lines),

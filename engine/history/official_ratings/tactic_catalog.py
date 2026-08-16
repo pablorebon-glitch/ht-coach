@@ -17,6 +17,7 @@ TACTIC_ALIASES: dict[Tactic, tuple[str, ...]] = {
         "atacar por el centro",
         "ataque por el centro",
         "attack in the middle",
+        "attack through the middle",
     ),
     Tactic.ATTACK_ON_WINGS: (
         "atacar por las bandas",

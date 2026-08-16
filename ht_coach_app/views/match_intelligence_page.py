@@ -91,6 +91,16 @@ class MatchIntelligencePage(BasePage):
         )
         outer.addWidget(self.conclusions_frame)
 
+        self.opponent_actual_frame, _, self.opponent_actual_label = _card(
+            "official_match_intelligence.section.opponent_actual"
+        )
+        outer.addWidget(self.opponent_actual_frame)
+
+        self.scenario_drift_frame, _, self.scenario_drift_label = _card(
+            "official_match_intelligence.section.scenario_drift"
+        )
+        outer.addWidget(self.scenario_drift_frame)
+
         # Part 7: the internal HT Coach estimate collapses under
         # "Diagnóstico interno" when it adds no comparative value (no
         # numeric delta shown, scales not confirmed compatible) --
@@ -270,9 +280,19 @@ class MatchIntelligencePage(BasePage):
         self.empty_state_label.setVisible(False)
         self._sections_container.setVisible(True)
         self.pre_label.setText(sections.get("pre") or t("official_match_intelligence.not_imported"))
-        self.post_label.setText(sections.get("post") or t("official_match_intelligence.not_imported"))
+        post_text = sections.get("post") or t("official_match_intelligence.not_imported")
+        source_text = sections.get("post_source") or ""
+        if source_text:
+            post_text = f"{post_text}\n\n{t('official_match_intelligence.post_source')}\n{source_text}"
+        self.post_label.setText(post_text)
         self.sector_label.setText(sections.get("comparison") or "-")
         self.conclusions_label.setText(sections.get("conclusions") or "-")
+        opponent_actual = sections.get("opponent_actual") or ""
+        self.opponent_actual_frame.setVisible(bool(opponent_actual))
+        self.opponent_actual_label.setText(opponent_actual)
+        scenario_drift = sections.get("scenario_drift") or ""
+        self.scenario_drift_frame.setVisible(bool(scenario_drift))
+        self.scenario_drift_label.setText(scenario_drift)
         self.prediction_label.setText(sections.get("prediction") or "-")
         self.internal_diagnostic_limitation_label.setText(
             sections.get("internal_diagnostic_limitation") or ""

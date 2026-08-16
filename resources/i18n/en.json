@@ -2459,6 +2459,8 @@
       "sector_analysis": "Comparison",
       "not_yet_available": "Conclusions",
       "conclusions": "Conclusions",
+      "opponent_actual": "Actual Opponent",
+      "scenario_drift": "Opponent Scenario",
       "internal_diagnostic": "Internal Diagnostic",
       "expand": "Show technical detail",
       "collapse": "Hide technical detail"
@@ -2489,6 +2491,7 @@
       },
       "missing_data": "Could not compare {count} sector(s) due to missing data."
     },
+    "post_source": "POST Source",
     "summary": {
       "defense": "Defense",
       "midfield": "Midfield",
@@ -2506,7 +2509,7 @@
       "central_attack": "Central attack",
       "left_attack": "Left attack"
     },
-    "not_yet_available_body": "Opponent ratings, official comparison against the opponent, cross-match historical comparisons, and automatic insights aren't supported yet -- there's no confirmed data source for the opponent's ratings yet. This is a known limitation, not a bug.",
+    "not_yet_available_body": "Cross-match historical comparisons and automatic insights are not supported yet. When a full-match POST is imported, HT Coach can show the opponent's actual ratings without inferring its formation.",
     "direction": {
       "improved": "Improved",
       "stable": "No Change",

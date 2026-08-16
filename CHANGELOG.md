@@ -4,6 +4,14 @@
 
 ### Added
 
+- Added Alpha 0.6.12 bilateral Official POST support. The existing POST import
+  action now auto-detects individual vs full-match POST exports, normalizes both
+  into a unified `OfficialMatchPost`, preserves `official_post` as our-side
+  compatibility data, enriches existing individual POST records with opponent
+  actual ratings without duplicating Match Records, exposes a compact Rival Real
+  section in Official Intelligence, and records POST validation evidence without
+  changing rating, optimizer, xG or probability formulas.
+
 - Added Alpha 0.6.11 rating-scale normalization foundations. Analytical ratings
   now carry explicit scale/source metadata, MatchEvaluator rejects explicit
   mixed-scale inputs, lineup/order/tactic optimization normalizes internal

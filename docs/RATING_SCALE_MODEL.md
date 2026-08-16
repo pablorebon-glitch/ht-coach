@@ -1,5 +1,12 @@
 # Rating Scale Model
 
+## Alpha 0.6.12 Evidence Boundary
+
+Bilateral Official POST enriches historical evidence without changing the rating
+scale model. The internal-to-HT mapping remains the Alpha 0.6.11 calibration
+layer; POST observations are stored as validation samples and opponent scenario
+samples, not as primary calibration coefficients.
+
 HT Coach separates rating prediction from match decision math.
 
 ## Scales

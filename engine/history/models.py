@@ -476,6 +476,7 @@ class HistoricalMatchSnapshot:
     official_result: OfficialResultSnapshot | None = None
     official_pre: "OfficialRatingSnapshot | None" = None
     official_post: "OfficialRatingSnapshot | None" = None
+    official_match_post: "OfficialMatchPost | None" = None
     cohort: MatchCohort = field(default_factory=MatchCohort)
     prediction_error: PredictionErrorPlaceholder | None = None
     provenance: SnapshotProvenance = field(default_factory=SnapshotProvenance)
@@ -565,6 +566,11 @@ class HistoricalMatchSnapshot:
             "official_post": (
                 self.official_post.to_dict() if self.official_post else None
             ),
+            "official_match_post": (
+                self.official_match_post.to_dict()
+                if self.official_match_post
+                else None
+            ),
             "cohort": self.cohort.to_dict(),
             "prediction_error": (
                 self.prediction_error.to_dict() if self.prediction_error else None
@@ -587,7 +593,15 @@ class HistoricalMatchSnapshot:
             )
         # Imported lazily to avoid a circular import: official_ratings
         # imports SectorRatings from this module.
-        from engine.history.official_ratings.models import OfficialRatingSnapshot
+        from engine.history.official_ratings.models import (
+            OfficialMatchPost,
+            OfficialRatingSnapshot,
+        )
+
+        official_post = OfficialRatingSnapshot.from_dict(data.get("official_post"))
+        official_match_post = OfficialMatchPost.from_dict(data.get("official_match_post"))
+        if official_match_post is None and official_post is not None:
+            official_match_post = OfficialMatchPost.from_legacy_snapshot(official_post)
 
         return cls(
             snapshot_id=data.get("snapshot_id", ""),
@@ -605,7 +619,8 @@ class HistoricalMatchSnapshot:
             predictions=PredictionSnapshot.from_dict(data.get("predictions")),
             official_result=OfficialResultSnapshot.from_dict(data.get("official_result")),
             official_pre=OfficialRatingSnapshot.from_dict(data.get("official_pre")),
-            official_post=OfficialRatingSnapshot.from_dict(data.get("official_post")),
+            official_post=official_post,
+            official_match_post=official_match_post,
             cohort=MatchCohort.from_dict(data.get("cohort")),
             prediction_error=PredictionErrorPlaceholder.from_dict(
                 data.get("prediction_error")

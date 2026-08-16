@@ -204,6 +204,76 @@ class MatchIntelligenceAppService:
         conclusions = generate_conclusions(interpreted)
         return tuple(self._localize_conclusion_sectors(c) for c in conclusions)
 
+    def post_source_indicator(self, snapshot):
+        match_post = getattr(snapshot, "official_match_post", None) if snapshot else None
+        if match_post is None and getattr(snapshot, "official_post", None) is not None:
+            return "Solo Hit'em up"
+        if match_post is None:
+            return ""
+        return (
+            "Completo del partido"
+            if getattr(match_post, "opponent_team_post", None) is not None
+            else "Solo Hit'em up"
+        )
+
+    def opponent_actual_summary(self, snapshot):
+        match_post = getattr(snapshot, "official_match_post", None) if snapshot else None
+        opponent = getattr(match_post, "opponent_team_post", None)
+        if opponent is None:
+            return ""
+        lines = [
+            opponent.team_name,
+            f"MID       {_fmt(opponent.ratings.midfield)}",
+            (
+                "DEF   "
+                f"{_fmt(opponent.ratings.right_defense)} / "
+                f"{_fmt(opponent.ratings.central_defense)} / "
+                f"{_fmt(opponent.ratings.left_defense)}"
+            ),
+            (
+                "ATT   "
+                f"{_fmt(opponent.ratings.right_attack)} / "
+                f"{_fmt(opponent.ratings.central_attack)} / "
+                f"{_fmt(opponent.ratings.left_attack)}"
+            ),
+        ]
+        if opponent.tactic.label:
+            lines.append(f"Táctica: {opponent.tactic.label}")
+        if opponent.tactic_level is not None:
+            lines.append(f"Nivel: {opponent.tactic_level:g}")
+        if opponent.playing_style:
+            lines.append(f"Estilo: {opponent.playing_style}")
+        if opponent.score is not None:
+            lines.append(f"Resultado rival: {opponent.score}")
+        return "\n".join(lines)
+
+    def scenario_drift_summary(self, snapshot):
+        match_post = getattr(snapshot, "official_match_post", None) if snapshot else None
+        opponent = getattr(match_post, "opponent_team_post", None)
+        if opponent is None:
+            return ""
+        expected = _expected_opponent_snapshot(snapshot)
+        if expected is None:
+            return "Sin escenario previo para comparar."
+        from engine.history.official_ratings.scenario_drift import (
+            compare_expected_opponent_to_actual_post,
+        )
+
+        drift = compare_expected_opponent_to_actual_post(expected, opponent)
+        lines = [
+            f"Escenario rival: {drift.overall_magnitude}",
+            drift.explanation,
+        ]
+        comparable = [item for item in drift.sectors if item.delta is not None]
+        for item in comparable[:3]:
+            lines.append(
+                f"{format_official_sector_label(item.sector)}: "
+                f"{item.expected:.2f} -> {item.actual:.2f} ({item.delta:+.2f})"
+            )
+        if drift.tactic_changed is True:
+            lines.append("La táctica real difirió del escenario esperado.")
+        return "\n".join(lines)
+
     @staticmethod
     def _localize_conclusion_sectors(conclusion):
         from engine.history.official_ratings.interpretation import Conclusion
@@ -230,3 +300,16 @@ class MatchIntelligenceAppService:
     @property
     def scales_confirmed_compatible(self):
         return SCALES_CONFIRMED_COMPATIBLE
+
+
+def _fmt(value):
+    return "?" if value is None else f"{float(value):.2f}"
+
+
+def _expected_opponent_snapshot(snapshot):
+    predictions = getattr(snapshot, "predictions", None)
+    return (
+        getattr(predictions, "opponent_ratings", None)
+        or getattr(predictions, "opponent_snapshot", None)
+        or getattr(snapshot, "opponent_expected_snapshot", None)
+    )

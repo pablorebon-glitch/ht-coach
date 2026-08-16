@@ -1,5 +1,16 @@
 # Official Match History
 
+## Alpha 0.6.12 Bilateral POST
+
+Historical records now persist a unified `official_match_post` alongside the
+legacy-compatible `official_post`. Existing individual POST records are migrated
+in memory to an `OfficialMatchPost` with only `our_team_post`; bilateral imports
+add `opponent_team_post` to the same canonical Match Record when the official
+Match ID and our-side data match.
+
+This preserves one record per official match while allowing richer opponent
+actual evidence.
+
 Alpha 0.6.6 begins the `OfficialMatchRecord` subsystem (Parts 9-21 of the
 sprint). This document covers the foundational pieces built so far; it will
 grow as the remaining parts (the full record lifecycle, provisional-record

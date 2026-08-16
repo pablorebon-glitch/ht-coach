@@ -1,5 +1,17 @@
 # Rating Calibration
 
+## Alpha 0.6.12 Evidence Types
+
+Alpha 0.6.12 adds explicit sample roles:
+
+- `PRE_RATING_PAIR`: primary calibration evidence.
+- `POST_VALIDATION_PAIR`: secondary validation from our Official POST.
+- `OPPONENT_SCENARIO_PAIR`: expected opponent scenario vs actual opponent POST
+  from a bilateral import.
+
+Only PRE pairs feed the current calibration fit. POST and opponent scenario
+evidence are preserved for validation and future modeling.
+
 HT Coach uses a dedicated rating normalization layer to convert raw internal
 lineup ratings into HT-compatible estimates before matchup calculations.
 

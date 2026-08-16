@@ -1,5 +1,14 @@
 # HT Coach Alpha 0.2 Architecture
 
+## Alpha 0.6.12 Official POST Architecture
+
+Official rating import now normalizes POST input through a unified
+`OfficialMatchPost` model. `OfficialRatingImportService` remains the single
+application entry point: it detects individual vs bilateral POST, stores our side
+as the backward-compatible `official_post`, and stores the richer unified object
+as `official_match_post`. Official Intelligence reads through the service layer
+and never calls optimizer or rating formulas.
+
 ## Product Direction
 
 HT Coach Alpha 0.2 is a professional desktop application for planning Hattrick matches.

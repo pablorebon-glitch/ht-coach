@@ -1,5 +1,13 @@
 # Unified Match Workflow
 
+## Alpha 0.6.12 Official POST Enrichment
+
+The Official POST import workflow remains one button. Individual and bilateral
+POST exports both attach to the canonical Match Record selected by active record
+id or official Match ID. Bilateral POST enriches the record with opponent actual
+ratings and score; it does not create a second record and does not replace the
+prepared opponent scenario.
+
 Alpha 0.6.7 reorganizes the complete match workflow around one canonical
 persistent Match Record (extending Alpha 0.6.6's `OfficialMatchRecord`
 foundation, never a parallel entity). This document covers the pieces built

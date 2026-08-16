@@ -2457,6 +2457,8 @@
       "sector_analysis": "Comparación",
       "not_yet_available": "Conclusiones",
       "conclusions": "Conclusiones",
+      "opponent_actual": "Rival real",
+      "scenario_drift": "Escenario rival",
       "internal_diagnostic": "Diagnóstico interno",
       "expand": "Ver detalle técnico",
       "collapse": "Ocultar detalle técnico"
@@ -2487,7 +2489,8 @@
       },
       "missing_data": "No se pudieron comparar {count} sector(es) por falta de datos."
     },
-    "not_yet_available_body": "Ratings del rival, comparación oficial contra el rival, comparaciones históricas entre partidos, e insights automáticos todavía no están soportados â€” no hay una fuente de datos confirmada para el rival todavía. Esto es una limitación conocida, no un error.",
+    "not_yet_available_body": "Las comparaciones históricas entre partidos y los insights automáticos todavía no están soportados. Si importás un POST completo del partido, HT Coach puede mostrar las calificaciones reales del rival sin inferir su formación.",
+    "post_source": "Fuente POST",
     "post_missing": "Aún no se importó el resumen POST.",
     "pre_missing": "Aún no se importó el resumen PRE.",
     "summary": {

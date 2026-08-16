@@ -2,10 +2,21 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import replace
 from datetime import datetime, timezone
 
-from engine.history.official_ratings.models import OfficialRatingSnapshot, RatedAttribute
-from engine.history.official_ratings.tactic_catalog import find_tactic_alias_prefix
+from engine.history.official_ratings.models import (
+    POST_BILATERAL,
+    POST_INDIVIDUAL,
+    OfficialMatchPost,
+    OfficialRatingSnapshot,
+    OfficialTeamPost,
+    RatedAttribute,
+)
+from engine.history.official_ratings.tactic_catalog import (
+    find_tactic_alias_prefix,
+    resolve_tactic_alias,
+)
 from engine.history.official_ratings.validation import OfficialRatingParsingError
 
 # ---------------------------------------------------------------------------
@@ -32,6 +43,10 @@ _HEADER_LINE = re.compile(
     r"\[b\](?P<team>.*?)\[/b\]\s*(?:\[matchid=(?P<match_id>\d+)\])?", re.IGNORECASE
 )
 _MATCH_ID = re.compile(r"\[matchid=(?P<match_id>\d+)\]", re.IGNORECASE)
+_TEAM_ID = re.compile(r"\[teamid=(?P<team_id>\d+)\]", re.IGNORECASE)
+_TEAM_HEADER_WITH_SCORE = re.compile(
+    r"^(?P<name>.*?)(?:\s+-\s+|\s+)(?P<score>\d+)\s*$"
+)
 _TABLE_BLOCK = re.compile(r"\[table\](?P<body>.*?)\[/table\]", re.IGNORECASE | re.DOTALL)
 _TABLE_ROW = re.compile(r"\[tr\](?P<row>.*?)\[/tr\]", re.IGNORECASE | re.DOTALL)
 _TABLE_HEADER_CELL = re.compile(r"\[th\](?P<label>.*?)\[/th\]", re.IGNORECASE | re.DOTALL)
@@ -242,6 +257,18 @@ def detect_format(raw_text):
     return DETAILED_POST
 
 
+def detect_post_format(raw_text):
+    table_match = _TABLE_BLOCK.search(raw_text or "")
+    if not table_match:
+        return POST_INDIVIDUAL
+    first_row = _TABLE_ROW.search(table_match.group("body"))
+    if not first_row:
+        return POST_INDIVIDUAL
+    headers = _TABLE_HEADER_CELL_ANY.findall(first_row.group("row"))
+    team_headers = [header for header in headers if _TEAM_ID.search(header or "")]
+    return POST_BILATERAL if len(team_headers) >= 2 else POST_INDIVIDUAL
+
+
 def _extract_header(raw_text):
     match = _HEADER_LINE.search(raw_text)
     if match:
@@ -289,6 +316,266 @@ def _last_float(values):
         if parsed is not None:
             return parsed
     return None
+
+
+def _parse_team_header(raw_header):
+    team_id_match = _TEAM_ID.search(raw_header or "")
+    team_id = team_id_match.group("team_id") if team_id_match else ""
+    cleaned = _strip_bbcode(raw_header or "").strip()
+    cleaned = re.sub(r"\[teamid=\d+\]", "", cleaned, flags=re.IGNORECASE).strip()
+    score = None
+    match = _TEAM_HEADER_WITH_SCORE.match(cleaned)
+    if match:
+        cleaned = match.group("name").strip()
+        score = int(match.group("score"))
+    return {"team_name": cleaned, "team_id": team_id, "score": score}
+
+
+def _split_bilateral_values(cells):
+    if len(cells) >= 4:
+        midpoint = len(cells) // 2
+        return cells[:midpoint], cells[midpoint:]
+    if len(cells) == 3:
+        return cells[:2], cells[2:]
+    if len(cells) >= 2:
+        return [cells[0]], [cells[1]]
+    return cells, []
+
+
+def _clean_text_value(values):
+    text = " ".join(_strip_bbcode(value).strip() for value in values if value).strip()
+    return text
+
+
+def _parse_tactic_value(text):
+    alias_match = find_tactic_alias_prefix(text or "")
+    if alias_match is None:
+        parsed = _parse_rated_attribute("tactic", text or "")
+        return parsed, ""
+    matched_text, canonical = alias_match
+    remainder = (text or "").strip()[len(matched_text):].strip()
+    quality_match = _QUALITY_NUMBER.match(remainder)
+    quality = (quality_match.group("quality") or "").strip() if quality_match else remainder
+    level = _to_float(quality_match.group("level")) if quality_match else None
+    return (
+        RatedAttribute(
+            label=matched_text,
+            quality=quality,
+            level=level,
+            raw_text=text or "",
+        ),
+        canonical.value if canonical else "",
+    )
+
+
+def _parse_bilateral_post_table(raw_text, *, captured_at=None, language=""):
+    table_match = _TABLE_BLOCK.search(raw_text or "")
+    if table_match is None:
+        raise OfficialRatingParsingError("bilateral_post_missing_table")
+
+    match_id_match = _MATCH_ID.search(raw_text or "")
+    match_id = match_id_match.group("match_id") if match_id_match else ""
+    rows = list(_TABLE_ROW.finditer(table_match.group("body")))
+    if not rows:
+        raise OfficialRatingParsingError("bilateral_post_missing_rows")
+
+    header_cells = _TABLE_HEADER_CELL_ANY.findall(rows[0].group("row"))
+    team_headers = [_parse_team_header(header) for header in header_cells if _TEAM_ID.search(header or "")]
+    if len(team_headers) < 2:
+        raise OfficialRatingParsingError("bilateral_post_missing_team_headers")
+
+    teams = [
+        {
+            **team_headers[0],
+            "sector_values": {},
+            "tactic": RatedAttribute(),
+            "canonical_tactic": "",
+            "playing_style": "",
+            "experience_average": None,
+            "midfield_average": None,
+            "defense_average": None,
+            "attack_average": None,
+            "overall_average": None,
+        },
+        {
+            **team_headers[1],
+            "sector_values": {},
+            "tactic": RatedAttribute(),
+            "canonical_tactic": "",
+            "playing_style": "",
+            "experience_average": None,
+            "midfield_average": None,
+            "defense_average": None,
+            "attack_average": None,
+            "overall_average": None,
+        },
+    ]
+    section = ""
+
+    for row_match in rows[1:]:
+        row = row_match.group("row")
+        headers = [_strip_bbcode(cell).strip() for cell in _TABLE_HEADER_CELL_ANY.findall(row)]
+        cells = [_strip_bbcode(cell).strip() for cell in _TABLE_DATA_CELL.findall(row)]
+        if not headers:
+            continue
+
+        label = headers[0]
+        normalized_label = _normalize(label)
+        if not cells:
+            if normalized_label in {
+                "tiro indirecto",
+                "indirect set pieces",
+                "plan de juego",
+                "game plan",
+                "calificaciones medias",
+                "average ratings",
+            }:
+                section = normalized_label
+            continue
+
+        left_values, right_values = _split_bilateral_values(cells)
+        side_values = (left_values, right_values)
+
+        def set_for_both(key, parser):
+            for index, values in enumerate(side_values):
+                value = parser(values)
+                if value is not None:
+                    teams[index][key] = value
+
+        if section in {"tiro indirecto", "indirect set pieces"}:
+            sector = None
+            if normalized_label in {"defensa", "defense"}:
+                sector = "indirect_defense"
+            elif normalized_label in {"ataque", "attack"}:
+                sector = "indirect_attack"
+            if sector:
+                for index, values in enumerate(side_values):
+                    value = _last_float(values)
+                    if value is not None:
+                        teams[index]["sector_values"][sector] = value
+            continue
+
+        if section in {"calificaciones medias", "average ratings"}:
+            average_key = None
+            if normalized_label in {"experiencia total de los jugadores", "total player experience"}:
+                average_key = "experience_average"
+            elif normalized_label in {"mediocampo promedio", "midfield average"}:
+                average_key = "midfield_average"
+            elif normalized_label in {"defensa promedio", "defense average"}:
+                average_key = "defense_average"
+            elif normalized_label in {"ataque promedio", "attack average"}:
+                average_key = "attack_average"
+            elif normalized_label in {"promedio total", "total average", "average rating"}:
+                average_key = "overall_average"
+            if average_key:
+                set_for_both(average_key, _last_float)
+            continue
+
+        mapped_sector = _DETAILED_TABLE_CORE_LABELS.get(normalized_label)
+        if mapped_sector:
+            for index, values in enumerate(side_values):
+                value = _last_float(values)
+                if value is not None:
+                    teams[index]["sector_values"][mapped_sector] = value
+            continue
+
+        if normalized_label in {"tactica", "tactics", "tactic"}:
+            for index, values in enumerate(side_values):
+                tactic, canonical = _parse_tactic_value(_clean_text_value(values))
+                teams[index]["tactic"] = tactic
+                teams[index]["canonical_tactic"] = canonical
+            continue
+
+        if normalized_label in {"nivel de tactica", "tactic level", "tactic skill"}:
+            for index, values in enumerate(side_values):
+                level = _last_float(values)
+                if level is not None:
+                    teams[index]["tactic"] = replace(teams[index]["tactic"], level=level)
+            continue
+
+        if normalized_label in {"estilo de juego", "style of play", "playing style"}:
+            set_for_both("playing_style", lambda values: _clean_text_value(values))
+
+    from engine.history.enums import HistoricalRatingSource
+    from engine.history.models import SectorRatings
+
+    team_posts = []
+    for team in teams:
+        sector_values = team["sector_values"]
+        ratings = SectorRatings(
+            source=HistoricalRatingSource.HATTRICK_OFFICIAL,
+            left_defense=sector_values.get("left_defense"),
+            central_defense=sector_values.get("central_defense"),
+            right_defense=sector_values.get("right_defense"),
+            midfield=sector_values.get("midfield"),
+            left_attack=sector_values.get("left_attack"),
+            central_attack=sector_values.get("central_attack"),
+            right_attack=sector_values.get("right_attack"),
+            indirect_defense=sector_values.get("indirect_defense"),
+            indirect_attack=sector_values.get("indirect_attack"),
+        )
+        team_posts.append(
+            OfficialTeamPost(
+                team_id=team["team_id"],
+                team_name=team["team_name"],
+                score=team["score"],
+                ratings=ratings,
+                tactic=team["tactic"],
+                canonical_tactic=team["canonical_tactic"],
+                tactic_level=team["tactic"].level,
+                playing_style=team["playing_style"],
+                experience_average=team["experience_average"],
+                midfield_average=team["midfield_average"],
+                defense_average=team["defense_average"],
+                attack_average=team["attack_average"],
+                overall_average=team["overall_average"],
+            )
+        )
+
+    imported_at = captured_at or datetime.now(timezone.utc).isoformat()
+    return OfficialMatchPost(
+        match_id=match_id,
+        our_team_post=team_posts[0],
+        opponent_team_post=team_posts[1],
+        source_format=POST_BILATERAL,
+        imported_at=imported_at,
+        provenance={
+            "raw_text": raw_text,
+            "language": language,
+            "detected_format": POST_BILATERAL,
+        },
+    )
+
+
+def _normalize_identity(value):
+    return _normalize(value or "")
+
+
+def _choose_our_side(match_post, *, our_team_id="", our_team_name=""):
+    sides = [match_post.our_team_post, match_post.opponent_team_post]
+    if our_team_id:
+        matches = [side for side in sides if side and side.team_id == str(our_team_id)]
+        if len(matches) == 1:
+            our = matches[0]
+            opponent = next((side for side in sides if side is not our), None)
+            return replace(match_post, our_team_post=our, opponent_team_post=opponent)
+        if len(matches) > 1:
+            raise OfficialRatingParsingError("bilateral_post_ambiguous_team_id")
+
+    if our_team_name:
+        normalized = _normalize_identity(our_team_name)
+        matches = [
+            side for side in sides
+            if side and _normalize_identity(side.team_name) == normalized
+        ]
+        if len(matches) == 1:
+            our = matches[0]
+            opponent = next((side for side in sides if side is not our), None)
+            return replace(match_post, our_team_post=our, opponent_team_post=opponent)
+        if len(matches) > 1:
+            raise OfficialRatingParsingError("bilateral_post_ambiguous_team_name")
+
+    raise OfficialRatingParsingError("bilateral_post_our_team_unresolved")
 
 
 def _extract_detailed_table(table_body):
@@ -620,10 +907,67 @@ def parse_official_pre_ratings(raw_text, *, captured_at=None, language=""):
     return snapshot
 
 
-def parse_official_post_ratings(raw_text, *, captured_at=None, language=""):
+def parse_official_match_post(
+    raw_text,
+    *,
+    captured_at=None,
+    language="",
+    our_team_id="",
+    our_team_name="Hit'em up",
+):
+    if detect_post_format(raw_text) == POST_BILATERAL:
+        parsed = _parse_bilateral_post_table(
+            raw_text,
+            captured_at=captured_at,
+            language=language,
+        )
+        return _choose_our_side(
+            parsed,
+            our_team_id=our_team_id,
+            our_team_name=our_team_name,
+        )
+
     snapshot = parse_official_ratings(
         raw_text,
         captured_at=captured_at,
         language=language,
     )
+    return OfficialMatchPost(
+        match_id=snapshot.hattrick_match_id,
+        our_team_post=OfficialTeamPost.from_snapshot(snapshot),
+        opponent_team_post=None,
+        source_format=POST_INDIVIDUAL,
+        imported_at=snapshot.captured_at,
+        provenance={
+            "raw_text": raw_text,
+            "language": language,
+            "detected_format": POST_INDIVIDUAL,
+        },
+    )
+
+
+def parse_official_post_ratings(
+    raw_text,
+    *,
+    captured_at=None,
+    language="",
+    our_team_id="",
+    our_team_name="Hit'em up",
+):
+    if detect_post_format(raw_text) == POST_INDIVIDUAL:
+        return parse_official_ratings(
+            raw_text,
+            captured_at=captured_at,
+            language=language,
+        )
+    match_post = parse_official_match_post(
+        raw_text,
+        captured_at=captured_at,
+        language=language,
+        our_team_id=our_team_id,
+        our_team_name=our_team_name,
+    )
+    snapshot = match_post.our_snapshot(language=language, raw_text=raw_text)
+    if snapshot is None:
+        raise OfficialRatingParsingError("post_missing_our_side")
     return snapshot

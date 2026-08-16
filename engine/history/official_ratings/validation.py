@@ -67,6 +67,21 @@ def validate_official_post_rating_snapshot(snapshot, *, minimum_sectors=4):
     return snapshot
 
 
+def validate_official_match_post(match_post, *, minimum_sectors=4):
+    if match_post is None or match_post.our_team_post is None:
+        raise OfficialRatingValidationError("official_match_post_missing_our_side")
+    validate_official_post_rating_snapshot(
+        match_post.our_team_post.to_snapshot(match_id=match_post.match_id),
+        minimum_sectors=minimum_sectors,
+    )
+    if match_post.opponent_team_post is not None:
+        validate_official_post_rating_snapshot(
+            match_post.opponent_team_post.to_snapshot(match_id=match_post.match_id),
+            minimum_sectors=minimum_sectors,
+        )
+    return match_post
+
+
 def validate_official_rating_snapshot(snapshot, *, minimum_sectors=4):
     if getattr(snapshot, "detected_format", "") == "DETAILED_POST":
         return validate_official_post_rating_snapshot(

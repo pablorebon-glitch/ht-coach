@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from dataclasses import replace
 
 from engine.history.official_ratings.parser import (
+    parse_official_match_post,
     parse_official_post_ratings,
     parse_official_pre_ratings,
 )
 from engine.history.official_ratings.validation import (
     OfficialRatingValidationError,
+    validate_official_match_post,
     validate_official_post_rating_snapshot,
     validate_official_pre_rating_snapshot,
 )
@@ -21,6 +23,7 @@ from engine.history.models import (
 )
 from engine.history.repository import HistoricalMatchRepository
 from ht_coach_app.core.paths import historical_match_snapshots_path
+from ht_coach_app.services.match_display_formatter import DEFAULT_OUR_TEAM_NAME
 
 PRE = "pre"
 POST = "post"
@@ -96,7 +99,10 @@ class OfficialRatingImportService:
             return ()
         return tuple(
             snapshot for snapshot in self._repository.list_all()
-            if snapshot.provenance.imported_match_id == hattrick_match_id
+            if (
+                snapshot.provenance.imported_match_id == hattrick_match_id
+                or snapshot.match_context.official_match_id == hattrick_match_id
+            )
         )
 
     def import_ratings(
@@ -123,14 +129,21 @@ class OfficialRatingImportService:
         if snapshot is None:
             raise OfficialRatingImportError(f"snapshot_not_found: {snapshot_id}")
 
-        parsed = self._parse_and_validate(raw_text, language, slot)
+        parsed, official_match_post = self._parse_for_slot(raw_text, language, slot)
 
         field_name = "official_pre" if slot == PRE else "official_post"
         existing = getattr(snapshot, field_name)
         if existing is not None and not confirm_replace:
-            raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
+            if slot != POST or not self._posts_match(existing, parsed):
+                raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
 
         updates = {field_name: parsed}
+        if slot == POST:
+            updates["official_match_post"] = self._merged_match_post(
+                snapshot,
+                official_match_post,
+                replace_existing=confirm_replace,
+            )
         if parsed.hattrick_match_id:
             updates["match_context"] = replace(
                 snapshot.match_context,
@@ -180,7 +193,7 @@ class OfficialRatingImportService:
         if slot not in (PRE, POST):
             raise OfficialRatingImportError(f"invalid_slot: {slot}")
 
-        parsed = self._parse_and_validate(raw_text, language, slot)
+        parsed, official_match_post = self._parse_for_slot(raw_text, language, slot)
 
         if not parsed.hattrick_match_id:
             raise OfficialRatingImportError("no_match_id_in_text")
@@ -216,9 +229,16 @@ class OfficialRatingImportService:
         field_name = "official_pre" if slot == PRE else "official_post"
         existing = getattr(snapshot, field_name)
         if existing is not None and not confirm_replace:
-            raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
+            if slot != POST or not self._posts_match(existing, parsed):
+                raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
 
         updates = {field_name: parsed}
+        if slot == POST:
+            updates["official_match_post"] = self._merged_match_post(
+                snapshot,
+                official_match_post,
+                replace_existing=confirm_replace,
+            )
         if parsed.hattrick_match_id:
             updates["match_context"] = replace(
                 snapshot.match_context,
@@ -249,7 +269,7 @@ class OfficialRatingImportService:
         snapshot = self._repository.get(pre_snapshot_id)
         if snapshot is None:
             raise OfficialRatingImportError(f"snapshot_not_found: {pre_snapshot_id}")
-        parsed = self._parse_and_validate(raw_text, language, POST)
+        parsed, official_match_post = self._parse_for_slot(raw_text, language, POST)
         normalized_match_id = str(match_id or "").strip()
         if not normalized_match_id:
             raise OfficialRatingImportError("no_match_id_in_text")
@@ -257,7 +277,8 @@ class OfficialRatingImportService:
         parsed = replace(parsed, hattrick_match_id=normalized_match_id)
         existing = snapshot.official_post
         if existing is not None and not confirm_replace:
-            raise OfficialRatingReplaceConfirmationRequired(POST, snapshot)
+            if not self._posts_match(existing, parsed):
+                raise OfficialRatingReplaceConfirmationRequired(POST, snapshot)
 
         provenance = SnapshotProvenance.from_dict(
             {
@@ -274,6 +295,11 @@ class OfficialRatingImportService:
             snapshot.with_updates(
                 official_pre=updated_pre,
                 official_post=parsed,
+                official_match_post=self._merged_match_post(
+                    snapshot,
+                    official_match_post,
+                    replace_existing=confirm_replace,
+                ),
                 match_context=replace(
                     snapshot.match_context,
                     official_match_id=normalized_match_id,
@@ -313,13 +339,74 @@ class OfficialRatingImportService:
 
     @staticmethod
     def _parse_and_validate(raw_text, language, slot=PRE):
+        parsed, _ = OfficialRatingImportService._parse_for_slot(raw_text, language, slot)
+        return parsed
+
+    @staticmethod
+    def _parse_for_slot(raw_text, language, slot=PRE):
         try:
             if slot == POST:
-                parsed = parse_official_post_ratings(raw_text, language=language)
+                official_match_post = parse_official_match_post(
+                    raw_text,
+                    language=language,
+                    our_team_name=DEFAULT_OUR_TEAM_NAME,
+                )
+                validate_official_match_post(official_match_post)
+                parsed = official_match_post.our_snapshot(
+                    language=language,
+                    raw_text=raw_text,
+                )
                 validate_official_post_rating_snapshot(parsed)
             else:
                 parsed = parse_official_pre_ratings(raw_text, language=language)
                 validate_official_pre_rating_snapshot(parsed)
+                official_match_post = None
         except (ValueError, OfficialRatingValidationError) as exc:
             raise OfficialRatingImportError(str(exc)) from exc
-        return parsed
+        return parsed, official_match_post
+
+    @staticmethod
+    def _posts_match(left, right):
+        if left is None or right is None:
+            return False
+        sectors = (
+            "left_defense",
+            "central_defense",
+            "right_defense",
+            "midfield",
+            "left_attack",
+            "central_attack",
+            "right_attack",
+            "indirect_defense",
+            "indirect_attack",
+        )
+        for sector in sectors:
+            left_value = getattr(left.ratings, sector, None)
+            right_value = getattr(right.ratings, sector, None)
+            if left_value is None and right_value is None:
+                continue
+            if left_value is None or right_value is None:
+                return False
+            if abs(float(left_value) - float(right_value)) > 0.001:
+                return False
+        return (
+            (left.canonical_tactic or "") == (right.canonical_tactic or "")
+            and (left.style or "") == (right.style or "")
+        )
+
+    @staticmethod
+    def _merged_match_post(snapshot, parsed_match_post, *, replace_existing=False):
+        if parsed_match_post is None:
+            return snapshot.official_match_post
+        existing = snapshot.official_match_post
+        if existing is None:
+            from engine.history.official_ratings.models import OfficialMatchPost
+
+            existing = OfficialMatchPost.from_legacy_snapshot(snapshot.official_post)
+        if existing is None or replace_existing:
+            return parsed_match_post
+        if parsed_match_post.opponent_team_post is not None:
+            return parsed_match_post
+        if existing.opponent_team_post is not None:
+            return existing
+        return parsed_match_post
