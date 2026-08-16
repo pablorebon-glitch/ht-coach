@@ -20,6 +20,39 @@ The roadmap protects the engine and moves product work into the application laye
 
 ## Alpha 0.2 Milestones
 
+### Alpha 0.6.10: Optimizer Calibration and Explainability
+
+Goal: make lineup recommendations rival-aware and explainable without replacing
+the validated rating, tactic, xG or probability calculations.
+
+Deliverables:
+
+- Serializable objective traces for evaluated XIs.
+- Head-to-head lineup comparator using canonical match evaluation.
+- Marginal sector, possession, offensive, defensive and training deltas.
+- La Rocha regression fixture and synthetic context tests.
+- Decision Lab data-model wiring for lineup decision traces.
+- Documentation for tactical vs training hierarchy and limitations.
+
+No player-specific exceptions, PRE/POST parser changes, calendar changes,
+portable-distribution changes or probability formula changes.
+
+### Alpha 0.6.9: Portable Windows Distribution
+
+Goal: make HT Coach usable from a copied folder or USB drive on Windows 10/11 without
+installing Python or modifying the registry.
+
+Deliverables:
+
+- `portable.flag` mode detection and centralized `ApplicationPaths`.
+- Portable data, logs, backups, resources and roster CSV copies beside the executable.
+- First-launch AppData import offer and manual Settings import with backup.
+- PyInstaller one-folder build script and documentation.
+- Canonical visible version `HT Coach Alpha 0.6.9 Portable`.
+
+No optimizer, rating, probability, parser, Formation Board, Weekly Planner formula,
+season-calendar, Match Intelligence or Club Advisor logic changes.
+
 ### Alpha 0.6.8: Future Weekly Training Planning
 
 Goal: let the manager plan near-future training cycles and analyze future matches

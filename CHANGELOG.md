@@ -4,6 +4,25 @@
 
 ### Added
 
+- Added Alpha 0.6.10 optimizer explainability foundations. Lineup evaluation now
+  emits a serializable objective trace with sector ratings, possession/chance
+  share, attacking and defensive matchup components, xG/o-xG, probabilities,
+  training and availability components. Added a deterministic head-to-head
+  lineup comparator, compact Pareto frontier support, La Rocha calibration
+  fixture tests and Decision Lab payload wiring for recommended/alternative XI
+  traces. The sprint keeps canonical TeamRater, tactic, xG and probability
+  formulas unchanged; training is visible separately and only breaks close
+  tactical ties in the comparator.
+
+- Added Alpha 0.6.9 portable Windows distribution foundations. The app now has
+  one canonical version source, detects `portable.flag`, routes portable user
+  data to `data/`, logs to `logs/`, backups to `backups/`, resolves bundled
+  resources independent of current working directory, copies roster CSV imports
+  into `data/rosters/` with relative paths, adds manual data import with backup,
+  and includes PyInstaller one-folder packaging scripts/docs. No optimizer,
+  rating, probability, PRE/POST parser, Formation Board, Weekly Planner formula,
+  season-calendar calculation, Match Intelligence or Club Advisor logic changed.
+
 - Added Alpha 0.6.8 future Weekly Training planning. The Squad Weekly Planner
   now shows the current cycle plus the next two cycles, with structured
   `cycle_id` item data, cycle-scoped coverage and no accidental mouse-wheel

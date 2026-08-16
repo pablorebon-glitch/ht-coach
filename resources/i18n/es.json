@@ -85,6 +85,16 @@
     "verbosity_simple": "Simple",
     "verbosity_detailed": "Detallado",
     "advisor_saved": "Preferencia del asesor guardada.",
+    "portable_data": {
+      "title": "Datos portables",
+      "explanation": "Importa datos de HT Coach desde otra instalacion. Los datos actuales se respaldan antes de reemplazarlos.",
+      "import_action": "Importar datos de otra instalacion",
+      "select_title": "Seleccionar carpeta de datos de HT Coach",
+      "confirm_title": "Importar datos",
+      "confirm_message": "Importar datos desde:\n{source}\n\nHacia:\n{destination}\n\nArchivos:\n{files}\n\nBackup:\n{backup}\n\nContinuar?",
+      "no_supported_files": "No se encontraron archivos de datos compatibles de HT Coach.",
+      "imported": "Se importaron {count} item(s). Backup: {backup}"
+    },
     "season_calendar": {
       "title": "Calendario de temporada HT",
       "explanation": "La semana competitiva de Hattrick va de lunes a domingo. Este calendario es independiente del ciclo de entrenamiento.",

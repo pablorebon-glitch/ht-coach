@@ -6,6 +6,8 @@ from uuid import uuid4
 from engine.squad_health.availability_service import CURRENT_AVAILABLE
 from ht_coach_app.change_analysis.service import ChangeAnalysisService
 from ht_coach_app.core.localization import t
+from ht_coach_app.core.paths import application_paths
+from ht_coach_app.core.portable import portable_roster_copy
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
@@ -284,14 +286,15 @@ class MatchController(QObject):
         path = self._view.choose_players_file()
 
         if path:
-            self._view.set_players_csv_path(path)
+            portable_path = portable_roster_copy(path)
+            self._view.set_players_csv_path(portable_path)
             self._save_current_settings()
             self._load_players()
 
     def _load_players(self):
         try:
             players = self._service.load_players(
-                self._view.players_csv_path(),
+                self._resolved_players_csv_path(),
                 availability_mode=self._availability_mode(),
             )
         except Exception as exc:
@@ -1078,7 +1081,7 @@ class MatchController(QObject):
             return
         try:
             self._service.validate_inputs(
-                self._view.players_csv_path(),
+                self._resolved_players_csv_path(),
                 self._view.selected_opponent_name(),
                 self._view.selected_formations()
             )
@@ -1129,7 +1132,7 @@ class MatchController(QObject):
         self._thread = QThread(self)
         self._worker = MatchAnalysisWorker(
             self._service,
-            self._view.players_csv_path(),
+            self._resolved_players_csv_path(),
             self._view.selected_opponent_name(),
             self._view.selected_formations(),
             availability_mode=self._availability_mode(),
@@ -1190,7 +1193,7 @@ class MatchController(QObject):
             return
         try:
             self._service.validate_inputs(
-                self._view.players_csv_path(),
+                self._resolved_players_csv_path(),
                 self._view.selected_opponent_name(),
                 list(workspace_state.workspace_boards.keys())
             )
@@ -1218,7 +1221,7 @@ class MatchController(QObject):
         self._thread = QThread(self)
         self._worker = MatchAnalysisWorker(
             self._service,
-            self._view.players_csv_path(),
+            self._resolved_players_csv_path(),
             self._view.selected_opponent_name(),
             list(workspace_state.workspace_boards.keys()),
             workspace_state=workspace_state,
@@ -1947,7 +1950,7 @@ class MatchController(QObject):
     def _load_current_roster_for_inspector(self, show_errors, update_count=True):
         try:
             players = self._service.load_players(
-                self._view.players_csv_path(),
+                self._resolved_players_csv_path(),
                 availability_mode=self._availability_mode(),
             )
         except Exception as exc:
@@ -1973,6 +1976,9 @@ class MatchController(QObject):
             return self._view.availability_mode()
 
         return CURRENT_AVAILABLE
+
+    def _resolved_players_csv_path(self):
+        return str(application_paths().resolve_user_path(self._view.players_csv_path()))
 
     def _current_match_date(self):
         if hasattr(self._view, "match_date") and self._view.match_date():

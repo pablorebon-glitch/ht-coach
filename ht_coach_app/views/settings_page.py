@@ -1,6 +1,7 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -20,6 +21,7 @@ class SettingsPage(BasePage):
     advisor_verbosity_changed = Signal(str)
     season_calendar_save_requested = Signal(object, str, int)
     season_calendar_recalculate_requested = Signal()
+    data_import_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(
@@ -77,6 +79,64 @@ class SettingsPage(BasePage):
         self.body_layout.addWidget(self.advisor_verbosity_help_label)
 
         self._build_season_calendar_section()
+        self._build_portable_data_section()
+
+    def _build_portable_data_section(self):
+        card = QFrame()
+        card.setObjectName("workspacePanel")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        title = QLabel(t("settings.portable_data.title"))
+        title.setObjectName("sectionTitle")
+        layout.addWidget(title)
+
+        explanation = QLabel(t("settings.portable_data.explanation"))
+        explanation.setWordWrap(True)
+        explanation.setObjectName("pageSubtitle")
+        layout.addWidget(explanation)
+
+        self.data_import_status_label = QLabel("")
+        self.data_import_status_label.setWordWrap(True)
+        layout.addWidget(self.data_import_status_label)
+
+        button_row = QHBoxLayout()
+        self.data_import_button = QPushButton(t("settings.portable_data.import_action"))
+        self.data_import_button.clicked.connect(self._select_data_import_directory)
+        button_row.addWidget(self.data_import_button)
+        button_row.addStretch(1)
+        layout.addLayout(button_row)
+
+        self.body_layout.addWidget(card)
+
+    def _select_data_import_directory(self):
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            t("settings.portable_data.select_title"),
+        )
+        if directory:
+            self.data_import_requested.emit(directory)
+
+    def confirm_data_import(self, source, destination, files, backup):
+        box = QMessageBox(self)
+        box.setWindowTitle(t("settings.portable_data.confirm_title"))
+        file_list = "\n".join(f"- {item}" for item in files)
+        box.setText(
+            t(
+                "settings.portable_data.confirm_message",
+                source=source,
+                destination=destination,
+                files=file_list,
+                backup=backup,
+            )
+        )
+        box.setStandardButtons(QMessageBox.Cancel | QMessageBox.Ok)
+        box.setDefaultButton(QMessageBox.Cancel)
+        return box.exec() == QMessageBox.Ok
+
+    def set_data_import_status(self, message):
+        self.data_import_status_label.setText(message or "")
 
     def _build_season_calendar_section(self):
         """Alpha 0.6.7 HF-02, Part 13: Configuración -> Calendario de

@@ -4,6 +4,7 @@ Part 11).
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 from datetime import datetime, timezone
 
@@ -28,6 +29,10 @@ class SeasonCalendarRepository:
                 updated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
             )
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as file:
+        temp_path = self.storage_path.with_name(f".{self.storage_path.name}.tmp")
+        with open(temp_path, "w", encoding="utf-8") as file:
             json.dump(config.to_dict(), file, indent=2)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_path, self.storage_path)
         return config

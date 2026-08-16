@@ -8,6 +8,7 @@ from engine.optimizers.lineup_optimizer import (
     LineupOptimizationResult,
     LineupOptimizer,
 )
+from engine.optimizers.lineup_objective import LineupObjectiveEvaluator
 from engine.optimizers.order_optimizer import OrderOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
 from models.lineup import Lineup
@@ -175,6 +176,12 @@ class TrainingConstrainedLineupOptimizer:
             baseline_win_probability=baseline_probabilities.win,
             best_normal_win_probability=best_normal_win_probability,
             best_order_win_probability=best_order_win_probability,
+            objective_trace=LineupObjectiveEvaluator.evaluate_lineup(
+                best_lineup,
+                opponent_ratings,
+                candidate_id="training-constrained",
+                config=config,
+            ),
         )
 
         return ConstrainedOptimizationResult(
@@ -405,6 +412,8 @@ class TrainingConstrainedFormationOptimizer:
                 baseline_win_probability=lineup_optimization.baseline_win_probability,
                 best_normal_win_probability=lineup_optimization.best_normal_win_probability,
                 best_order_win_probability=lineup_optimization.best_order_win_probability,
+                objective_trace=lineup_optimization.objective_trace,
+                objective_frontier=lineup_optimization.objective_frontier,
             )
 
             results.append(

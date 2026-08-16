@@ -20,6 +20,15 @@ optimization logic, tactic math, probability calculations, or formation scoring.
 The Tactical Advisor lives under `engine/advisor`, but it is an expert-system layer over
 already evaluated result data. It does not alter engine formulas or optimizer behavior.
 
+Alpha 0.6.10 adds `engine/optimizers/lineup_objective.py` as the explicit
+optimizer objective and explainability boundary. It reuses `TeamRater`,
+`TacticOptimizer`, `MatchEvaluator` and `ResultProbabilityEvaluator` instead of
+duplicating formulas, records objective traces for diagnostics and exposes a
+head-to-head comparator for rival-aware marginal lineup decisions. Training is
+kept as a separate component and can only break close tactical ties in that
+comparison layer. See `docs/OPTIMIZER_OBJECTIVE.md` and
+`docs/LINEUP_EXPLAINABILITY.md`.
+
 Alpha 0.6.7 HF-07 adds two stabilization boundaries. Match identity is structured
 canonical history data, never a persisted display label: the record owns opponent,
 date, competition, venue and official Match ID, and views render titles through the
@@ -118,6 +127,13 @@ current/+1/+2 cycle options, explicit `cycle_id` coverage queries, match-date tr
 context and weekly revision hashing. Squad renders the selectable cycles and Match
 stores only serializable context metadata on `MatchAnalysisResult`; views never call
 the optimizer or planner engine directly.
+
+Alpha 0.6.9 adds portable Windows distribution support as an application shell concern.
+`ht_coach_app.core.paths.ApplicationPaths` owns mode detection, writable directories and
+resource roots. Repositories keep their existing contracts but receive paths rooted in
+AppData for development/installed mode or beside the executable for portable mode.
+Portable CSV handling copies roster imports into `data/rosters/` and stores relative
+paths so the folder remains relocatable across USB drive-letter changes.
 
 ## Target Layers
 

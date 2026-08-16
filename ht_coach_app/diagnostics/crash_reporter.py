@@ -9,11 +9,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ht_coach_app.core.constants import APP_VERSION
+from ht_coach_app.core.json_io import write_text_atomic
+from ht_coach_app.core.paths import application_paths
 from ht_coach_app.diagnostics.app_context import current_context
 from ht_coach_app.diagnostics.event_buffer import recent_events
 
 
 def crash_log_directory():
+    paths = application_paths()
+    if paths.is_portable:
+        return paths.crash_log_dir
     return Path("logs") / "crashes"
 
 
@@ -50,7 +55,7 @@ def write_crash_report(exc_type, exc_value, exc_traceback, directory=None):
                 f"record={event.match_record_id} outcome={event.outcome} "
                 f"detail={event.detail}"
             )
-        log_path.write_text("\n".join(lines), encoding="utf-8")
+        write_text_atomic(log_path, "\n".join(lines))
     except Exception:
         print(f"HT Coach: failed to write crash log to {log_path}", file=sys.stderr)
         traceback.print_exception(exc_type, exc_value, exc_traceback)

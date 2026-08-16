@@ -1399,6 +1399,7 @@ class SquadPage(BasePage):
             )
             label = t(
                 label_key,
+                offset=getattr(option, "relative_offset", 0),
                 start=option.start_date.strftime("%d/%m/%Y"),
                 end=option.end_date.strftime("%d/%m/%Y"),
             )

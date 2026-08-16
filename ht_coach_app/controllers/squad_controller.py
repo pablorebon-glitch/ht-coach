@@ -2,6 +2,8 @@ from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
 from ht_coach_app.core.localization import t
+from ht_coach_app.core.paths import application_paths
+from ht_coach_app.core.portable import portable_roster_copy
 from ht_coach_app.services.squad_builder_service import (
     AVAILABILITY_CURRENT,
     AVAILABILITY_FULL_STRENGTH,
@@ -222,8 +224,9 @@ class SquadController:
         path = self._view.choose_players_file()
 
         if path:
-            self._view.set_csv_path(path)
-            self._save_roster_path(path)
+            portable_path = portable_roster_copy(path)
+            self._view.set_csv_path(portable_path)
+            self._save_roster_path(portable_path)
 
     def _load(self):
         self._view.show_loading()
@@ -234,15 +237,15 @@ class SquadController:
 
         try:
             self._roster = self._service.load_roster(
-                self._view.csv_path()
+                self._resolved_csv_path(self._view.csv_path())
             )
         except SquadValidationError as exc:
             self._view.show_error(str(exc))
             return
 
-        self._save_roster_path(
-            self._roster.source_path
-        )
+        saved_roster_path = portable_roster_copy(self._roster.source_path)
+        self._view.set_csv_path(saved_roster_path)
+        self._save_roster_path(saved_roster_path)
         self._view.set_specialties(
             self._roster.specialties
         )
@@ -259,7 +262,7 @@ class SquadController:
 
         if self._app_events is not None:
             self._app_events.roster_changed.emit(
-                self._roster.source_path,
+                self._view.csv_path(),
                 self._roster.player_count
             )
 
@@ -967,3 +970,7 @@ class SquadController:
         )
         if hasattr(self._view, "set_recent_csv_paths"):
             self._view.set_recent_csv_paths(recent)
+
+    @staticmethod
+    def _resolved_csv_path(path):
+        return str(application_paths().resolve_user_path(path))

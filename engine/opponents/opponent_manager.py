@@ -158,17 +158,12 @@ class OpponentManager:
             for opponent in self.list_sorted(opponents)
         ]
 
-        with open(
-            self.storage_path,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            json.dump(
-                data,
-                file,
-                indent=2
-            )
+        temp_path = f"{self.storage_path}.tmp"
+        with open(temp_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=2)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_path, self.storage_path)
 
     @staticmethod
     def list_sorted(

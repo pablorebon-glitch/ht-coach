@@ -1,6 +1,7 @@
 import json
 import logging
-from pathlib import Path
+
+from ht_coach_app.core.paths import resources_dir
 
 
 LOGGER = logging.getLogger(__name__)
@@ -24,9 +25,7 @@ class LocalizationService:
     }
 
     def __init__(self, language="en", resources_path=None):
-        self.resources_path = resources_path or (
-            Path(__file__).resolve().parents[2] / "resources" / "i18n"
-        )
+        self.resources_path = resources_path or (resources_dir() / "i18n")
         self._catalogs = {}
         self._language = "en"
         self.set_language(language)

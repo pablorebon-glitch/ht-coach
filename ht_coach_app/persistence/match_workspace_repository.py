@@ -1,6 +1,7 @@
 import json
 from dataclasses import asdict, dataclass, field, replace
 
+from ht_coach_app.core.json_io import write_json_atomic
 from ht_coach_app.core.paths import user_data_dir
 from ht_coach_app.services.match_workspace_service import (
     match_analysis_result_from_dict,
@@ -111,16 +112,10 @@ class MatchWorkspaceRepository:
             exist_ok=True
         )
 
-        with open(
+        write_json_atomic(
             self.storage_path,
-            "w",
-            encoding="utf-8"
-        ) as file:
-            json.dump(
-                asdict(settings),
-                file,
-                indent=2
-            )
+            asdict(settings),
+        )
 
         return settings
 
@@ -168,16 +163,10 @@ class MatchWorkspaceRepository:
             exist_ok=True
         )
 
-        with open(
+        write_json_atomic(
             self.result_storage_path,
-            "w",
-            encoding="utf-8"
-        ) as file:
-            json.dump(
-                match_analysis_result_to_dict(result),
-                file,
-                indent=2
-            )
+            match_analysis_result_to_dict(result),
+        )
 
     def clear_last_result(self):
         """Alpha 0.6.7 HF-02, Part 1: the cached "last analyzed

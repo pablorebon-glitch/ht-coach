@@ -159,6 +159,7 @@ class FormationAnalysisResult:
     sector_rating_comparisons: list[SectorRatingComparisonResult] = field(
         default_factory=list
     )
+    objective_trace: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -187,6 +188,7 @@ class MatchAnalysisResult:
     training_context_timestamp: str = ""
     training_context_summary: str = ""
     training_context_stale: bool = False
+    lineup_decision: dict | None = None
 
     @property
     def recommended_formation(self):
@@ -744,6 +746,9 @@ class MatchWorkspaceService:
                         team_ratings,
                         mapped_opponent_ratings,
                     ),
+                    objective_trace=self._objective_trace_to_dict(
+                        getattr(result, "objective_trace", None)
+                    ),
                 )
             )
 
@@ -768,6 +773,16 @@ class MatchWorkspaceService:
             ),
             player_name=lineup_player.player.name
         )
+
+    @staticmethod
+    def _objective_trace_to_dict(trace):
+        if trace is None:
+            return {}
+        if hasattr(trace, "to_dict"):
+            return trace.to_dict()
+        if isinstance(trace, dict):
+            return dict(trace)
+        return {}
 
     def apply_official_pre_override(self, result, official_pre_ratings):
         """HF-02.2 source-selection policy, applied as a pure
@@ -1027,6 +1042,7 @@ def match_analysis_result_from_dict(data):
                     for comparison in item.get("sector_rating_comparisons", [])
                     if isinstance(comparison, dict)
                 ],
+                objective_trace=dict(item.get("objective_trace", {})),
                 lineup=[
                     LineupPlayerResult(
                         number=int(player.get("number", index + 1)),
@@ -1065,6 +1081,7 @@ def match_analysis_result_from_dict(data):
         ],
         analysis_owner_type=data.get("analysis_owner_type", ""),
         analysis_owner_id=data.get("analysis_owner_id", ""),
+        lineup_decision=data.get("lineup_decision"),
     )
 
     decision_lab = result.decision_lab
@@ -1332,6 +1349,7 @@ def _decision_lab_from_dict(data):
             order_gain=float(data.get("order_gain", 0.0)),
             tactic_gain=float(data.get("tactic_gain", 0.0)),
             total_gain=float(data.get("total_gain", 0.0)),
+            lineup_decision=data.get("lineup_decision"),
             schema_version=int(data.get("schema_version", 1))
         )
     except (TypeError, ValueError, AttributeError):

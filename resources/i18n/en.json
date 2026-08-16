@@ -85,6 +85,16 @@
     "verbosity_simple": "Simple",
     "verbosity_detailed": "Detailed",
     "advisor_saved": "Advisor preference saved.",
+    "portable_data": {
+      "title": "Portable data",
+      "explanation": "Import HT Coach data from another installation. Current data is backed up before replacement.",
+      "import_action": "Import Data From Another Installation",
+      "select_title": "Select HT Coach Data Folder",
+      "confirm_title": "Import Data",
+      "confirm_message": "Import data from:\n{source}\n\nInto:\n{destination}\n\nFiles:\n{files}\n\nBackup:\n{backup}\n\nContinue?",
+      "no_supported_files": "No supported HT Coach data files were found.",
+      "imported": "Imported {count} item(s). Backup: {backup}"
+    },
     "season_calendar": {
       "title": "HT Season Calendar",
       "explanation": "Hattrick's competitive week runs Monday to Sunday. This calendar is independent of the training cycle.",

@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -92,8 +93,12 @@ class WeeklyTrainingRepository:
 
     def save(self, state):
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as file:
-            json.dump(_state_to_dict(state), file, indent=2, ensure_ascii=False)
+        _write_json_atomic(
+            self.storage_path,
+            _state_to_dict(state),
+            indent=2,
+            ensure_ascii=False,
+        )
         return state
 
     def save_priority(self, state, record):
@@ -198,6 +203,15 @@ def _state_to_dict(state):
         "match_records": [_match_to_dict(record) for record in state.match_records],
         "archived_weeks": [_week_to_dict(week) for week in state.archived_weeks],
     }
+
+
+def _write_json_atomic(path, data, **dump_kwargs):
+    temp_path = path.with_name(f".{path.name}.tmp")
+    with open(temp_path, "w", encoding="utf-8") as file:
+        json.dump(data, file, **dump_kwargs)
+        file.flush()
+        os.fsync(file.fileno())
+    os.replace(temp_path, path)
 
 
 def _week_to_dict(week):

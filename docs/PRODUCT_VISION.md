@@ -34,6 +34,10 @@ optimized recommendation as the baseline.
 - A manager should be able to prepare a match in under five minutes.
 - Prefer conclusions over raw numbers where appropriate.
 - Preserve access to detailed numbers for advanced users.
+- A lineup recommendation should explain the marginal trade-off against the
+  actual rival, not just show isolated player or sector scores.
+- A manager should be able to carry the desktop workspace between Windows PCs without
+  losing local data when using the portable distribution.
 
 ## Alpha 0.4 Sequence
 

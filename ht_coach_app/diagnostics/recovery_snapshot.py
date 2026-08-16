@@ -6,8 +6,14 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ht_coach_app.core.json_io import write_json_atomic
+from ht_coach_app.core.paths import application_paths
+
 
 def recovery_snapshot_directory():
+    paths = application_paths()
+    if paths.is_portable:
+        return paths.recovery_log_dir
     return Path("logs") / "recovery"
 
 
@@ -35,7 +41,7 @@ class RecoverySnapshotStore:
             "lineup_summary": lineup_summary or [],
         }
         path = self._path_for(match_record_id)
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        write_json_atomic(path, payload)
         return path
 
     def load(self, match_record_id):

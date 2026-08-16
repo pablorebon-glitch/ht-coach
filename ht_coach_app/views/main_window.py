@@ -29,6 +29,7 @@ from ht_coach_app.core.localization import (
     t,
 )
 from ht_coach_app.core.paths import application_icon_path, historical_match_snapshots_path, user_data_dir
+from ht_coach_app.core.portable import build_import_plan, import_data_directory
 from ht_coach_app.persistence.app_settings_repository import (
     AppSettings,
     AppSettingsRepository,
@@ -296,8 +297,36 @@ class MainWindow(QMainWindow):
                 self._change_advisor_verbosity
             )
             self._wire_season_calendar_settings(widget)
+            widget.data_import_requested.connect(
+                lambda directory, settings_widget=widget: self._import_data_directory(
+                    settings_widget,
+                    directory,
+                )
+            )
 
         return widget
+
+    def _import_data_directory(self, widget, directory):
+        plan = build_import_plan(directory)
+        if not plan.has_files:
+            widget.set_data_import_status(t("settings.portable_data.no_supported_files"))
+            return
+        backup_text = str(plan.destination_dir.parent / "backups")
+        if not widget.confirm_data_import(
+            str(plan.source_dir),
+            str(plan.destination_dir),
+            [item.name for item in plan.files],
+            backup_text,
+        ):
+            return
+        completed = import_data_directory(directory)
+        widget.set_data_import_status(
+            t(
+                "settings.portable_data.imported",
+                count=len(completed.files),
+                backup=str(completed.backup_dir or backup_text),
+            )
+        )
 
     def _wire_season_calendar_settings(self, widget):
         from engine.calendar.season_calendar import SeasonCalendarConfig

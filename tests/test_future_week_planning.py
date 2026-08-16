@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import date
 from decimal import Decimal
 
@@ -25,6 +26,7 @@ from engine.weekly_training.training_rules import (
     assumed_confidence,
 )
 from engine.weekly_training.training_week import active_training_week
+from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.services.match_workspace_service import (
     MatchAnalysisResult,
     match_analysis_result_from_dict,
@@ -236,3 +238,43 @@ def test_week_selector_view_uses_cycle_item_data(tmp_path):
 
     assert page.selected_weekly_cycle_id() == "2026-08-09:PLAYMAKING"
     assert page.weekly_cycle_combo_v2.currentData()["relative_offset"] == 1
+
+
+def test_week_selector_labels_render_offsets_without_warnings(tmp_path, caplog):
+    QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
+    from ht_coach_app.views.squad_page import SquadPage
+
+    QApplication.instance() or QApplication([])
+    service = make_service(tmp_path)
+    options = service.visible_cycle_options()
+
+    expectations = {
+        "en": [
+            "Current - 02/08/2026 to 08/08/2026",
+            "+1 - 09/08/2026 to 15/08/2026",
+            "+2 - 16/08/2026 to 22/08/2026",
+        ],
+        "es": [
+            "Actual - 02/08/2026 a 08/08/2026",
+            "+1 - 09/08/2026 a 15/08/2026",
+            "+2 - 16/08/2026 a 22/08/2026",
+        ],
+    }
+
+    for language, expected_labels in expectations.items():
+        configure_localization(language)
+        page = SquadPage()
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="ht_coach_app.core.localization"):
+            page.set_weekly_cycle_options(options)
+
+        rendered = [
+            page.weekly_cycle_combo_v2.itemText(index)
+            for index in range(page.weekly_cycle_combo_v2.count())
+        ]
+        messages = [record.getMessage() for record in caplog.records]
+
+        assert rendered == expected_labels
+        assert "Missing localization parameter: offset" not in "\n".join(messages)
+
+    configure_localization("en")
