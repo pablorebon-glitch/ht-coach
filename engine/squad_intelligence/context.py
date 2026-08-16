@@ -11,13 +11,20 @@ class PositionEvidence:
     player-ranking infrastructure (PlayerAnalyzer / SquadService) --
     never a second, parallel Match rating engine. `rank_in_best_position`
     is 1-based among `candidates_in_best_position` current roster
-    players evaluated for that same position."""
+    players evaluated for that same position. `formation_slots` is the
+    maximum number of that position used by any canonical Hattrick
+    formation (e.g. 3 for CENTRAL_DEFENDER) -- when known, current
+    performance uses it so "rank 2 of 5" for a position that regularly
+    fields 3 starters is read as a genuine rotation starter, not
+    conflated with "rank 2 of 2" for a position (like GOALKEEPER) that
+    only ever fields one."""
 
     best_position: str = ""
     best_position_score: float | None = None
     rank_in_best_position: int | None = None
     candidates_in_best_position: int = 0
     alternative_positions: tuple[str, ...] = ()
+    formation_slots: int = 0
 
     @property
     def is_available(self) -> bool:
@@ -60,13 +67,28 @@ class PlayerIntelligenceContext:
 @dataclass(frozen=True)
 class SquadIntelligenceContext:
     """Squad-relative facts shared across every player's report in a
-    batch analysis -- built once, not recomputed per player."""
+    batch analysis -- built once, not recomputed per player.
+
+    `positional_depth` always reflects the *structural* club (the
+    complete roster -- a player out injured for four weeks still
+    counts as a real, owned player). `temporary_positional_depth`
+    reflects only players available *this week*; the difference
+    between the two is what lets Club Advisor say "structural depth:
+    adequate, temporary availability: reduced" instead of conflating a
+    short-term absence with a genuine structural gap (Alpha 0.6.3)."""
 
     roster_size: int = 0
     positional_depth: dict = field(default_factory=dict)
+    temporary_positional_depth: dict = field(default_factory=dict)
     active_training_type: str = ""
     salary_values: tuple[int, ...] = ()
     age_values: tuple[int, ...] = ()
+    ages_by_position: dict = field(default_factory=dict)
 
     def depth_at(self, position: str) -> int:
         return self.positional_depth.get(position, 0)
+
+    def temporary_depth_at(self, position: str) -> int:
+        return self.temporary_positional_depth.get(
+            position, self.positional_depth.get(position, 0)
+        )

@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from types import SimpleNamespace
 from pathlib import Path
@@ -84,6 +84,8 @@ class MatchWorkspaceValidationError(ValueError):
 
 MATCH_TYPE_LEAGUE = "LEAGUE"
 MATCH_TYPE_CUP = "CUP"
+ANALYSIS_OWNER_NEW_MATCH_DRAFT = "NEW_MATCH_DRAFT"
+ANALYSIS_OWNER_SAVED_MATCH = "SAVED_MATCH"
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,7 @@ class FormationAnalysisResult:
     sector_rating_comparisons: list[SectorRatingComparisonResult] = field(
         default_factory=list
     )
+    objective_trace: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -178,6 +181,14 @@ class MatchAnalysisResult:
     unavailable_players_count: int = 0
     match_type: str = MATCH_TYPE_LEAGUE
     training_conflict_warning: str = ""
+    analysis_owner_type: str = ""
+    analysis_owner_id: str = ""
+    training_cycle_id: str = ""
+    weekly_cycle_revision_used: str = ""
+    training_context_timestamp: str = ""
+    training_context_summary: str = ""
+    training_context_stale: bool = False
+    lineup_decision: dict | None = None
 
     @property
     def recommended_formation(self):
@@ -238,6 +249,7 @@ class MatchWorkspaceService:
         required_player_ids=None,
         training_rules=None,
     ):
+        match_type = self._normalize_match_type(match_type)
         self.validate_inputs(
             players_csv_path,
             opponent_name,
@@ -326,6 +338,11 @@ class MatchWorkspaceService:
             unavailable_players_count=self._unavailable_count(all_players),
             match_type=match_type,
             training_conflict_warning=training_conflict_warning,
+            training_cycle_id="",
+            weekly_cycle_revision_used="",
+            training_context_timestamp="",
+            training_context_summary="",
+            training_context_stale=False,
         )
 
         return self._with_decision_lab(
@@ -348,10 +365,12 @@ class MatchWorkspaceService:
         opponent_name,
         workspace_state,
         availability_mode=CURRENT_AVAILABLE,
+        match_type=MATCH_TYPE_LEAGUE,
     ):
         formation_names = list(
             workspace_state.workspace_boards.keys()
         )
+        match_type = self._normalize_match_type(match_type)
         self.validate_inputs(
             players_csv_path,
             opponent_name,
@@ -435,6 +454,7 @@ class MatchWorkspaceService:
             availability_mode=mode,
             availability_warning=self._availability_warning(mode),
             unavailable_players_count=self._unavailable_count(all_players),
+            match_type=match_type,
         )
 
         return self._with_decision_lab(
@@ -479,6 +499,13 @@ class MatchWorkspaceService:
             raise MatchWorkspaceValidationError(
                 "Unsupported formation selected."
             )
+
+    @staticmethod
+    def _normalize_match_type(match_type):
+        value = getattr(match_type, "value", match_type)
+        if value in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP}:
+            return value
+        raise MatchWorkspaceValidationError("Select a valid match type.")
 
     def validate_players_csv_path(self, players_csv_path):
         normalized_path = str(players_csv_path).strip()
@@ -719,6 +746,9 @@ class MatchWorkspaceService:
                         team_ratings,
                         mapped_opponent_ratings,
                     ),
+                    objective_trace=self._objective_trace_to_dict(
+                        getattr(result, "objective_trace", None)
+                    ),
                 )
             )
 
@@ -742,6 +772,79 @@ class MatchWorkspaceService:
                 else ""
             ),
             player_name=lineup_player.player.name
+        )
+
+    @staticmethod
+    def _objective_trace_to_dict(trace):
+        if trace is None:
+            return {}
+        if hasattr(trace, "to_dict"):
+            return trace.to_dict()
+        if isinstance(trace, dict):
+            return dict(trace)
+        return {}
+
+    def apply_official_pre_override(self, result, official_pre_ratings):
+        """HF-02.2 source-selection policy, applied as a pure
+        post-processing step over an already-computed `MatchAnalysisResult`
+        -- never touches the optimizer, the rating formulas, or how the
+        other candidate formations were computed. Only the *recommended*
+        formation's "our" ratings are substituted (Official PRE was
+        captured for whatever lineup was actually submitted, not for
+        every candidate formation the optimizer explored), and only its
+        `sector_rating_comparisons` and the top-level `match_intelligence`
+        result are recomputed from that substitution.
+
+        Returns `result` unchanged if there's no recommended formation or
+        no usable Official PRE ratings.
+        """
+        from engine.ratings.rating_source_policy import select_our_ratings
+
+        recommended = result.recommended_formation
+        if recommended is None:
+            return result
+
+        selection = select_our_ratings(
+            recommended.team_ratings, official_pre_ratings
+        )
+        if not selection.is_official:
+            return result
+
+        official_team_ratings = self._map_team_ratings(selection.ratings)
+        sector_rating_comparisons = [
+            _sector_rating_comparison_from_domain(comparison)
+            for comparison in build_sector_comparisons(
+                official_team_ratings,
+                recommended.opponent_ratings,
+                our_scale=selection.scale,
+            )
+        ]
+
+        updated_formations = [
+            (
+                self._with_official_ratings(
+                    formation, official_team_ratings, sector_rating_comparisons
+                )
+                if formation is recommended
+                else formation
+            )
+            for formation in result.formations
+        ]
+        updated_result = replace(result, formations=updated_formations)
+
+        try:
+            match_intelligence = MatchIntelligenceEngine().analyze(updated_result)
+        except Exception:
+            match_intelligence = result.match_intelligence
+
+        return replace(updated_result, match_intelligence=match_intelligence)
+
+    @staticmethod
+    def _with_official_ratings(formation, official_team_ratings, sector_rating_comparisons):
+        return replace(
+            formation,
+            team_ratings=official_team_ratings,
+            sector_rating_comparisons=sector_rating_comparisons,
         )
 
     def _with_decision_lab(self, result):
@@ -768,6 +871,15 @@ class MatchWorkspaceService:
             availability_mode=result.availability_mode,
             availability_warning=result.availability_warning,
             unavailable_players_count=result.unavailable_players_count,
+            match_type=result.match_type,
+            training_conflict_warning=result.training_conflict_warning,
+            analysis_owner_type=result.analysis_owner_type,
+            analysis_owner_id=result.analysis_owner_id,
+            training_cycle_id=result.training_cycle_id,
+            weekly_cycle_revision_used=result.weekly_cycle_revision_used,
+            training_context_timestamp=result.training_context_timestamp,
+            training_context_summary=result.training_context_summary,
+            training_context_stale=result.training_context_stale,
         )
         return with_tactical_advisor(enriched)
 
@@ -776,28 +888,21 @@ class MatchWorkspaceService:
         if ratings is None:
             return TeamRatingsResult()
 
+        def _required(sector):
+            # HF-02.2: a sector attribute may exist but hold None (e.g. a
+            # partial Official PRE capture) -- "or 0.0" catches that,
+            # unlike a getattr default (which only applies when the
+            # attribute is missing entirely). Never fail on optional data.
+            return float(getattr(ratings, sector, 0.0) or 0.0)
+
         return TeamRatingsResult(
-            left_defense=float(
-                getattr(ratings, "left_defense", 0.0)
-            ),
-            central_defense=float(
-                getattr(ratings, "central_defense", 0.0)
-            ),
-            right_defense=float(
-                getattr(ratings, "right_defense", 0.0)
-            ),
-            midfield=float(
-                getattr(ratings, "midfield", 0.0)
-            ),
-            left_attack=float(
-                getattr(ratings, "left_attack", 0.0)
-            ),
-            central_attack=float(
-                getattr(ratings, "central_attack", 0.0)
-            ),
-            right_attack=float(
-                getattr(ratings, "right_attack", 0.0)
-            ),
+            left_defense=_required("left_defense"),
+            central_defense=_required("central_defense"),
+            right_defense=_required("right_defense"),
+            midfield=_required("midfield"),
+            left_attack=_required("left_attack"),
+            central_attack=_required("central_attack"),
+            right_attack=_required("right_attack"),
             indirect_defense=_optional_float(
                 getattr(ratings, "indirect_defense", None)
             ),
@@ -880,6 +985,13 @@ def match_analysis_result_from_dict(data):
         availability_mode=data.get("availability_mode", CURRENT_AVAILABLE),
         availability_warning=data.get("availability_warning", ""),
         unavailable_players_count=int(data.get("unavailable_players_count", 0)),
+        match_type=data.get("match_type", MATCH_TYPE_LEAGUE),
+        training_conflict_warning=data.get("training_conflict_warning", ""),
+        training_cycle_id=data.get("training_cycle_id", ""),
+        weekly_cycle_revision_used=data.get("weekly_cycle_revision_used", ""),
+        training_context_timestamp=data.get("training_context_timestamp", ""),
+        training_context_summary=data.get("training_context_summary", ""),
+        training_context_stale=bool(data.get("training_context_stale", False)),
         formations=[
             FormationAnalysisResult(
                 formation_name=item.get("formation_name", ""),
@@ -930,6 +1042,7 @@ def match_analysis_result_from_dict(data):
                     for comparison in item.get("sector_rating_comparisons", [])
                     if isinstance(comparison, dict)
                 ],
+                objective_trace=dict(item.get("objective_trace", {})),
                 lineup=[
                     LineupPlayerResult(
                         number=int(player.get("number", index + 1)),
@@ -966,6 +1079,9 @@ def match_analysis_result_from_dict(data):
             )
             if recommendation is not None
         ],
+        analysis_owner_type=data.get("analysis_owner_type", ""),
+        analysis_owner_id=data.get("analysis_owner_id", ""),
+        lineup_decision=data.get("lineup_decision"),
     )
 
     decision_lab = result.decision_lab
@@ -1001,6 +1117,15 @@ def match_analysis_result_from_dict(data):
             availability_mode=result.availability_mode,
             availability_warning=result.availability_warning,
             unavailable_players_count=result.unavailable_players_count,
+            match_type=result.match_type,
+            training_conflict_warning=result.training_conflict_warning,
+            analysis_owner_type=result.analysis_owner_type,
+            analysis_owner_id=result.analysis_owner_id,
+            training_cycle_id=result.training_cycle_id,
+            weekly_cycle_revision_used=result.weekly_cycle_revision_used,
+            training_context_timestamp=result.training_context_timestamp,
+            training_context_summary=result.training_context_summary,
+            training_context_stale=result.training_context_stale,
         )
 
     return result
@@ -1026,6 +1151,15 @@ def with_tactical_advisor(result):
         availability_mode=result.availability_mode,
         availability_warning=result.availability_warning,
         unavailable_players_count=result.unavailable_players_count,
+        match_type=result.match_type,
+        training_conflict_warning=result.training_conflict_warning,
+        analysis_owner_type=result.analysis_owner_type,
+        analysis_owner_id=result.analysis_owner_id,
+        training_cycle_id=result.training_cycle_id,
+        weekly_cycle_revision_used=result.weekly_cycle_revision_used,
+        training_context_timestamp=result.training_context_timestamp,
+        training_context_summary=result.training_context_summary,
+        training_context_stale=result.training_context_stale,
     )
 
 
@@ -1215,6 +1349,7 @@ def _decision_lab_from_dict(data):
             order_gain=float(data.get("order_gain", 0.0)),
             tactic_gain=float(data.get("tactic_gain", 0.0)),
             total_gain=float(data.get("total_gain", 0.0)),
+            lineup_decision=data.get("lineup_decision"),
             schema_version=int(data.get("schema_version", 1))
         )
     except (TypeError, ValueError, AttributeError):

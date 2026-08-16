@@ -366,7 +366,10 @@ def test_validate_rejects_incomplete_sector_coverage():
         validate_official_rating_snapshot(snapshot)
 
 
-def test_validate_rejects_missing_formation():
+def test_validate_accepts_detailed_post_missing_formation():
+    """Alpha 0.6.3: DETAILED_POST may legitimately omit formation --
+    this must no longer fail validation (it did before POST support
+    was added, when every input was assumed to be COMPACT_PRE-shaped)."""
     text = "\n".join(
         f"{label}: 6.0" for label in (
             "Central defense", "Left defense", "Right defense",
@@ -374,6 +377,21 @@ def test_validate_rejects_missing_formation():
         )
     )
     snapshot = parse_official_ratings(text)
+    assert snapshot.detected_format == "DETAILED_POST"
+    validate_official_rating_snapshot(snapshot)  # must not raise
+
+
+def test_validate_rejects_compact_pre_missing_formation():
+    """COMPACT_PRE (a [table] block present) still requires a
+    formation token -- it's always present in the confirmed real PRE
+    sample, so its absence signals a genuinely malformed paste."""
+    text = (
+        "[table][tr][th]Defense[/th][td]4.0[/td][td]6.0[/td][td]4.0[/td][/tr]"
+        "[tr][th]Midfield[/th][td colspan=3]6.0[/td][/tr]"
+        "[tr][th]Attack[/th][td]5.0[/td][td]6.0[/td][td]5.5[/td][/tr][/table]"
+    )
+    snapshot = parse_official_ratings(text)
+    assert snapshot.detected_format == "COMPACT_PRE"
     with pytest.raises(OfficialRatingValidationError):
         validate_official_rating_snapshot(snapshot)
 

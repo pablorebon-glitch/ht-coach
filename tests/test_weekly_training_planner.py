@@ -81,6 +81,22 @@ def player(
     )
 
 
+def _dates_within_current_week():
+    """Alpha 0.6.7 HF-02, Part 3: several fixtures below need a
+    match date that is genuinely "this week" and a `today` that is
+    genuinely "the day after" -- computed relative to the *real*
+    active week (whatever it happens to be when the suite actually
+    runs), rather than a hardcoded date that drifts into the past as
+    real time moves forward. Returns (match_date, today) both safely
+    inside the currently active training week."""
+    from datetime import timedelta
+
+    week = active_training_week()
+    match_date = week.start_date + timedelta(days=2)
+    today = match_date + timedelta(days=1)
+    return match_date, today
+
+
 def roster():
     return [
         player("Keeper", goalkeeper=12),
@@ -181,8 +197,43 @@ def test_weekly_training_engine_layer_does_not_import_desktop_app():
 
 
 def test_training_week_handles_year_boundary_and_timezone_aware_datetime():
-    week = active_training_week(datetime(2026, 1, 1, 3, 0))
+    from zoneinfo import ZoneInfo
+
+    # HF: after the HT-week-precise Thursday-21:00 cutoff fix, a bare
+    # "3am" naive datetime is ambiguous about which side of the cutoff
+    # it lands on once converted to Buenos Aires time. Use an explicit
+    # tz-aware moment well after the cutoff so this test keeps
+    # validating its original intent (year-boundary date arithmetic +
+    # timezone-aware input) rather than the since-fixed hour-precision
+    # behavior (covered by test_ht_calendar.py and
+    # test_training_week_respects_hour_precise_training_cutoff below).
+    week = active_training_week(datetime(2026, 1, 1, 22, 0, tzinfo=ZoneInfo("America/Buenos_Aires")))
     assert week.start_date == date(2026, 1, 4)
+
+
+def test_training_week_respects_hour_precise_training_cutoff():
+    """HF: the previous version of this function only ever compared
+    bare `date` objects, so any moment on Thursday counted as
+    "training already processed" -- even 00:01. It must now respect
+    the exact processing hour (21:00 by default) when a full,
+    timezone-aware `datetime` is supplied."""
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("America/Buenos_Aires")
+    before_cutoff = active_training_week(datetime(2026, 7, 23, 20, 59, tzinfo=tz))
+    at_cutoff = active_training_week(datetime(2026, 7, 23, 21, 0, tzinfo=tz))
+
+    assert before_cutoff.start_date == date(2026, 7, 19)  # still last week's cycle
+    assert at_cutoff.start_date == date(2026, 7, 26)  # rolled over
+
+
+def test_bare_date_on_training_day_still_rolls_over_for_backward_compatibility():
+    """A caller that only cares about the date (no time-of-day
+    information at all) keeps the original, coarser date-only
+    comparison -- this is the same behavior `date(2026, 7, 23)` already
+    had before the hour-precision fix, preserved deliberately."""
+    week = active_training_week(date(2026, 7, 23))
+    assert week.start_date == date(2026, 7, 26)
 
 
 def test_rollover_archives_week_and_preserves_training_type():
@@ -256,6 +307,7 @@ def test_first_match_past_played_counts_as_already_trained(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
@@ -264,12 +316,12 @@ def test_first_match_past_played_counts_as_already_trained(tmp_path):
     service.record_first_match(
         board,
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(service.first_match_record()),
     )
 
@@ -281,6 +333,7 @@ def test_first_match_past_planned_counts_only_as_planned(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
@@ -288,12 +341,12 @@ def test_first_match_past_planned_counts_only_as_planned(tmp_path):
     service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLANNED,
-        today=date(2026, 7, 22),
+        today=today,
     )
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(service.first_match_record()),
     )
 
@@ -327,6 +380,7 @@ def test_first_match_today_played_with_confirmation_counts_as_played(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, _ = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
@@ -334,15 +388,15 @@ def test_first_match_today_played_with_confirmation_counts_as_played(tmp_path):
     saved = service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 22),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
         played_confirmed=True,
-        today=date(2026, 7, 22),
+        today=match_date,
     )
 
     assert saved.match_records[0].planned_or_played == MatchStatus.PLAYED
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(service.first_match_record()),
     )
     assert row.assumed_exposure > 0
@@ -354,18 +408,19 @@ def test_first_match_future_played_becomes_planned_and_never_already_trained(tmp
     )
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    week = service.load_state().active_week
     plan = service.generate_plan(players, "3-5-2")
 
     saved = service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 23),
+        match_date=week.second_match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=week.first_match_date,
     )
     record = saved.match_records[0]
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(record),
     )
 
@@ -390,29 +445,33 @@ def test_future_played_strict_validation_returns_clear_error(tmp_path):
 
 
 def test_edit_past_played_record_to_future_invalidates_played_status(tmp_path):
+    from datetime import timedelta
+
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
+    future_date = today + timedelta(days=1)
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
     service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     saved = service.update_first_match_metadata(
-        match_date=date(2026, 7, 23),
+        match_date=future_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     assert saved.match_records[0].planned_or_played == MatchStatus.PLANNED
     row = coverage_row_for_player(
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         trainable_lineup_player_id(saved.match_records[0]),
     )
     assert row.assumed_exposure == 0
@@ -423,20 +482,21 @@ def test_delete_first_match_removes_confirmed_exposure(tmp_path):
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
     plan = service.generate_plan(players, "3-5-2")
     service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     service.delete_first_match()
     row = next(
-        item for item in service.coverage(players)
+        item for item in service.coverage(players, service.active_cycle_id())
         if item.player_id == player_training_id(players[1])
     )
 
@@ -510,15 +570,16 @@ def test_updating_recorded_lineup_replaces_same_record_and_preserves_metadata(tm
     service = WeeklyTrainingAppService(
         repository=WeeklyTrainingRepository(tmp_path / "planner.json")
     )
+    match_date, today = _dates_within_current_week()
     players = roster()
     plan = service.generate_plan(players, "3-5-2")
     saved = service.record_first_match(
         service.board_for_plan(plan),
         opponent_name="Rival FC",
         roster_players=players,
-        match_date=date(2026, 7, 21),
+        match_date=match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=today,
     )
     original = saved.match_records[0]
     board = service.board_for_record(original)
@@ -542,7 +603,7 @@ def test_updating_recorded_lineup_replaces_same_record_and_preserves_metadata(tm
         roster_players=players,
         requested_status=original.planned_or_played,
         played_confirmed=True,
-        today=date(2026, 7, 22),
+        today=today,
     )
 
     assert len(updated.match_records) == 1
@@ -739,7 +800,21 @@ def test_app_service_persists_priority_and_records_first_match(tmp_path):
 
     plan = service.generate_plan(players, "3-5-2")
     board = service.board_for_plan(plan)
-    service.record_first_match(board, roster_players=players)
+    # Root cause of a previously-flaky assertion here, documented inline:
+    # record_first_match() defaults to the active week's dynamically
+    # computed first_match_date (relative to the real wall clock) when no
+    # match_date is given. As real time passes, that date can drift into
+    # the future relative to "today", which triggers a deliberate safety
+    # downgrade (a future match can't be marked PLAYED). This test's
+    # intent is "a match that has already happened", so it fixes both
+    # the match date and "today" explicitly rather than depending on
+    # which day of the week the suite happens to run on.
+    service.record_first_match(
+        board,
+        roster_players=players,
+        match_date=date(2026, 7, 19),
+        today=date(2026, 7, 26),
+    )
     loaded = repository.load()
 
     assert loaded.priorities[player_training_id(players[1])].priority == TrainingPriority.REQUIRED_100
@@ -943,7 +1018,7 @@ def test_weekly_planner_table_has_only_three_visible_columns(tmp_path):
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
 
@@ -996,18 +1071,20 @@ def test_weekly_status_filters_use_simplified_status_roles(tmp_path):
     )
 
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("already_trained")
+        page.weekly_filter_combo.findData("training_players")
     )
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == "Done"
-    assert page.weekly_player_table.item(0, 2).text() == "\u2713"
-
-    page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("will_train")
-    )
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == "Planned"
-    assert page.weekly_player_table.item(0, 2).text() == "\u25cb"
+    assert page.weekly_player_table.rowCount() == 2
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert visible_names == {"Done", "Planned"}
+    status_by_name = {
+        page.weekly_player_table.item(row, 0).text(): page.weekly_player_table.item(row, 2).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert status_by_name["Done"] == "\u2713"
+    assert status_by_name["Planned"] == "\u25cb"
 
     page.weekly_filter_combo.setCurrentIndex(
         page.weekly_filter_combo.findData("not_training")
@@ -1027,13 +1104,14 @@ def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
     )
     players = roster()
     service.save_priority(players[1], TrainingPriority.REQUIRED_100.value)
+    week = service.load_state().active_week
     plan = service.generate_plan(players, "3-5-2")
     saved = service.record_first_match(
         service.board_for_plan(plan),
         roster_players=players,
-        match_date=date(2026, 7, 23),
+        match_date=week.second_match_date,
         requested_status=MatchStatus.PLAYED,
-        today=date(2026, 7, 22),
+        today=week.first_match_date,
     )
     trained_id = trainable_lineup_player_id(saved.match_records[0])
     trained_name = next(
@@ -1044,7 +1122,7 @@ def test_future_first_match_record_renders_as_planned_not_trained(tmp_path):
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
 
@@ -1080,7 +1158,7 @@ def test_recorded_lineup_edit_mode_restores_interactive_board(tmp_path):
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
     page.show_weekly_record_edit_mode(
@@ -1118,7 +1196,7 @@ def test_weekly_planner_pitch_remains_interactive_after_plan_generation(tmp_path
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
     page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
@@ -1146,26 +1224,41 @@ def test_weekly_priority_filter_uses_visible_priority_and_updates_on_edit(tmp_pa
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
 
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("100")
+        page.weekly_filter_combo.findData("training_players")
     )
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == players[1].name
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name in visible_names
+    assert players[2].name in visible_names
 
-    combo = page.weekly_player_table.cellWidget(0, 1)
+    combo = page.weekly_player_table.cellWidget(
+        [
+            row for row in range(page.weekly_player_table.rowCount())
+            if page.weekly_player_table.item(row, 0).text() == players[1].name
+        ][0],
+        1,
+    )
     combo.setCurrentIndex(combo.findData("NO_PRIORITY"))
     app.processEvents()
     QTimer.singleShot(0, lambda: None)
     app.processEvents()
 
-    assert page.weekly_player_table.rowCount() == 0
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name not in visible_names
+    assert players[2].name in visible_names
 
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("no_priority")
+        page.weekly_filter_combo.findData("not_training")
     )
     names = {
         page.weekly_player_table.item(row, 0).text()
@@ -1192,23 +1285,78 @@ def test_weekly_priority_filter_survives_sorting_plan_and_localization(tmp_path)
     page.show_weekly_training(
         service.load_state(),
         service.priority_rows(players),
-        service.coverage(players),
+        service.coverage(players, service.active_cycle_id()),
         ["3-5-2"],
     )
     page.weekly_filter_combo.setCurrentIndex(
-        page.weekly_filter_combo.findData("50")
+        page.weekly_filter_combo.findData("training_players")
     )
     page.weekly_player_table.sortItems(0, Qt.DescendingOrder)
     page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
 
-    assert page.weekly_filter_combo.currentData() == "50"
-    assert page.weekly_player_table.rowCount() == 1
-    assert page.weekly_player_table.item(0, 0).text() == players[2].name
-    assert (
-        page.weekly_player_table.item(0, 0).data(SquadPage.PRIORITY_ROLE)
-        == "REQUIRED_50"
-    )
+    assert page.weekly_filter_combo.currentData() == "training_players"
+    visible_names = {
+        page.weekly_player_table.item(row, 0).text()
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert players[1].name in visible_names
+    assert players[2].name in visible_names
+    priorities_by_name = {
+        page.weekly_player_table.item(row, 0).text(): page.weekly_player_table.item(
+            row, 0
+        ).data(SquadPage.PRIORITY_ROLE)
+        for row in range(page.weekly_player_table.rowCount())
+    }
+    assert priorities_by_name[players[1].name] == "REQUIRED_100"
+    assert priorities_by_name[players[2].name] == "REQUIRED_50"
     page.show_weekly_training_plan(plan, service.board_for_plan(plan), players)
     assert "Se asumen 90 minutos" in page.weekly_warnings_label.text()
     configure_localization("en")
     app.processEvents()
+
+
+def test_training_has_processed_respects_hour_precise_cutoff(tmp_path):
+    """HF (Alpha 0.6.5, Part 3/10): `_training_has_processed` used to
+    be a bare `date.today() >= training_update_date` comparison,
+    treating any moment on Thursday as "training already processed".
+    It must now respect the exact HTCalendarService cutoff hour."""
+    from datetime import date, datetime
+
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.services import ht_week_context_provider
+
+    training_update_date = date(2026, 8, 6)  # a Thursday
+    before_cutoff = datetime(2026, 8, 6, 20, 59)
+    after_cutoff = datetime(2026, 8, 6, 21, 0)
+    next_day = datetime(2026, 8, 7, 8, 0)
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    try:
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: before_cutoff))
+        assert WeeklyTrainingAppService._training_has_processed(training_update_date) is False
+
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: after_cutoff))
+        assert WeeklyTrainingAppService._training_has_processed(training_update_date) is True
+
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: next_day))
+        assert WeeklyTrainingAppService._training_has_processed(training_update_date) is True
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
+
+
+def test_training_has_processed_falls_back_to_date_comparison_on_other_days(tmp_path):
+    """When `now` isn't literally the training-update day itself, a
+    plain date comparison is still correct (e.g. checking a long-stale
+    week doesn't need hour-of-day precision)."""
+    from datetime import date, datetime
+
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    try:
+        far_future = datetime(2026, 9, 1, 8, 0)
+        ht_week_context_provider.set_calendar_service(HTCalendarService(clock=lambda: far_future))
+        assert WeeklyTrainingAppService._training_has_processed(date(2026, 8, 6)) is True
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)

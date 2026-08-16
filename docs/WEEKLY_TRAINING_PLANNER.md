@@ -138,9 +138,59 @@ Weekly match records are serializable JSON objects containing:
 - minutes-known flag;
 - training exposure entries.
 
+HF-07 tightens the bridge from Match Workspace to Weekly Planner: when the
+manager saves a historical Match Record as Partido 1 or Partido 2, the
+destination is the Sunday-Saturday training cycle containing the record's
+own match date. The current application date is never used as an implicit
+fallback for a historical save. If the match date is missing, the app asks
+the user to enter it first instead of guessing a week.
+
+This remains independent from the HT competitive season calendar, which is
+Monday-Sunday and exists only for season/week context.
+
 Confirmed played records, assumed played records and planned records remain distinct in
 coverage output. Rollover archives the week marker while retaining match records for
 history and diagnostics.
+
+HF-10 makes the final saved lineup the only authority for weekly participation. When
+a Match Workspace record linked to Partido 1 or Partido 2 is saved again, the Weekly
+Planner does not patch player booleans or append another historical exposure list.
+It rebuilds the linked weekly match record from the final saved Formation Board,
+removes the previous record for that weekly slot/link and persists the replacement.
+Coverage is therefore always derived as:
+
+```text
+current Partido 1 lineup
++ current Partido 2 lineup
+= weekly participation
+```
+
+Prior optimizer recommendations, temporary drafts, deleted/replaced records and older
+lineup versions do not contribute. Deleting one weekly match removes only that match's
+participation and preserves the other match. Replacing a linked match may also move
+the record to the training cycle matching the visible match date, using the same
+date shown in the Match form.
+
+For diagnostics, `WeeklyTrainingAppService.participation_provenance(player_id)` reports
+which current weekly record and formatted slot explain a player's participation. This
+is intended for tests/debugging; normal UI should keep using localized, user-facing
+position and side labels rather than raw slot ids.
+
+HF-10.1 repairs the remaining stale-source path: every service read now normalizes
+weekly match records to a canonical view with at most one Partido 1 and one Partido 2
+per training cycle. If a JSON file contains duplicate active records for the same
+cycle/slot (for example an old Match 1 projection plus its replacement), load-time
+repair keeps the last persisted slot record and removes the superseded active
+projection. Coverage, required-player lookup, plan generation and diagnostics all read
+from this canonical view, so no old lineup version is merged into the displayed weekly
+table.
+
+`WeeklyTrainingAppService.explain_weekly_player_state(player_id, players,
+displayed_symbol)` returns an auditable dictionary with priority, confirmed/assumed/
+planned exposure, source matches and Partido 1/2 slot provenance. A player with only
+a 100% priority and no current lineup presence has no participation source. In the UI,
+`✓` means already counted as played/assumed played, `○` means planned training from a
+lineup not yet counted as played, and `—` means no current participation.
 
 Alpha 0.5.7.3 validates first-match dates before a record can affect training
 coverage:
@@ -320,3 +370,15 @@ shown to the user.
   extension.
 - Best-effort priority selection is intentionally heuristic. It reuses the existing
   ranking and order behavior rather than introducing a new exhaustive training optimizer.
+
+## Alpha 0.6.8 Future Cycles
+
+The visible Weekly Planner selector is intentionally bounded to the current training
+cycle and the next two cycles. It defaults to the current cycle when Squad opens, and
+stores structured combo data (`cycle_id`, `start_date`, `end_date`,
+`relative_offset`) instead of deriving state from visible labels.
+
+All visible planner data is scoped by the selected `cycle_id`: coverage, first and
+second match records, generated plans, empty states and record actions. Future cycles
+can be empty without pulling Match 1 or Match 2 from another cycle. Training type alone
+is never enough to merge records across weeks.

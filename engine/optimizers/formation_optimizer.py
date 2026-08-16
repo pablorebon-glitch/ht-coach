@@ -48,6 +48,10 @@ class FormationMatchResult:
 
     best_order_win_probability: float
 
+    objective_trace: object = None
+
+    objective_frontier: tuple = ()
+
 
 class FormationOptimizer:
 
@@ -255,6 +259,16 @@ class FormationOptimizer:
 
                 best_order_win_probability=(
                     best_order_win_probability
+                ),
+
+                objective_trace=(
+                    lineup_optimization
+                    .objective_trace
+                ),
+
+                objective_frontier=(
+                    lineup_optimization
+                    .objective_frontier
                 )
             )
 

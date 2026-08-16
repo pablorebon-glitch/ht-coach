@@ -683,8 +683,18 @@ class WorkspaceService:
         if source is None or target is None:
             return self._error(state, "The swap cannot be applied safely.")
 
-        source_for_target = self._assign_player_to_slot(source, target, selected=True)
-        target_for_source = self._assign_player_to_slot(target, source, selected=False)
+        source_for_target = self._assign_player_to_slot(
+            source,
+            target_slot,
+            selected=True,
+            preserve_slot_order=True,
+        )
+        target_for_source = self._assign_player_to_slot(
+            target,
+            source_slot,
+            selected=False,
+            preserve_slot_order=True,
+        )
         updated_slots = []
         for slot in board.slots:
             if slot.slot_id == preview.source_slot_id:
@@ -699,9 +709,8 @@ class WorkspaceService:
             slots=tuple(updated_slots),
             selected_player_id=source.player_id,
         )
-        updated_board, order_changes = self._apply_best_orders_to_slots(
+        updated_board, order_changes = self._normalize_invalid_orders_for_slots(
             updated_board,
-            roster_players,
             (preview.source_slot_id, preview.target_slot_id),
         )
         boards = dict(state.workspace_boards)
@@ -982,6 +991,120 @@ class WorkspaceService:
             "order_recommendation",
         )
 
+    def set_manual_order(self, state, player_id, order, order_side=None):
+        """Part 1 (Alpha 0.6.6): lets the user directly pick any valid
+        individual order for a player -- e.g. right after a manual
+        replacement -- without needing a prior recommendation to
+        accept. Reuses the exact same `_board_with_order` primitive
+        `apply_order_recommendation` already uses; this is not a
+        second order system, just a second entry point into it that
+        doesn't require `state.recommendations` to be populated."""
+        board = state.current_board
+        if board is None:
+            return self._error(state, "No active board.")
+        slot = next(
+            (s for s in board.slots if s.player is not None and s.player.player_id == player_id),
+            None,
+        )
+        if slot is None:
+            return self._error(state, "Player not found in the current lineup.")
+        return self.set_manual_order_for_slot(
+            state,
+            slot.slot_id,
+            order,
+            order_side,
+            expected_revision=state.revision,
+        )
+
+    def set_manual_order_for_slot(
+        self,
+        state,
+        slot_id,
+        order,
+        order_side=None,
+        expected_revision=None,
+    ):
+        board = state.current_board
+        if board is None:
+            return self._error(state, "No active board.")
+        if expected_revision is not None:
+            try:
+                revision_matches = int(expected_revision) == int(state.revision)
+            except (TypeError, ValueError):
+                revision_matches = False
+            if not revision_matches:
+                return self._error(state, "The lineup changed. Try the order again.")
+        slot = self._slot_by_id(board, slot_id)
+        if slot is None:
+            return self._error(state, "Slot not found in the current lineup.")
+        if slot.player is None:
+            return self._error(state, "Slot is empty.")
+
+        normalized_order = self._order(order)
+        valid_orders = self.valid_orders_for_position(slot.player.position)
+        if normalized_order not in valid_orders:
+            return self._error(
+                state,
+                f"'{order}' is not a valid order for {slot.player.position}.",
+            )
+
+        previous_order = self._order(slot.player.individual_order)
+        previous_side = self._optional_side(slot.player.order_side)
+        updated_board = self._board_with_order(
+            board, slot.player.player_id, normalized_order, order_side
+        )
+        new_side = self._optional_side(
+            next(
+                s.player.order_side
+                for s in updated_board.slots
+                if (
+                    s.player is not None
+                    and s.player.player_id == slot.player.player_id
+                )
+            )
+        )
+
+        boards = dict(state.workspace_boards)
+        boards[updated_board.formation_name] = updated_board
+        modification = WorkspaceModification(
+            formation_name=updated_board.formation_name,
+            slot_id=slot.slot_id,
+            role=slot.player.position,
+            original_player_name=slot.player.player_name,
+            replacement_player_name=slot.player.player_name,
+            score_difference=0.0,
+            kind="manual_order",
+            source_slot_id=slot.slot_id,
+            target_slot_id=slot.slot_id,
+            incoming_player_id=slot.player.player_id,
+            before_lineup_ids=self._lineup_ids(board),
+            after_lineup_ids=self._lineup_ids(updated_board),
+            revision_before=state.revision,
+            revision_after=state.revision + 1,
+            order_changes=(
+                (
+                    slot.player.player_name,
+                    self._format_order_change(previous_order, previous_side),
+                    self._format_order_change(normalized_order, new_side),
+                ),
+            ),
+        )
+        return replace(
+            state,
+            workspace_boards=boards,
+            history=state.history + (modification,),
+            redo_stack=(),
+            evaluation_state="pending",
+            revision=state.revision + 1,
+            last_error="",
+            selected_player_id=slot.player.player_id,
+            manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.MANUALLY_MODIFIED,
+                stale_revision=state.revision + 1,
+            ),
+        )
+
     def apply_all_recommendations(self, state, roster_players=None):
         state = self.apply_position_recommendations(state)
         if state.last_error:
@@ -1236,6 +1359,45 @@ class WorkspaceService:
             )
         if not target_ids:
             return board, ()
+        return updated, tuple(changes)
+
+    def _normalize_invalid_orders_for_slots(self, board, slot_ids):
+        updated = board
+        changes = []
+        for slot_id in slot_ids:
+            slot = self._slot_by_id(updated, slot_id)
+            if slot is None or slot.player is None:
+                continue
+            current_order = self._order(slot.player.individual_order)
+            current_side = self._optional_side(slot.player.order_side)
+            configurations = self.valid_order_configurations_for_position(
+                slot.player.position
+            )
+            is_valid = any(
+                configuration.order == current_order
+                and configuration.order_side == current_side
+                for configuration in configurations
+            )
+            if is_valid:
+                continue
+            normal = next(
+                configuration
+                for configuration in configurations
+                if configuration.order == Order.NORMAL
+            )
+            updated = self._board_with_order(
+                updated,
+                slot.player.player_id,
+                normal.order,
+                normal.order_side,
+            )
+            changes.append(
+                (
+                    slot.player.player_name,
+                    self._format_order_change(current_order, current_side),
+                    self._format_order_change(normal.order, normal.order_side),
+                )
+            )
         return updated, tuple(changes)
 
     def _best_order_for_slot(self, board, roster_players, slot_id):
@@ -1711,7 +1873,12 @@ class WorkspaceService:
         return str(name or "").strip().replace(" ", "_").lower()
 
     @staticmethod
-    def _assign_player_to_slot(player, slot_template, selected=False):
+    def _assign_player_to_slot(
+        player,
+        slot_template,
+        selected=False,
+        preserve_slot_order=False,
+    ):
         template_player = getattr(slot_template, "player", None) or slot_template
         position = getattr(slot_template, "position", getattr(template_player, "position", ""))
         position_label = getattr(
@@ -1725,6 +1892,7 @@ class WorkspaceService:
             "side_label",
             format_side(side),
         )
+        order_source = template_player if preserve_slot_order else player
         return replace(
             player,
             position=position,
@@ -1732,10 +1900,10 @@ class WorkspaceService:
             position_abbreviation=format_position_abbreviation(position),
             side=side,
             side_label=side_label,
-            individual_order=getattr(player, "individual_order", "Normal"),
-            order_label=getattr(player, "order_label", "Normal"),
-            order_side=getattr(player, "order_side", ""),
-            order_side_label=getattr(player, "order_side_label", ""),
+            individual_order=getattr(order_source, "individual_order", "Normal"),
+            order_label=getattr(order_source, "order_label", "Normal"),
+            order_side=getattr(order_source, "order_side", ""),
+            order_side_label=getattr(order_source, "order_side_label", ""),
             is_selected=selected,
             is_modified=True,
             is_replacement_preview=False,

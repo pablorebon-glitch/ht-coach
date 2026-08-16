@@ -1,20 +1,56 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from engine.calendar import DEFAULT_SCHEDULE, HTCalendarService
 from engine.weekly_training.models import PLAYMAKING, TrainingWeek, TrainingWeekStatus
+
+_calendar_service = HTCalendarService(schedule=DEFAULT_SCHEDULE)
+
+
+def _training_update_has_occurred(today, training_update_date):
+    """Whether the Thursday training update for `training_update_date`
+    has already processed, as of `today`.
+
+    HF: the previous version of this function only ever compared bare
+    `date` objects (`today >= training_update_date`), which silently
+    discarded whatever hour was actually passed in -- any moment on
+    Thursday counted as "already processed", even 00:01. This module
+    now asks `HTCalendarService` for the precise Thursday-21:00 (or
+    whatever the schedule says) cutoff *whenever a full `datetime` with
+    real time-of-day information is available* -- `today=None` (the
+    common case, meaning "right now") always gets full precision via
+    `datetime.now()`. A caller that explicitly passes a bare `date`
+    (no time component) keeps the original date-only comparison, for
+    backward compatibility with existing callers/tests that don't care
+    about the exact hour.
+    """
+    if isinstance(today, datetime):
+        naive_today = today.replace(tzinfo=None)
+        return _calendar_service.is_training_processed(naive_today) if (
+            naive_today.date() == training_update_date
+        ) else naive_today.date() >= training_update_date
+    return today >= training_update_date
 
 
 def active_training_week(today=None, timezone_name="America/Buenos_Aires", training_type=PLAYMAKING):
+    now = None
     if today is None:
-        today = date.today()
-    if hasattr(today, "astimezone"):
-        today = today.astimezone(ZoneInfo(timezone_name)).date()
+        now = datetime.now(ZoneInfo(timezone_name))
+        today = now.date()
+    elif hasattr(today, "astimezone"):
+        now = today.astimezone(ZoneInfo(timezone_name))
+        today = now.date()
 
     weekday = today.weekday()
     days_since_sunday = (weekday + 1) % 7
     start = today - timedelta(days=days_since_sunday)
     training_update = start + timedelta(days=4)
-    if today >= training_update:
+    rolled_over = (
+        _training_update_has_occurred(now, training_update)
+        if now is not None
+        else _training_update_has_occurred(today, training_update)
+    )
+    if rolled_over:
         start = start + timedelta(days=7)
         training_update = start + timedelta(days=4)
 
@@ -34,11 +70,20 @@ def active_training_week(today=None, timezone_name="America/Buenos_Aires", train
 def rollover_week(current_week, today=None, timezone_name="America/Buenos_Aires"):
     if current_week is None:
         return None, active_training_week(today, timezone_name)
+    now = None
     if today is None:
-        today = date.today()
-    if hasattr(today, "astimezone"):
-        today = today.astimezone(ZoneInfo(timezone_name)).date()
-    if today < current_week.training_update_date:
+        now = datetime.now(ZoneInfo(timezone_name))
+        today = now.date()
+    elif hasattr(today, "astimezone"):
+        now = today.astimezone(ZoneInfo(timezone_name))
+        today = now.date()
+
+    rolled_over = (
+        _training_update_has_occurred(now, current_week.training_update_date)
+        if now is not None
+        else _training_update_has_occurred(today, current_week.training_update_date)
+    )
+    if not rolled_over:
         return None, current_week
     archived = TrainingWeek(
         week_id=current_week.week_id,

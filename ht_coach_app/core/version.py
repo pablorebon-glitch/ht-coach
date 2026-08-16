@@ -1,0 +1,4 @@
+APP_BASE_NAME = "HT Coach"
+APP_VERSION = "Alpha 0.6.9 Portable"
+APP_DISPLAY_NAME = f"{APP_BASE_NAME} {APP_VERSION}"
+

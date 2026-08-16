@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
-from engine.squad_health.availability_service import AvailabilityService
+from engine.squad_health.availability_service import CURRENT_AVAILABLE, AvailabilityService
 from engine.squad_intelligence import (
     ClubStrategy,
     generate_report,
@@ -14,6 +14,7 @@ from engine.squad_intelligence.context import (
     TrainingEvidence,
 )
 from engine.weekly_training.player_identity import player_training_id
+from engine.weekly_training.training_priority_policy import formation_position_maximums
 from engine.weekly_training.training_rules import rule_provider_for
 from models.position import Position
 from models.side import Side
@@ -36,11 +37,16 @@ class SquadIntelligenceAppService:
 
     def build_squad_context(self, players) -> SquadIntelligenceContext:
         positional_depth: dict[str, int] = {}
+        ages_by_position: dict[str, list] = {}
         for player in players:
             best_position, _score = PlayerAnalyzer.best_position(player)
             if not best_position:
                 continue
             positional_depth[best_position] = positional_depth.get(best_position, 0) + 1
+            if getattr(player, "age", None) is not None:
+                ages_by_position.setdefault(best_position, []).append(player.age)
+
+        temporary_positional_depth = self._temporary_positional_depth(players)
 
         state = self._weekly_training_service.load_state()
         salary_values = tuple(
@@ -52,10 +58,35 @@ class SquadIntelligenceAppService:
         return SquadIntelligenceContext(
             roster_size=len(players),
             positional_depth=positional_depth,
+            temporary_positional_depth=temporary_positional_depth,
             active_training_type=state.active_training_type or "",
             salary_values=salary_values,
             age_values=age_values,
+            ages_by_position={
+                position: tuple(ages) for position, ages in ages_by_position.items()
+            },
         )
+
+    def _temporary_positional_depth(self, players) -> dict[str, int]:
+        """Positional depth counted only among players available *this
+        week* -- a short-term injury/suspension reduces this layer
+        without touching `positional_depth` (the structural club, which
+        always includes every owned player). See
+        SquadIntelligenceContext's docstring."""
+        try:
+            available_players = self._availability_service.eligible_players(
+                players, CURRENT_AVAILABLE
+            )
+        except Exception:
+            available_players = players
+
+        temporary_depth: dict[str, int] = {}
+        for player in available_players:
+            best_position, _score = PlayerAnalyzer.best_position(player)
+            if not best_position:
+                continue
+            temporary_depth[best_position] = temporary_depth.get(best_position, 0) + 1
+        return temporary_depth
 
     def build_player_context(
         self, player, players, squad_context: SquadIntelligenceContext | None = None
@@ -112,13 +143,35 @@ class SquadIntelligenceAppService:
         if not best_position:
             return PositionEvidence()
 
+        # Rank and candidate count are computed only among the player's
+        # real peers -- other players whose *own* best position is the
+        # same one -- not the full roster. Ranking against everyone
+        # (including players who are only marginally competent there)
+        # was the root cause of a real calibration bug: a squad's
+        # second goalkeeper showed up as "rank 2 of 19" instead of
+        # "rank 2 of 2", making an ordinary backup look like a
+        # near-top performer and inflating current-performance far
+        # past what a genuine second-choice goalkeeper should get.
+        peer_ids = set()
+        peers_by_id = {}
+        for candidate in players:
+            candidate_best_position, _candidate_score = PlayerAnalyzer.best_position(candidate)
+            if candidate_best_position == best_position:
+                candidate_id = id(candidate)
+                peer_ids.add(candidate_id)
+                peers_by_id[candidate_id] = candidate
+
         ranking = PlayerAnalyzer.rank_players(players, best_position, Side.CENTER)
+        peer_ranking = [entry for entry in ranking if id(entry.player) in peer_ids]
+
         rank = next(
-            (index + 1 for index, entry in enumerate(ranking) if entry.player is player), None
+            (index + 1 for index, entry in enumerate(peer_ranking) if entry.player is player),
+            None,
         )
         score = next(
-            (entry.score for entry in ranking if entry.player is player), best_score
+            (entry.score for entry in peer_ranking if entry.player is player), best_score
         )
+        candidates_count = len(peer_ranking) or 1
 
         alternatives = []
         for position in Position:
@@ -132,12 +185,19 @@ class SquadIntelligenceAppService:
             if alt_rank is not None and alt_rank <= _ALTERNATIVE_POSITION_RANK_CEILING:
                 alternatives.append(position.value)
 
+        formation_slots = 0
+        for canonical_position, max_count in formation_position_maximums().items():
+            if canonical_position.value == best_position:
+                formation_slots = max_count
+                break
+
         return PositionEvidence(
             best_position=best_position,
             best_position_score=score,
             rank_in_best_position=rank,
-            candidates_in_best_position=len(ranking),
+            candidates_in_best_position=candidates_count,
             alternative_positions=tuple(alternatives),
+            formation_slots=formation_slots,
         )
 
     def _build_training_evidence(self, player, players, active_training_type) -> TrainingEvidence:

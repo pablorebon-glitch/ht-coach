@@ -53,7 +53,7 @@ def test_unknown_future_training_type_does_not_crash_load(tmp_path):
     service = WeeklyTrainingAppService(repository=repository)
     assert service.active_training_rules() is None
     # coverage() must not crash even though there are no rules to apply
-    assert service.coverage([]) == ()
+    assert service.coverage([], service.active_cycle_id()) == ()
 
 
 def test_all_twelve_training_types_round_trip_through_persistence(tmp_path):

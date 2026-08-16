@@ -183,6 +183,7 @@ def test_active_training_change_recalculates_shown_report(tmp_path):
     controller._show_player_detail("Alice")
     before = page.intelligence_dimensions_label.text()
 
+    controller._request_training_priority_selections = lambda *_args: {}
     controller._change_active_training_type("DEFENDING")
     after = page.intelligence_dimensions_label.text()
 

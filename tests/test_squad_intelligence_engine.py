@@ -989,3 +989,98 @@ def test_limitations_unavailable_current_roster_and_missing_stable_id():
     report = generate_report(context, make_squad_context())
     assert LimitationType.UNAVAILABLE_CURRENT_ROSTER in report.limitations
     assert LimitationType.MISSING_STABLE_PLAYER_ID in report.limitations
+
+
+# --------------------------------------------------------------------------
+# UX-03 role calibration: formation-demand-aware current performance
+# --------------------------------------------------------------------------
+
+def test_second_choice_goalkeeper_is_not_rated_as_high_as_a_starter():
+    """Regression for a real calibration bug: a position that only
+    ever fields one player (goalkeeper, formation_slots=1) must treat
+    its second-choice very differently from a position with several
+    starting slots. Rank 2 of 2 with formation_slots=1 should land
+    clearly below rank 1's tier."""
+    starter = make_context(
+        position=make_position(
+            best_position="GOALKEEPER", rank_in_best_position=1,
+            candidates_in_best_position=2, formation_slots=1,
+        )
+    )
+    backup = make_context(
+        position=make_position(
+            best_position="GOALKEEPER", rank_in_best_position=2,
+            candidates_in_best_position=2, formation_slots=1,
+        )
+    )
+    starter_perf, _ = classify_current_performance(starter)
+    backup_perf, _ = classify_current_performance(backup)
+
+    tiers = [
+        CurrentPerformance.VERY_LOW, CurrentPerformance.LOW, CurrentPerformance.MEDIUM,
+        CurrentPerformance.HIGH, CurrentPerformance.VERY_HIGH,
+    ]
+    assert tiers.index(starter_perf) > tiers.index(backup_perf)
+
+
+def test_second_choice_goalkeeper_does_not_become_starter_role():
+    context = make_context(
+        player=make_player(form=5),
+        position=make_position(
+            best_position="GOALKEEPER", rank_in_best_position=2,
+            candidates_in_best_position=2, formation_slots=1,
+        ),
+    )
+    engine = SquadIntelligenceRuleEngine()
+    eval_context = _evaluation_context(context, make_squad_context(positional_depth={"GOALKEEPER": 2}))
+    role, _ = engine.resolve_role(eval_context)
+    assert role not in (RecommendedRole.KEY_STARTER, RecommendedRole.STARTER)
+
+
+def test_a_position_with_three_formation_slots_treats_its_third_choice_generously():
+    """Unlike goalkeeper, a position that regularly fields several
+    players (e.g. central defender, formation_slots=3) should still
+    rate its rank-3 candidate as a genuine rotation starter, not a
+    bench afterthought."""
+    third_choice = make_context(
+        position=make_position(
+            best_position="CENTRAL_DEFENDER", rank_in_best_position=3,
+            candidates_in_best_position=6, formation_slots=3,
+        )
+    )
+    performance, _ = classify_current_performance(third_choice)
+    assert performance in (CurrentPerformance.HIGH, CurrentPerformance.VERY_HIGH)
+
+
+def test_beyond_formation_slots_performance_drops_off():
+    within_slots = make_context(
+        position=make_position(
+            best_position="CENTRAL_DEFENDER", rank_in_best_position=3,
+            candidates_in_best_position=6, formation_slots=3,
+        )
+    )
+    beyond_slots = make_context(
+        position=make_position(
+            best_position="CENTRAL_DEFENDER", rank_in_best_position=4,
+            candidates_in_best_position=6, formation_slots=3,
+        )
+    )
+    within_perf, _ = classify_current_performance(within_slots)
+    beyond_perf, _ = classify_current_performance(beyond_slots)
+    tiers = [
+        CurrentPerformance.VERY_LOW, CurrentPerformance.LOW, CurrentPerformance.MEDIUM,
+        CurrentPerformance.HIGH, CurrentPerformance.VERY_HIGH,
+    ]
+    assert tiers.index(within_perf) >= tiers.index(beyond_perf)
+
+
+def test_formation_slots_defaults_to_zero_and_falls_back_to_flat_formula():
+    """Backward compatibility: existing PositionEvidence instances that
+    don't set formation_slots (the default, 0) must behave exactly as
+    before this sprint's calibration fix."""
+    context = make_context(
+        position=make_position(rank_in_best_position=2, candidates_in_best_position=4)
+    )
+    assert context.position.formation_slots == 0
+    performance, _ = classify_current_performance(context)
+    assert performance is not None

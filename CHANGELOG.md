@@ -4,6 +4,476 @@
 
 ### Added
 
+- Added Alpha 0.6.10 optimizer explainability foundations. Lineup evaluation now
+  emits a serializable objective trace with sector ratings, possession/chance
+  share, attacking and defensive matchup components, xG/o-xG, probabilities,
+  training and availability components. Added a deterministic head-to-head
+  lineup comparator, compact Pareto frontier support, La Rocha calibration
+  fixture tests and Decision Lab payload wiring for recommended/alternative XI
+  traces. The sprint keeps canonical TeamRater, tactic, xG and probability
+  formulas unchanged; training is visible separately and only breaks close
+  tactical ties in the comparator.
+
+- Added Alpha 0.6.9 portable Windows distribution foundations. The app now has
+  one canonical version source, detects `portable.flag`, routes portable user
+  data to `data/`, logs to `logs/`, backups to `backups/`, resolves bundled
+  resources independent of current working directory, copies roster CSV imports
+  into `data/rosters/` with relative paths, adds manual data import with backup,
+  and includes PyInstaller one-folder packaging scripts/docs. No optimizer,
+  rating, probability, PRE/POST parser, Formation Board, Weekly Planner formula,
+  season-calendar calculation, Match Intelligence or Club Advisor logic changed.
+
+- Added Alpha 0.6.8 future Weekly Training planning. The Squad Weekly Planner
+  now shows the current cycle plus the next two cycles, with structured
+  `cycle_id` item data, cycle-scoped coverage and no accidental mouse-wheel
+  changes on the week selector. Match analysis now resolves training context
+  from the selected match date, persists the weekly revision used by the result
+  and can mark a restored analysis stale when the Weekly Planner changes. No
+  optimizer, rating, probability, PRE/POST parser or calendar formula code
+  changed.
+
+### Fixed
+
+- Fixed Alpha 0.6.7 HF-10.7 duplicate saved-match record creation after
+  importing Official PRE from a Saved Match editor. PRE/POST imports in
+  `EDIT_SAVED_MATCH` now require the active canonical Match Record ID and attach
+  evidence to that exact record instead of using the automatic import path that
+  can create minimal official-evidence records. Explicit PRE imports now stamp
+  the official Match ID/provenance onto the target record, repeated saves keep
+  Weekly Planner links unchanged, and duplicate reconciliation can safely merge
+  older partial PRE-only records with the single complete planned match for the
+  same opponent while leaving ambiguous cases unresolved. No optimizer, rating,
+  probability, PRE/POST parser, season-calendar, Formation Board order or weekly
+  participation formula code changed.
+
+- Fixed Alpha 0.6.7 HF-10.6 saved-match restoration and weekly-link continuity.
+  Saved Match edit now restores competition type from canonical item data without
+  converting missing values to Liga, restores venue from canonical `HomeAway`,
+  reloads the persisted players CSV into the Match workspace, and can rebuild a
+  visible Formation Board directly from the saved `HistoricalMatchSnapshot`
+  lineup/tactical setup when the last-result cache is absent. Weekly saves from
+  a Saved Match editor keep `EDIT_SAVED_MATCH`, preserve the active record ID,
+  write Partido 1/2 against that same canonical record and leave the editor
+  visible. Result enrichment now preserves match type and analysis ownership so
+  Copa/Amistoso no longer turns into Liga through serialization. No optimizer,
+  rating, probability, PRE/POST parser, Formation Board slot/order, season
+  calendar or weekly participation formula code changed.
+
+- Fixed Alpha 0.6.7 HF-10.5 Match save workflow isolation. `Guardar
+  formacion`, `Guardar como Partido 1` and `Guardar como Partido 2` now share
+  one canonical workspace save transaction before any Weekly Planner link is
+  written. The transaction persists structured metadata plus lineup, switches
+  New Match into saved-edit mode, keeps the board/results visible, emits saved
+  match refresh events and reports actionable errors instead of silently
+  swallowing persistence failures. Weekly saves now link to the same canonical
+  Match Record ID and leave the workspace open; if the weekly link fails, the
+  canonical save remains available for retry. Reopening saved records also
+  reconciles old formatted opponent titles back to a clean managed opponent
+  name when the match is unambiguous. No optimizer, rating, probability,
+  PRE/POST parser, calendar, Formation Board order or weekly participation
+  formula code changed.
+
+- Fixed Alpha 0.6.7 HF-10.4 canonical Match metadata persistence when saving
+  formations. `Guardar formación`, `Guardar cambios` and weekly save linking
+  now read one structured workspace metadata snapshot for opponent identity,
+  competition type, venue, scheduled date, HT season/week and training cycle.
+  New Match formation saves create one complete canonical Match Record instead
+  of a partial duplicate, then switch into saved-edit mode. Saved Matches now
+  renders the title through `MatchDisplayFormatter`, keeps `opponent_name`
+  canonical, formats saved dates for users, and preserves Copa/Amistoso,
+  Local/Visitante/Neutral/Unknown and configured season/week on reopen. Added
+  migration repair for malformed opponent names that contain formatted match
+  identities such as `Hit'em up - Santa Cruz Club`. No optimizer, rating,
+  probability, PRE/POST parser, evidence ownership, Formation Board order,
+  calendar calculation or training participation formulas changed.
+
+- Fixed Alpha 0.6.7 HF-10.3 Match competition-type synchronization. The Match
+  workspace now treats the selector's structured item data as the canonical
+  match type for analysis, saved Match Records, Formation Board weekly saves
+  and `WeeklyMatchRecord.competition_type`. Invalid selector data blocks
+  analysis instead of falling back to Liga. Changing the match type after an
+  analysis marks that analysis stale and disables Guardar como Partido 1/2 until
+  reanalysis, so weekly slot number no longer implies Liga or Copa/Amistoso. No
+  optimizer, rating, probability, PRE/POST parser, Formation Board order,
+  calendar or training participation formulas changed.
+
+- Fixed Weekly Planner coverage isolation by training cycle. Coverage,
+  participation provenance and `explain_weekly_player_state` now scope Match 1
+  and Match 2 to the requested `cycle_id`, so records from older or future
+  cycles can only appear in the diagnostic `Other cycles` section and always
+  contribute zero minutes to the visible cycle. Linked weekly records with an
+  invalid cycle are repaired from the canonical Match Record date when that is
+  unambiguous; otherwise they are quarantined outside weekly coverage. Added
+  regression coverage for the Bassedas cross-cycle leak, cycle switching,
+  on-disk reload after repair and quarantine behavior. No optimizer, rating,
+  probability, training percentage or PRE/POST parser formulas changed.
+
+- Fixed Alpha 0.6.7 HF-10.1 stale Weekly Planner participation after lineup
+  replacement. Coverage, plan generation and diagnostics now read a canonical
+  weekly-record view that keeps at most one active Partido 1 and one active
+  Partido 2 per training cycle, with duplicate/superseded slot records repaired
+  on load. This closes the remaining source where an old Match 1 projection
+  could still contribute a removed player such as Bassedas even after the linked
+  record was replaced. Added `explain_weekly_player_state` diagnostics and
+  regression coverage for disk reload, duplicate active Match 1 records,
+  replacement, deletion, priority-only rows and table symbol semantics. Clarified
+  that `○` means planned training from a lineup not yet counted as played. No
+  training percentage rules, optimizers, ratings, probabilities, priorities or
+  PRE/POST parsers changed.
+
+- Fixed Alpha 0.6.7 HF-10 training participation integrity and Match
+  preparation ordering. Weekly Training can now replace a linked saved match's
+  current lineup by recomputing the complete weekly record from the final saved
+  board, removing the previous record's exposure entries before inserting the
+  new ones. This prevents removed players from continuing to count as played or
+  trained after editing a saved match. Added participation provenance for
+  diagnostics. Reordered Match preparation to Rival, Match Type, Venue, Match
+  Date, Formations, formation actions, Analyze; Analyze is disabled until CSV,
+  opponent and at least one formation are selected. The match date label now
+  reads "Fecha del partido" / "Match date", and New Match defaults to the
+  injected application calendar date instead of an accidental stale year. No
+  training percentage rules, optimizer formulas, rating formulas, probability
+  formulas or PRE/POST parsers changed.
+
+- Fixed Alpha 0.6.7 HF-09 Match workspace isolation between New Match and
+  Saved Match editing. Match analysis results now carry a serializable owner
+  (`NEW_MATCH_DRAFT` or `SAVED_MATCH` plus ID), and the controller only
+  restores, copies or saves a result when that owner matches the active
+  workspace mode. Opening a saved match clears stale lower results before
+  restoring only that record's own cached analysis; opening New Match creates a
+  fresh draft context with no inherited Formation Board, comparison or lineup
+  from the previous flow. Editing from Saved Matches keeps saved-match context
+  instead of selecting the New Match navigation item. No optimizer, rating,
+  probability, PRE/POST parser or tactical calculation code changed.
+
+- Fixed Alpha 0.6.7 HF-08 official evidence ownership and saved-opponent
+  restoration. POST imports from an actively selected historical record are now
+  scoped to that record instead of being redirected by a global/latest Match ID
+  lookup. Official PRE/POST mismatch rules remain strict, while retrospective
+  PRE source IDs are not treated as real historical POST IDs. POST replacement
+  updates only the active record and preserves retrospective PRE, opponent,
+  date, competition, venue and lineup identity. Saved Match editing now restores
+  opponent selector identity from structured combo data; if the opponent is no
+  longer in Opponent Manager, Match shows a synthetic saved-opponent entry and
+  blocks analysis instead of falling back to another rival. No optimizer,
+  rating, probability or PRE/POST parser code changed.
+
+- Fixed Alpha 0.6.7 HF-07 retrospective match identity, season calendar and
+  historical Weekly Planner targeting. Retrospective PRE evidence is now read
+  for Official Intelligence when no official PRE exists, but its source
+  opponent and source Match ID never rename the canonical historical match.
+  The Official Intelligence selector/header use canonical record metadata so
+  Torres remains `Hit'em up vs. Torres Futbol Club` even when the supporting
+  retrospective PRE was captured from Santa Cruz. Added safe migration repair
+  for duplicated display strings and retrospective-source contamination, with
+  ambiguous records reported instead of guessed. Season calendar persistence is
+  schema-versioned with canonical fields, validation, timestamping and the
+  `America/Argentina/Buenos_Aires` timezone option. Saving Match records as
+  Weekly Planner Partido 1/2 now requires an actual match date and targets the
+  Sunday-Saturday training cycle containing that historical date rather than
+  silently falling back to the current week. No optimizer, rating, probability
+  or PRE/POST parser formulas changed.
+
+- Fixed Alpha 0.6.7 HF-06 page-only mouse-wheel behavior in the Match
+  workspace: closed combo boxes, tab bars, date/spin controls and Formation
+  Board selectors no longer change values from hover-wheel scrolling. Wheel
+  input is redirected to the page scroll area where possible, while open combo
+  popups and genuine inner scroll areas keep their normal scrolling behavior.
+  Added regression coverage for Match inputs, formation/tactic/attitude
+  selectors, the individual player-order selector, result tabs and scroll-limit
+  safety. No analytical, optimizer, rating, probability, persistence or
+  official-evidence parser behavior changed.
+
+- Fixed Alpha 0.6.7 HF-05 Formation Board stability and slot integrity:
+  manual starter swaps now preserve slot-owned valid orders instead of rerunning
+  automatic order selection, manual order edits are applied by stable slot id plus
+  workspace revision, the PySide6 order selector defers inspector rebuilds until
+  after the combo signal returns to avoid access violations, and the Match
+  Formation Board header now keeps actions reachable in restored windows. Added
+  regression coverage for inner-midfield/winger swaps, slot-based order edits
+  after swaps, and responsive Match layout behavior. No optimizer, rating,
+  probability or official-evidence parser formulas changed.
+
+- Fixed Alpha 0.6.7 HF-02 (Match Record Integrity, Season Calendar and
+  Match UX Completion) -- a repair sprint over Alpha 0.6.7's own real-use
+  regressions, found through manual verification. Root causes and fixes:
+  deleting a Match Record left orphaned Official PRE data behind in a
+  separate, un-invalidated cache (`MatchWorkspaceRepository`'s "last
+  analyzed result" slot) -- added `clear_last_result()`, wired into
+  deletion, verified with the brief's own exact 6-step scenario. Individual
+  player orders had no editing control anywhere in the real Formation
+  Board UI despite the underlying service already supporting it since
+  Alpha 0.6.6 -- added an order selector to the player inspector, reusing
+  the exact recalculation pipeline the existing replacement flow already
+  used. Match date wasn't threaded from the New Match date field into
+  Weekly Planner saves at all; fixed the controller wiring and the
+  replace-confirmation dialog to name the actually-affected week -- an
+  initial deeper fix (making the weekly match_id itself date-aware) broke
+  9 pre-existing tests built around an "active week is the only identity"
+  assumption throughout weekly_training_service.py, so that part was
+  reverted and documented as a known, explicitly tested limitation rather
+  than shipped broken. Metadata corrections (date/competition type/venue)
+  made while editing a saved match were silently discarded -- only the
+  lineup was ever persisted back; fixed to also persist match_context
+  corrections onto the same canonical record. VenueRole reused the
+  existing (but previously unwired) HomeAway enum rather than inventing a
+  parallel one, added the New Match selector, and built one central
+  match-display formatter (used by Official Intelligence's own selector)
+  to reduce the risk of the reported duplicated-name-fragment bug. Added a
+  Venue column to Saved Matches (was missing entirely) and added venue to
+  the weaker duplicate-detection signal so a two-leg cup tie's home/away
+  legs are never mistaken for the same duplicated record. Built the full
+  HT Season Calendar stack (configuration, deterministic
+  anchor-based resolution that still never guesses without a configured
+  season, and recalculation that never overwrites manual corrections
+  unless explicitly requested) and wired its live preview into New Match's
+  date field. Found and fixed a genuine test-isolation bug of my own along
+  the way: a new test that didn't isolate `WeeklyTrainingAppService`'s
+  repository fell back to the shared, real user-data path, letting state
+  leak across test runs and triggering a real, unmocked confirmation
+  dialog that hung headless test execution. ~150 new/updated tests across
+  the hotfix; full suite re-verified at 2093 passed / 0 failed. See
+  docs/UNIFIED_MATCH_WORKFLOW.md and docs/HT_SEASON_CALENDAR.md.
+
+- Fixed Alpha 0.6.7 (partial) Unified Match Workflow's own explicitly
+  flagged bug: Official Match History's previous/next navigation
+  (Alpha 0.6.6) sorted newest-first but treated raw array-index
+  direction as the button semantics, so "Partido anterior" (should mean
+  chronologically older) did nothing from the newest record and
+  "Partido siguiente" (should mean newer) actually moved to an older
+  one -- exactly backwards. Fixed the index arithmetic to match the
+  labeled meaning, fixed deterministic ordering for records with an
+  unknown date (always after dated ones, never randomly reordered
+  between runs), and rewrote every affected test to assert on actual
+  dates rather than array positions, per the brief's own explicit
+  instruction -- the wrong code and the wrong test previously agreed
+  with each other. Made the "COMPLETE requires official_post" status
+  invariant an explicit, always-checked assertion rather than an
+  implicit property of the derivation function's control flow, and
+  verified provisional-identity collision safety against the brief's
+  own numeric concatenation example. ~10 new/updated tests; full suite
+  re-verified at 1877 passed / 0 failed. See
+  docs/UNIFIED_MATCH_WORKFLOW.md. The larger scope of this sprint (New
+  Match / Saved Matches screens, PRE import relocated beside the pitch,
+  duplicate reconciliation) remains for a future pass.
+
+### Added
+
+- Added Alpha 0.6.6 Match Decision Memory, Weekly Planning Navigation and
+  Official Match History. Manual lineup replacement was already correctly
+  preserving slot/side and never resetting unrelated players' orders;
+  `WorkspaceService.set_manual_order()` closed the one real gap (no way to
+  directly pick any valid order after a replacement). New
+  `engine/lineup_memory/` compares a previously planned lineup against a new
+  recommendation, classifies how meaningful the difference actually is
+  (CLEAR_IMPROVEMENT/MODERATE_IMPROVEMENT/MARGINAL_CHANGE/EQUIVALENT/
+  TRADE_OFF, combining win-probability, xG, and whether sectors moved in
+  opposite directions -- never one arbitrary player score), and builds a
+  structured, evidence-grounded change explanation -- verified against the
+  brief's own worked example (Bassedas/Alvarez, midfield gain vs. central-
+  defense loss) character-for-character. Found and fixed a real scale-
+  compatibility bug in Match's own sector-comparison check (optional
+  indirect-set-piece sectors with no data were blocking otherwise-fully-
+  comparable Official PRE vs. opponent comparisons) and removed a genuinely
+  duplicated technical matchup table from the main Match Intelligence
+  section, relocating it to the existing technical/diagnostic section.
+  Weekly Planner gained previous/current/next week navigation (never
+  unrestricted history -- that's what Official Match History is for) and
+  immediate cross-page refresh when a lineup is saved from Match. Built the
+  full `OfficialMatchRecord` foundation: a strict distinction between
+  training cycles and Hattrick's own competitive season/week numbering
+  (never computed from a date -- always explicit or unknown), typed record
+  statuses always derived fresh from actual PRE/POST/retrospective-PRE
+  evidence (never persisted separately), the progressive provisional ->
+  consolidated -> completed record lifecycle (verified end-to-end to never
+  duplicate a record), full official-match-history navigation wired into
+  the real Match Intelligence page (season filter, previous/current/next,
+  record identity header reproducing the brief's own layout example
+  character-for-character), record editability rules, and the missed-PRE
+  retrospective-simulation workflow (detection, save, and comparison
+  labeling all engine-tested; the confirmation dialog widget itself is the
+  one remaining UI piece). `HistoricalMatchSnapshot` was extended rather
+  than duplicated as a parallel model, verified with a hand-written legacy
+  payload to migrate without any data loss. ~150 new/updated tests across
+  the whole sprint; full suite re-verified at 1864 passed / 0 failed. See
+  docs/MATCH_DECISION_MEMORY.md and docs/OFFICIAL_MATCH_HISTORY.md.
+
+- Added Alpha 0.6.5 Hattrick Weekly Cycle, Squad UX Simplification and
+  Training Timeline: architecture-first, no new analytical engines.
+  `engine/calendar/` is now the single canonical source of truth for "what
+  HT week is this?" -- `HTWeekday`/`HTWeekState` typed enums, an
+  `HT_DAY_ACTIVITY` table (the one place "Thursday means training" is
+  defined), and `HTCalendarService` with `current_state()`,
+  `next_transition()`, `days_until_training()/finances()/match()` and
+  `week_snapshot()`. All eight `HTWeekState` values are reachable, mapped
+  directly onto the day-to-activity table. Fixed the core bug this sprint
+  targets in two separate places (`engine/weekly_training/training_week.py`
+  and `weekly_training_service.py`'s `load_state()`): both used to compare
+  bare `date` objects against the training-update date, so any moment on
+  Thursday counted as "already processed" hours before the real 21:00
+  server update -- both now respect the exact hour via
+  `HTCalendarService.is_training_processed()` whenever a full `datetime` is
+  available, falling back to the original date-only comparison only for
+  backward compatibility with callers that never passed time-of-day
+  information. Added pure, unimplemented `FinancialWeekSnapshot` and
+  `YouthWeekSnapshot` contracts (every field defaults to `None`, never a
+  fabricated zero) for a future Finance/Youth module. Verified the
+  already-built Squad UX simplification (Role/State/Specialty filters only,
+  positioned immediately above the player table), the official `Specialty`
+  enum (all six Hattrick specialties, accent/case-insensitive parsing,
+  full localization), the single week-context provider
+  (`ht_week_context_provider.py`), and the compact "Current HT Week" header
+  in the Weekly Planner -- all already wired correctly, confirmed end-to-end
+  with real data. Swept Club Advisor and Match Intelligence for direct
+  `datetime.now()`/`date.today()` calls (clean) and fixed the one remaining
+  violation found. 33 new tests; full suite re-verified at 1708 passed / 0
+  failed. See docs/HT_WEEK_CALENDAR.md for the full write-up.
+
+### Fixed
+
+- Fixed HF-02.2 Official Match Intelligence Integration and Advisor Modal
+  Polish: found and fixed the root cause of Official PRE never reaching
+  Match's tactical intelligence -- `MatchWorkspaceService._map_sector_comparisons`
+  hardcoded `our_scale=SOURCE_HT_COACH_INTERNAL` unconditionally, so "our"
+  side was always excluded from direct comparison even with a real Official
+  PRE on the same Hattrick scale as the opponent estimate. Added a source-
+  selection policy (Official PRE > calibrated internal, not yet confirmed >
+  internal diagnostic) applied as a pure post-processing step over the
+  recommended formation only -- the lineup optimizer, tactic optimizer, and
+  every rating formula are completely untouched. Unified a second, independent
+  left/right orientation mapping that had been duplicating the one in
+  `sector_rating.py`. Added an `AppEvents.official_ratings_changed` signal so
+  Match and Match Intelligence auto-refresh each other after an import from
+  either page, with no restart or manual re-analysis. Added deterministic
+  direction/magnitude interpretation and evidence-only conclusion generation
+  for the PRE/POST comparison (verified against the brief's own worked example
+  character-for-character), a responsive two-column PRE/POST layout, and a
+  collapsed-by-default "Diagnóstico interno" section instead of always-visible
+  "?" placeholder rows. Fixed two Club Advisor UI bugs: the drill-down modal's
+  panel had no CSS rule of its own and inherited the overlay's translucent
+  grey background instead of showing opaque white; and the Training drill-down
+  showed player counts instead of the actual names, now derived directly from
+  the Weekly Planner's own priority records. ~85 new/updated tests; full suite
+  re-verified at 1656 passed / 0 failed. No optimizer, financial, or transfer-
+  market logic was added. See docs/OFFICIAL_MATCH_INTELLIGENCE.md and
+  docs/CLUB_ADVISOR.md for the full write-up.
+
+### Added
+
+- Added Alpha 0.6.4 UX Polish & Data Integrity stabilization. Official PRE
+  and POST imports now keep independent parser/validator entry points because
+  they are different Hattrick documents even though both feed the same internal
+  snapshot model. PRE and POST are associated only by canonical Hattrick Match
+  ID; when IDs differ, HT Coach shows a manual confirmation dialog instead of
+  guessing, keeps the existing PRE unchanged on Back, and enables Apply only
+  after both IDs match. Match Intelligence now emphasizes Official PRE,
+  Official POST, Comparison and Conclusions, with HT Coach internal estimates
+  demoted to supporting context. Club Advisor status text now always includes
+  immediate causes when risks or warnings drive the global state, and its
+  training card reads 100% / 50% / No training counts directly from Weekly
+  Training Planner priority rows. Squad player filters were simplified to the
+  practical Role, State and Specialty controls near the player table. The Club
+  Advisor drill-down overlay was tightened into one elevated modal surface with
+  explicit Explanation, Players involved, Reason, Impact and Review fields.
+- Added Alpha 0.6.3 Advisor Grounding, Official POST Compatibility &
+  Drill-down UX: not more rules, better-grounded ones. Official Match
+  Intelligence gained automatic PRE/POST format detection and decimal
+  comma/point normalization (calibration note: no real POST sample was
+  available this sprint, so DETAILED_POST support is built from the brief's
+  field list and verified against a synthetic fixture, pending a real sample).
+  Club Advisor now separates structural club status (complete roster) from
+  temporary availability (this week only, from the existing AvailabilityService)
+  so a short-term injury is never conflated with a genuine depth gap; depth
+  conclusions are formation-aware (reusing the training wizard's own
+  formation-max helper) rather than assuming a flat replacement count; and a
+  player's current position and future training project now coexist, fixing a
+  real "Projects: 0" bug. Every risk now carries position, reason, impact,
+  urgency, real affected-player names, and a review trigger instead of an
+  abstract label; players-without-training and training-slot-pressure moved
+  out of risks entirely into training-plan-specific warnings, since a position
+  outside the active training's effect is often expected. Every squad count
+  now exposes the actual player list behind it. Clicking any Club Advisor card
+  opens a centered drill-down modal over a translucent overlay (closes via
+  button, Escape, or outside click), and the headline project status now
+  explains which dimension drove it rather than showing "Critical" with no
+  reason. 39 new/updated tests; full suite re-verified at 1567 passed / 0
+  failed. See docs/CLUB_ADVISOR.md and docs/OFFICIAL_MATCH_INTELLIGENCE.md.
+- Added Alpha 0.6.2 Season-Aware Club Advisor: the core principle this sprint
+  implements is that strategic need and operational urgency are independent
+  dimensions -- a club can have HIGH defensive-depth need while simultaneously
+  having LOW urgency to act on it, and the Advisor must never compute one from
+  the other. Six new Qt-independent modules extend the existing Club Advisor
+  package (no second engine): a fully optional `SeasonContext` that never
+  fabricates missing values; `compute_urgency()` with documented, evidenced
+  reducers/increasers and a per-need-tier floor that keeps a genuine need from
+  ever collapsing to "nothing to look at"; `determine_action_type()`, the
+  single place need and urgency combine into one recommended action;
+  season-aware `RecommendationHorizon`s; need derivation from Club Advisor's
+  already-computed depth/training/squad evidence (never recalculated); and an
+  orchestrator producing separately-framed strategic and operational priority
+  lists plus a preliminary, evidence-limited `PromotionReadiness` assessment
+  (current-league dominance never implies promotion readiness by itself).
+  Deliberate inaction ("maintain training, no signing currently required") is a
+  first-class evidenced recommendation. The sprint's own worked example
+  (central-defense depth: HIGH need, LOW urgency, MONITOR, review before
+  promotion) and a synthetic 19-player regression fixture matching its
+  described scenario are both reproduced exactly by the engine. Fully backward
+  compatible: `generate_report()`'s new `season_context` argument is optional,
+  `ClubAdvisorReport` gained four new optional fields, and every pre-existing
+  Club Advisor test passes unchanged. UI: the existing Club Advisor page gained
+  a compact, optional Season Plan card and Operational/Strategic
+  Priorities/Promotion Readiness sections -- no new top-level page. 35 engine
+  tests (all 12 required scenarios), 9 localization tests, 9 UI tests, 97%
+  coverage on the new/changed code; full suite re-verified at 1520 passed / 0
+  failed. See docs/CLUB_ADVISOR.md's "Need vs. Urgency" section for the full
+  write-up.
+- Added Alpha 0.6.1 Workflow Consolidation & Match Intelligence UI (UX-03): no
+  new intelligence this sprint, just making HT Coach feel coherent.
+  Training-type changes now show a confirmation dialog and a fully
+  catalog-driven Training Priority Wizard
+  (`engine/weekly_training/training_priority_policy.py`, verified against every
+  worked example in the brief across all 12 training types, 41 parameterized
+  tests). Match's official-summary import UI simplified to a single
+  confirmation dialog; all ratings/metadata/comparison display moved to a new
+  Match Intelligence page that reuses Alpha 0.5.9.0/UX-02's import service and
+  formatting rather than duplicating it, and auto-refreshes on tab focus.
+  Squad gained Role/Status/Training Fit filters and a scrollable, minimum-width
+  detail panel. Found and fixed a genuine role-calibration bug behind "too many
+  starters": positional rank was being computed against the entire roster
+  instead of real peers, and current performance didn't account for how many
+  players a position's formation slots actually call for -- fixing both dropped
+  starter-tier roles from 63% to 47% of a real 19-player squad and correctly
+  stopped a second goalkeeper from being classified as a starter. Also found
+  and fixed a real localization-namespace collision: this sprint's first draft
+  silently overwrote two keys of an existing, unrelated "Match Intelligence"
+  (tactical focus) section inside Match's results panel, caught by an existing
+  regression test; this sprint's content now lives under a distinct
+  `official_match_intelligence.*` namespace. Full suite re-verified at 1467
+  passed / 0 failed. See docs/ROADMAP.md's Alpha 0.6.1 entry and
+  docs/OFFICIAL_MATCH_INTELLIGENCE.md for the full write-up.
+- Added Alpha 0.6.0 Club Advisor Foundation: the first club-level intelligence
+  layer, a new Qt-independent `engine/club_advisor` package that summarizes the
+  current sporting project entirely from evidence already produced by Squad
+  Intelligence and Training — never a new player-rating or scoring engine. A
+  five-value project status is evaluated from three independent
+  sub-assessments (training utilization, positional depth, squad composition)
+  with the worst one capping the overall status, never a single blended score.
+  An ordered priority catalog (8 types) never recommends a purchase, a
+  specific player, or a transfer price. Independent strength/risk/warning
+  detectors, each carrying evidence (warnings additionally carry an explicit
+  reason). Five limitations (financial data, league comparison, transfer
+  market, salary budget, promotion target) are always disclosed, since this
+  sprint has no data source for any of them. A new "Club Advisor" navigation
+  tab renders one concise card per section — no charts, no gauges, no overall
+  score. `SquadIntelligenceContext` gained an additive `ages_by_position`
+  field enabling genuine "future shortage" depth detection. Building against a
+  real CSV caught and permanently fixed a pre-existing, unrelated flaky test
+  in the training planner suite (a match-date safety guard tripped by real
+  time having passed since the test was written). 62 new tests, 96% coverage
+  on the new engine package; full suite re-verified at 1386 passed / 0 failed.
+  See docs/CLUB_ADVISOR.md for the full write-up, including what's explicitly
+  deferred (History integration, Transfer/Financial Planner, configurable
+  Club DNA).
 - Added Alpha 0.5.9.1 Squad Intelligence: a new Qt-independent
   `engine/squad_intelligence` package (15 modules) turns Squad into a
   player-management intelligence screen. For any current-roster player it

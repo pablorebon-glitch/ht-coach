@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -92,8 +93,12 @@ class WeeklyTrainingRepository:
 
     def save(self, state):
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as file:
-            json.dump(_state_to_dict(state), file, indent=2, ensure_ascii=False)
+        _write_json_atomic(
+            self.storage_path,
+            _state_to_dict(state),
+            indent=2,
+            ensure_ascii=False,
+        )
         return state
 
     def save_priority(self, state, record):
@@ -131,6 +136,22 @@ class WeeklyTrainingRepository:
             existing.match_id == record.match_id for existing in state.match_records
         ):
             records = state.match_records + (record,)
+        return self.save(
+            WeeklyTrainingState(
+                active_training_type=state.active_training_type,
+                active_week=state.active_week,
+                priorities=state.priorities,
+                match_records=records,
+                archived_weeks=state.archived_weeks,
+            )
+        )
+
+    def replace_match_record_by_original_id(self, state, original_match_id, record):
+        records = tuple(
+            existing
+            for existing in state.match_records
+            if existing.match_id not in {original_match_id, record.match_id}
+        ) + (record,)
         return self.save(
             WeeklyTrainingState(
                 active_training_type=state.active_training_type,
@@ -182,6 +203,15 @@ def _state_to_dict(state):
         "match_records": [_match_to_dict(record) for record in state.match_records],
         "archived_weeks": [_week_to_dict(week) for week in state.archived_weeks],
     }
+
+
+def _write_json_atomic(path, data, **dump_kwargs):
+    temp_path = path.with_name(f".{path.name}.tmp")
+    with open(temp_path, "w", encoding="utf-8") as file:
+        json.dump(data, file, **dump_kwargs)
+        file.flush()
+        os.fsync(file.fileno())
+    os.replace(temp_path, path)
 
 
 def _week_to_dict(week):
@@ -301,6 +331,7 @@ def _match_to_dict(record):
             _exposure_to_dict(exposure)
             for exposure in record.training_exposure_entries
         ],
+        "linked_match_record_id": record.linked_match_record_id,
     }
 
 
@@ -321,4 +352,5 @@ def _match_from_dict(data):
             _exposure_from_dict(exposure)
             for exposure in data.get("training_exposure_entries", [])
         ),
+        linked_match_record_id=str(data.get("linked_match_record_id", "")),
     )

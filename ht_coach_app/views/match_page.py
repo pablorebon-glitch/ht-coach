@@ -1,9 +1,10 @@
-from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtCore import QDate, QEvent, QSignalBlocker, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
     QComboBox,
+    QDateEdit,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import t
 from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
 from ht_coach_app.ui.design_system.empty_state import EmptyState
+from ht_coach_app.ui.input_behavior import install_page_only_wheel_policy
 from ht_coach_app.ui.responsive import (
     restore_splitter_geometry,
     splitter_ratios_from_sizes,
@@ -70,6 +72,10 @@ class MatchPage(BasePage):
     workspace_changed = Signal()
     match_section_toggled = Signal(str, bool)
     save_as_first_match_requested = Signal()
+    save_formation_requested = Signal()
+    tactic_changed = Signal(str)
+    team_attitude_changed = Signal(str)
+    match_date_changed = Signal(str)
     save_as_second_match_requested = Signal()
     official_rating_import_requested = Signal(str)
 
@@ -95,14 +101,24 @@ class MatchPage(BasePage):
         self._last_result = None
         self._last_restored = False
         self._last_workspace_state = None
+        self._last_workspace_match_type = None
         self._advisor_verbosity = "detailed"
         self._analysis_inputs_collapsed = False
+        self._editing_saved_match = False
+        self._metadata_dirty = False
+        self._analysis_stale = False
         self._match_section_states = dict(self.MATCH_SECTION_DEFAULTS)
         self._match_sections = {}
         self._match_section_body_roots = {}
         self._result_tabs = None
         self._formation_board_widget = None
+        self._formation_board_tab_container = None
+        self._pre_side_panel = None
+        self._pre_status_label = None
+        self._tactic_mismatch_label = None
+        self._compact_ratings_container = None
         self._geometry_refresh_revision = 0
+        install_page_only_wheel_policy()
         self.body_layout.setContentsMargins(16, 12, 16, 12)
         self.body_layout.setSpacing(8)
         self._build_scroll_content()
@@ -110,9 +126,14 @@ class MatchPage(BasePage):
         self._build_results()
 
     def resizeEvent(self, event):
+        viewport_state = (
+            self._capture_viewport_state()
+            if hasattr(self, "scroll_area")
+            else None
+        )
         super().resizeEvent(event)
         if hasattr(self, "scroll_area"):
-            self._schedule_deferred_geometry_refresh()
+            self._schedule_deferred_geometry_refresh(viewport_state)
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -231,6 +252,7 @@ class MatchPage(BasePage):
         opponent_label = QLabel(t("match.opponent"))
         self.opponent_label = opponent_label
         self.opponent_combo = QComboBox()
+        self.opponent_combo.setEditable(True)
         self.opponent_combo.currentTextChanged.connect(
             self._emit_workspace_changed
         )
@@ -286,6 +308,10 @@ class MatchPage(BasePage):
         self.match_type_label = match_type_label
         self.match_type_combo = QComboBox()
         self.match_type_combo.addItem(
+            t("match.match_type_select"),
+            "",
+        )
+        self.match_type_combo.addItem(
             t("match.match_type_league"),
             MATCH_TYPE_LEAGUE,
         )
@@ -297,6 +323,35 @@ class MatchPage(BasePage):
             self._emit_workspace_changed
         )
 
+        match_date_label = QLabel(t("match.match_date"))
+        self.match_date_label = match_date_label
+        self.match_date_edit = QDateEdit()
+        self.match_date_edit.setCalendarPopup(True)
+        self.match_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.match_date_edit.setDate(self._default_match_qdate())
+        self.match_date_edit.dateChanged.connect(
+            self._emit_workspace_changed
+        )
+        self.match_date_edit.dateChanged.connect(
+            self._emit_match_date_changed
+        )
+
+        self.season_preview_label = QLabel("")
+        self.season_preview_label.setWordWrap(True)
+        self.season_preview_label.setObjectName("compactDecisionText")
+
+        venue_role_label = QLabel(t("match.venue_role"))
+        self.venue_role_label = venue_role_label
+        self.venue_role_combo = QComboBox()
+        self.venue_role_combo.addItem(t("match.venue_role_home"), "home")
+        self.venue_role_combo.addItem(t("match.venue_role_away"), "away")
+        self.venue_role_combo.addItem(t("match.venue_role_neutral"), "neutral")
+        self.venue_role_combo.addItem(t("match.venue_role_unknown"), "unknown")
+        self.venue_role_combo.setCurrentIndex(3)
+        self.venue_role_combo.currentIndexChanged.connect(
+            self._emit_workspace_changed
+        )
+
         self.training_conflict_label = QLabel("")
         self.training_conflict_label.setWordWrap(True)
         self.training_conflict_label.setProperty(
@@ -304,6 +359,19 @@ class MatchPage(BasePage):
             "warning"
         )
         self.training_conflict_label.setVisible(False)
+
+        self.training_context_label = QLabel("")
+        self.training_context_label.setWordWrap(True)
+        self.training_context_label.setObjectName("compactDecisionText")
+        self.training_context_label.setVisible(False)
+
+        self.metadata_evidence_warning_label = QLabel("")
+        self.metadata_evidence_warning_label.setWordWrap(True)
+        self.metadata_evidence_warning_label.setProperty(
+            "state",
+            "warning"
+        )
+        self.metadata_evidence_warning_label.setVisible(False)
 
         self.status_label = QLabel(t("match.ready"))
         self.status_label.setWordWrap(True)
@@ -320,10 +388,6 @@ class MatchPage(BasePage):
         self.official_import_button.clicked.connect(
             self._open_official_import_dialog
         )
-        self.official_summary_label = QLabel("")
-        self.official_summary_label.setWordWrap(True)
-        self.official_summary_label.setObjectName("officialSummaryLabel")
-        self.official_summary_label.setVisible(False)
 
         layout.addWidget(csv_label, 0, 0)
         layout.addWidget(self.recent_csv_combo, 0, 1)
@@ -336,22 +400,38 @@ class MatchPage(BasePage):
         layout.addWidget(self.availability_warning_label, 3, 1, 1, 3)
         layout.addWidget(opponent_label, 4, 0)
         layout.addWidget(self.opponent_combo, 4, 1, 1, 3)
-        layout.addWidget(formation_label, 5, 0)
-        layout.addWidget(formation_actions_widget, 5, 1, 1, 3)
-        layout.addWidget(self.formations_container, 6, 1, 1, 3)
-        layout.addWidget(match_type_label, 7, 0)
-        layout.addWidget(self.match_type_combo, 7, 1, 1, 3)
-        layout.addWidget(self.formation_warning_label, 8, 1, 1, 3)
-        layout.addWidget(self.status_label, 9, 0, 1, 3)
-        layout.addWidget(self.analyze_button, 9, 3)
-        layout.addWidget(self.training_conflict_label, 10, 1, 1, 3)
-        layout.addWidget(self.official_import_button, 11, 0)
-        layout.addWidget(self.official_summary_label, 11, 1, 1, 3)
+        layout.addWidget(match_type_label, 5, 0)
+        layout.addWidget(self.match_type_combo, 5, 1, 1, 3)
+        layout.addWidget(venue_role_label, 6, 0)
+        layout.addWidget(self.venue_role_combo, 6, 1, 1, 3)
+        layout.addWidget(match_date_label, 7, 0)
+        layout.addWidget(self.match_date_edit, 7, 1, 1, 3)
+        layout.addWidget(self.season_preview_label, 8, 1, 1, 3)
+        layout.addWidget(formation_label, 9, 0)
+        layout.addWidget(self.formations_container, 9, 1, 1, 3)
+        layout.addWidget(formation_actions_widget, 10, 1, 1, 3)
+        layout.addWidget(self.formation_warning_label, 11, 1, 1, 3)
+        layout.addWidget(self.training_conflict_label, 12, 1, 1, 3)
+        layout.addWidget(self.training_context_label, 13, 1, 1, 3)
+        layout.addWidget(self.metadata_evidence_warning_label, 14, 1, 1, 3)
+        layout.addWidget(self.status_label, 15, 0, 1, 3)
+        layout.addWidget(self.analyze_button, 15, 3)
         layout.setColumnStretch(1, 1)
 
         setup_layout.addWidget(self.analysis_inputs_panel)
         self.match_content_layout.addWidget(self.analysis_setup_panel, 0)
         self._sync_analysis_setup_toggle()
+        self._update_analyze_button_state()
+
+    @staticmethod
+    def _default_match_qdate():
+        try:
+            from ht_coach_app.services.ht_week_context_provider import get_calendar_service
+
+            current = get_calendar_service().now().date()
+            return QDate(current.year, current.month, current.day)
+        except Exception:
+            return QDate.currentDate()
 
     def _build_results(self):
         self.results_host = QWidget()
@@ -370,20 +450,73 @@ class MatchPage(BasePage):
             if selected_name is None
             else selected_name
         )
+        names = list(opponent_names or [])
+        saved_snapshot_name = current if current and current not in names else ""
         self.opponent_combo.blockSignals(True)
         self.opponent_combo.clear()
-        self.opponent_combo.addItem("")
+        self.opponent_combo.addItem("", None)
 
-        for name in opponent_names:
-            self.opponent_combo.addItem(name)
+        for name in names:
+            self.opponent_combo.addItem(
+                name,
+                {
+                    "opponent_id": name,
+                    "opponent_name": name,
+                    "source": "OPPONENT_MANAGER",
+                },
+            )
+        if saved_snapshot_name:
+            self.opponent_combo.addItem(
+                t(
+                    "match.saved_opponent_missing_label",
+                    opponent=saved_snapshot_name,
+                ),
+                {
+                    "opponent_id": saved_snapshot_name,
+                    "opponent_name": saved_snapshot_name,
+                    "source": "SAVED_MATCH_SNAPSHOT",
+                },
+            )
 
-        index = self.opponent_combo.findText(current)
+        index = self._find_opponent_index_by_name(current)
         if index >= 0:
             self.opponent_combo.setCurrentIndex(index)
         else:
             self.opponent_combo.setCurrentIndex(0)
 
         self.opponent_combo.blockSignals(False)
+
+    def _find_opponent_index_by_name(self, opponent_name):
+        for index in range(self.opponent_combo.count()):
+            data = self.opponent_combo.itemData(index)
+            if isinstance(data, dict) and data.get("opponent_name") == opponent_name:
+                return index
+            if self.opponent_combo.itemText(index) == opponent_name:
+                return index
+        return -1
+
+    def enter_saved_match_edit_mode(self, title=None):
+        self._editing_saved_match = True
+        self._metadata_dirty = False
+        self.analysis_setup_title.setText(title or t("match.editing_saved_match"))
+        self.expand_analysis_inputs()
+        self._update_save_action_labels()
+
+    def exit_saved_match_edit_mode(self):
+        self._editing_saved_match = False
+        self._metadata_dirty = False
+        self.analysis_setup_title.setText(t("match.analysis_setup"))
+        self.set_metadata_evidence_warning("")
+        self._update_save_action_labels()
+
+    def clear_metadata_dirty(self):
+        self._metadata_dirty = False
+        self._update_save_action_labels()
+
+    def set_metadata_evidence_warning(self, message):
+        text = (message or "").strip()
+        self.metadata_evidence_warning_label.setText(text)
+        self.metadata_evidence_warning_label.setVisible(bool(text))
 
     def set_supported_formations(
         self,
@@ -414,6 +547,7 @@ class MatchPage(BasePage):
 
         self.formations_layout.addStretch(1)
         self._update_formation_warning()
+        self._update_analyze_button_state()
 
     def apply_settings(self, settings):
         self._applying_settings = True
@@ -454,6 +588,7 @@ class MatchPage(BasePage):
 
         self._applying_settings = False
         self._update_formation_warning()
+        self._update_analyze_button_state()
 
     def players_csv_path(self):
         return self.players_path_edit.text().strip()
@@ -490,7 +625,35 @@ class MatchPage(BasePage):
         self.load_players_requested.emit()
 
     def selected_opponent_name(self):
+        data = self.opponent_combo.currentData()
+        if (
+            isinstance(data, dict)
+            and self.opponent_combo.currentIndex() >= 0
+            and self.opponent_combo.currentText() == self.opponent_combo.itemText(
+                self.opponent_combo.currentIndex()
+            )
+        ):
+            return (data.get("opponent_name") or "").strip()
         return self.opponent_combo.currentText().strip()
+
+    def selected_opponent_identity(self):
+        data = self.opponent_combo.currentData()
+        if (
+            isinstance(data, dict)
+            and self.opponent_combo.currentIndex() >= 0
+            and self.opponent_combo.currentText() == self.opponent_combo.itemText(
+                self.opponent_combo.currentIndex()
+            )
+        ):
+            return dict(data)
+        name = self.selected_opponent_name()
+        if not name:
+            return {}
+        return {
+            "opponent_id": name,
+            "opponent_name": name,
+            "source": "MANUAL_TEXT",
+        }
 
     def selected_formations(self):
         return [
@@ -502,25 +665,158 @@ class MatchPage(BasePage):
         return self.availability_combo.currentData() or CURRENT_AVAILABLE
 
     def match_type(self):
-        return self.match_type_combo.currentData() or MATCH_TYPE_LEAGUE
+        return self.match_type_combo.currentData()
+
+    def set_match_type(self, match_type):
+        index = self.match_type_combo.findData(match_type)
+        if index >= 0:
+            self.match_type_combo.setCurrentIndex(index)
+
+    def set_analysis_stale(self, stale, message=""):
+        self._analysis_stale = bool(stale)
+        self._update_save_action_labels()
+        if self._analysis_stale and message:
+            self.show_error(message)
+
+    def match_date(self):
+        return self.match_date_edit.date().toString("yyyy-MM-dd")
+
+    def set_match_date(self, iso_date_text):
+        if not iso_date_text:
+            return
+        qdate = QDate.fromString(iso_date_text[:10], "yyyy-MM-dd")
+        if qdate.isValid():
+            self.match_date_edit.setDate(qdate)
+
+    def _emit_match_date_changed(self, _qdate):
+        self.match_date_changed.emit(self.match_date())
+
+    def set_season_preview(self, text):
+        """Alpha 0.6.7 HF-02, Part 14: after picking a date, preview
+        "Temporada HT 95 · Semana 2" -- or the honest "Temporada HT:
+        sin configurar" when no season calendar has been set up yet.
+        Never blocks match creation either way."""
+        self.season_preview_label.setText(text or "")
+
+    def venue_role(self):
+        return self.venue_role_combo.currentData() or "unknown"
+
+    def set_venue_role(self, venue_role):
+        index = self.venue_role_combo.findData(venue_role)
+        if index >= 0:
+            self.venue_role_combo.setCurrentIndex(index)
+
+    def tactic(self):
+        board = self._formation_board_widget
+        if board is None:
+            return ""
+        return board.tactic_combo.currentData() or ""
+
+    def set_tactic(self, tactic):
+        board = self._formation_board_widget
+        if board is None or not tactic:
+            return
+        index = board.tactic_combo.findData(tactic)
+        if index >= 0:
+            blocker = QSignalBlocker(board.tactic_combo)
+            board.tactic_combo.setCurrentIndex(index)
+            del blocker
+
+    def team_attitude(self):
+        board = self._formation_board_widget
+        if board is None:
+            return ""
+        return board.team_attitude_combo.currentData() or ""
+
+    def set_team_attitude(self, attitude):
+        board = self._formation_board_widget
+        if board is None or not attitude:
+            return
+        index = board.team_attitude_combo.findData(attitude)
+        if index >= 0:
+            blocker = QSignalBlocker(board.team_attitude_combo)
+            board.team_attitude_combo.setCurrentIndex(index)
+            del blocker
+
+    def is_workspace_dirty(self):
+        """Alpha 0.6.7 HF-03, Part 12: whether the currently open
+        formation has unsaved changes."""
+        board = self._formation_board_widget
+        return self._metadata_dirty or (board is not None and board.is_dirty())
 
     def set_training_conflict_warning(self, message):
         text = (message or "").strip()
         self.training_conflict_label.setText(text)
         self.training_conflict_label.setVisible(bool(text))
 
-    def confirm_replace_first_match(self):
+    def set_training_context_summary(self, message, stale=False):
+        text = (message or "").strip()
+        self.training_context_label.setText(text)
+        self.training_context_label.setProperty(
+            "state",
+            "warning" if stale else "",
+        )
+        self.training_context_label.style().unpolish(self.training_context_label)
+        self.training_context_label.style().polish(self.training_context_label)
+        self.training_context_label.setVisible(bool(text))
+
+    def confirm_unsaved_changes(self):
+        """Alpha 0.6.7 HF-03, Part 12: when leaving or switching a
+        dirty Match workspace, the person must explicitly choose --
+        never a silent loss or an implicit transfer of changes onto a
+        different record."""
+        from PySide6.QtWidgets import QMessageBox
+
+        box = QMessageBox(self)
+        box.setWindowTitle(t("match.unsaved_changes.title"))
+        box.setText(t("match.unsaved_changes.message"))
+        cancel_button = box.addButton(t("match.unsaved_changes.cancel"), QMessageBox.RejectRole)
+        discard_button = box.addButton(
+            t("match.unsaved_changes.discard"), QMessageBox.DestructiveRole
+        )
+        save_button = box.addButton(
+            t("match.unsaved_changes.save"), QMessageBox.AcceptRole
+        )
+        box.setDefaultButton(cancel_button)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is save_button:
+            return "save"
+        if clicked is discard_button:
+            return "discard"
+        return "cancel"
+
+    def confirm_replace_first_match(self, week_start_text="", week_end_text=""):
+        """Alpha 0.6.7 HF-02, Part 3: names the *actual* training cycle
+        that already has a Match 1 -- never assumes it's the current
+        week just because the confirmation happened today."""
+        message = (
+            t(
+                "planner.replace_first_match_confirm_dated",
+                start=week_start_text, end=week_end_text,
+            )
+            if week_start_text and week_end_text
+            else t("planner.replace_first_match_confirm")
+        )
         return QMessageBox.question(
             self,
             t("planner.replace_first_match"),
-            t("planner.replace_first_match_confirm"),
+            message,
         ) == QMessageBox.Yes
 
-    def confirm_replace_second_match(self):
+    def confirm_replace_second_match(self, week_start_text="", week_end_text=""):
+        message = (
+            t(
+                "planner.replace_second_match_confirm_dated",
+                start=week_start_text, end=week_end_text,
+            )
+            if week_start_text and week_end_text
+            else t("planner.replace_second_match_confirm")
+        )
         return QMessageBox.question(
             self,
             t("planner.replace_second_match"),
-            t("planner.replace_second_match_confirm"),
+            message,
         ) == QMessageBox.Yes
 
     def confirm_save_match_type_mismatch(self, expected_label, actual_label):
@@ -567,9 +863,70 @@ class MatchPage(BasePage):
             self, t("match.official_import.error_title"), message
         )
 
-    def set_official_summary_text(self, text):
-        self.official_summary_label.setText(text)
-        self.official_summary_label.setVisible(bool(text))
+    def show_official_import_success(self):
+        """Per this sprint's guardrail: Match shows only a simple
+        confirmation after a successful official-summary import --
+        ratings, metadata, timestamps and comparisons all moved to the
+        dedicated Match Intelligence page."""
+        QMessageBox.information(
+            self,
+            t("match.official_import.action"),
+            t("match.official_import.success"),
+        )
+
+    def show_existing_match_dialog(self):
+        """Alpha 0.6.7, Part 5's own dialog, word-for-word."""
+        answer = QMessageBox.question(
+            self,
+            t("match.existing_match.title"),
+            t("match.existing_match.message"),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return answer == QMessageBox.Yes
+
+    def show_match_conflict_dialog(self, opponent_name, existing_competition, new_competition):
+        """Alpha 0.6.7, Part 6's own dialog, word-for-word -- three
+        explicit choices, never a silent duplicate."""
+        box = QMessageBox(self)
+        box.setWindowTitle(t("match.conflict.title"))
+        box.setText(
+            t(
+                "match.conflict.message",
+                opponent=opponent_name,
+                existing_competition=existing_competition,
+                new_competition=new_competition,
+            )
+        )
+        cancel_button = box.addButton(t("match.conflict.cancel"), QMessageBox.RejectRole)
+        correct_button = box.addButton(t("match.conflict.correct"), QMessageBox.ActionRole)
+        create_button = box.addButton(t("match.conflict.create_new"), QMessageBox.AcceptRole)
+        box.setDefaultButton(cancel_button)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is correct_button:
+            return "correct"
+        if clicked is create_button:
+            return "create_new"
+        return "cancel"
+
+    def reset_new_match_selectors(self):
+        """Part 5's "No" behavior: reset rival/type/date selectors to
+        blank, never modifying any saved record."""
+        if hasattr(self, "opponent_combo"):
+            self.opponent_combo.setCurrentIndex(-1)
+
+    def reset_new_match_workspace(self):
+        self.exit_saved_match_edit_mode()
+        self.reset_new_match_selectors()
+        if hasattr(self, "set_match_type"):
+            self.set_match_type("")
+        if hasattr(self, "set_venue_role"):
+            self.set_venue_role("unknown")
+        self.clear_metadata_dirty()
+        self.set_analysis_stale(False)
+        self.clear_results()
+        self.expand_analysis_inputs()
 
     def select_all_formations(self):
         self._set_checked_formations(
@@ -594,6 +951,7 @@ class MatchPage(BasePage):
 
         self._applying_settings = False
         self._emit_workspace_changed()
+        self._update_analyze_button_state()
 
     def choose_players_file(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -614,7 +972,7 @@ class MatchPage(BasePage):
 
     def set_processing(self, is_processing):
         self.analyze_button.setEnabled(
-            not is_processing
+            (not is_processing) and self._can_analyze()
         )
         self.analyze_button.setText(
             t("match.analyzing") if is_processing else t("match.analyze")
@@ -625,7 +983,7 @@ class MatchPage(BasePage):
 
     def set_workspace_processing(self, is_processing):
         self.analyze_button.setEnabled(
-            not is_processing
+            (not is_processing) and self._can_analyze()
         )
         self.analyze_button.setText(
             t("match.updating") if is_processing else t("match.analyze")
@@ -666,6 +1024,11 @@ class MatchPage(BasePage):
         )
 
     def clear_results(self):
+        self._state = "empty"
+        self._last_result = None
+        self._last_restored = False
+        self._last_workspace_state = None
+        self._last_workspace_match_type = None
         self._clear_results_widgets()
         self._show_empty_results()
 
@@ -684,6 +1047,8 @@ class MatchPage(BasePage):
         self._last_result = result
         self._last_restored = restored
         self._last_workspace_state = workspace_state
+        self._last_workspace_match_type = getattr(result, "match_type", None)
+        self.set_analysis_stale(False)
         self._clear_results_widgets()
         self.collapse_analysis_inputs()
         recommended = result.recommended_formation
@@ -828,7 +1193,7 @@ class MatchPage(BasePage):
         self._set_section_body_content(
             "rating_calibration",
             self._bounded_section_scroll(
-                self._build_sector_rating_panel(recommended)
+                self._build_sector_rating_panel(recommended, intelligence)
                 if recommended is not None and getattr(
                     recommended,
                     "sector_rating_comparisons",
@@ -1062,10 +1427,11 @@ class MatchPage(BasePage):
             current_target_width = self.scroll_area.viewport().width()
             target = int(viewport_state.get("vertical_scroll", 0))
             if abs(current_target_width - source_width) > 8:
-                target = int(
+                ratio_target = int(
                     vertical.maximum()
                     * float(viewport_state.get("vertical_scroll_ratio", 0.0))
                 )
+                target = min(target, ratio_target)
             vertical.setValue(max(0, min(target, vertical.maximum())))
             self.scroll_area.horizontalScrollBar().setValue(
                 int(viewport_state.get("horizontal_scroll", 0))
@@ -1083,10 +1449,10 @@ class MatchPage(BasePage):
         QTimer.singleShot(0, restore_scrollbars)
         QTimer.singleShot(25, restore_scrollbars)
 
-    def _schedule_deferred_geometry_refresh(self):
+    def _schedule_deferred_geometry_refresh(self, viewport_state=None):
         self._geometry_refresh_revision += 1
         revision = self._geometry_refresh_revision
-        viewport_state = self._capture_viewport_state()
+        viewport_state = viewport_state or self._capture_viewport_state()
 
         def refresh():
             if revision != self._geometry_refresh_revision:
@@ -1204,6 +1570,162 @@ class MatchPage(BasePage):
 
         tabs.addTab(widget, label)
 
+    def _build_pre_side_panel(self):
+        """Alpha 0.6.7, Parts 10-12: the import action and PRE status
+        live right beside the pitch, visually associated with the
+        lineup being prepared for Hattrick -- not buried in the setup
+        form above."""
+        panel = QFrame()
+        panel.setObjectName("preSidePanel")
+        panel.setMaximumWidth(240)
+        panel.setMinimumWidth(200)
+        panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        layout.addWidget(self.official_import_button)
+
+        self._pre_status_label = QLabel(t("match.pre_status.missing"))
+        self._pre_status_label.setObjectName("preStatusWarningLabel")
+        self._pre_status_label.setProperty("semanticStatus", "danger")
+        self._pre_status_label.setWordWrap(True)
+        layout.addWidget(self._pre_status_label)
+
+        self._compact_ratings_container = QVBoxLayout()
+        self._compact_ratings_container.setSpacing(4)
+        layout.addLayout(self._compact_ratings_container)
+
+        self._tactic_mismatch_label = QLabel("")
+        self._tactic_mismatch_label.setObjectName("tacticMismatchWarning")
+        self._tactic_mismatch_label.setProperty("semanticStatus", "warning")
+        self._tactic_mismatch_label.setWordWrap(True)
+        self._tactic_mismatch_label.setVisible(False)
+        layout.addWidget(self._tactic_mismatch_label)
+
+        layout.addStretch(1)
+        self._pre_side_panel = panel
+        return panel
+
+    def set_pre_status(self, is_loaded):
+        """Part 10-11: red warning before PRE exists, a normal-styled
+        confirmation once it's been imported for this record."""
+        if self._pre_status_label is None:
+            return
+        if is_loaded:
+            self._pre_status_label.setText(t("match.pre_status.loaded"))
+            self._pre_status_label.setProperty("semanticStatus", "success")
+        else:
+            self._pre_status_label.setText(t("match.pre_status.missing"))
+            self._pre_status_label.setProperty("semanticStatus", "danger")
+        self._pre_status_label.style().unpolish(self._pre_status_label)
+        self._pre_status_label.style().polish(self._pre_status_label)
+
+    def set_tactic_mismatch(self, current_tactic_label="", pre_tactic_label=""):
+        """Alpha 0.6.7 HF-03, Part 10: a concise warning near
+        Calificaciones when the current plan's tactic differs from
+        Official PRE's own tactic -- passing empty strings hides it
+        (no mismatch, or no PRE to compare against yet)."""
+        if self._tactic_mismatch_label is None:
+            return
+        if not current_tactic_label or not pre_tactic_label or current_tactic_label == pre_tactic_label:
+            self._tactic_mismatch_label.setVisible(False)
+            self._tactic_mismatch_label.setText("")
+            return
+        self._tactic_mismatch_label.setText(
+            t("match.tactic_mismatch.warning") + "\n"
+            + t("match.tactic_mismatch.current_plan", tactic=current_tactic_label) + "\n"
+            + t("match.tactic_mismatch.official_pre", tactic=pre_tactic_label)
+        )
+        self._tactic_mismatch_label.setVisible(True)
+
+    def show_compact_official_ratings(self, ratings):
+        """Alpha 0.6.7 HF-02, Part 15: a compact, Hattrick-inspired
+        panel titled "Calificaciones" -- never "PRE oficial" (that
+        wording lives in the separate status line beside it, Part 16).
+        Uses a spatial grid (defense row / midfield / attack row, each
+        with left-center-right columns) so *position* communicates the
+        sector -- never verbose "Izquierda:"/"Central:"/"Derecha:"
+        labels. `ratings` is a dict of already-formatted display
+        strings: left_defense, central_defense, right_defense,
+        midfield, left_attack, central_attack, right_attack, tactic,
+        tactic_level, formation (optional), team_attitude (optional).
+        """
+        if self._compact_ratings_container is None:
+            return
+        while self._compact_ratings_container.count():
+            item = self._compact_ratings_container.takeAt(0)
+            widget = item.widget()
+            layout_item = item.layout()
+            if widget is not None:
+                widget.setParent(None)
+            elif layout_item is not None:
+                while layout_item.count():
+                    sub_item = layout_item.takeAt(0)
+                    sub_widget = sub_item.widget()
+                    if sub_widget is not None:
+                        sub_widget.setParent(None)
+
+        if not ratings:
+            title = QLabel(t("match.compact_ratings.title"))
+            title.setObjectName("sectionTitle")
+            self._compact_ratings_container.addWidget(title)
+            empty_label = QLabel(t("match.compact_ratings.not_loaded"))
+            empty_label.setObjectName("compactDecisionText")
+            self._compact_ratings_container.addWidget(empty_label)
+            return
+
+        title = QLabel(t("match.compact_ratings.title"))
+        title.setObjectName("sectionTitle")
+        self._compact_ratings_container.addWidget(title)
+
+        grid = QGridLayout()
+        grid.setSpacing(4)
+
+        def _cell(value):
+            label = QLabel(str(value) if value not in (None, "") else "-")
+            label.setObjectName("compactRatingsValue")
+            label.setAlignment(Qt.AlignCenter)
+            return label
+
+        # Row 0: defense (left, central, right) -- position alone
+        # conveys the sector, matching the pitch's own left-to-right
+        # orientation.
+        grid.addWidget(_cell(ratings.get("left_defense")), 0, 0)
+        grid.addWidget(_cell(ratings.get("central_defense")), 0, 1)
+        grid.addWidget(_cell(ratings.get("right_defense")), 0, 2)
+        # Row 1: midfield, centered across all three columns.
+        grid.addWidget(_cell(ratings.get("midfield")), 1, 0, 1, 3)
+        # Row 2: attack (left, central, right).
+        grid.addWidget(_cell(ratings.get("left_attack")), 2, 0)
+        grid.addWidget(_cell(ratings.get("central_attack")), 2, 1)
+        grid.addWidget(_cell(ratings.get("right_attack")), 2, 2)
+        for column in range(3):
+            grid.setColumnStretch(column, 1)
+        self._compact_ratings_container.addLayout(grid)
+
+        if ratings.get("tactic"):
+            tactic_label = QLabel(
+                f"{t('match.compact_ratings.tactic')}: {ratings['tactic']}"
+            )
+            tactic_label.setWordWrap(True)
+            self._compact_ratings_container.addWidget(tactic_label)
+        if ratings.get("tactic_level"):
+            level_label = QLabel(
+                f"{t('match.compact_ratings.tactic_level')}: {ratings['tactic_level']}"
+            )
+            self._compact_ratings_container.addWidget(level_label)
+        if ratings.get("formation"):
+            formation_label = QLabel(
+                f"{t('match.compact_ratings.formation')}: {ratings['formation']}"
+            )
+            self._compact_ratings_container.addWidget(formation_label)
+        if ratings.get("team_attitude"):
+            attitude_label = QLabel(
+                f"{t('match.compact_ratings.team_attitude')}: {ratings['team_attitude']}"
+            )
+            self._compact_ratings_container.addWidget(attitude_label)
+
     def _build_formation_board_tab(
         self,
         result,
@@ -1236,6 +1758,16 @@ class MatchPage(BasePage):
                 board.save_as_second_match_requested.connect(
                     self.save_as_second_match_requested
                 )
+                board.save_formation_requested.connect(
+                    self.save_formation_requested
+                )
+                self._update_save_action_labels()
+                board.tactic_changed.connect(
+                    self.tactic_changed
+                )
+                board.team_attitude_changed.connect(
+                    self.team_attitude_changed
+                )
                 self._formation_board_widget = board
             recommended = result.recommended_formation
             board.set_boards(
@@ -1248,8 +1780,22 @@ class MatchPage(BasePage):
                 roster_players=self._roster_players,
                 workspace_state=workspace_state,
                 preserve_input_orders=True,
+                default_tactic=(
+                    getattr(recommended, "recommended_tactic", "") if recommended else ""
+                ),
             )
-            return board
+            self._update_save_action_labels()
+
+            container = self._formation_board_tab_container
+            if container is None:
+                container = QWidget()
+                container_layout = QHBoxLayout(container)
+                container_layout.setContentsMargins(0, 0, 0, 0)
+                container_layout.setSpacing(10)
+                container_layout.addWidget(board, 1)
+                container_layout.addWidget(self._build_pre_side_panel())
+                self._formation_board_tab_container = container
+            return container
         except Exception as exc:
             panel = QFrame()
             panel.setObjectName("statePanel")
@@ -1304,7 +1850,7 @@ class MatchPage(BasePage):
 
         return card
 
-    def _build_sector_rating_panel(self, formation):
+    def _build_sector_rating_panel(self, formation, intelligence=None):
         card = QFrame()
         card.setObjectName("compactDecisionLab")
         layout = QVBoxLayout(card)
@@ -1360,6 +1906,24 @@ class MatchPage(BasePage):
                 table.setItem(row, column, QTableWidgetItem(value))
 
         layout.addWidget(table)
+
+        # Alpha 0.6.6, Part 6: the matchup matrix (formerly duplicated
+        # in the main Match Intelligence section) lives here now --
+        # technical calibration detail stays accessible in this
+        # diagnostic section, just not repeated in the tactical
+        # narrative above it.
+        matrix = getattr(intelligence, "matrix", None) if intelligence is not None else None
+        has_matrix_rows = matrix is not None and (
+            matrix.our_attack_rows or matrix.opponent_attack_rows
+        )
+        if has_matrix_rows:
+            matrix_title = QLabel(t("match_intelligence.matrix.title"))
+            matrix_title.setObjectName("sectionTitle")
+            layout.addWidget(matrix_title)
+            layout.addWidget(
+                self._build_matchup_matrix(matrix, comparable)
+            )
+
         return card
 
     def _build_availability_panel(self, result):
@@ -1498,8 +2062,14 @@ class MatchPage(BasePage):
             )
         layout.addWidget(highlights, content_row, 2)
 
-        matrix = self._build_matchup_matrix(intelligence.matrix, comparable)
-        layout.addWidget(matrix, content_row + 1, 0, 1, 3)
+        # Alpha 0.6.6, Part 6: the raw matchup matrix table used to be
+        # duplicated here -- it's now shown once, in the technical/
+        # diagnostic "rating_calibration" section
+        # (`_build_sector_rating_panel`), which already covers this
+        # same numeric detail. The main Match Intelligence section
+        # keeps only the qualitative highlights above (tactical
+        # objective, key advantages/risks) -- never the number-heavy
+        # comparison table.
 
         for column in range(3):
             layout.setColumnStretch(column, 1)
@@ -1578,7 +2148,24 @@ class MatchPage(BasePage):
         )
         if not comparisons:
             return True
-        return all(comparison.comparable for comparison in comparisons)
+        # Alpha 0.6.6, Part 5: "comparable" on each individual
+        # SectorComparison also requires both values to be present --
+        # correct for that field's own purpose, but too strict here.
+        # Optional secondary sectors (indirect set pieces) frequently
+        # have no data at all, which is a data-availability question,
+        # not a scale-compatibility one. This check is specifically
+        # about whether the scales genuinely disagree, so it only
+        # looks at comparisons that actually have both values.
+        with_data = [
+            comparison for comparison in comparisons
+            if comparison.our_value is not None and comparison.opponent_value is not None
+        ]
+        if not with_data:
+            return True
+        return all(
+            comparison.our_scale == comparison.opponent_scale
+            for comparison in with_data
+        )
 
     def _build_decision_lab_panel(self, decision_lab, recommended):
         card = QFrame()
@@ -2018,7 +2605,11 @@ class MatchPage(BasePage):
             t("match.title"),
             t("match.subtitle"),
         )
-        self.analysis_setup_title.setText(t("match.analysis_setup"))
+        self.analysis_setup_title.setText(
+            t("match.editing_saved_match")
+            if self._editing_saved_match
+            else t("match.analysis_setup")
+        )
         self.csv_label.setText(t("match.players_csv"))
         self.players_path_edit.setPlaceholderText(t("match.select_players_csv"))
         self.browse_button.setText(t("match.browse"))
@@ -2029,6 +2620,13 @@ class MatchPage(BasePage):
         self.clear_all_button.setText(t("match.clear_all"))
         self.favorites_button.setText(t("match.favorites"))
         self.analyze_button.setText(t("match.analyze"))
+        self.match_type_label.setText(t("match.match_type"))
+        self.match_type_combo.setItemText(0, t("match.match_type_select"))
+        self.match_type_combo.setItemText(1, t("match.match_type_league"))
+        self.match_type_combo.setItemText(2, t("match.match_type_cup"))
+        self.match_date_label.setText(t("match.match_date"))
+        self.venue_role_label.setText(t("match.venue_role"))
+        self._update_save_action_labels()
         self._sync_analysis_setup_toggle()
         self._update_formation_warning()
         self._retranslate_match_sections()
@@ -2265,11 +2863,69 @@ class MatchPage(BasePage):
         return f"{text[:limit - 3].rstrip()}..."
 
     def _emit_workspace_changed(self):
+        previous_match_type = getattr(self, "_last_workspace_match_type", None)
         self._update_formation_warning()
         self._update_availability_warning()
+        self._update_analyze_button_state()
 
         if not self._applying_settings:
+            if self._editing_saved_match:
+                self._metadata_dirty = True
+            self._update_save_action_labels()
+            if (
+                self._last_result is not None
+                and previous_match_type is not None
+                and self.match_type() != previous_match_type
+            ):
+                self.set_analysis_stale(
+                    True,
+                    t("match.analysis_stale_match_type"),
+                )
             self.workspace_changed.emit()
+        self._last_workspace_match_type = self.match_type()
+
+    def _can_analyze(self):
+        return bool(
+            self.players_csv_path()
+            and self.selected_opponent_name()
+            and self.match_type()
+            and self.selected_formations()
+        )
+
+    def _update_analyze_button_state(self):
+        if hasattr(self, "analyze_button"):
+            self.analyze_button.setEnabled(self._can_analyze())
+
+    def _update_save_action_labels(self):
+        board = getattr(self, "_formation_board_widget", None)
+        if board is None:
+            return
+        board.save_as_first_match_button.setText(t("match.save_as_first_match"))
+        board.save_as_second_match_button.setText(t("match.save_as_second_match"))
+        if self._editing_saved_match:
+            board.save_formation_button.setText(t("match.save_changes"))
+        else:
+            board.save_formation_button.setText(t("match.save_formation"))
+        reason = self._save_action_disabled_reason()
+        if hasattr(board, "set_save_action_validation"):
+            board.set_save_action_validation(not reason, reason)
+
+    def _save_action_disabled_reason(self):
+        if self._analysis_stale:
+            return t("match.analysis_stale_match_type")
+        result = getattr(self, "_last_result", None)
+        if result is None or not getattr(result, "formations", None):
+            return t("match.save_disabled_no_analysis")
+        recommended = getattr(result, "recommended_formation", None)
+        if recommended is None or not getattr(recommended, "lineup", None):
+            return t("match.save_disabled_no_lineup")
+        if not self.selected_opponent_name():
+            return t("match.save_disabled_no_opponent")
+        if not self.match_type():
+            return t("match.save_disabled_no_match_type")
+        if not self.match_date():
+            return t("match.save_disabled_no_match_date")
+        return ""
 
     def _update_availability_warning(self):
         if not hasattr(self, "availability_warning_label"):

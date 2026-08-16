@@ -117,6 +117,17 @@ class DecisionLab:
         )
         summary = self._summary(recommended, second, win_gap)
 
+        lineup_decision = getattr(
+            match_result,
+            "lineup_decision",
+            None
+        )
+        if lineup_decision is None:
+            lineup_decision = self._lineup_decision_payload(
+                recommended,
+                second
+            )
+
         return DecisionLabResult(
             recommended_formation=RecommendedDecision(
                 formation=recommended.formation_name,
@@ -142,7 +153,27 @@ class DecisionLab:
             order_gain=recommended.order_gain,
             tactic_gain=recommended.tactic_gain,
             total_gain=recommended.total_gain,
+            lineup_decision=lineup_decision,
         )
+
+    @staticmethod
+    def _lineup_decision_payload(recommended, second):
+        recommended_trace = getattr(
+            recommended,
+            "objective_trace",
+            {}
+        )
+        second_trace = (
+            getattr(second, "objective_trace", {})
+            if second is not None
+            else {}
+        )
+        if not recommended_trace and not second_trace:
+            return None
+        return {
+            "recommended": recommended_trace,
+            "strongest_alternative": second_trace,
+        }
 
     def _confidence(self, match_result, recommended, second, win_gap):
         score = 0.55

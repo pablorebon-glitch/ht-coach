@@ -27,6 +27,12 @@ from PySide6.QtWidgets import (
 from ht_coach_app.core.localization import localization_service, t
 from ht_coach_app.core.training_type_labels import training_type_label_key
 from engine.weekly_training.training_types import TrainingType
+from engine.squad_intelligence.enums import ManagementStatus, RecommendedRole, TrainingFit
+from ht_coach_app.services.squad_intelligence_formatting import (
+    role_label_key,
+    status_label_key,
+    training_fit_label_key,
+)
 from ht_coach_app.services.recent_csv_labels import format_recent_csv_label
 from ht_coach_app.ui.design_system.badges import StatusBadge
 from ht_coach_app.ui.design_system.tables import configure_table
@@ -44,6 +50,11 @@ from engine.transfer_planner.models import TransferConstraints
 from ht_coach_app.views.base_page import BasePage
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 from ht_coach_app.widgets.sortable_table_item import SortableTableItem
+
+
+class NoWheelComboBox(QComboBox):
+    def wheelEvent(self, event):
+        event.ignore()
 
 
 class SquadPage(BasePage):
@@ -68,7 +79,9 @@ class SquadPage(BasePage):
     delete_first_match_requested = Signal()
     delete_second_match_requested = Signal()
     use_training_plan_requested = Signal()
+    week_navigation_requested = Signal(str)
     training_type_changed = Signal(str)
+    weekly_cycle_changed = Signal(str)
 
     HEADERS = [
         "Name",
@@ -190,6 +203,33 @@ class SquadPage(BasePage):
             self.filters_changed
         )
 
+        self.role_filter_combo = QComboBox()
+        self._populate_squad_intelligence_filter_combo(
+            self.role_filter_combo, "role", RecommendedRole
+        )
+        self.role_filter_combo.currentIndexChanged.connect(self.filters_changed)
+
+        self.status_filter_combo = QComboBox()
+        self._populate_squad_intelligence_filter_combo(
+            self.status_filter_combo, "status", ManagementStatus
+        )
+        self.status_filter_combo.currentIndexChanged.connect(self.filters_changed)
+
+        self.training_fit_filter_combo = QComboBox()
+        self._populate_squad_intelligence_filter_combo(
+            self.training_fit_filter_combo, "training_fit", TrainingFit
+        )
+        self.training_fit_filter_combo.currentIndexChanged.connect(self.filters_changed)
+        for removed_filter in (
+            self.search_edit,
+            self.minimum_form,
+            self.minimum_stamina,
+            self.position_combo,
+            self.availability_filter_combo,
+            self.training_fit_filter_combo,
+        ):
+            removed_filter.setVisible(False)
+
         layout.addWidget(QLabel("Players CSV"), 0, 0)
         layout.addWidget(self.path_edit, 0, 1, 1, 4)
         layout.addWidget(browse_button, 0, 5)
@@ -199,15 +239,6 @@ class SquadPage(BasePage):
         layout.addWidget(self.recent_csv_combo, 1, 1, 1, 2)
         layout.addWidget(self.loaded_label, 2, 1, 1, 2)
         layout.addWidget(self.status_label, 2, 3, 1, 6)
-        layout.addWidget(QLabel("Search"), 3, 0)
-        layout.addWidget(self.search_edit, 3, 1, 1, 2)
-        layout.addWidget(QLabel("Min form"), 3, 3)
-        layout.addWidget(self.minimum_form, 3, 4)
-        layout.addWidget(QLabel("Min stamina"), 3, 5)
-        layout.addWidget(self.minimum_stamina, 3, 6)
-        layout.addWidget(self.speciality_combo, 3, 7)
-        layout.addWidget(self.position_combo, 3, 8)
-        layout.addWidget(self.availability_filter_combo, 3, 9)
         layout.setColumnStretch(1, 1)
 
         self.body_layout.addWidget(panel)
@@ -475,6 +506,19 @@ class SquadPage(BasePage):
         self.state_label.setWordWrap(True)
         table_layout.addWidget(self.state_label)
 
+        filter_row = QWidget()
+        filter_layout = QHBoxLayout(filter_row)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(8)
+        filter_layout.addWidget(QLabel("Role"))
+        filter_layout.addWidget(self.role_filter_combo)
+        filter_layout.addWidget(QLabel("State"))
+        filter_layout.addWidget(self.status_filter_combo)
+        filter_layout.addWidget(QLabel("Specialty"))
+        filter_layout.addWidget(self.speciality_combo)
+        filter_layout.addStretch(1)
+        table_layout.addWidget(filter_row)
+
         self.players_table = QTableWidget(0, len(self.HEADERS))
         self.players_table.setHorizontalHeaderLabels(self.HEADERS)
         self.players_table.setSortingEnabled(True)
@@ -555,7 +599,12 @@ class SquadPage(BasePage):
         detail_layout.addWidget(self.intelligence_limitations_label)
 
         splitter.addWidget(table_panel)
-        splitter.addWidget(detail_panel)
+        detail_scroll_area = QScrollArea()
+        detail_scroll_area.setWidgetResizable(True)
+        detail_scroll_area.setWidget(detail_panel)
+        detail_scroll_area.setMinimumWidth(280)
+        splitter.addWidget(detail_scroll_area)
+        splitter.setObjectName("squadPlayersSplitter")
         set_splitter_proportions(splitter, [0.73, 0.27])
         tab_layout.addWidget(splitter, 1)
         self._add_squad_tab(tab, t("squad_builder.players"), "players")
@@ -800,6 +849,22 @@ class SquadPage(BasePage):
         self.weekly_week_label = QLabel(t("planner.no_active_week"))
         self.weekly_week_label.setWordWrap(True)
 
+        self.week_nav_previous_button = QPushButton(t("planner.week_nav.previous"))
+        self.week_nav_previous_button.clicked.connect(
+            lambda: self.week_navigation_requested.emit("previous")
+        )
+        self.week_nav_current_button = QPushButton(t("planner.week_nav.current"))
+        self.week_nav_current_button.clicked.connect(
+            lambda: self.week_navigation_requested.emit("current")
+        )
+        self.week_nav_next_button = QPushButton(t("planner.week_nav.next"))
+        self.week_nav_next_button.clicked.connect(
+            lambda: self.week_navigation_requested.emit("next")
+        )
+        self.week_nav_summary_label = QLabel("")
+        self.week_nav_summary_label.setWordWrap(True)
+        self.week_nav_summary_label.setObjectName("weekNavSummaryLabel")
+
         controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
         controls_layout.addWidget(self.weekly_training_type_combo, 0, 1)
         controls_layout.addWidget(QLabel(t("planner.fixed_formation")), 0, 2)
@@ -809,6 +874,14 @@ class SquadPage(BasePage):
         controls_layout.addWidget(self.weekly_cancel_edit_button, 0, 6)
         controls_layout.addWidget(self.weekly_use_button, 0, 7)
         controls_layout.addWidget(self.weekly_week_label, 1, 0, 1, 8)
+
+        week_nav_row = QHBoxLayout()
+        week_nav_row.addWidget(self.week_nav_previous_button)
+        week_nav_row.addWidget(self.week_nav_current_button)
+        week_nav_row.addWidget(self.week_nav_next_button)
+        week_nav_row.addWidget(self.week_nav_summary_label, 1)
+        controls_layout.addLayout(week_nav_row, 2, 0, 1, 8)
+
         controls_layout.setColumnStretch(3, 1)
         layout.addWidget(controls)
 
@@ -995,13 +1068,25 @@ class SquadPage(BasePage):
         self.weekly_training_type_combo_v2.currentIndexChanged.connect(
             self._emit_training_type_changed
         )
+        self.weekly_cycle_combo_v2 = NoWheelComboBox()
+        self.weekly_cycle_combo_v2.currentIndexChanged.connect(
+            self._emit_weekly_cycle_changed
+        )
         self.weekly_week_label_v2 = QLabel(t("planner.no_active_week"))
         self.weekly_week_label_v2.setWordWrap(True)
 
+        self.ht_week_status_label = QLabel("")
+        self.ht_week_status_label.setObjectName("htWeekStatusLabel")
+        self.ht_week_status_label.setWordWrap(True)
+
         controls_layout.addWidget(QLabel(t("planner.active_training")), 0, 0)
         controls_layout.addWidget(self.weekly_training_type_combo_v2, 0, 1)
-        controls_layout.addWidget(self.weekly_week_label_v2, 1, 0, 1, 2)
+        controls_layout.addWidget(QLabel(t("planner.week_selector_label")), 0, 2)
+        controls_layout.addWidget(self.weekly_cycle_combo_v2, 0, 3)
+        controls_layout.addWidget(self.weekly_week_label_v2, 1, 0, 1, 4)
+        controls_layout.addWidget(self.ht_week_status_label, 2, 0, 1, 4)
         controls_layout.setColumnStretch(1, 1)
+        controls_layout.setColumnStretch(3, 2)
         layout.addWidget(controls)
 
         self.weekly_record_card_v2 = QFrame()
@@ -1286,6 +1371,59 @@ class SquadPage(BasePage):
         if training_type:
             self.training_type_changed.emit(training_type)
 
+    def _emit_weekly_cycle_changed(self, _index):
+        if not hasattr(self, "weekly_cycle_combo_v2"):
+            return
+        data = self.weekly_cycle_combo_v2.currentData() or {}
+        cycle_id = data.get("cycle_id") if isinstance(data, dict) else ""
+        if cycle_id:
+            self.weekly_cycle_changed.emit(cycle_id)
+
+    def selected_weekly_cycle_id(self):
+        if not hasattr(self, "weekly_cycle_combo_v2"):
+            return ""
+        data = self.weekly_cycle_combo_v2.currentData() or {}
+        return data.get("cycle_id", "") if isinstance(data, dict) else ""
+
+    def set_weekly_cycle_options(self, options, selected_cycle_id=""):
+        if not hasattr(self, "weekly_cycle_combo_v2"):
+            return
+        combo = self.weekly_cycle_combo_v2
+        combo.blockSignals(True)
+        combo.clear()
+        for option in options or ():
+            label_key = (
+                "planner.week_selector_current"
+                if getattr(option, "is_current", False)
+                else "planner.week_selector_future"
+            )
+            label = t(
+                label_key,
+                offset=getattr(option, "relative_offset", 0),
+                start=option.start_date.strftime("%d/%m/%Y"),
+                end=option.end_date.strftime("%d/%m/%Y"),
+            )
+            combo.addItem(label, option.to_item_data())
+        index = combo.findData(
+            selected_cycle_id,
+            role=Qt.UserRole,
+        )
+        if index < 0:
+            for item_index in range(combo.count()):
+                data = combo.itemData(item_index) or {}
+                if isinstance(data, dict) and data.get("cycle_id") == selected_cycle_id:
+                    index = item_index
+                    break
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        combo.blockSignals(False)
+
+    def confirm_training_type_change(self):
+        return QMessageBox.question(
+            self,
+            t("planner.wizard.confirm_change_title"),
+            t("planner.wizard.confirm_change_body"),
+        ) == QMessageBox.Yes
+
     def set_recent_csv_paths(self, paths):
         self.recent_csv_combo.blockSignals(True)
         self.recent_csv_combo.clear()
@@ -1531,27 +1669,43 @@ class SquadPage(BasePage):
                     break
 
     def set_specialties(self, specialties):
-        current = self.speciality_combo.currentText()
+        from models.specialty import Specialty
+
+        current = self.speciality_combo.currentData()
         self.speciality_combo.blockSignals(True)
         self.speciality_combo.clear()
-        self.speciality_combo.addItem("")
+        self.speciality_combo.addItem(t("squad_builder.filter_specialty_all"), "")
 
-        for speciality in specialties:
-            self.speciality_combo.addItem(speciality)
+        for specialty in specialties:
+            value = specialty.value if isinstance(specialty, Specialty) else specialty
+            self.speciality_combo.addItem(t(f"specialty.{value}"), value)
 
-        index = self.speciality_combo.findText(current)
+        index = self.speciality_combo.findData(current)
         self.speciality_combo.setCurrentIndex(index if index >= 0 else 0)
         self.speciality_combo.blockSignals(False)
 
     def filter_values(self):
         return {
-            "search_text": self.search_edit.text(),
-            "minimum_form": self.minimum_form.value(),
-            "minimum_stamina": self.minimum_stamina.value(),
-            "speciality": self.speciality_combo.currentText(),
-            "selected_position": self.position_combo.currentText(),
-            "availability": self.availability_filter_combo.currentData() or "all",
+            "search_text": "",
+            "minimum_form": 0,
+            "minimum_stamina": 0,
+            "speciality": self.speciality_combo.currentData() or "",
+            "selected_position": "",
+            "availability": "all",
+            "role": self.role_filter_combo.currentData() or "all",
+            "status": self.status_filter_combo.currentData() or "all",
+            "training_fit": "all",
         }
+
+    def _populate_squad_intelligence_filter_combo(self, combo, filter_kind, enum_cls):
+        label_key_fn = {
+            "role": role_label_key,
+            "status": status_label_key,
+            "training_fit": training_fit_label_key,
+        }[filter_kind]
+        combo.addItem(t(f"squad_builder.filter_{filter_kind}_all"), "all")
+        for value in enum_cls:
+            combo.addItem(t(label_key_fn(value)), value.value)
 
     def set_players(self, rows):
         self.players_table.setSortingEnabled(False)
@@ -1689,9 +1843,59 @@ class SquadPage(BasePage):
         self.weekly_explanations_label.setText("")
         self._weekly_plan_board = None
 
-    def show_weekly_training(self, state, priority_rows, coverage_rows, formations):
+    def set_ht_week_status(self, text):
+        self.ht_week_status_label.setText(text)
+
+    def show_week_navigation_context(self, context):
+        """Alpha 0.6.6, Part 7: renders whichever of the three
+        navigable contexts (previous/current/next) the user just
+        requested -- canonical HT training-cycle range, first/second
+        match, and planned/played status. A planned lineup is shown
+        even before the match is played."""
+        self.week_nav_previous_button.setEnabled(context.can_go_previous)
+        self.week_nav_next_button.setEnabled(context.can_go_next)
+
+        if context.week is None:
+            self.week_nav_summary_label.setText(t("planner.week_nav.no_data"))
+            return
+
+        lines = [
+            t(
+                f"planner.week_nav.range_{'preview' if context.is_preview else 'label'}",
+                start=context.week.start_date.isoformat(),
+                end=context.week.end_date.isoformat(),
+            )
+        ]
+        for label_key, match in (
+            ("planner.week_nav.first_match", context.first_match),
+            ("planner.week_nav.second_match", context.second_match),
+        ):
+            if match is None:
+                lines.append(f"{t(label_key)}: {t('planner.week_nav.not_saved')}")
+                continue
+            status_key = (
+                "planner.week_nav.status_played"
+                if getattr(match.planned_or_played, "value", match.planned_or_played) == "PLAYED"
+                else "planner.week_nav.status_planned"
+            )
+            lines.append(
+                f"{t(label_key)}: {match.opponent_name} "
+                f"({match.formation}) — {t(status_key)}"
+            )
+        self.week_nav_summary_label.setText("\n".join(lines))
+
+    def show_weekly_training(
+        self,
+        state,
+        priority_rows,
+        coverage_rows,
+        formations,
+        cycle_options=(),
+        selected_cycle_id="",
+    ):
         self._clear_weekly_training_plan()
         self.set_active_training_type(state.active_training_type)
+        self.set_weekly_cycle_options(cycle_options, selected_cycle_id)
         self._weekly_priority_rows = list(priority_rows)
         self._weekly_coverage_rows = list(coverage_rows)
         self._weekly_priority_by_player_id = {
@@ -2011,6 +2215,15 @@ class SquadPage(BasePage):
             row for row in priority_rows
             if self._weekly_row_matches_filter(row, coverage_by_id.get(row.player_id), filter_key)
         ]
+        # Default order: Full Priority, then Partial Priority, then
+        # remaining players -- stable sort so players sharing a tier
+        # keep whatever relative order they arrived in. Column-header
+        # click sorting (enabled below) can still reorder interactively;
+        # this only sets the initial view.
+        filtered_rows = sorted(
+            filtered_rows,
+            key=lambda row: self._priority_sort(self._visible_weekly_priority(row)),
+        )
         table.setSortingEnabled(False)
         table.setRowCount(len(filtered_rows))
         priority_column = 2 if has_age_column else 1
@@ -2069,13 +2282,9 @@ class SquadPage(BasePage):
 
     def _weekly_filter_options(self):
         return [
-            (t("planner.filter_all"), "all"),
-            (t("planner.filter_100"), "100"),
-            (t("planner.filter_50"), "50"),
-            (t("planner.filter_no_priority"), "no_priority"),
-            (t("planner.filter_already_trained"), "already_trained"),
-            (t("planner.filter_will_train"), "will_train"),
+            (t("planner.filter_training_players"), "training_players"),
             (t("planner.filter_not_training"), "not_training"),
+            (t("planner.filter_all"), "all"),
         ]
 
     def _apply_weekly_filter(self):
@@ -2096,7 +2305,7 @@ class SquadPage(BasePage):
         self._weekly_priority_by_player_id[player_id] = priority
         self.training_priority_changed.emit(player_id, priority)
         self._clear_weekly_training_plan()
-        refresh_keys = {"100", "50", "no_priority"}
+        refresh_keys = {"100", "50", "no_priority", "training_players", "not_training"}
         if (
             getattr(self, "_weekly_filter_key", "all") in refresh_keys
             or getattr(self, "_weekly_filter_key_v2", "all") in refresh_keys
@@ -2111,7 +2320,8 @@ class SquadPage(BasePage):
         planned = self._numeric(getattr(coverage, "planned_exposure", 0))
         already = confirmed + assumed > 0
         will_train = planned > 0 and not already
-        not_training = confirmed + assumed + planned == 0
+        has_active_priority = priority in ("REQUIRED_100", "REQUIRED_50")
+        not_training = confirmed + assumed + planned == 0 and not has_active_priority
         if key == "100":
             return priority == "REQUIRED_100"
         if key == "50":
@@ -2124,6 +2334,8 @@ class SquadPage(BasePage):
             return will_train
         if key == "not_training":
             return not_training
+        if key == "training_players":
+            return not not_training
         return True
 
     def _visible_weekly_priority(self, row):

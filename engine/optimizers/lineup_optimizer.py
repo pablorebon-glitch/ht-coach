@@ -24,6 +24,11 @@ from engine.optimizers.order_optimizer import (
     OrderOptimizer
 )
 
+from engine.optimizers.lineup_objective import (
+    LineupObjectiveEvaluator,
+    select_pareto_frontier,
+)
+
 from engine.position_registry import (
     POSITION_ENGINES
 )
@@ -70,6 +75,10 @@ class LineupOptimizationResult:
 
     best_order_win_probability: float
 
+    objective_trace: object = None
+
+    objective_frontier: tuple = ()
+
 
 @dataclass
 class EvaluatedLineup:
@@ -81,6 +90,8 @@ class EvaluatedLineup:
     match_evaluation: object
 
     probabilities: object
+
+    objective_trace: object = None
 
 
 class LineupOptimizer:
@@ -338,7 +349,19 @@ class LineupOptimizer:
                     match_evaluation=(
                         match_evaluation
                     ),
-                    probabilities=probabilities
+                    probabilities=probabilities,
+                    objective_trace=(
+                        LineupObjectiveEvaluator.build_trace(
+                            ratings,
+                            opponent_ratings,
+                            match_evaluation,
+                            probabilities,
+                            lineup=lineup,
+                            candidate_id=(
+                                f"candidate-{tested_lineups}"
+                            ),
+                        )
+                    )
                 )
             )
 
@@ -351,13 +374,25 @@ class LineupOptimizer:
                 ),
                 probabilities=(
                     baseline_probabilities
+                ),
+                objective_trace=(
+                    LineupObjectiveEvaluator.build_trace(
+                        baseline_ratings,
+                        opponent_ratings,
+                        baseline_match_evaluation,
+                        baseline_probabilities,
+                        lineup=baseline_lineup,
+                        candidate_id="baseline",
+                    )
                 )
             )
         )
 
         evaluated_lineups.sort(
             key=lambda result: (
-                result.probabilities.win
+                result.objective_trace
+                .components
+                .final_objective_score
             ),
             reverse=True
         )
@@ -391,6 +426,11 @@ class LineupOptimizer:
             best_normal_result
             .probabilities
             .win
+        )
+
+        best_objective_trace = (
+            best_normal_result
+            .objective_trace
         )
 
         tested_order_configurations = 0
@@ -444,6 +484,23 @@ class LineupOptimizer:
                     .probabilities
                 )
 
+                best_objective_trace = (
+                    LineupObjectiveEvaluator.evaluate_lineup(
+                        best_lineup,
+                        opponent_ratings,
+                        candidate_id="best-order",
+                        config=config
+                    )
+                )
+
+        objective_frontier = select_pareto_frontier(
+            [
+                evaluated.objective_trace
+                for evaluated in evaluated_lineups
+                if evaluated.objective_trace is not None
+            ]
+        )
+
         return LineupOptimizationResult(
 
             lineup=best_lineup,
@@ -488,5 +545,13 @@ class LineupOptimizer:
 
             best_order_win_probability=(
                 best_order_win_probability
+            ),
+
+            objective_trace=(
+                best_objective_trace
+            ),
+
+            objective_frontier=(
+                objective_frontier
             )
         )

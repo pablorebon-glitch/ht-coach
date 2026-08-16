@@ -211,6 +211,7 @@ def test_comparison_never_shows_a_numeric_delta_while_scales_unconfirmed():
 
 def test_comparison_still_shows_both_raw_values_side_by_side():
     from ht_coach_app.services.official_rating_formatting import (
+        format_official_sector_label,
         format_prediction_vs_official_comparison,
     )
     from engine.history.official_ratings.comparison import compare_official_ratings
@@ -218,6 +219,6 @@ def test_comparison_still_shows_both_raw_values_side_by_side():
     predicted = SectorRatings(midfield=7.0)
     comparison = compare_official_ratings(predicted, None, None)
     rows = format_prediction_vs_official_comparison(comparison)
-    midfield_row = next(row for row in rows if row[0] == "midfield")
+    midfield_row = next(row for row in rows if row[0] == format_official_sector_label("midfield"))
     assert midfield_row[1] == "7.00"
     assert midfield_row[2] == "?"  # no official value captured yet

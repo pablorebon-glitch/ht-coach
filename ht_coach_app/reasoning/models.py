@@ -96,4 +96,5 @@ class DecisionLabResult:
     order_gain: float = 0.0
     tactic_gain: float = 0.0
     total_gain: float = 0.0
+    lineup_decision: dict | None = None
     schema_version: int = 1
