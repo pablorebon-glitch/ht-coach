@@ -77,3 +77,9 @@ Explanation confidence should reflect data quality:
 The current engine API defaults explicit calibration fixtures to high confidence.
 Future official-history integration should pass richer provenance instead of
 inferring certainty from numbers alone.
+# Rating Scale Explanations
+
+User-facing lineup explanations prefer HT-compatible sector values. Internal
+contribution values may appear in diagnostics, but Decision Lab and copied
+lineup reasoning should explain deltas in the same scale used by the matchup
+model.

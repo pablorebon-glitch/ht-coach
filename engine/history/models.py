@@ -521,6 +521,9 @@ class HistoricalMatchSnapshot:
         from datetime import date as _date
 
         from engine.history.match_record_status import derive_match_record_status
+        from ht_coach_app.services.ht_week_context_provider import (
+            get_calendar_service,
+        )
 
         match_date = None
         raw_date = self.match_context.match_date
@@ -535,7 +538,7 @@ class HistoricalMatchSnapshot:
             official_post=self.official_post,
             retrospective_pre=self.retrospective_pre,
             match_date=match_date,
-            today=_date.today(),
+            today=get_calendar_service().now().date(),
         )
 
     def with_updates(self, **changes) -> "HistoricalMatchSnapshot":

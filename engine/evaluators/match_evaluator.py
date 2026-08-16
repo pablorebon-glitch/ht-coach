@@ -10,6 +10,13 @@ from models.match_model_config import (
 
 from models.tactic import Tactic
 
+from models.rating_scale import RatingScale
+
+from engine.ratings.rating_scale_normalizer import (
+    rating_scale_of,
+    validate_compatible_ratings,
+)
+
 
 @dataclass
 class MatchEvaluation:
@@ -205,6 +212,11 @@ class MatchEvaluator:
 
         config = cls._resolve_config(
             config
+        )
+
+        cls._validate_rating_scales(
+            our_ratings,
+            opponent_ratings
         )
 
         possession = cls._possession_share(
@@ -451,6 +463,29 @@ class MatchEvaluator:
             opponent_expected_goals=(
                 opponent_expected_goals
             )
+        )
+
+    @staticmethod
+    def _validate_rating_scales(
+        our_ratings,
+        opponent_ratings
+    ):
+        our_scale = rating_scale_of(
+            our_ratings
+        )
+        opponent_scale = rating_scale_of(
+            opponent_ratings
+        )
+
+        if (
+            our_scale == RatingScale.UNKNOWN
+            and opponent_scale == RatingScale.UNKNOWN
+        ):
+            return True
+
+        return validate_compatible_ratings(
+            our_ratings,
+            opponent_ratings
         )
 
 

@@ -12,7 +12,17 @@ from engine.tactics.tactic_engine import (
     TacticEngine
 )
 
+from engine.ratings.rating_scale_normalizer import (
+    RatingScaleNormalizer,
+    rating_scale_of,
+)
+
+from models.rating_scale import RatingScale
+
 from models.tactic import Tactic
+
+
+DEFAULT_RATING_NORMALIZER = RatingScaleNormalizer()
 
 
 @dataclass
@@ -47,6 +57,16 @@ class TacticOptimizer:
         lineup=None,
         config=None
     ):
+
+        if (
+            rating_scale_of(base_ratings) != RatingScale.UNKNOWN
+            or rating_scale_of(opponent_ratings) != RatingScale.UNKNOWN
+        ):
+            calibrated, opponent_ratings = DEFAULT_RATING_NORMALIZER.normalize_matchup(
+                base_ratings,
+                opponent_ratings
+            )
+            base_ratings = calibrated.ratings
 
         (
             context,

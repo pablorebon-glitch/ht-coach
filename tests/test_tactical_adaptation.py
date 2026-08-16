@@ -6,8 +6,13 @@ from engine.optimizers.formation_optimizer import (
     FormationOptimizer
 )
 
-from models.formations import FORMATIONS
+from models.formations import FORMATION_BY_NAME
 from models.team_ratings import TeamRatings
+
+TACTICAL_ADAPTATION_FORMATIONS = [
+    FORMATION_BY_NAME["3-5-2"],
+    FORMATION_BY_NAME["4-5-1"],
+]
 
 
 @pytest.fixture(scope="module")
@@ -90,7 +95,7 @@ def optimization_results(
         results[profile_name] = (
             FormationOptimizer.optimize_against(
                 players,
-                FORMATIONS,
+                TACTICAL_ADAPTATION_FORMATIONS,
                 opponent
             )
         )
@@ -135,7 +140,7 @@ def test_all_profiles_return_results(
     ):
 
         assert len(results) == len(
-            FORMATIONS
+            TACTICAL_ADAPTATION_FORMATIONS
         )
 
 

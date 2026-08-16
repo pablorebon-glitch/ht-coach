@@ -75,12 +75,12 @@ def test_calibrated_internal_tier_never_fires_yet():
     assert CALIBRATED_INTERNAL_CONFIRMED is False
 
 
-def test_override_makes_recommended_formation_comparable():
+def test_override_preserves_comparable_recommended_formation():
     service = _service()
     formation = _recommended_formation(service)
     result = MatchAnalysisResult(player_count=18, opponent_name="Rival", formations=[formation])
 
-    assert not any(c.comparable for c in result.recommended_formation.sector_rating_comparisons)
+    assert any(c.comparable for c in result.recommended_formation.sector_rating_comparisons)
 
     updated = service.apply_official_pre_override(result, _official_pre())
     comparisons = updated.recommended_formation.sector_rating_comparisons

@@ -4,6 +4,15 @@
 
 ### Added
 
+- Added Alpha 0.6.11 rating-scale normalization foundations. Analytical ratings
+  now carry explicit scale/source metadata, MatchEvaluator rejects explicit
+  mixed-scale inputs, lineup/order/tactic optimization normalizes internal
+  lineup ratings to an HT-compatible estimate before xG/WDL, objective traces
+  include raw internal and normalized HT layers, and calibration storage/sample
+  extraction supports future Official PRE rebuilds. Bootstrap v1 is
+  low-confidence and sector-specific; it replaces the invalid 39.68-vs-5.75
+  mixed-scale La Rocha evaluation without tuning probability formulas.
+
 - Added Alpha 0.6.10 optimizer explainability foundations. Lineup evaluation now
   emits a serializable objective trace with sector ratings, possession/chance
   share, attacking and defensive matchup components, xG/o-xG, probabilities,

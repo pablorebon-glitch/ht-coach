@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -27,13 +27,30 @@ from engine.weekly_training.training_rules import (
 )
 from engine.weekly_training.training_week import active_training_week
 from ht_coach_app.core.localization import configure_localization
+from ht_coach_app.services.ht_week_context_provider import (
+    get_calendar_service,
+    set_calendar_service,
+)
 from ht_coach_app.services.match_workspace_service import (
     MatchAnalysisResult,
     match_analysis_result_from_dict,
     match_analysis_result_to_dict,
 )
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
+from engine.calendar import HTCalendarService
 from models.player import Player
+
+
+@pytest.fixture(autouse=True)
+def fixed_calendar_service():
+    previous = get_calendar_service()
+    set_calendar_service(
+        HTCalendarService(
+            clock=lambda: datetime(2026, 8, 3, 12, 0, 0)
+        )
+    )
+    yield
+    set_calendar_service(previous)
 
 
 def player(name, playmaking=10):

@@ -1,5 +1,7 @@
 import pytest
+from datetime import datetime
 
+from engine.calendar import HTCalendarService
 from engine.history.enums import MatchRecordStatus
 from engine.history.official_ratings.models import OfficialRatingSnapshot
 from engine.history.provisional_record import (
@@ -10,6 +12,22 @@ from engine.history.provisional_record import (
     find_or_create_provisional_record,
 )
 from engine.history.repository import HistoricalMatchRepository
+from ht_coach_app.services.ht_week_context_provider import (
+    get_calendar_service,
+    set_calendar_service,
+)
+
+
+@pytest.fixture(autouse=True)
+def fixed_calendar_service():
+    previous = get_calendar_service()
+    set_calendar_service(
+        HTCalendarService(
+            clock=lambda: datetime(2026, 8, 3, 12, 0, 0)
+        )
+    )
+    yield
+    set_calendar_service(previous)
 
 
 @pytest.fixture()

@@ -11,7 +11,15 @@ from engine.evaluators.result_probability_evaluator import (
     ResultProbabilityEvaluator,
 )
 from engine.optimizers.tactic_optimizer import TacticOptimizer
+from engine.ratings.rating_scale_normalizer import (
+    RatingScaleNormalizer,
+    rating_scale_of,
+)
+from models.rating_scale import RatingScale
 from models.tactic import Tactic
+
+
+DEFAULT_RATING_NORMALIZER = RatingScaleNormalizer()
 
 
 TACTICAL_TIE_TOLERANCE = 0.01
@@ -44,6 +52,11 @@ class LineupObjectiveTrace:
     route_weights: dict[str, float]
     components: ObjectiveComponents
     lineup: tuple[dict[str, str], ...] = field(default_factory=tuple)
+    raw_internal_ratings: dict[str, float] = field(default_factory=dict)
+    normalized_ht_ratings: dict[str, float] = field(default_factory=dict)
+    opponent_ht_ratings: dict[str, float] = field(default_factory=dict)
+    calibration_version: str = ""
+    calibration_confidence: str = ""
 
     def to_dict(self):
         return asdict(self)
@@ -93,6 +106,11 @@ class LineupObjectiveEvaluator:
         training_score=0.0,
         availability_penalty=0.0,
         candidate_id=None,
+        raw_internal_ratings=None,
+        normalized_ht_ratings=None,
+        opponent_ht_ratings=None,
+        calibration_version="",
+        calibration_confidence="",
     ):
         tactic = _coerce_tactic(tactic)
         if route_weights is None:
@@ -100,6 +118,20 @@ class LineupObjectiveEvaluator:
 
         sectors = _ratings_to_dict(ratings)
         opponent = _ratings_to_dict(opponent_ratings)
+        provenance = getattr(ratings, "provenance", None)
+        if not calibration_version and provenance is not None:
+            calibration_version = getattr(
+                provenance,
+                "calibration_version",
+                "",
+            )
+        if not calibration_confidence and provenance is not None:
+            confidence = getattr(provenance, "confidence", "")
+            calibration_confidence = getattr(
+                confidence,
+                "value",
+                str(confidence or ""),
+            )
         tactical_score = float(probabilities.win)
         final_score = (
             tactical_score
@@ -129,6 +161,23 @@ class LineupObjectiveEvaluator:
             candidate_id=candidate_id or _candidate_id(lineup, sectors),
             sector_ratings=sectors,
             opponent_ratings=opponent,
+            raw_internal_ratings=(
+                _ratings_to_dict(raw_internal_ratings)
+                if raw_internal_ratings is not None
+                else {}
+            ),
+            normalized_ht_ratings=(
+                _ratings_to_dict(normalized_ht_ratings)
+                if normalized_ht_ratings is not None
+                else sectors
+            ),
+            opponent_ht_ratings=(
+                _ratings_to_dict(opponent_ht_ratings)
+                if opponent_ht_ratings is not None
+                else opponent
+            ),
+            calibration_version=calibration_version,
+            calibration_confidence=calibration_confidence,
             tactic=tactic.value,
             tactic_level=float(tactic_level or 0.0),
             route_weights={
@@ -176,6 +225,26 @@ class LineupObjectiveEvaluator:
         config=None,
     ):
         tactic = _coerce_tactic(tactic)
+        raw_internal_ratings = None
+        normalized_ht_ratings = None
+        opponent_ht_ratings = None
+        calibration_version = ""
+        calibration_confidence = ""
+
+        if (
+            rating_scale_of(ratings) != RatingScale.UNKNOWN
+            or rating_scale_of(opponent_ratings) != RatingScale.UNKNOWN
+        ):
+            calibrated, opponent_ratings = DEFAULT_RATING_NORMALIZER.normalize_matchup(
+                ratings,
+                opponent_ratings,
+            )
+            raw_internal_ratings = calibrated.raw_internal_ratings
+            normalized_ht_ratings = calibrated.ratings
+            opponent_ht_ratings = opponent_ratings
+            calibration_version = calibrated.calibration_version
+            calibration_confidence = calibrated.confidence.value
+            ratings = calibrated.ratings
 
         if lineup is not None:
             context, effects, evaluation, probabilities = (
@@ -218,6 +287,11 @@ class LineupObjectiveEvaluator:
             training_score=training_score,
             availability_penalty=availability_penalty,
             candidate_id=candidate_id,
+            raw_internal_ratings=raw_internal_ratings,
+            normalized_ht_ratings=normalized_ht_ratings or effective_ratings,
+            opponent_ht_ratings=opponent_ht_ratings or opponent_ratings,
+            calibration_version=calibration_version,
+            calibration_confidence=calibration_confidence,
         )
 
 

@@ -32,6 +32,7 @@ from engine.match_intelligence.models import (
     TeamProfile,
 )
 from engine.ratings import (
+    SOURCE_HATTRICK_DECIMAL,
     SOURCE_HT_COACH_INTERNAL,
     SectorComparison as RatingSectorComparison,
     build_sector_comparisons,
@@ -918,7 +919,8 @@ class MatchWorkspaceService:
             for comparison in build_sector_comparisons(
                 team_ratings,
                 opponent_ratings,
-                our_scale=SOURCE_HT_COACH_INTERNAL,
+                our_scale=SOURCE_HATTRICK_DECIMAL,
+                opponent_scale=SOURCE_HATTRICK_DECIMAL,
             )
         ]
 

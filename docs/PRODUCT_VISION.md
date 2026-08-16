@@ -213,3 +213,9 @@ associates them. If they differ, the manager reviews and corrects the IDs manual
 This extra step is intentional: the Match ID uniquely identifies an official Hattrick
 match, and automatic association would risk turning two truthful documents into one
 false story.
+# Rating Integrity
+
+HT Coach should be trustworthy before it is clever. Match advice must not compare
+internal contribution totals against official Hattrick ratings silently. The
+product model separates rating prediction, tactical decision math and long-term
+outcome calibration.

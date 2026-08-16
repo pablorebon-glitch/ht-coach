@@ -1,8 +1,9 @@
 import json
 import os
-from dataclasses import MISSING, asdict, fields
+from dataclasses import MISSING, fields
 
 from models.opponent import Opponent
+from models.rating_scale import RatingScale, RatingSource
 from models.team_ratings import TeamRatings
 
 
@@ -199,7 +200,7 @@ class OpponentManager:
 
         return {
             "name": opponent.name,
-            "ratings": asdict(opponent.ratings)
+            "ratings": _ratings_to_dict(opponent.ratings)
         }
 
     @staticmethod
@@ -220,3 +221,28 @@ class OpponentManager:
                 **rating_values
             )
         )
+
+
+def _ratings_to_dict(ratings):
+    data = {
+        "left_defense": ratings.left_defense,
+        "central_defense": ratings.central_defense,
+        "right_defense": ratings.right_defense,
+        "midfield": ratings.midfield,
+        "left_attack": ratings.left_attack,
+        "central_attack": ratings.central_attack,
+        "right_attack": ratings.right_attack,
+        "indirect_defense": ratings.indirect_defense,
+        "indirect_attack": ratings.indirect_attack,
+    }
+    data["rating_scale"] = _enum_value(
+        getattr(ratings, "rating_scale", RatingScale.UNKNOWN)
+    )
+    data["rating_source"] = _enum_value(
+        getattr(ratings, "rating_source", RatingSource.UNKNOWN)
+    )
+    return data
+
+
+def _enum_value(value):
+    return getattr(value, "value", value)

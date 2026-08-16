@@ -43,8 +43,8 @@ def _qt_app():
 def _seed_last_result(settings_repo):
     service = MatchWorkspaceService.__new__(MatchWorkspaceService)
     our = TeamRatingsResult(
-        left_defense=100, central_defense=120, right_defense=95, midfield=140,
-        left_attack=110, central_attack=150, right_attack=105,
+        left_defense=5.0, central_defense=6.0, right_defense=4.75, midfield=7.0,
+        left_attack=7.5, central_attack=9.0, right_attack=7.25,
     )
     opponent = TeamRatingsResult(
         left_defense=6.0, central_defense=7.0, right_defense=5.5, midfield=6.5,
@@ -87,7 +87,7 @@ def test_importing_pre_refreshes_last_result_without_reanalysis(tmp_path):
     _seed_last_result(settings_repo)
 
     before = settings_repo.load_last_result()
-    assert not any(
+    assert any(
         c.comparable for c in before.recommended_formation.sector_rating_comparisons
     )
 

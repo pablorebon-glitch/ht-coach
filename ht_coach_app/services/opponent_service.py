@@ -1,6 +1,7 @@
 import math
 
 from models.opponent import Opponent
+from models.rating_scale import RatingScale, RatingSource
 from models.team_ratings import TeamRatings
 
 
@@ -24,13 +25,13 @@ ALL_RATING_FIELDS = RATING_FIELDS + OPTIONAL_RATING_FIELDS
 
 
 DEFAULT_RATINGS = {
-    "midfield": 40.0,
-    "right_defense": 24.0,
-    "central_defense": 35.0,
-    "left_defense": 25.0,
-    "right_attack": 24.0,
-    "central_attack": 30.0,
-    "left_attack": 25.0,
+    "midfield": 5.0,
+    "right_defense": 5.0,
+    "central_defense": 5.0,
+    "left_defense": 5.0,
+    "right_attack": 5.0,
+    "central_attack": 5.0,
+    "left_attack": 5.0,
     "indirect_defense": None,
     "indirect_attack": None,
 }
@@ -214,4 +215,8 @@ class OpponentService:
 
             values[field] = numeric_value
 
-        return TeamRatings(**values)
+        return TeamRatings(
+            **values,
+            rating_scale=RatingScale.HT_OFFICIAL_DECIMAL,
+            rating_source=RatingSource.OPPONENT_IMPORT,
+        )

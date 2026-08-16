@@ -89,3 +89,9 @@ The objective currently explains the engine's existing expected-goals and
 probability outputs. It does not perform outcome machine learning, does not tune
 ratings from official POST data, and does not claim false precision beyond the
 existing model.
+# Rating Scale Contract
+
+Optimizer objective traces expose both raw internal sector totals and normalized
+HT-compatible ratings. Tactical objective, possession, xG, opponent xG and W/D/L
+must be computed from compatible HT-scale operands. Internal contribution totals
+remain diagnostic and are not compared directly with opponent official ratings.

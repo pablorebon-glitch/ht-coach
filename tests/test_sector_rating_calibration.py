@@ -137,7 +137,7 @@ class SectorRatingCalibrationTest(unittest.TestCase):
                             },
                         )(),
                         "lineup": type("Lineup", (), {"players": []})(),
-                        "ratings": TeamRatings(midfield=40),
+                        "ratings": TeamRatings(midfield=7.75),
                     },
                 )()
             ],
@@ -157,10 +157,11 @@ class SectorRatingCalibrationTest(unittest.TestCase):
 
         self.assertEqual(
             restored.formations[0].sector_rating_comparisons[0].advantage,
-            ADVANTAGE_NOT_COMPARABLE,
+            ADVANTAGE_OURS,
         )
-        self.assertIsNone(
-            restored.formations[0].sector_rating_comparisons[0].difference
+        self.assertEqual(
+            restored.formations[0].sector_rating_comparisons[0].difference,
+            0.5,
         )
 
 

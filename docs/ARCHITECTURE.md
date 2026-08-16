@@ -1609,3 +1609,10 @@ Avoid brittle screenshot tests early. Prefer fast unit tests for services and st
 - Adding account management.
 - Replacing all persistence with a database before the data model needs it.
 - Building a plugin system.
+# Rating Scale Integrity
+
+HT Coach keeps rating prediction and matchup evaluation separate. The lineup
+engine may produce raw internal contribution totals, but xG/WDL receives
+HT-compatible ratings only. Rating scale metadata lives with `TeamRatings`, and
+the normalization layer records calibration version, confidence and provenance.
+See `docs/RATING_SCALE_MODEL.md` and `docs/RATING_CALIBRATION.md`.

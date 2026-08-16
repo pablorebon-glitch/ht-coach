@@ -29,6 +29,8 @@ from engine.optimizers.lineup_objective import (
     select_pareto_frontier,
 )
 
+from engine.ratings.rating_scale_normalizer import RatingScaleNormalizer
+
 from engine.position_registry import (
     POSITION_ENGINES
 )
@@ -44,6 +46,9 @@ from models.position import Position
 from models.side import Side
 
 from models.tactic import Tactic
+
+
+DEFAULT_RATING_NORMALIZER = RatingScaleNormalizer()
 
 
 @dataclass
@@ -235,12 +240,20 @@ class LineupOptimizer:
             lineup
         )
 
+        (
+            calibrated,
+            opponent_calibrated
+        ) = DEFAULT_RATING_NORMALIZER.normalize_matchup(
+            ratings,
+            opponent_ratings
+        )
+
         if config is None:
 
             match_evaluation = (
                 MatchEvaluator.evaluate(
-                    ratings,
-                    opponent_ratings
+                    calibrated.ratings,
+                    opponent_calibrated
                 )
             )
 
@@ -248,8 +261,8 @@ class LineupOptimizer:
 
             match_evaluation = (
                 MatchEvaluator.evaluate(
-                    ratings,
-                    opponent_ratings,
+                    calibrated.ratings,
+                    opponent_calibrated,
                     config=config
                 )
             )
@@ -262,7 +275,7 @@ class LineupOptimizer:
         )
 
         return (
-            ratings,
+            calibrated.ratings,
             match_evaluation,
             probabilities
         )

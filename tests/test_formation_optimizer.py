@@ -22,13 +22,13 @@ def players():
 def opponent():
 
     return TeamRatings(
-        left_defense=25,
-        central_defense=35,
-        right_defense=24,
-        midfield=40,
-        left_attack=25,
-        central_attack=30,
-        right_attack=24
+        left_defense=8.50,
+        central_defense=13.00,
+        right_defense=7.50,
+        midfield=5.75,
+        left_attack=4.25,
+        central_attack=7.00,
+        right_attack=4.00
     )
 
 

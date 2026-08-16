@@ -1369,3 +1369,11 @@ Acceptance criteria:
 - User data persists locally.
 - Long-running optimization does not block the UI.
 - Documentation matches the implemented architecture.
+# Rating Calibration Roadmap
+
+- Grow the Official PRE calibration dataset with real paired observations.
+- Replace Bootstrap v1 with a higher-confidence sector-specific model once data
+  volume supports it.
+- Keep POST as validation/sanity evidence until its uncertainty is modeled.
+- Treat probability outcome calibration as a later layer, separate from rating
+  scale normalization.

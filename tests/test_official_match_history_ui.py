@@ -1,7 +1,9 @@
 import pytest
+from datetime import datetime
 
 QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
 
+from engine.calendar import HTCalendarService
 from engine.history.official_ratings.models import OfficialRatingSnapshot
 from engine.history.provisional_record import (
     consolidate_with_official_pre,
@@ -12,15 +14,26 @@ from ht_coach_app.controllers.match_intelligence_controller import (
     MatchIntelligenceController,
 )
 from ht_coach_app.core.localization import configure_localization
+from ht_coach_app.services.ht_week_context_provider import (
+    get_calendar_service,
+    set_calendar_service,
+)
 from ht_coach_app.services.match_intelligence_service import MatchIntelligenceAppService
 from ht_coach_app.views.match_intelligence_page import MatchIntelligencePage
 
 
 @pytest.fixture(autouse=True)
 def _qt_app():
+    previous_calendar = get_calendar_service()
+    set_calendar_service(
+        HTCalendarService(
+            clock=lambda: datetime(2026, 8, 3, 12, 0, 0)
+        )
+    )
     QApplication.instance() or QApplication([])
     configure_localization("es")
     yield
+    set_calendar_service(previous_calendar)
     configure_localization("en")
 
 

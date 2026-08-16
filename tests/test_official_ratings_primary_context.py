@@ -7,6 +7,7 @@ from ht_coach_app.services.match_workspace_service import (
     FormationAnalysisResult,
     MatchAnalysisResult,
     MatchWorkspaceService,
+    SectorRatingComparisonResult,
     TeamRatingsResult,
 )
 from ht_coach_app.views.match_page import MatchPage
@@ -66,6 +67,25 @@ def test_missing_indirect_set_piece_data_does_not_block_comparability():
 
 def test_genuine_scale_mismatch_still_reported():
     formation = _formation_with_comparisons()
+    formation = FormationAnalysisResult(
+        **{
+            **formation.__dict__,
+            "sector_rating_comparisons": [
+                SectorRatingComparisonResult(
+                    matchup_key="midfield",
+                    our_sector="midfield",
+                    opponent_sector="midfield",
+                    our_value=140,
+                    opponent_value=6.5,
+                    our_scale="ht_coach_internal_contribution",
+                    opponent_scale="hattrick_decimal",
+                    difference=None,
+                    advantage="not_directly_comparable",
+                    comparable=False,
+                )
+            ],
+        }
+    )
     page = MatchPage()
     assert page._sector_ratings_comparable(formation) is False
 

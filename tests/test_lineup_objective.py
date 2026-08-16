@@ -7,6 +7,7 @@ from engine.optimizers.lineup_objective import (
 )
 from models.team_ratings import TeamRatings
 from models.tactic import Tactic
+from models.rating_scale import RatingScale, RatingSource
 
 
 def la_rocha_opponent():
@@ -105,6 +106,31 @@ def test_objective_trace_contains_required_debug_components():
     assert trace.components.final_objective_score == pytest.approx(
         trace.components.win_probability
     )
+
+
+def test_objective_trace_records_raw_and_normalized_rating_layers():
+    trace = LineupObjectiveEvaluator.evaluate_ratings(
+        TeamRatings(
+            midfield=39.68,
+            left_defense=16.45,
+            central_defense=28.32,
+            right_defense=15.89,
+            left_attack=25.92,
+            central_attack=39.12,
+            right_attack=26.56,
+            rating_scale=RatingScale.INTERNAL_CONTRIBUTION,
+            rating_source=RatingSource.LINEUP_ENGINE,
+        ),
+        la_rocha_opponent(),
+        tactic=Tactic.ATTACK_ON_WINGS,
+        candidate_id="internal-baseline",
+    )
+
+    assert trace.raw_internal_ratings["midfield"] == pytest.approx(39.68)
+    assert trace.normalized_ht_ratings["midfield"] == pytest.approx(7.75)
+    assert trace.opponent_ht_ratings["midfield"] == pytest.approx(5.75)
+    assert trace.calibration_version
+    assert trace.calibration_confidence == "low"
 
 
 def test_possession_gain_receives_contextual_value():

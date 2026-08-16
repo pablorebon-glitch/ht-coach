@@ -1,0 +1,1051 @@
+{
+  "diagnostic": "rating_scale_audit",
+  "branch_expected": "feature/rating-scale-calibration",
+  "production_code_changed": false,
+  "fixture": {
+    "players_csv": "C:\\Users\\pablo\\Documents\\Codex\\2026-07-07\\github-app-connector-76869538009648d5b282a4bb21c3d157\\repo\\players.csv",
+    "players_loaded": 18,
+    "opponent": "La Rocha",
+    "opponent_ratings_hattrick_decimal": {
+      "left_defense": 8.5,
+      "central_defense": 13.0,
+      "right_defense": 7.5,
+      "midfield": 5.75,
+      "left_attack": 4.25,
+      "central_attack": 7.0,
+      "right_attack": 4.0
+    }
+  },
+  "rating_scales_found": [
+    {
+      "name": "PlayerScore",
+      "class": "models.player_score.PlayerScore",
+      "fields": [
+        "player",
+        "score"
+      ],
+      "semantic": "individual ranking score for a role/side",
+      "scale": "raw internal player/position contribution score",
+      "producer": "engine.analyzers.player_analyzer.PlayerAnalyzer",
+      "consumer": "candidate lineup generation and ranking",
+      "display_only": false
+    },
+    {
+      "name": "Contribution",
+      "class": "models.contribution.Contribution",
+      "fields": [
+        "left_defense",
+        "central_defense",
+        "right_defense",
+        "midfield",
+        "left_attack",
+        "central_attack",
+        "right_attack"
+      ],
+      "semantic": "per-player sector contribution after position/order modifiers",
+      "scale": "HT Coach internal additive contribution",
+      "producer": "POSITION_ENGINES + OrderModifier",
+      "consumer": "TeamCalculator",
+      "display_only": false
+    },
+    {
+      "name": "TeamRatings",
+      "class": "models.team_ratings.TeamRatings",
+      "fields": [
+        "left_defense",
+        "central_defense",
+        "right_defense",
+        "midfield",
+        "left_attack",
+        "central_attack",
+        "right_attack",
+        "indirect_defense",
+        "indirect_attack"
+      ],
+      "semantic": "team sector totals or imported opponent sectors depending on caller",
+      "scale": "untyped; can carry internal totals or Hattrick decimal values",
+      "producer": "TeamRater, opponent imports, official rating adapters",
+      "consumer": "MatchEvaluator, tactic/lineup/formation optimizers, UI mappers",
+      "display_only": false
+    },
+    {
+      "name": "Official PRE/POST snapshot ratings",
+      "class": "engine.history.official_ratings.models.OfficialRatingSnapshot",
+      "semantic": "official Hattrick match-sector ratings",
+      "scale": "Hattrick decimal quarter-step scale",
+      "producer": "official PRE/POST parser",
+      "consumer": "Match Intelligence and source policy comparisons",
+      "display_only": false
+    },
+    {
+      "name": "SectorComparison",
+      "class": "engine.ratings.sector_rating.SectorComparison",
+      "semantic": "UI/advisory comparison with explicit source labels",
+      "scale": "source-aware; marks mixed scales not_directly_comparable",
+      "producer": "build_sector_comparisons",
+      "consumer": "Match Intelligence/Advisor UI",
+      "display_only": true
+    },
+    {
+      "name": "LineupObjectiveTrace",
+      "class": "engine.optimizers.lineup_objective.LineupObjectiveTrace",
+      "semantic": "decision trace for optimizer/objective explanation",
+      "scale": "inherits untyped TeamRatings and MatchEvaluator outputs",
+      "producer": "LineupObjectiveEvaluator",
+      "consumer": "Decision Lab/result explanation",
+      "display_only": false
+    }
+  ],
+  "la_rocha_current_pipeline": {
+    "best_result": {
+      "formation": "2-5-3",
+      "tactic": "Attack on Wings",
+      "tactic_level": 4.705,
+      "ratings": {
+        "left_defense": 16.45,
+        "central_defense": 28.320000000000004,
+        "right_defense": 15.89,
+        "midfield": 39.67999999999999,
+        "left_attack": 25.92,
+        "central_attack": 39.120000000000005,
+        "right_attack": 26.56
+      },
+      "match_evaluation": {
+        "possession": 0.87343165309267,
+        "chance_probability": 0.9969663251380189,
+        "opponent_chance_probability": 0.0030336748619811393,
+        "expected_chances": 9.969663251380188,
+        "opponent_expected_chances": 0.030336748619811393,
+        "left_conversion": 0.9683001591324951,
+        "central_conversion": 0.9527521826008067,
+        "right_conversion": 0.9575851207856714,
+        "opponent_left_conversion": 0.013961138954850301,
+        "opponent_central_conversion": 0.011051463277550978,
+        "opponent_right_conversion": 0.010527319279884461,
+        "expected_goals": 9.551806169116649,
+        "opponent_expected_goals": 0.00035335778205454514
+      },
+      "probabilities": {
+        "win": 0.9999142900989166,
+        "draw": 8.567967114551955e-05,
+        "loss": 3.022993779674048e-08
+      },
+      "lineup": [
+        {
+          "player": "Ansu Fati",
+          "position": "GOALKEEPER",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "Jae-Pyo Yang",
+          "position": "CENTRAL_DEFENDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Feliciano Alvarez",
+          "position": "CENTRAL_DEFENDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Nahuel Pulian",
+          "position": "WINGER",
+          "side": "LEFT",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Emiliano José Rodríguez",
+          "position": "WINGER",
+          "side": "RIGHT",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Diego García de Paredes",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Pierre-Jean Delion",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Fabián Abbiendi",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Néstor 'El Barbas' Agusevich",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "Michael Rushton",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "David Schiller",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        }
+      ],
+      "tested_lineups": 1000,
+      "tested_order_configurations": 30410,
+      "tested_tactics": 7
+    },
+    "re_evaluated_trace": {
+      "tactic": "Attack on Wings",
+      "tactic_level": 4.705,
+      "ratings": {
+        "left_defense": 16.45,
+        "central_defense": 28.320000000000004,
+        "right_defense": 15.89,
+        "midfield": 39.67999999999999,
+        "left_attack": 25.92,
+        "central_attack": 39.120000000000005,
+        "right_attack": 26.56
+      },
+      "route_weights": {
+        "left": 0.2617625,
+        "center": 0.476475,
+        "right": 0.2617625
+      },
+      "opponent_route_weights": {
+        "left": 0.25,
+        "center": 0.5,
+        "right": 0.25
+      },
+      "match_evaluation": {
+        "possession": 0.87343165309267,
+        "chance_probability": 0.9969663251380189,
+        "opponent_chance_probability": 0.0030336748619811393,
+        "expected_chances": 9.969663251380188,
+        "opponent_expected_chances": 0.030336748619811393,
+        "left_conversion": 0.9683001591324951,
+        "central_conversion": 0.9527521826008067,
+        "right_conversion": 0.9575851207856714,
+        "opponent_left_conversion": 0.013961138954850301,
+        "opponent_central_conversion": 0.011051463277550978,
+        "opponent_right_conversion": 0.010527319279884461,
+        "expected_goals": 9.551806169116649,
+        "opponent_expected_goals": 0.00035335778205454514
+      },
+      "probabilities": {
+        "win": 0.9999142900989166,
+        "draw": 8.567967114551955e-05,
+        "loss": 3.022993779674048e-08
+      },
+      "sector_xg_breakdown": {
+        "ours": {
+          "left_attack_vs_opponent_right_defense": {
+            "route_weight": 0.2617625,
+            "conversion": 0.9683001591324951,
+            "xg": 2.5269574100591203
+          },
+          "central_attack_vs_opponent_central_defense": {
+            "route_weight": 0.476475,
+            "conversion": 0.9527521826008067,
+            "xg": 4.525854212883334
+          },
+          "right_attack_vs_opponent_left_defense": {
+            "route_weight": 0.2617625,
+            "conversion": 0.9575851207856714,
+            "xg": 2.4989945461741945
+          }
+        },
+        "opponent": {
+          "left_attack_vs_our_right_defense": {
+            "route_weight": 0.25,
+            "conversion": 0.013961138954850301,
+            "xg": 0.00010588389072988749
+          },
+          "central_attack_vs_our_central_defense": {
+            "route_weight": 0.5,
+            "conversion": 0.011051463277550978,
+            "xg": 0.00016763273166607047
+          },
+          "right_attack_vs_our_left_defense": {
+            "route_weight": 0.25,
+            "conversion": 0.010527319279884461,
+            "xg": 7.98411596585872e-05
+          }
+        }
+      }
+    },
+    "first_scale_meeting": {
+      "file": "engine/evaluators/match_evaluator.py",
+      "function": "MatchEvaluator.evaluate",
+      "line_of_first_use": "possession = _possession_share(our_ratings.midfield, opponent_ratings.midfield)",
+      "own_value": {
+        "field": "midfield",
+        "value": 39.67999999999999,
+        "scale": "HT Coach internal additive contribution"
+      },
+      "opponent_value": {
+        "field": "midfield",
+        "value": 5.75,
+        "scale": "Hattrick decimal imported opponent rating"
+      },
+      "same_scale": false
+    }
+  },
+  "la_rocha_ab_official_scale": {
+    "candidate_a": {
+      "tactic": "Attack on Wings",
+      "tactic_level": 0.0,
+      "ratings": {
+        "left_defense": 4.25,
+        "central_defense": 5.25,
+        "right_defense": 4.25,
+        "midfield": 6.75,
+        "left_attack": 9.5,
+        "central_attack": 12.5,
+        "right_attack": 9.25
+      },
+      "route_weights": {
+        "left": 0.3,
+        "center": 0.4,
+        "right": 0.3
+      },
+      "opponent_route_weights": {
+        "left": 0.25,
+        "center": 0.5,
+        "right": 0.25
+      },
+      "match_evaluation": {
+        "possession": 0.54,
+        "chance_probability": 0.6179905808477237,
+        "opponent_chance_probability": 0.38200941915227626,
+        "expected_chances": 6.179905808477237,
+        "opponent_expected_chances": 3.8200941915227626,
+        "left_conversion": 0.600622909926562,
+        "central_conversion": 0.39681177823154934,
+        "right_conversion": 0.48814399062760705,
+        "opponent_left_conversion": 0.4252873563218391,
+        "opponent_central_conversion": 0.6369015599784831,
+        "opponent_right_conversion": 0.38154893479891844,
+        "expected_goals": 2.9994468331098734,
+        "opponent_expected_goals": 1.9870596322278384
+      },
+      "probabilities": {
+        "win": 0.5875605091088354,
+        "draw": 0.16754890359613717,
+        "loss": 0.24489058729502747
+      }
+    },
+    "candidate_b": {
+      "tactic": "Attack on Wings",
+      "tactic_level": 0.0,
+      "ratings": {
+        "left_defense": 4.25,
+        "central_defense": 5.25,
+        "right_defense": 4.5,
+        "midfield": 7.75,
+        "left_attack": 9.25,
+        "central_attack": 12.25,
+        "right_attack": 9.0
+      },
+      "route_weights": {
+        "left": 0.3,
+        "center": 0.4,
+        "right": 0.3
+      },
+      "opponent_route_weights": {
+        "left": 0.25,
+        "center": 0.5,
+        "right": 0.25
+      },
+      "match_evaluation": {
+        "possession": 0.5740740740740741,
+        "chance_probability": 0.7100195433528766,
+        "opponent_chance_probability": 0.28998045664712335,
+        "expected_chances": 7.100195433528766,
+        "opponent_expected_chances": 2.8998045664712335,
+        "left_conversion": 0.5812864183891562,
+        "central_conversion": 0.38239963708599517,
+        "right_conversion": 0.4676378420315798,
+        "opponent_left_conversion": 0.3840056952011171,
+        "opponent_central_conversion": 0.6369015599784831,
+        "opponent_right_conversion": 0.38154893479891844,
+        "expected_goals": 3.3203150359954705,
+        "opponent_expected_goals": 1.4784347289984536
+      },
+      "probabilities": {
+        "win": 0.7296294300975206,
+        "draw": 0.13559505683684522,
+        "loss": 0.13477551306563412
+      }
+    },
+    "ranking": "B>A"
+  },
+  "sanchez_regression": {
+    "status": "forced_replacement_tested",
+    "player": {
+      "name": "Juan Martín Sánchez",
+      "age": 19,
+      "form": 7,
+      "stamina": 6,
+      "defending": 6,
+      "playmaking": 11,
+      "winger": 7,
+      "passing": 3,
+      "scoring": 3,
+      "tsi": 15170
+    },
+    "baseline": {
+      "formation": "2-5-3",
+      "tactic": "Attack on Wings",
+      "xg": 9.551806169116649,
+      "opponent_xg": 0.00035335778205454514,
+      "probabilities": {
+        "win": 0.9999142900989166,
+        "draw": 8.567967114551955e-05,
+        "loss": 3.022993779674048e-08
+      },
+      "lineup": [
+        {
+          "player": "Ansu Fati",
+          "position": "GOALKEEPER",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "Jae-Pyo Yang",
+          "position": "CENTRAL_DEFENDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Feliciano Alvarez",
+          "position": "CENTRAL_DEFENDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Nahuel Pulian",
+          "position": "WINGER",
+          "side": "LEFT",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Emiliano José Rodríguez",
+          "position": "WINGER",
+          "side": "RIGHT",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Diego García de Paredes",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Pierre-Jean Delion",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Fabián Abbiendi",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Néstor 'El Barbas' Agusevich",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "Michael Rushton",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "David Schiller",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        }
+      ]
+    },
+    "best_forced": {
+      "replace_player": "Pierre-Jean Delion",
+      "xg": 9.519529479210881,
+      "opponent_xg": 0.0002954365635559902,
+      "probabilities": {
+        "win": 0.9999118197975594,
+        "draw": 8.815419118367857e-05,
+        "loss": 2.6011256935090495e-08
+      },
+      "ratings": {
+        "left_defense": 16.49,
+        "central_defense": 28.410000000000004,
+        "right_defense": 15.93,
+        "midfield": 42.01,
+        "left_attack": 25.12,
+        "central_attack": 38.040000000000006,
+        "right_attack": 25.76
+      },
+      "lineup": [
+        {
+          "player": "Ansu Fati",
+          "position": "GOALKEEPER",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "Jae-Pyo Yang",
+          "position": "CENTRAL_DEFENDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Feliciano Alvarez",
+          "position": "CENTRAL_DEFENDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Nahuel Pulian",
+          "position": "WINGER",
+          "side": "LEFT",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Emiliano José Rodríguez",
+          "position": "WINGER",
+          "side": "RIGHT",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Diego García de Paredes",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Juan Martín Sánchez",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Fabián Abbiendi",
+          "position": "INNER_MIDFIELDER",
+          "side": "CENTER",
+          "order": "Offensive",
+          "order_side": null
+        },
+        {
+          "player": "Néstor 'El Barbas' Agusevich",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "Michael Rushton",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        },
+        {
+          "player": "David Schiller",
+          "position": "FORWARD",
+          "side": "CENTER",
+          "order": "Normal",
+          "order_side": null
+        }
+      ],
+      "deltas_vs_baseline": {
+        "xg": -0.0322766899057676,
+        "opponent_xg": -5.792121849855492e-05,
+        "win": -2.4703013572491272e-06,
+        "draw": 2.4745200381590235e-06,
+        "loss": -4.2186808616499865e-09
+      }
+    },
+    "all_inner_midfielder_replacements": [
+      {
+        "replace_player": "Pierre-Jean Delion",
+        "xg": 9.519529479210881,
+        "opponent_xg": 0.0002954365635559902,
+        "probabilities": {
+          "win": 0.9999118197975594,
+          "draw": 8.815419118367857e-05,
+          "loss": 2.6011256935090495e-08
+        },
+        "ratings": {
+          "left_defense": 16.49,
+          "central_defense": 28.410000000000004,
+          "right_defense": 15.93,
+          "midfield": 42.01,
+          "left_attack": 25.12,
+          "central_attack": 38.040000000000006,
+          "right_attack": 25.76
+        },
+        "lineup": [
+          {
+            "player": "Ansu Fati",
+            "position": "GOALKEEPER",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "Jae-Pyo Yang",
+            "position": "CENTRAL_DEFENDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Feliciano Alvarez",
+            "position": "CENTRAL_DEFENDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Nahuel Pulian",
+            "position": "WINGER",
+            "side": "LEFT",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Emiliano José Rodríguez",
+            "position": "WINGER",
+            "side": "RIGHT",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Diego García de Paredes",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Juan Martín Sánchez",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Fabián Abbiendi",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Néstor 'El Barbas' Agusevich",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "Michael Rushton",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "David Schiller",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          }
+        ],
+        "deltas_vs_baseline": {
+          "xg": -0.0322766899057676,
+          "opponent_xg": -5.792121849855492e-05,
+          "win": -2.4703013572491272e-06,
+          "draw": 2.4745200381590235e-06,
+          "loss": -4.2186808616499865e-09
+        }
+      },
+      {
+        "replace_player": "Fabián Abbiendi",
+        "xg": 9.511713191435938,
+        "opponent_xg": 0.00027698607093151967,
+        "probabilities": {
+          "win": 0.9999112141153219,
+          "draw": 8.876132795737327e-05,
+          "loss": 2.455672072183081e-08
+        },
+        "ratings": {
+          "left_defense": 16.66,
+          "central_defense": 28.770000000000003,
+          "right_defense": 16.1,
+          "midfield": 42.43999999999999,
+          "left_attack": 25.21,
+          "central_attack": 37.47,
+          "right_attack": 25.85
+        },
+        "lineup": [
+          {
+            "player": "Ansu Fati",
+            "position": "GOALKEEPER",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "Jae-Pyo Yang",
+            "position": "CENTRAL_DEFENDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Feliciano Alvarez",
+            "position": "CENTRAL_DEFENDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Nahuel Pulian",
+            "position": "WINGER",
+            "side": "LEFT",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Emiliano José Rodríguez",
+            "position": "WINGER",
+            "side": "RIGHT",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Diego García de Paredes",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Pierre-Jean Delion",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Juan Martín Sánchez",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Néstor 'El Barbas' Agusevich",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "Michael Rushton",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "David Schiller",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          }
+        ],
+        "deltas_vs_baseline": {
+          "xg": -0.04009297768071107,
+          "opponent_xg": -7.637171112302547e-05,
+          "win": -3.0759835947247183e-06,
+          "draw": 3.0816568118537184e-06,
+          "loss": -5.673217074909672e-09
+        }
+      },
+      {
+        "replace_player": "Diego García de Paredes",
+        "xg": 9.510843739855396,
+        "opponent_xg": 0.0003240754058399593,
+        "probabilities": {
+          "win": 0.999911105004797,
+          "draw": 8.886623547637936e-05,
+          "loss": 2.875972671505468e-08
+        },
+        "ratings": {
+          "left_defense": 16.7,
+          "central_defense": 28.860000000000003,
+          "right_defense": 16.14,
+          "midfield": 40.15999999999999,
+          "left_attack": 24.93,
+          "central_attack": 38.010000000000005,
+          "right_attack": 25.57
+        },
+        "lineup": [
+          {
+            "player": "Ansu Fati",
+            "position": "GOALKEEPER",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "Jae-Pyo Yang",
+            "position": "CENTRAL_DEFENDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Feliciano Alvarez",
+            "position": "CENTRAL_DEFENDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Nahuel Pulian",
+            "position": "WINGER",
+            "side": "LEFT",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Emiliano José Rodríguez",
+            "position": "WINGER",
+            "side": "RIGHT",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Juan Martín Sánchez",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Pierre-Jean Delion",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Fabián Abbiendi",
+            "position": "INNER_MIDFIELDER",
+            "side": "CENTER",
+            "order": "Offensive",
+            "order_side": null
+          },
+          {
+            "player": "Néstor 'El Barbas' Agusevich",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "Michael Rushton",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          },
+          {
+            "player": "David Schiller",
+            "position": "FORWARD",
+            "side": "CENTER",
+            "order": "Normal",
+            "order_side": null
+          }
+        ],
+        "deltas_vs_baseline": {
+          "xg": -0.04096242926125271,
+          "opponent_xg": -2.9282376214585847e-05,
+          "win": -3.1850941196731597e-06,
+          "draw": 3.186564330859813e-06,
+          "loss": -1.470211081685803e-09
+        }
+      }
+    ]
+  },
+  "san_bason_sanity": {
+    "official_vs_official": {
+      "tactic": "Normal",
+      "tactic_level": 0.0,
+      "ratings": {
+        "left_defense": 4.0,
+        "central_defense": 6.25,
+        "right_defense": 4.0,
+        "midfield": 7.0,
+        "left_attack": 7.75,
+        "central_attack": 10.25,
+        "right_attack": 8.0
+      },
+      "route_weights": {
+        "left": 0.25,
+        "center": 0.5,
+        "right": 0.25
+      },
+      "opponent_route_weights": {
+        "left": 0.25,
+        "center": 0.5,
+        "right": 0.25
+      },
+      "match_evaluation": {
+        "possession": 0.6829268292682927,
+        "chance_probability": 0.9090231479564371,
+        "opponent_chance_probability": 0.09097685204356287,
+        "expected_chances": 9.090231479564371,
+        "opponent_expected_chances": 0.9097685204356287,
+        "left_conversion": 0.7337357473738024,
+        "central_conversion": 0.8814563431312601,
+        "right_conversion": 0.9169229186865577,
+        "opponent_left_conversion": 0.4702274555655865,
+        "opponent_central_conversion": 0.07564725397723104,
+        "opponent_right_conversion": 0.37878213391976945,
+        "expected_goals": 7.757538441156143,
+        "opponent_expected_goals": 0.22751129467838005
+      },
+      "probabilities": {
+        "win": 0.9984687239730878,
+        "draw": 0.0013353831489486022,
+        "loss": 0.00019589287796358242
+      }
+    },
+    "internal_own_vs_official_opponent_using_la_rocha_best_xi": {
+      "tactic": "Attack on Wings",
+      "tactic_level": 4.705,
+      "ratings": {
+        "left_defense": 16.45,
+        "central_defense": 28.320000000000004,
+        "right_defense": 15.89,
+        "midfield": 39.67999999999999,
+        "left_attack": 25.92,
+        "central_attack": 39.120000000000005,
+        "right_attack": 26.56
+      },
+      "route_weights": {
+        "left": 0.2617625,
+        "center": 0.476475,
+        "right": 0.2617625
+      },
+      "opponent_route_weights": {
+        "left": 0.25,
+        "center": 0.5,
+        "right": 0.25
+      },
+      "match_evaluation": {
+        "possession": 0.9242953645469368,
+        "chance_probability": 0.9994508429907948,
+        "opponent_chance_probability": 0.0005491570092052145,
+        "expected_chances": 9.994508429907947,
+        "opponent_expected_chances": 0.005491570092052145,
+        "left_conversion": 0.9903931517558892,
+        "central_conversion": 0.9975867448551363,
+        "right_conversion": 0.9975302089770232,
+        "opponent_left_conversion": 0.013961138954850301,
+        "opponent_central_conversion": 0.0008788886833609019,
+        "opponent_right_conversion": 0.008690347661646836,
+        "expected_goals": 9.951421434121722,
+        "opponent_expected_goals": 3.351129601481269e-05
+      },
+      "probabilities": {
+        "win": 0.9999401162613776,
+        "draw": 5.988173220901379e-05,
+        "loss": 2.006413540397892e-09
+      }
+    }
+  },
+  "conversion_audit": {
+    "production_internal_to_ht_conversion_found": false,
+    "production_ht_to_internal_conversion_found": false,
+    "existing_modules": [
+      "engine.ratings.rating_alignment: source-tagged diagnostics and candidate quarter-step helpers; conversion unsupported for internal ratings",
+      "engine.ratings.sector_rating: scale detection/comparison; mixed scales marked not_directly_comparable",
+      "engine.ratings.rating_source_policy: Match Intelligence source selection; does not feed optimizer/xG"
+    ],
+    "match_evaluator_scale_guard": false
+  },
+  "historical_calibration_opportunity": {
+    "available_code": [
+      "engine.history.official_ratings parser/model",
+      "engine.history.snapshot_factory",
+      "engine.rating_validation dataset/metrics",
+      "engine.hattrick_ratings.calibration services",
+      "fixtures/hattrick/calibration/synthetic_real_match_records.json"
+    ],
+    "missing_for_production_mapping": [
+      "sufficient real paired observations of internal predicted sectors and official PRE/POST sectors for the same match",
+      "formation/order/tactic/context provenance for each pair",
+      "source-scale metadata carried through optimizer inputs",
+      "held-out validation before changing probability outputs"
+    ]
+  },
+  "recommendation": {
+    "outcome_classification": "C/D: missing normalization layer, with xG calibrated around same-scale operands while opponent input is semantically Hattrick decimal",
+    "architecture": [
+      "Attach explicit rating source/scale metadata to match-evaluator operands.",
+      "Introduce a service/engine adapter that normalizes both teams to one calibrated model scale before xG/WDL.",
+      "Reject or diagnostically flag mixed-scale MatchEvaluator calls unless an explicit calibrated conversion is applied.",
+      "Keep UI formatting and official PRE display separate from optimizer formulas.",
+      "Use historical official snapshots to fit sector-specific mappings only after enough real pairs exist."
+    ]
+  }
+}

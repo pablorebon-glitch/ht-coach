@@ -32,6 +32,16 @@ from engine.ratings.rating_alignment import (
     normalize_source,
     pata2008_reference_fixture,
 )
+from engine.ratings.rating_scale_normalizer import (
+    BOOTSTRAP_CALIBRATION_VERSION,
+    CANONICAL_ANALYTICAL_SCALE,
+    CalibratedTeamRatings,
+    RatingCalibrationModel,
+    RatingScaleNormalizer,
+    bootstrap_calibration_model,
+    rebuild_rating_calibration,
+    validate_compatible_ratings,
+)
 
 __all__ = [
     "ADVANTAGE_BALANCED",
@@ -64,4 +74,12 @@ __all__ = [
     "internal_contribution",
     "normalize_source",
     "pata2008_reference_fixture",
+    "BOOTSTRAP_CALIBRATION_VERSION",
+    "CANONICAL_ANALYTICAL_SCALE",
+    "CalibratedTeamRatings",
+    "RatingCalibrationModel",
+    "RatingScaleNormalizer",
+    "bootstrap_calibration_model",
+    "rebuild_rating_calibration",
+    "validate_compatible_ratings",
 ]

@@ -11,9 +11,14 @@ from engine.evaluators.result_probability_evaluator import (
     ResultProbabilityEvaluator
 )
 
+from engine.ratings.rating_scale_normalizer import RatingScaleNormalizer
+
 from models.order import Order
 from models.position import Position
 from models.side import Side
+
+
+DEFAULT_RATING_NORMALIZER = RatingScaleNormalizer()
 
 
 @dataclass(frozen=True)
@@ -158,12 +163,20 @@ class OrderOptimizer:
             lineup
         )
 
+        (
+            calibrated,
+            opponent_calibrated
+        ) = DEFAULT_RATING_NORMALIZER.normalize_matchup(
+            ratings,
+            opponent_ratings
+        )
+
         if config is None:
 
             match_evaluation = (
                 MatchEvaluator.evaluate(
-                    ratings,
-                    opponent_ratings
+                    calibrated.ratings,
+                    opponent_calibrated
                 )
             )
 
@@ -171,8 +184,8 @@ class OrderOptimizer:
 
             match_evaluation = (
                 MatchEvaluator.evaluate(
-                    ratings,
-                    opponent_ratings,
+                    calibrated.ratings,
+                    opponent_calibrated,
                     config=config
                 )
             )
@@ -185,7 +198,7 @@ class OrderOptimizer:
         )
 
         return (
-            ratings,
+            calibrated.ratings,
             match_evaluation,
             probabilities
         )
