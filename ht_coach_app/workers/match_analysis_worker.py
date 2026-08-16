@@ -42,11 +42,16 @@ class MatchAnalysisWorker(QObject):
                 self.progress_changed.emit(
                     t("match.status_updating_available_lineup")
                 )
+                workspace_kwargs = {
+                    "availability_mode": self._availability_mode,
+                }
+                if self._match_type is not None:
+                    workspace_kwargs["match_type"] = self._match_type
                 result = self._service.analyze_workspace(
                     self._players_csv_path,
                     self._opponent_name,
                     self._workspace_state,
-                    availability_mode=self._availability_mode,
+                    **workspace_kwargs,
                 )
                 self.finished.emit(result)
                 return
@@ -59,8 +64,8 @@ class MatchAnalysisWorker(QObject):
             }
             if self._match_type is not None:
                 analyze_kwargs["match_type"] = self._match_type
-                analyze_kwargs["required_player_ids"] = self._required_player_ids
-                analyze_kwargs["training_rules"] = self._training_rules
+            analyze_kwargs["required_player_ids"] = self._required_player_ids
+            analyze_kwargs["training_rules"] = self._training_rules
             result = self._service.analyze(
                 self._players_csv_path,
                 self._opponent_name,

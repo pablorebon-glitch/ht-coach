@@ -129,6 +129,13 @@ class WeeklyMatchRecord:
     minutes_known: bool = False
     notes: str = ""
     training_exposure_entries: tuple[TrainingExposure, ...] = ()
+    # Alpha 0.6.7, Part 19: the canonical Match Record this weekly
+    # entry belongs to, when known. Additive and optional -- existing
+    # records created before this field existed simply have it empty,
+    # and callers fall back to the opponent+date inference
+    # (`engine.history.match_deletion.find_linked_weekly_match_records`)
+    # when it's not populated.
+    linked_match_record_id: str = ""
 
 
 @dataclass(frozen=True)

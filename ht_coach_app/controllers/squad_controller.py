@@ -2,6 +2,8 @@ from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
 from ht_coach_app.core.localization import t
+from ht_coach_app.core.paths import application_paths
+from ht_coach_app.core.portable import portable_roster_copy
 from ht_coach_app.services.squad_builder_service import (
     AVAILABILITY_CURRENT,
     AVAILABILITY_FULL_STRENGTH,
@@ -28,6 +30,7 @@ class SquadController:
         evolution_service=None,
         transfer_planner_service=None,
         weekly_training_service=None,
+        squad_intelligence_service=None,
     ):
         self._view = view
         self._service = service
@@ -41,9 +44,11 @@ class SquadController:
         self._weekly_training_service = (
             weekly_training_service or WeeklyTrainingAppService()
         )
+        self._squad_intelligence_service = squad_intelligence_service
         self._settings_repository = settings_repository
         self._app_events = app_events
         self._roster = None
+        self._last_selected_player_name = None
         self._visible_rows = []
         self._ideal_selection = AUTO_FORMATION
         self._availability_mode = AVAILABILITY_CURRENT
@@ -53,6 +58,7 @@ class SquadController:
         self._last_current_available_result = None
         self._last_evolution_result = None
         self._transfer_constraints = TransferConstraints()
+        self._selected_weekly_cycle_id = ""
 
         self._connect_view()
         self.refresh()
@@ -136,9 +142,21 @@ class SquadController:
             self._view.use_training_plan_requested.connect(
                 self._accept_training_plan
             )
+        if hasattr(self._view, "week_navigation_requested"):
+            self._view.week_navigation_requested.connect(
+                self._navigate_week
+            )
+        if self._app_events is not None:
+            self._app_events.weekly_plan_saved.connect(
+                self._refresh_weekly_training_after_external_save
+            )
         if hasattr(self._view, "training_type_changed"):
             self._view.training_type_changed.connect(
                 self._change_active_training_type
+            )
+        if hasattr(self._view, "weekly_cycle_changed"):
+            self._view.weekly_cycle_changed.connect(
+                self._change_weekly_cycle
             )
 
     def refresh(self):
@@ -206,8 +224,9 @@ class SquadController:
         path = self._view.choose_players_file()
 
         if path:
-            self._view.set_csv_path(path)
-            self._save_roster_path(path)
+            portable_path = portable_roster_copy(path)
+            self._view.set_csv_path(portable_path)
+            self._save_roster_path(portable_path)
 
     def _load(self):
         self._view.show_loading()
@@ -218,15 +237,15 @@ class SquadController:
 
         try:
             self._roster = self._service.load_roster(
-                self._view.csv_path()
+                self._resolved_csv_path(self._view.csv_path())
             )
         except SquadValidationError as exc:
             self._view.show_error(str(exc))
             return
 
-        self._save_roster_path(
-            self._roster.source_path
-        )
+        saved_roster_path = portable_roster_copy(self._roster.source_path)
+        self._view.set_csv_path(saved_roster_path)
+        self._save_roster_path(saved_roster_path)
         self._view.set_specialties(
             self._roster.specialties
         )
@@ -243,7 +262,7 @@ class SquadController:
 
         if self._app_events is not None:
             self._app_events.roster_changed.emit(
-                self._roster.source_path,
+                self._view.csv_path(),
                 self._roster.player_count
             )
 
@@ -267,9 +286,48 @@ class SquadController:
             selected_position=filters["selected_position"],
             availability=filters.get("availability", "all")
         )
+        self._visible_rows = self._apply_squad_intelligence_filters(
+            self._visible_rows,
+            role=filters.get("role", "all"),
+            status=filters.get("status", "all"),
+            training_fit=filters.get("training_fit", "all"),
+        )
         self._view.set_players(
             self._visible_rows
         )
+
+    def _apply_squad_intelligence_filters(self, rows, role="all", status="all", training_fit="all"):
+        if role == "all" and status == "all" and training_fit == "all":
+            return rows
+        if self._squad_intelligence_service is None:
+            from ht_coach_app.services.squad_intelligence_service import (
+                SquadIntelligenceAppService,
+            )
+
+            self._squad_intelligence_service = SquadIntelligenceAppService(
+                weekly_training_service=self._weekly_training_service
+            )
+        try:
+            reports = self._squad_intelligence_service.generate_squad_reports(
+                self._roster.players
+            )
+        except Exception:
+            return rows
+        reports_by_name = {report.player_name: report for report in reports}
+
+        def _matches(row):
+            report = reports_by_name.get(row.name)
+            if report is None:
+                return False
+            if role != "all" and report.recommended_role.value != role:
+                return False
+            if status != "all" and report.management_status.value != status:
+                return False
+            if training_fit != "all" and report.training_fit.value != training_fit:
+                return False
+            return True
+
+        return [row for row in rows if _matches(row)]
 
     def _show_ideal_xi(self, formation_name=AUTO_FORMATION):
         self._ideal_selection = formation_name or AUTO_FORMATION
@@ -313,19 +371,74 @@ class SquadController:
         self._show_evolution()
         self._show_weekly_training()
 
+    def _refresh_weekly_training_after_external_save(self):
+        """Alpha 0.6.6, Part 8: a lineup saved as First/Second Weekly
+        Match from Match must update the Weekly Planner record
+        immediately -- not only the next time this tab happens to be
+        rebuilt. Cheap to call unconditionally: `_show_weekly_training`
+        already no-ops safely when there's no roster loaded yet."""
+        self._show_weekly_training()
+
     def _show_weekly_training(self):
         if not hasattr(self._view, "show_weekly_training"):
             return
+        if hasattr(self._view, "set_ht_week_status"):
+            from ht_coach_app.services.ht_week_context_provider import current_week_snapshot
+            from ht_coach_app.services.ht_week_formatting import format_ht_week_status
+
+            self._view.set_ht_week_status(format_ht_week_status(current_week_snapshot()))
         if self._roster is None:
             self._view.show_weekly_training_empty()
             return
         state = self._weekly_training_service.load_state()
-        self._view.show_weekly_training(
-            state,
-            self._weekly_training_service.priority_rows(self._roster.players),
-            self._weekly_training_service.coverage(self._roster.players),
-            self._builder_service.supported_formations(),
+        options = self._weekly_training_service.visible_cycle_options(state)
+        option_ids = {option.cycle_id for option in options}
+        current_cycle_id = options[0].cycle_id if options else ""
+        if self._selected_weekly_cycle_id not in option_ids:
+            self._selected_weekly_cycle_id = current_cycle_id
+        cycle_id = self._selected_weekly_cycle_id or current_cycle_id
+        visible_week = (
+            self._weekly_training_service.training_week_for_cycle(cycle_id, state)
+            if cycle_id
+            else state.active_week
         )
+        display_state = (
+            state
+            if visible_week == state.active_week
+            else state.__class__(
+                schema_version=state.schema_version,
+                active_training_type=state.active_training_type,
+                active_week=visible_week,
+                priorities=state.priorities,
+                match_records=state.match_records,
+                archived_weeks=state.archived_weeks,
+                diagnostics=state.diagnostics,
+            )
+        )
+        self._view.show_weekly_training(
+            display_state,
+            self._weekly_training_service.priority_rows(self._roster.players),
+            self._weekly_training_service.coverage(
+                self._roster.players,
+                cycle_id,
+            ),
+            self._builder_service.supported_formations(),
+            cycle_options=options,
+            selected_cycle_id=cycle_id,
+        )
+        if hasattr(self._view, "show_week_navigation_context"):
+            self._navigate_week("current")
+
+    def _change_weekly_cycle(self, cycle_id):
+        self._selected_weekly_cycle_id = cycle_id or ""
+        self._show_weekly_training()
+
+    def _navigate_week(self, direction):
+        if not hasattr(self._view, "show_week_navigation_context"):
+            return
+        state = self._weekly_training_service.load_state()
+        context = self._weekly_training_service.week_navigation_context(state, direction)
+        self._view.show_week_navigation_context(context)
 
     def _change_active_training_type(self, training_type):
         if self._roster is None:
@@ -333,8 +446,69 @@ class SquadController:
         current_state = self._weekly_training_service.load_state()
         if current_state.active_training_type == training_type:
             return
+
+        if current_state.priorities:
+            if not self._view.confirm_training_type_change():
+                self._view.set_active_training_type(current_state.active_training_type)
+                return
+
+        eligible_by_position = self._eligible_players_by_position(training_type)
+        selections = self._request_training_priority_selections(
+            training_type, eligible_by_position
+        )
+        if selections is None:
+            self._view.set_active_training_type(current_state.active_training_type)
+            return
+
         self._weekly_training_service.set_active_training_type(training_type)
+        self._selected_weekly_cycle_id = ""
+        self._apply_wizard_selections(selections)
+
         self._show_weekly_training()
+        if self._last_selected_player_name:
+            self._show_squad_intelligence(self._last_selected_player_name)
+
+    def _eligible_players_by_position(self, training_type):
+        from engine.analyzers.player_analyzer import PlayerAnalyzer
+        from engine.weekly_training.player_identity import player_training_id
+
+        by_position = {}
+        for player in self._roster.players:
+            best_position, _score = PlayerAnalyzer.best_position(player)
+            if not best_position:
+                continue
+            by_position.setdefault(best_position, []).append(
+                (player_training_id(player), player.name)
+            )
+        return by_position
+
+    def _request_training_priority_selections(self, training_type, eligible_by_position):
+        from ht_coach_app.widgets.training_priority_wizard import TrainingPriorityWizard
+
+        return TrainingPriorityWizard.request_selections(
+            training_type, eligible_by_position, self._view
+        )
+
+    def _apply_wizard_selections(self, selections):
+        from engine.weekly_training.models import TrainingPriority
+        from engine.weekly_training.player_identity import player_training_id
+
+        effect_to_priority = {
+            "FULL": TrainingPriority.REQUIRED_100.value,
+            "REDUCED": TrainingPriority.REQUIRED_50.value,
+            "VERY_SMALL": TrainingPriority.SECONDARY_PRIORITY.value,
+        }
+        players_by_id = {
+            player_training_id(player): player for player in self._roster.players
+        }
+        for effect, player_ids in (selections or {}).items():
+            priority_value = effect_to_priority.get(effect)
+            if priority_value is None:
+                continue
+            for player_id in player_ids:
+                player = players_by_id.get(player_id)
+                if player is not None:
+                    self._weekly_training_service.save_priority(player, priority_value)
 
     def _change_training_priority(self, player_id, priority):
         if self._roster is None:
@@ -358,6 +532,7 @@ class SquadController:
         plan = self._weekly_training_service.generate_plan(
             self._roster.players,
             formation_name,
+            cycle_id=self._selected_weekly_cycle_id or None,
         )
         board = self._weekly_training_service.board_for_plan(plan)
         self._view.show_weekly_training_plan(plan, board, self._roster.players)
@@ -377,13 +552,22 @@ class SquadController:
             self._view.show_error(t("planner.no_plan_to_record"))
             return
         state = self._weekly_training_service.load_state()
+        cycle_id = self._selected_weekly_cycle_id or (
+            state.active_week.week_id if state.active_week is not None else ""
+        )
+        selected_week = (
+            self._weekly_training_service.training_week_for_cycle(cycle_id, state)
+            if cycle_id
+            else state.active_week
+        )
         requested_status, confirmed = self._first_match_requested_status(
-            state.active_week.first_match_date
+            selected_week.first_match_date
         )
         try:
             saved = self._weekly_training_service.record_first_match(
                 board,
                 roster_players=self._roster.players,
+                match_date=selected_week.first_match_date,
                 requested_status=requested_status,
                 played_confirmed=confirmed,
             )
@@ -399,7 +583,9 @@ class SquadController:
     def _edit_first_training_match(self, opponent_name, minutes_known):
         if self._roster is None:
             return
-        record = self._weekly_training_service.first_match_record()
+        record = self._weekly_training_service.first_match_record_for_cycle(
+            self._selected_weekly_cycle_id
+        ) if self._selected_weekly_cycle_id else self._weekly_training_service.first_match_record()
         if record is None:
             return
         if not opponent_name and not minutes_known:
@@ -435,7 +621,9 @@ class SquadController:
         if board is None:
             self._view.show_error(t("planner.no_plan_to_record"))
             return
-        record = self._weekly_training_service.first_match_record()
+        record = self._weekly_training_service.first_match_record_for_cycle(
+            self._selected_weekly_cycle_id
+        ) if self._selected_weekly_cycle_id else self._weekly_training_service.first_match_record()
         if record is None:
             self._view.show_error(t("planner.no_first_match_record"))
             return
@@ -473,13 +661,22 @@ class SquadController:
             self._view.show_error(t("planner.no_plan_to_record"))
             return
         state = self._weekly_training_service.load_state()
+        cycle_id = self._selected_weekly_cycle_id or (
+            state.active_week.week_id if state.active_week is not None else ""
+        )
+        selected_week = (
+            self._weekly_training_service.training_week_for_cycle(cycle_id, state)
+            if cycle_id
+            else state.active_week
+        )
         requested_status, confirmed = self._first_match_requested_status(
-            state.active_week.first_match_date
+            selected_week.first_match_date
         )
         try:
             saved = self._weekly_training_service.replace_first_match(
                 board,
                 roster_players=self._roster.players,
+                match_date=selected_week.first_match_date,
                 requested_status=requested_status,
                 played_confirmed=confirmed,
             )
@@ -492,14 +689,24 @@ class SquadController:
     def _delete_first_training_match(self):
         if self._roster is None:
             return
-        self._weekly_training_service.delete_first_match()
+        if self._selected_weekly_cycle_id:
+            self._weekly_training_service.delete_first_match_for_cycle(
+                self._selected_weekly_cycle_id
+            )
+        else:
+            self._weekly_training_service.delete_first_match()
         self._show_weekly_training()
         self._view.show_status(t("planner.no_first_match_record"))
 
     def _delete_second_training_match(self):
         if self._roster is None:
             return
-        self._weekly_training_service.delete_second_match()
+        if self._selected_weekly_cycle_id:
+            self._weekly_training_service.delete_second_match_for_cycle(
+                self._selected_weekly_cycle_id
+            )
+        else:
+            self._weekly_training_service.delete_second_match()
         self._show_weekly_training()
         self._view.show_status(t("planner.no_second_match_record"))
 
@@ -672,6 +879,34 @@ class SquadController:
         self._view.show_player_detail(
             detail
         )
+        self._last_selected_player_name = player_name
+        self._show_squad_intelligence(player_name)
+
+    def _show_squad_intelligence(self, player_name):
+        if self._roster is None or not hasattr(self._view, "show_squad_intelligence"):
+            return
+        player = next(
+            (p for p in self._roster.players if p.name == player_name), None
+        )
+        if player is None:
+            self._view.clear_squad_intelligence()
+            return
+        if self._squad_intelligence_service is None:
+            from ht_coach_app.services.squad_intelligence_service import (
+                SquadIntelligenceAppService,
+            )
+
+            self._squad_intelligence_service = SquadIntelligenceAppService(
+                weekly_training_service=self._weekly_training_service
+            )
+        try:
+            report = self._squad_intelligence_service.generate_report(
+                player, self._roster.players
+            )
+        except Exception:
+            self._view.clear_squad_intelligence()
+            return
+        self._view.show_squad_intelligence(report)
 
     def _export(self):
         if not self._visible_rows:
@@ -735,3 +970,7 @@ class SquadController:
         )
         if hasattr(self._view, "set_recent_csv_paths"):
             self._view.set_recent_csv_paths(recent)
+
+    @staticmethod
+    def _resolved_csv_path(path):
+        return str(application_paths().resolve_user_path(path))

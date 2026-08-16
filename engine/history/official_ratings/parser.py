@@ -31,9 +31,11 @@ _BOLD_TAG = re.compile(r"\[/?b\]", re.IGNORECASE)
 _HEADER_LINE = re.compile(
     r"\[b\](?P<team>.*?)\[/b\]\s*(?:\[matchid=(?P<match_id>\d+)\])?", re.IGNORECASE
 )
+_MATCH_ID = re.compile(r"\[matchid=(?P<match_id>\d+)\]", re.IGNORECASE)
 _TABLE_BLOCK = re.compile(r"\[table\](?P<body>.*?)\[/table\]", re.IGNORECASE | re.DOTALL)
 _TABLE_ROW = re.compile(r"\[tr\](?P<row>.*?)\[/tr\]", re.IGNORECASE | re.DOTALL)
 _TABLE_HEADER_CELL = re.compile(r"\[th\](?P<label>.*?)\[/th\]", re.IGNORECASE | re.DOTALL)
+_TABLE_HEADER_CELL_ANY = re.compile(r"\[th[^\]]*\](?P<label>.*?)\[/th\]", re.IGNORECASE | re.DOTALL)
 _TABLE_DATA_CELL = re.compile(r"\[td[^\]]*\](?P<value>.*?)\[/td\]", re.IGNORECASE | re.DOTALL)
 
 # A "quality word (number)" fragment, e.g. "excellent (8)", "clase mundial
@@ -50,10 +52,30 @@ def _strip_bbcode(text):
     return re.sub(r"\[[^\]]*\]", "", text)
 
 
+def _repair_common_mojibake(text):
+    replacements = {
+        "Ã¡": "á",
+        "Ã©": "é",
+        "Ã­": "í",
+        "Ã³": "ó",
+        "Ãº": "ú",
+        "Ã±": "ñ",
+        "Ã": "Á",
+        "Ã‰": "É",
+        "Ã": "Í",
+        "Ã“": "Ó",
+        "Ãš": "Ú",
+        "Ã‘": "Ñ",
+    }
+    for broken, fixed in replacements.items():
+        text = text.replace(broken, fixed)
+    return text
+
+
 def _normalize(text):
     """Lowercased, accent-stripped, whitespace-collapsed — used only for
     keyword comparison, never for anything that gets stored."""
-    text = unicodedata.normalize("NFKD", text)
+    text = unicodedata.normalize("NFKD", _repair_common_mojibake(text))
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     return " ".join(text.lower().split())
 
@@ -83,10 +105,11 @@ def _split_label_value(line, keywords):
     longest-first so a short prefix never eats into a longer, more
     specific one that happens to share it."""
     normalized_line = _normalize(line)
+    repaired_line = _repair_common_mojibake(line.strip())
     for keyword in sorted(keywords, key=len, reverse=True):
         normalized_keyword = _normalize(keyword)
         if normalized_line.startswith(normalized_keyword):
-            remainder = line.strip()[len(keyword):]
+            remainder = repaired_line[len(keyword):]
             remainder = remainder.lstrip(":").strip()
             return remainder
     return None
@@ -142,17 +165,22 @@ _INDIRECT_ATTACK_KEYWORDS = (
     "jugadas de pizarra indirectas (ataque)",
 )
 
-_TACTIC_KEYWORDS = ("tactic type", "tactics", "tactic", "tacticas", "tactica")
-_TACTIC_LEVEL_KEYWORDS = ("tactic level", "tactic skill", "nivel tactico")
+_TACTIC_KEYWORDS = ("tactic type", "game plan", "tactics", "tactic", "tacticas", "tactica", "plan de juego")
+_TACTIC_LEVEL_KEYWORDS = ("tactic level", "tactic skill", "nivel de tactica", "nivel tactico")
 _FORMATION_KEYWORDS = ("formation", "formacion")
 _FORMATION_EXPERIENCE_KEYWORDS = (
     "formation experience",
     "experiencia de formacion",
     "experiencia con la formacion",
 )
-_TEAM_ATTITUDE_KEYWORDS = ("team attitude", "actitud del equipo", "actitud")
-_STYLE_KEYWORDS = ("style of play", "style", "estilo de juego", "estilo")
-_AVERAGE_KEYWORDS = ("average rating", "average", "promedio", "calificacion promedio")
+_TEAM_ATTITUDE_KEYWORDS = (
+    "hidden team attitude", "team attitude", "actitud del equipo", "actitud oculta", "actitud",
+)
+_STYLE_KEYWORDS = ("style of play", "playing style", "style", "estilo de juego", "estilo")
+_AVERAGE_KEYWORDS = (
+    "average ratings", "average rating", "average", "promedio", "calificacion promedio",
+    "calificaciones promedio",
+)
 
 # Fallback for sector values when no [table] block is present at all, or a
 # sector wasn't found inside it (e.g. a manually retyped or differently
@@ -167,14 +195,160 @@ _LEGACY_SECTOR_LINE_KEYWORDS = {
     "right_attack": ("right attack", "ataque derecho", "ataque der"),
 }
 
+_DETAILED_TABLE_CORE_LABELS = {
+    "mediocampo": "midfield",
+    "midfield": "midfield",
+    "defensa derecha": "right_defense",
+    "right defense": "right_defense",
+    "defensa central": "central_defense",
+    "central defense": "central_defense",
+    "defensa izquierda": "left_defense",
+    "left defense": "left_defense",
+    "ataque derecho": "right_attack",
+    "right attack": "right_attack",
+    "ataque central": "central_attack",
+    "central attack": "central_attack",
+    "ataque izquierdo": "left_attack",
+    "left attack": "left_attack",
+}
+
+
+COMPACT_PRE = "COMPACT_PRE"
+DETAILED_POST = "DETAILED_POST"
+
+
+def detect_format(raw_text):
+    """Automatic format detection between the two confirmed/expected
+    Hattrick "Copy Ratings" shapes:
+
+    - COMPACT_PRE: the BBCode `[table]` layout confirmed against a real
+      pre-match sample in Alpha 0.5.9.0 (one row per sector, left/
+      center/right as separate `[td]` cells).
+    - DETAILED_POST: a plain labeled-line layout (no `[table]` block),
+      matching the field list Hattrick's detailed post-match summary is
+      documented to include (Midfield, Right/Central/Left Defense,
+      Right/Central/Left Attack, Indirect Set Pieces, Game Plan,
+      Average Ratings, Hidden Team Attitude, Tactic, Tactic Level,
+      Playing Style).
+
+    This is purely informational/testable -- `parse_official_ratings`
+    itself doesn't branch on the result, since its line-based fallback
+    parsing already tolerates both shapes; `detect_format` exists so
+    callers and tests can assert which shape was actually recognized.
+    """
+    table_match = _TABLE_BLOCK.search(raw_text or "")
+    if table_match and not _is_detailed_post_table(table_match.group("body")):
+        return COMPACT_PRE
+    return DETAILED_POST
+
 
 def _extract_header(raw_text):
     match = _HEADER_LINE.search(raw_text)
-    if not match:
-        return "", ""
-    team_name = _strip_bbcode(match.group("team") or "").strip()
-    match_id = match.group("match_id") or ""
+    if match:
+        team_name = _strip_bbcode(match.group("team") or "").strip()
+        match_id = match.group("match_id") or ""
+        return team_name, match_id
+
+    match_id_match = _MATCH_ID.search(raw_text)
+    match_id = match_id_match.group("match_id") if match_id_match else ""
+    team_name = ""
+    table_match = _TABLE_BLOCK.search(raw_text)
+    if table_match:
+        first_row = _TABLE_ROW.search(table_match.group("body"))
+        if first_row:
+            headers = [
+                _strip_bbcode(header).strip()
+                for header in _TABLE_HEADER_CELL_ANY.findall(first_row.group("row"))
+            ]
+            team_name = next(
+                (
+                    header for header in headers
+                    if header and not _normalize(header).isdigit()
+                ),
+                "",
+            )
     return team_name, match_id
+
+
+def _is_detailed_post_table(table_body):
+    labels = [
+        _normalize(_strip_bbcode(label))
+        for row in _TABLE_ROW.findall(table_body or "")
+        for label in _TABLE_HEADER_CELL_ANY.findall(row)
+    ]
+    detailed_sector_labels = set(_DETAILED_TABLE_CORE_LABELS) - {"mediocampo", "midfield"}
+    return any(label in detailed_sector_labels for label in labels) or any(
+        label in {"tiro indirecto", "indirect set pieces", "plan de juego", "game plan"}
+        for label in labels
+    )
+
+
+def _last_float(values):
+    for value in reversed(values):
+        parsed = _first_float(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _extract_detailed_table(table_body):
+    values = {}
+    synthesized_lines = []
+    section = ""
+
+    for row_match in _TABLE_ROW.finditer(table_body):
+        row = row_match.group("row")
+        headers = [_strip_bbcode(cell).strip() for cell in _TABLE_HEADER_CELL_ANY.findall(row)]
+        cells = [_strip_bbcode(cell).strip() for cell in _TABLE_DATA_CELL.findall(row)]
+        if not headers:
+            continue
+
+        label = headers[0]
+        normalized_label = _normalize(label)
+        normalized_cells = [_normalize(cell) for cell in cells]
+
+        if not cells:
+            if normalized_label in {
+                "tiro indirecto",
+                "indirect set pieces",
+                "plan de juego",
+                "game plan",
+                "calificaciones medias",
+                "average ratings",
+            }:
+                section = normalized_label
+            continue
+
+        value = _last_float(cells)
+        if section in {"tiro indirecto", "indirect set pieces"}:
+            if normalized_label in {"defensa", "defense"} and value is not None:
+                values["indirect_defense"] = value
+            elif normalized_label in {"ataque", "attack"} and value is not None:
+                values["indirect_attack"] = value
+            continue
+
+        if section in {"calificaciones medias", "average ratings"}:
+            if normalized_label in {"promedio total", "total average", "average rating"}:
+                values["average_rating"] = value
+            continue
+
+        mapped_sector = _DETAILED_TABLE_CORE_LABELS.get(normalized_label)
+        if mapped_sector and value is not None:
+            values[mapped_sector] = value
+            continue
+
+        if normalized_label in {"actitud del equipo", "team attitude", "hidden team attitude"}:
+            synthesized_lines.append(f"{label}: {' '.join(cells).strip()}")
+        elif normalized_label in {"tactica", "tactics", "tactic"}:
+            synthesized_lines.append(f"{label}: {' '.join(cells).strip()}")
+        elif normalized_label in {"nivel de tactica", "tactic level", "tactic skill"}:
+            synthesized_lines.append(f"{label}: {' '.join(cells).strip()}")
+        elif normalized_label in {"estilo de juego", "style of play", "playing style"}:
+            synthesized_lines.append(f"{label}: {' '.join(cells).strip()}")
+        elif "oculta" in normalized_cells or "hidden" in normalized_cells:
+            synthesized_lines.append(f"{label}: {' '.join(cells).strip()}")
+
+    return values, "\n".join(synthesized_lines)
 
 
 def _extract_table_sectors(raw_text):
@@ -190,6 +364,20 @@ def _extract_table_sectors(raw_text):
         return values, raw_text
 
     body = table_match.group("body")
+    if _is_detailed_post_table(body):
+        values, synthesized_lines = _extract_detailed_table(body)
+        if "average_rating" in values:
+            average = values.pop("average_rating")
+            synthesized_lines = "\n".join(
+                line for line in (
+                    synthesized_lines,
+                    f"Average Ratings: {average}",
+                )
+                if line
+            )
+        remaining_text = raw_text[: table_match.start()] + raw_text[table_match.end():]
+        return values, "\n".join(part for part in (remaining_text, synthesized_lines) if part)
+
     for row_match in _TABLE_ROW.finditer(body):
         row = row_match.group("row")
         header_match = _TABLE_HEADER_CELL.search(row)
@@ -419,4 +607,23 @@ def parse_official_ratings(raw_text, *, captured_at=None, language=""):
         hattrick_match_id=match_id,
         canonical_tactic=canonical_tactic_value,
         warnings=tuple(warnings),
+        detected_format=detect_format(raw_text),
     )
+
+
+def parse_official_pre_ratings(raw_text, *, captured_at=None, language=""):
+    snapshot = parse_official_ratings(
+        raw_text,
+        captured_at=captured_at,
+        language=language,
+    )
+    return snapshot
+
+
+def parse_official_post_ratings(raw_text, *, captured_at=None, language=""):
+    snapshot = parse_official_ratings(
+        raw_text,
+        captured_at=captured_at,
+        language=language,
+    )
+    return snapshot

@@ -20,6 +20,167 @@ The roadmap protects the engine and moves product work into the application laye
 
 ## Alpha 0.2 Milestones
 
+### Alpha 0.6.10: Optimizer Calibration and Explainability
+
+Goal: make lineup recommendations rival-aware and explainable without replacing
+the validated rating, tactic, xG or probability calculations.
+
+Deliverables:
+
+- Serializable objective traces for evaluated XIs.
+- Head-to-head lineup comparator using canonical match evaluation.
+- Marginal sector, possession, offensive, defensive and training deltas.
+- La Rocha regression fixture and synthetic context tests.
+- Decision Lab data-model wiring for lineup decision traces.
+- Documentation for tactical vs training hierarchy and limitations.
+
+No player-specific exceptions, PRE/POST parser changes, calendar changes,
+portable-distribution changes or probability formula changes.
+
+### Alpha 0.6.9: Portable Windows Distribution
+
+Goal: make HT Coach usable from a copied folder or USB drive on Windows 10/11 without
+installing Python or modifying the registry.
+
+Deliverables:
+
+- `portable.flag` mode detection and centralized `ApplicationPaths`.
+- Portable data, logs, backups, resources and roster CSV copies beside the executable.
+- First-launch AppData import offer and manual Settings import with backup.
+- PyInstaller one-folder build script and documentation.
+- Canonical visible version `HT Coach Alpha 0.6.9 Portable`.
+
+No optimizer, rating, probability, parser, Formation Board, Weekly Planner formula,
+season-calendar, Match Intelligence or Club Advisor logic changes.
+
+### Alpha 0.6.8: Future Weekly Training Planning
+
+Goal: let the manager plan near-future training cycles and analyze future matches
+against the correct weekly context without adding analytical features.
+
+Deliverables:
+
+- Weekly Planner selector for current cycle, current + 1 and current + 2.
+- Structured week selector item data with `cycle_id`, date range and relative offset.
+- Cycle-scoped coverage, Match 1/Match 2 lookup, generated plan and empty states.
+- Match analysis resolves training context from scheduled date and persists the weekly
+  revision used by the result.
+- Restored Match results can be marked stale when the relevant Weekly Planner cycle
+  changes after analysis.
+
+No optimizer, rating, probability, official parser or calendar formula changes.
+
+### Alpha 0.6.7 HF-07: Match Identity, Calendar and Weekly Planning Repair
+
+Goal: stabilize historical match identity and date-driven planning before
+continuing product work.
+
+Deliverables:
+
+- Retrospective PRE stays as provenance/evidence and no longer contaminates
+  the canonical opponent, title, venue, competition, date or official Match ID.
+- Official Intelligence can render `PRE retrospectivo + POST oficial` and
+  populate comparison/conclusions without weakening normal official Match ID
+  rules.
+- Central match display formatting is used for canonical record identity.
+- HT season configuration is schema-versioned and validated, with explicit
+  Monday-Sunday competitive week semantics.
+- Historical Weekly Planner saves use the match date to choose the
+  Sunday-Saturday training cycle and block when the date is missing.
+
+No optimizer, rating, probability or official parser formula changes.
+
+### Alpha 0.6.5: Hattrick Weekly Cycle, Squad UX Simplification and Training Timeline
+
+Goal: architecture-first, no new analytical engines. Establish one canonical
+Hattrick weekly timeline every future module (Training, History, Finance,
+Advisor, Match Intelligence, Evolution) shares, and simplify Squad UX.
+
+**Canonical HT week (`engine/calendar/`).** `HTWeekday` and `HTWeekState` are
+strongly typed; `HT_DAY_ACTIVITY` is the single place "Thursday means
+training" is ever defined. `HTCalendarService` provides `current_state()`,
+`next_transition()`, `days_until_training()/finances()/match()`, and
+`week_snapshot()`. All eight `HTWeekState` values are reachable, mapped
+directly onto the brief's own day-to-activity table (Monday/Recovery reads as
+`POST_LEAGUE_MATCH`, Tuesday/Preparation as `PRE_FRIENDLY`, etc.).
+`HTWeekScheduleConfig` makes every processing hour (21:00 for training, per
+the brief; the others are documented best-effort defaults) an overridable
+field, never a hardcoded weekday again.
+
+**The core fix: training weeks no longer roll over too early.** Two separate
+places (`engine/weekly_training/training_week.py` and
+`ht_coach_app/services/weekly_training_service.py`'s `load_state()`) used to
+compare bare `date` objects against the training-update date, so *any* moment
+on Thursday counted as "already processed" -- hours before the real 21:00
+server update. Both now delegate to `HTCalendarService.is_training_processed()`
+whenever a time-of-day-aware `datetime` is available, falling back to the
+original date-only comparison only for callers that explicitly pass a bare
+`date` (backward compatible with existing call sites that never cared about
+the hour).
+
+**Financial and Youth contracts, no implementation.** `FinancialWeekSnapshot`
+and `YouthWeekSnapshot` are pure dataclasses with every numeric/boolean field
+defaulting to `None` (unknown, never a fabricated zero) -- architecture for a
+future Finance/Youth module, nothing computed here.
+
+**Squad UX simplification and the official Specialty filter.** The player
+table's filter row was simplified to exactly Role / State / Specialty,
+positioned immediately above the table (Search, Min Form, Min Stamina,
+Training Fit and Position filter removed from view; Weekly Planner remains
+the sole owner of training-related filtering). `models/specialty.py`'s
+`Specialty` enum covers all six official Hattrick specialties (Quick,
+Technical, Powerful, Unpredictable, Head, Resilient), parsed
+accent/case-insensitively from either Spanish or English raw CSV text, with
+full localization -- the filter combo shows translated labels
+("Rápido"/"Quick") while filtering on the canonical value underneath.
+
+**Single week-context provider, no duplication.**
+`ht_coach_app/services/ht_week_context_provider.py`'s `get_calendar_service()`
+is the one shared `HTCalendarService` instance the whole app reads from;
+`current_week_snapshot()` is the shortcut most callers use.
+`ht_coach_app/services/ht_week_formatting.py`'s `format_ht_week_status()`
+renders the compact "Current HT Week" header (Training/Friendly/League/
+Financial update/Youth scout, each Pending/Processed-equivalent) already
+wired into the Weekly Planner tab -- no large widgets, no raw enum values.
+
+**Architecture audit (Part 10).** Swept `engine/club_advisor`,
+`ht_coach_app/services/club_advisor_service.py` and
+`ht_coach_app/services/match_intelligence_service.py` for direct
+`datetime.now()`/`date.today()` calls -- clean. Found and fixed one real
+remaining violation in `weekly_training_service.py`'s rollover check (the
+same class of bug as the core training-timeline fix above).
+
+Testing: 31 calendar-service tests, 2 hour-precision rollover tests, plus
+pre-existing (already-implemented ahead of this pass) coverage for the week
+header, Specialty parsing, and simplified Squad filters. Full suite
+re-verified at 1708 passed / 0 failed.
+
+Not shipped (explicitly out of scope): any Finance or Youth calculation,
+CHPP/API integration, League Intelligence.
+
+### Alpha 0.6.4: UX Polish & Data Integrity
+
+Goal: stabilize the Alpha 0.6 product before adding more capability.
+
+Deliverables:
+
+- Independent PRE and POST official-summary parser/validator entry points.
+- Match ID mismatch dialog that requires manual ID agreement before PRE/POST association.
+- Match Intelligence layout centered on Official PRE, Official POST, Comparison and
+  Conclusions.
+- Club Advisor global states with immediate visible causes.
+- Club Advisor training counts synchronized from Weekly Training Planner.
+- Simplified Squad filters focused on Role, State and Specialty.
+- Club Advisor drill-down modal as one elevated surface with clear detail fields.
+
+Acceptance criteria:
+
+- PRE and POST documents are never validated with each other's rules.
+- PRE and POST with different Hattrick Match IDs are never associated automatically.
+- Manual confirmation preserves data integrity because the Match ID uniquely identifies
+  the official Hattrick match.
+- No optimizer, probability, rating or formula code is changed.
+
 ### Milestone 1: Architecture Foundation
 
 Goal: define and scaffold the desktop application boundary.
@@ -477,12 +638,393 @@ state that already existed.
 
 ### Alpha 0.5.9.1: Squad Intelligence
 
-Future sprint. Not started.
+Goal: turn Squad from a roster-data screen into a player-management intelligence
+screen. For any current-roster player, produce a deterministic, explainable
+classification (recommended role, management status, why, training fit,
+strengths/risks, next milestone) understandable in five seconds, with no raw
+"Overall: 87" score exposed anywhere.
+
+Deliverables:
+
+- `engine/squad_intelligence/` (Qt- and localization-independent, 15 modules): a
+  role catalog (11 roles) and management-status catalog (8 statuses, deliberately
+  no unconditional "sell"), five qualitative dimensions (current performance,
+  training potential, training fit, salary efficiency, strategic value) each with
+  evidence, a documented internal-scoring layer (normalized [0,1], never shown
+  directly), one-rule-per-role/status classes (never a monolithic if/elif chain)
+  with a guaranteed fallback so every player gets exactly one role and one status,
+  deterministic milestone selection, and a documented confidence policy.
+- Reuses rather than duplicates: current performance is built from the existing
+  `PlayerAnalyzer` positional ranking (no second rating engine); training fit
+  reads the canonical Complete Training System via `rule_provider_for` (no second
+  training matrix).
+- `ht_coach_app/services/squad_intelligence_service.py`'s
+  `SquadIntelligenceAppService` bridges the current roster into the engine's
+  context objects. Building it against a real CSV surfaced a real bug —
+  `PlayerAnalyzer.best_position()` returns a `(position, score)` tuple, not a bare
+  enum — fixed and covered by a regression test using a realistic roster size.
+- `ht_coach_app/services/squad_intelligence_formatting.py`: stable
+  enum-to-localization-key mapping; full English/Spanish translations (151 keys)
+  for every role, status, dimension value, strength, risk, milestone, confidence
+  level, limitation and primary-reason template — verified by a dedicated test
+  that every enum member resolves in both languages.
+- UI: no new navigation page. The existing Squad "Jugadores" tab's player
+  selection now also renders a compact Squad Intelligence panel (role, status,
+  reason, the five dimensions, strengths, risks, next milestone, evidence,
+  limitations) directly below the existing player detail. Changing the active
+  training type recalculates the currently-shown report immediately.
+- 122 new tests (engine, app service, localization, UI), 96% coverage on the new
+  engine package. Full suite re-verified at 1320 passed / 0 failed.
+- `docs/SQUAD_INTELLIGENCE.md` added, documenting the role/status catalogs, the
+  documented KEY_STARTER-vs-PRIMARY_TRAINEE conflict resolution, the
+  salary-efficiency and strategic-value models, and the Club Advisor extension
+  point.
+
+Not shipped in this pass:
+
+- Historical-appearance evidence (recent starting frequency, no-show patterns) —
+  the engine is built to accept it when available and degrade safely without it,
+  but no adapter from `engine/history` was wired up this sprint.
+- A role/status/training-fit badge or column in the main Squad table/list (the
+  brief allows this but doesn't require it); the detailed panel is the
+  authoritative surface for now.
+- Any Club Advisor aggregation across the whole squad's reports — explicitly out
+  of scope until Alpha 0.6.0.
 
 ### Alpha 0.6.0: Club Advisor Foundation
 
-Future sprint. Not started. Configurable Club DNA is explicitly out of scope until
-this sprint at the earliest.
+Goal: the first club-level intelligence layer. Summarize the current state of
+the sporting project and its most important priorities, entirely from evidence
+already produced by Squad Intelligence and Training — never a new player-rating
+or scoring engine.
+
+Deliverables:
+
+- `engine/club_advisor/` (Qt- and localization-independent, 12 modules): a
+  five-value `ProjectStatus` deliberately evaluated from three *independent*
+  sub-assessments (training utilization, positional depth, squad composition)
+  with the worst one capping the overall status — never a single blended score
+  (see `test_project_status_never_uses_a_single_blended_score`). An 8-value
+  ordered priority catalog that never recommends a purchase, a specific player,
+  or a transfer price. Independent evidence-based detectors for strengths (6
+  types), risks (8 types) and warnings (6 types, each carrying an explicit
+  reason). Training/Squad/Depth/Sporting summaries built as pure aggregations
+  over Squad Intelligence's already-computed `PlayerIntelligenceReport`s and
+  positional depth — no second rating engine.
+- `SquadIntelligenceContext` gained an additive `ages_by_position` field
+  (backward-compatible, defaults to `{}`) enabling genuine "future shortage"
+  depth detection (a position with only aging replacements) rather than a
+  documented-but-inactive code path.
+- `ht_coach_app/services/club_advisor_service.py`'s `ClubAdvisorAppService`
+  bridges the current roster into the engine by reusing
+  `SquadIntelligenceAppService` — never rebuilding roster/training context a
+  second time.
+- A new "Club Advisor" navigation tab — the first genuinely new top-level page
+  since the original module set — with one concise card per section (Project
+  Status, Priorities, Strengths, Risks, Training, Squad, Depth, Warnings,
+  Limitations). No charts, no gauges, no overall score.
+- Five limitations (financial data, league comparison, transfer market, salary
+  budget, promotion target) are always present in every report, by design —
+  this sprint has no data source for any of them at all.
+- Full English/Spanish localization (92 keys) for every enum member, every
+  warning's reason template, and the UI panel headings.
+- 62 new tests (engine, app service, localization, UI), 96% coverage on the new
+  engine package. Full suite re-verified at 1386 passed / 0 failed.
+- Building against a real CSV caught (and permanently fixed) a genuinely
+  pre-existing, unrelated flaky test in `test_weekly_training_planner.py`: a
+  first-match record's default `match_date` is computed relative to the real
+  wall clock, and enough real time had passed since that test was written that
+  the computed date drifted into the future, tripping a deliberate "a future
+  match can't be marked PLAYED" safety guard. Fixed the same way two similar
+  cases were fixed in Alpha 0.5.8.5: injecting explicit `match_date` / `today`
+  values instead of depending on which day of the week the suite happens to
+  run on.
+- `docs/CLUB_ADVISOR.md` added.
+
+Not shipped in this pass (explicitly deferred, matches the sprint's own "out of
+scope" list):
+
+- Wiring `has_historical_data` / `evolution_result` / `insights_result` to a
+  real History adapter — the context objects already have the shape for this,
+  but nothing populates them yet.
+- Transfer Planner, Financial Planner, League analysis, Promotion planner,
+  automatic purchases/sales, market searches, budget calculations — all
+  explicitly out of scope per the brief.
+- Configurable Club DNA — `SUSTAINABLE_GROWTH` remains the only implemented
+  strategy, read from context rather than hardcoded so a future sprint can add
+  more without redesigning the engine.
+
+### Alpha 0.6.1: Workflow Consolidation & Match Intelligence UI (UX-03)
+
+Goal: no new intelligence this sprint -- consolidate the workflows introduced in
+recent versions so HT Coach feels like one coherent application rather than a
+collection of modules. Four areas: Weekly Training workflow, Match workflow,
+Match Intelligence separation, and Squad usability.
+
+**Weekly Training workflow.** Changing the active training type is now treated
+as an important club decision: a confirmation dialog appears when existing
+priorities exist, and a fully catalog-driven Training Priority Wizard follows
+confirmation. `engine/weekly_training/training_priority_policy.py`'s
+`build_policy()` derives everything the wizard needs -- five policy types
+(`FIXED_POSITIONAL_CAPACITY`, `MULTI_EFFECT_POSITIONAL_CAPACITY`,
+`BROAD_PARTICIPATION`, `TEAM_WIDE`, `SINGLE_POSITION`), per-tier capacity
+groups, and per-match/weekly counts -- purely from the shape of the catalog's
+`TrainingDefinition` plus each canonical formation's maximum position counts.
+Verified against every one of the brief's own worked examples exactly
+(Defending 5/10, Playmaking 3+2/6+4, Scoring 3/6, Goalkeeping 1/2, Winger
+2+2/4+4) with 41 parameterized tests across all 12 training types. The wizard
+(`ht_coach_app/widgets/training_priority_wizard.py`) generates one step per
+capacity group -- skipped entirely for TEAM_WIDE/BROAD_PARTICIPATION training,
+which has no fixed quota to force -- and never blocks on a theoretical target
+the squad can't actually reach (`min(weekly_capacity, available_players)`). The
+Planner's filter combo simplified from 7 granular options down to the requested
+3 (Training Players / Not Training / All Players, defaulting to Training
+Players), with rows defaulting to Full Priority / Partial Priority / Remaining
+order.
+
+**Match workflow.** Match's "Import Official Summary" button and its underlying
+import logic (parsing, automatic match-ID linking, PRE/POST replace
+confirmation) are unchanged from Alpha 0.5.9.0/UX-02. What changed is what Match
+displays afterward: a single "Official summary imported successfully. [OK]"
+confirmation, nothing else -- ratings, metadata, timestamps and comparisons all
+moved to the new Match Intelligence page.
+
+**Match Intelligence.** A new page
+(`ht_coach_app/views/match_intelligence_page.py`) owns Official PRE, Official
+POST, the HT Coach diagnostic comparison and sector analysis, all reusing
+Alpha 0.5.9.0/UX-02's existing formatting and import service rather than
+duplicating anything. It auto-refreshes whenever the tab becomes visible. See
+docs/OFFICIAL_MATCH_INTELLIGENCE.md, including a real naming collision found
+and fixed while building this: the first draft used a `match_intelligence.*`
+localization namespace that was already in use by an unrelated, pre-existing
+"tactical focus" section inside Match's own results panel, silently
+overwriting two of its keys until an existing regression test caught it. The
+new page's content now lives under `official_match_intelligence.*` instead.
+Opponent ratings, official-vs-opponent comparison, and cross-match historical
+insights are explicitly not implemented -- there's no confirmed sample of what
+an opponent's ratings export looks like yet, and the page states this plainly
+rather than guessing.
+
+**Squad usability.** Added Role / Status / Training Fit filter combos to the
+Squad player table (combinable with existing filters), backed by a real batch
+`SquadIntelligenceAppService.generate_squad_reports()` call -- not a mock.
+Wrapped the player-detail panel in a scroll area with a minimum width so long
+Squad Intelligence content (added in Alpha 0.5.9.1) scrolls instead of
+truncating.
+
+**Role calibration -- a real bug found and fixed.** Investigating "too many
+players marked as starters" found the actual root cause:
+`candidates_in_best_position` was always the *entire roster size* regardless of
+position, because `PlayerAnalyzer.rank_players()` ranks every player for every
+position (even ones they're barely competent at). A squad's second goalkeeper
+showed up as "rank 2 of 19" instead of "rank 2 of 2", inflating an ordinary
+backup's current-performance almost to the level of the starter. Fixed by
+computing rank and candidate count only among genuine peers (players whose own
+best position matches). A second refinement made `current_performance` aware of
+how many players a position's formation slots actually calls for
+(`PositionEvidence.formation_slots`, reusing the same
+`formation_position_maximums()` helper built for the training wizard): a
+position that only ever fields one player (goalkeeper) treats its second choice
+very differently from one that regularly fields three (central defender). On
+the real 19-player roster this was developed against, "starter"-tier roles
+dropped from 12/19 (63%) to 9/19 (47%), and the second goalkeeper correctly
+stopped being classified as a starter. Fully backward compatible --
+`formation_slots` defaults to 0 and falls back to the original flat formula.
+
+Not shipped in this pass:
+
+- Splitter-size persistence across sessions (the splitter is named for future
+  wiring, but nothing currently saves/restores its position).
+- Any further status-wording review beyond what shipped in Alpha 0.5.9.1 --
+  the management statuses (`KEEP`, `TRAIN`, `MONITOR`, etc.) are unchanged.
+
+Testing: 41 new training-policy tests, 26 wizard tests, 9 Squad filter tests, 5
+role-calibration regression tests, 16 Match Intelligence tests, plus fixes to
+pre-existing tests whose assumptions this sprint intentionally changed (the old
+7-option Planner filter, Match's detailed post-import summary). Full suite
+re-verified at 1467 passed / 0 failed.
+
+### Alpha 0.6.2: Season-Aware Club Advisor
+
+Goal: the Club Advisor evaluated structural squad needs correctly (Alpha 0.6.0),
+but a structural need doesn't automatically imply an immediate action. This
+sprint's core principle: **strategic need and operational urgency are
+independent dimensions** — a club can have `HIGH` defensive-depth need while
+simultaneously having `LOW` urgency to act on it (dominant in its current
+league, several bot opponents, early season, a recent relevant signing,
+promotion not being a priority). Never compute one from the other.
+
+Six new Qt-independent modules extend the existing Club Advisor package (no
+second engine): `season_context.py` (a fully optional, typed `SeasonContext` --
+every field may be unknown, never fabricated), `urgency.py`
+(`compute_urgency()`: a documented "prior" from need, evidenced reducers and
+increasers, and a per-need-tier floor that keeps a genuine need from ever being
+reduced to "no need to look at this at all"), `timing.py`
+(`determine_action_type()`: the single place need and urgency combine into one
+of 7 action types), `horizons.py` (every priority gets a
+`RecommendationHorizon`, sharpened by season context — e.g. an age-driven depth
+concern becomes "next season" rather than "this season"), `season_plan.py`
+(derives `StrategicNeed` per area from Club Advisor's *already-computed* depth/
+training/squad evidence, never recalculating anything), and
+`recommendation_policy.py` (the orchestrator: builds separately-framed
+strategic and operational priority lists, and a preliminary
+`PromotionReadiness` assessment).
+
+The sprint's own worked example — central-defense depth with `HIGH` strategic
+need and `LOW` operational urgency, action `MONITOR`, review `BEFORE_PROMOTION`
+— is reproduced exactly by the engine, not just narratively described. A
+synthetic regression fixture matching the sprint's own described 19-player
+scenario (weak defense, two aging goalkeepers, several non-training players,
+league dominance, several bots, one recent expensive defensive signing) confirms
+all five of its expected conclusions, including that goalkeeper succession
+correctly lands as a *next-season* concern (using an age-aware "future
+shortage" depth status, not just a raw replacement count) and that current
+league dominance never implies promotion readiness by itself.
+
+Deliberate inaction ("maintain the current training cycle, no additional
+signing is currently required") is treated as a first-class, evidenced
+recommendation, not an absence of intelligence.
+
+`ClubAdvisorReport` gained four new optional fields (`strategic_priorities`,
+`operational_priorities`, `promotion_readiness`, `season_context`) and
+`generate_report()` gained an optional `season_context` keyword argument --
+both fully backward compatible; every pre-existing Club Advisor test continues
+to pass unchanged. The existing three-independent-dimension project-status
+calculation (training/depth/squad composition health, worst-dimension-caps-
+overall) is completely untouched by season awareness, per this sprint's own
+explicit requirement.
+
+UI: the existing Club Advisor page (no new top-level page) gained a compact,
+optional Season Plan card (season phase, promotion objective, current
+competitiveness, bot opponent count, a recent-signing checkbox, free-text
+notes) plus Operational Priorities, Strategic Priorities and Promotion
+Readiness sections, each showing need/urgency/action/horizon/reason per
+recommendation.
+
+Testing: 35 engine tests (all 12 required scenarios from the brief plus the
+synthetic regression fixture), 9 localization tests, 9 UI tests. 97% coverage
+on the new/changed `engine/club_advisor` code. Full suite re-verified at 1520
+passed / 0 failed.
+
+Not shipped in this pass (explicitly out of scope per the brief): automatic
+league import, CHPP/API integration, opponent scraping, a target-division
+promotion simulator, financial budgets, salary affordability, specific-player
+or transfer-price recommendations, automatic sales, configurable Club DNA,
+Experience Engine, machine learning.
+
+### Alpha 0.6.3: Advisor Grounding, Official POST Compatibility & Drill-down UX
+
+Goal: not more rules -- better-grounded ones. The Advisor must use the correct
+context and distinguish structural club situation from temporary match
+situation, training plan, and actual sporting context.
+
+**Official POST support.** Automatic format detection
+(`engine/history/official_ratings/parser.py`'s `detect_format()`) between
+`COMPACT_PRE` (the confirmed BBCode table layout) and `DETAILED_POST` (a plain
+labeled-line layout matching the detailed post-match field list). Decimal
+comma and point both normalize correctly. Validation relaxed so POST can
+legitimately omit formation/team attitude without failing. **Calibration
+note**: no real POST sample was available this sprint -- the parser is built
+from the field list in the brief and verified against a synthetic fixture; it
+should be re-verified against a real sample when one becomes available.
+
+**Structural vs. temporary.** `SquadIntelligenceContext.temporary_positional_depth`
+(built from the existing `AvailabilityService`, never a new one) separates
+"the real, complete-roster club" from "who's available this week" --
+`PositionDepth` now carries both, so a four-week injury no longer gets
+conflated with a genuine structural gap.
+
+**Formation-aware depth.** Central-defense risk now compares combined
+central-defender-plus-wing-back coverage against
+`formation_position_maximums()` (reused from the Alpha 0.6.1 training wizard)
+before deciding impact -- a manager who plays 2-5-3 isn't told they need four
+or five starting central defenders.
+
+**Training-aware projects.** `_is_training_project()` fixed a real "Projects:
+0" reporting bug: a player's current best position and future training
+project now coexist (a Wing Back can simultaneously be a Playmaking trainee),
+derived from `training_fit` + `training_potential`, independent of
+`recommended_role`.
+
+**Detailed risks, not abstract labels.** Every `ClubRisk` now carries
+position, reason, impact, urgency, real affected-player names, and a review
+trigger. `PLAYERS_WITHOUT_TRAINING` and `TOO_MANY_PLAYERS_PER_TRAINING_SLOT`
+moved entirely out of risks into training-plan-specific warnings
+(`PRIORITY_TRAINEES_MISSING_TRAINING`, `TRAINING_SLOT_COMPETITION`,
+`TRAINING_PLAN_DEVIATION`) -- a position outside the active training's effect
+is often expected, never a squad-structure risk by itself.
+
+**Every count is also a player list.** `SquadSummary` carries the actual names
+behind every category count.
+
+**Card drill-down UX.** Clicking any Club Advisor card opens a centered modal
+over a translucent overlay (`ht_coach_app/widgets/drilldown_overlay.py`) --
+clickable list on the left (first row selected by default), full detail on
+the right. Closes via Close button, Escape, or outside click. Each card
+defines its own drill-down content, reusing the same report data already
+shown -- never a second calculation.
+
+**Project status explanation.** `explain_project_status()` identifies which
+of the three independent health dimensions actually drove the overall status
+and separately reads season-aware operational urgency -- never "Critical"
+displayed with no explanation.
+
+Testing: 15 PRE/POST format tests, 7 detailed-risk/training-warning tests, 3
+project-status-explanation tests, 14 drill-down UI tests, plus fixes to
+pre-existing tests whose assumptions this sprint intentionally changed (formation
+validation, players-without-training reclassified from risk to warning). Full
+suite re-verified at 1567 passed / 0 failed.
+
+### HF-02.2: Official Match Intelligence Integration and Advisor Modal Polish
+
+Goal: not more rules -- close the loop on Alpha 0.6.3's own work. The real
+POST imported and PRE/POST comparison technically worked, but Official PRE
+still never reached Match's tactical intelligence, the comparison showed only
+raw differences, and two Club Advisor UI bugs (grey modal, placeholder detail)
+remained.
+
+**Root cause found and fixed**: `MatchWorkspaceService._map_sector_comparisons`
+hardcoded `our_scale=SOURCE_HT_COACH_INTERNAL` unconditionally, so "our" side
+was *always* excluded from direct comparison even with a real Official PRE on
+the same scale as the opponent estimate. `engine/ratings/rating_source_policy.py`
+implements the requested priority order (Official PRE > calibrated internal,
+not yet confirmed > internal diagnostic); `MatchWorkspaceService.apply_official_pre_override()`
+applies it as a pure post-processing step over the recommended formation only
+-- the lineup optimizer, tactic optimizer, and every rating formula are
+completely untouched. A second duplication (two independent left/right
+orientation mappings) was found alongside this and unified into the one that
+already existed in `engine/ratings/sector_rating.py`. A new
+`AppEvents.official_ratings_changed` signal lets Match and Match Intelligence
+auto-refresh each other's tactical intelligence after an import from either
+page -- no restart, no manual re-analysis.
+
+`engine/history/official_ratings/interpretation.py` adds deterministic
+direction (`improved`/`stable`/`declined`) and magnitude
+(`stable`/`small`/`moderate`/`large`) classification per sector, with typed,
+configurable thresholds matching the brief's own suggested defaults exactly,
+plus evidence-only conclusion generation (largest improvement/decline, stable
+sectors, defensive/attacking/midfield trends, missing-data limitations) that
+never claims a cause. Verified against the brief's own worked example
+character-for-character ("Ataque central... Cambio -2.00... Caída
+importante") and its own sample conclusion ("El POST muestra una caída
+general del ataque"). PRE and POST now render in a responsive two-column row
+(stacking below 720px), and the internal HT Coach estimate collapses under
+"Diagnóstico interno" by default instead of always showing "?" placeholder
+rows.
+
+Two Club Advisor bugs fixed: the drill-down modal's white panel had no CSS
+rule of its own and silently inherited the overlay's translucent grey; and the
+Training drill-down showed player counts instead of actual names --
+`TrainingSummary` gained real name lists derived directly from the Weekly
+Planner's own priority records, cross-referenced against training coverage.
+
+Testing: 11 source-policy/override tests, 5 auto-refresh integration tests, 20
+interpretation tests, 4 service-wiring tests, 10 PRE/POST UI tests, 9 visual
+regression tests, 6 training-name tests, plus fixes to 2 pre-existing tests
+whose assumptions this sprint intentionally changed. Full suite re-verified at
+1656 passed / 0 failed. No optimizer, financial, or transfer-market logic was
+added -- confirmed by static-import guardrail tests carried over from prior
+sprints and by direct inspection of every touched call site.
 
 ### Epic 2: State And Services
 

@@ -144,6 +144,65 @@ def roster_that_prefers_middle_orders(result):
     ]
 
 
+def slot_id_for(board, position, side):
+    expected_side = str(side or "").upper()
+    return next(
+        slot.slot_id
+        for slot in board.slots
+        if slot.position == position and str(slot.side).upper() == expected_side
+    )
+
+
+def slot_player(board, slot_id):
+    return next(slot.player for slot in board.slots if slot.slot_id == slot_id)
+
+
+def set_slot_order(board, slot_id, order, order_side=""):
+    return replace(
+        board,
+        slots=tuple(
+            replace(
+                slot,
+                player=(
+                    replace(
+                        slot.player,
+                        individual_order=order,
+                        order_label=order,
+                        order_side=order_side,
+                        order_side_label=order_side,
+                    )
+                    if slot.slot_id == slot_id and slot.player is not None
+                    else slot.player
+                ),
+            )
+            for slot in board.slots
+        ),
+    )
+
+
+def slot_order_map(board):
+    return {
+        slot.slot_id: (
+            slot.player.player_id,
+            slot.player.player_name,
+            slot.player.position,
+            slot.player.side,
+            slot.player.individual_order,
+            slot.player.order_side,
+        )
+        for slot in board.slots
+        if slot.player is not None
+    }
+
+
+def combo_index_for_order(combo, order, side=None):
+    for index in range(combo.count()):
+        data = combo.itemData(index)
+        if data == (order, side):
+            return index
+    return -1
+
+
 class FakeOpponentService:
     def __init__(self):
         self.opponent = Opponent(
@@ -181,6 +240,97 @@ class WorkspaceServiceTest(unittest.TestCase):
             make_player("E Replacement", scoring=7, passing=8),
             make_player("F Replacement", scoring=6, passing=8),
         ]
+
+    def test_inner_midfield_swap_preserves_unaffected_slot_orders(self):
+        left = slot_id_for(self.board, Position.INNER_MIDFIELDER.value, "left")
+        center = slot_id_for(self.board, Position.INNER_MIDFIELDER.value, "center")
+        right_wing = slot_id_for(self.board, Position.WINGER.value, "right")
+        board = set_slot_order(self.board, left, "Offensive")
+        board = set_slot_order(board, center, "Defensive")
+        board = set_slot_order(board, right_wing, "Offensive")
+        state = self.service.create([board], "3-5-2", optimize_orders=False)
+        before = slot_order_map(state.current_board)
+
+        updated = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            left,
+            center,
+            state.revision,
+            roster_players=self.roster,
+            interaction_source="TEST",
+        )
+        after = slot_order_map(updated.current_board)
+
+        for slot_id, fields in before.items():
+            if slot_id not in {left, center}:
+                self.assertEqual(after[slot_id], fields)
+        self.assertEqual(after[left][4], "Offensive")
+        self.assertEqual(after[center][4], "Defensive")
+
+    def test_winger_swap_preserves_slot_orders(self):
+        left = slot_id_for(self.board, Position.WINGER.value, "left")
+        right = slot_id_for(self.board, Position.WINGER.value, "right")
+        center_mid = slot_id_for(self.board, Position.INNER_MIDFIELDER.value, "center")
+        board = set_slot_order(self.board, left, "Offensive")
+        board = set_slot_order(board, right, "Defensive")
+        board = set_slot_order(board, center_mid, "Offensive")
+        state = self.service.create([board], "3-5-2", optimize_orders=False)
+        before = slot_order_map(state.current_board)
+
+        updated = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            left,
+            right,
+            state.revision,
+            roster_players=self.roster,
+            interaction_source="TEST",
+        )
+        after = slot_order_map(updated.current_board)
+
+        for slot_id, fields in before.items():
+            if slot_id not in {left, right}:
+                self.assertEqual(after[slot_id], fields)
+        self.assertEqual(after[left][4], "Offensive")
+        self.assertEqual(after[right][4], "Defensive")
+
+    def test_manual_order_change_is_resolved_by_slot_identity_after_swap(self):
+        left = slot_id_for(self.board, Position.INNER_MIDFIELDER.value, "left")
+        center = slot_id_for(self.board, Position.INNER_MIDFIELDER.value, "center")
+        state = self.service.create([self.board], "3-5-2", optimize_orders=False)
+        first_player = slot_player(state.current_board, left).player_id
+
+        state = self.service.set_manual_order_for_slot(
+            state,
+            left,
+            "Offensive",
+            expected_revision=state.revision,
+        )
+        self.assertFalse(state.last_error)
+        self.assertEqual(slot_player(state.current_board, left).individual_order, "Offensive")
+
+        state = self.service.swap_slots_immediately(
+            state,
+            "3-5-2",
+            left,
+            center,
+            state.revision,
+            roster_players=self.roster,
+            interaction_source="TEST",
+        )
+        second_player = slot_player(state.current_board, left).player_id
+        self.assertNotEqual(first_player, second_player)
+
+        state = self.service.set_manual_order_for_slot(
+            state,
+            left,
+            "Defensive",
+            expected_revision=state.revision,
+        )
+        self.assertFalse(state.last_error)
+        self.assertEqual(slot_player(state.current_board, left).player_id, second_player)
+        self.assertEqual(slot_player(state.current_board, left).individual_order, "Defensive")
 
     def test_workspace_creation_keeps_original_recommendation_immutable(self):
         state = self.service.create([self.board], "3-5-2")
@@ -930,24 +1080,19 @@ class WorkspaceServiceTest(unittest.TestCase):
             (("A Replacement", "Normal", "Towards Middle"),),
         )
 
-    def test_starter_swap_recalculates_orders_for_both_affected_players(self):
+    def test_starter_swap_preserves_orders_for_both_affected_slots(self):
         state = self.service.create([self.board], "3-5-2")
         winger_slots = [
             slot for slot in state.current_board.slots
             if slot.player is not None
             and slot.position == Position.WINGER.value
         ]
-        roster = [
-            make_player(
-                slot.player.player_name,
-                defending=1,
-                playmaking=20,
-                winger=1,
-                passing=1,
-                scoring=1,
-            )
-            for slot in winger_slots
-        ]
+        board = set_slot_order(state.current_board, winger_slots[0].slot_id, "Offensive")
+        board = set_slot_order(board, winger_slots[1].slot_id, "Defensive")
+        state = replace(
+            state,
+            workspace_boards={state.current_formation_name: board},
+        )
 
         state = self.service.swap_slots_immediately(
             state,
@@ -955,7 +1100,7 @@ class WorkspaceServiceTest(unittest.TestCase):
             winger_slots[0].slot_id,
             winger_slots[1].slot_id,
             state.revision,
-            roster_players=roster,
+            roster_players=self.roster,
             interaction_source="TEST",
         )
 
@@ -965,9 +1110,9 @@ class WorkspaceServiceTest(unittest.TestCase):
         ]
         self.assertEqual(
             [slot.player.individual_order for slot in updated_wingers],
-            ["Towards Middle", "Towards Middle"],
+            ["Offensive", "Defensive"],
         )
-        self.assertEqual(len(state.history[-1].order_changes), 2)
+        self.assertEqual(state.history[-1].order_changes, ())
 
     def test_match_evaluation_refresh_preserves_manual_slot_assignments(self):
         result = formation_result()
@@ -1467,7 +1612,7 @@ class WorkspaceServiceTest(unittest.TestCase):
 
 
 try:
-    from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QTabWidget
+    from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QComboBox, QTabWidget
 
     from ht_coach_app.views.match_page import MatchPage
     from ht_coach_app.views.squad_page import SquadPage
@@ -1493,6 +1638,7 @@ except ModuleNotFoundError as exc:
     QLabel = None
     QPushButton = None
     QTabWidget = None
+    QComboBox = None
 
 
 @unittest.skipIf(QApplication is None, "PySide6 is not installed")
@@ -1522,6 +1668,66 @@ class InteractiveWorkspaceQtTest(unittest.TestCase):
             )
         )
         self.assertFalse(board_widget.workspace_state().dirty)
+
+    def test_inner_midfield_slot_order_change_after_swap_does_not_crash(self):
+        result = formation_result()
+        board_widget = FormationBoard()
+        board_widget.set_boards(
+            [self._board_model()],
+            roster_players=roster_for_result(result),
+            preserve_input_orders=True,
+        )
+        board = board_widget.current_board()
+        left = slot_id_for(board, Position.INNER_MIDFIELDER.value, "left")
+        center = slot_id_for(board, Position.INNER_MIDFIELDER.value, "center")
+
+        first_player_id = slot_player(board, left).player_id
+        board_widget.select_player(first_player_id)
+        combo = board_widget.findChild(QComboBox, "playerOrderCombo")
+        self.assertIsNotNone(combo)
+        offensive_index = combo_index_for_order(combo, "Offensive", None)
+        self.assertGreaterEqual(offensive_index, 0)
+        combo.setCurrentIndex(offensive_index)
+        QApplication.processEvents()
+        self.assertEqual(
+            slot_player(board_widget.current_board(), left).individual_order,
+            "Offensive",
+        )
+
+        state = board_widget.workspace_state()
+        board_widget._workspace_state = board_widget._workspace_service.swap_slots_immediately(
+            state,
+            board_widget.current_board().formation_name,
+            left,
+            center,
+            state.revision,
+            roster_players=board_widget._roster_players,
+            interaction_source="TEST",
+        )
+        board_widget._sync_boards_cache()
+        board_widget._render_current_board()
+        QApplication.processEvents()
+
+        second_player_id = slot_player(board_widget.current_board(), left).player_id
+        self.assertNotEqual(first_player_id, second_player_id)
+        board_widget.clear_selection()
+        board_widget.select_player(second_player_id)
+        combo = board_widget.findChild(QComboBox, "playerOrderCombo")
+        self.assertIsNotNone(combo)
+        defensive_index = combo_index_for_order(combo, "Defensive", None)
+        self.assertGreaterEqual(defensive_index, 0)
+        combo.setCurrentIndex(defensive_index)
+        QApplication.processEvents()
+
+        self.assertFalse(board_widget.workspace_state().last_error)
+        self.assertEqual(
+            slot_player(board_widget.current_board(), left).player_id,
+            second_player_id,
+        )
+        self.assertEqual(
+            slot_player(board_widget.current_board(), left).individual_order,
+            "Defensive",
+        )
 
     def test_board_ui_replacement_commits_and_requests_recalculation_immediately(self):
         board_widget = FormationBoard()

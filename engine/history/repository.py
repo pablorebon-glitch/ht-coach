@@ -67,6 +67,17 @@ class HistoricalMatchRepository:
                 return snapshot
         return None
 
+    def find_by_provisional_identity(self, provisional_identity):
+        """Alpha 0.6.6, Part 11: looks up a record by its provisional
+        identity (season + week + date + opponent + competition type)
+        -- the only lookup available before a real Match ID exists."""
+        if not provisional_identity:
+            return None
+        for snapshot in self.list_all():
+            if snapshot.provisional_identity == provisional_identity:
+                return snapshot
+        return None
+
     def query(self, criteria):
         return self._query_service.filter(self.list_all(), criteria)
 

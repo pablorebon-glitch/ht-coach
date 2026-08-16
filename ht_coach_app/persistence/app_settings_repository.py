@@ -1,6 +1,7 @@
 import json
 from dataclasses import asdict, dataclass
 
+from ht_coach_app.core.json_io import write_json_atomic
 from ht_coach_app.core.paths import user_data_dir
 
 
@@ -51,16 +52,5 @@ class AppSettingsRepository:
             exist_ok=True,
         )
 
-        with open(
-            self.storage_path,
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                asdict(settings),
-                file,
-                indent=2,
-                ensure_ascii=False,
-            )
-
+        write_json_atomic(self.storage_path, asdict(settings))
         return settings

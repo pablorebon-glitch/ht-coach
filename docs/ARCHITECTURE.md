@@ -20,6 +20,33 @@ optimization logic, tactic math, probability calculations, or formation scoring.
 The Tactical Advisor lives under `engine/advisor`, but it is an expert-system layer over
 already evaluated result data. It does not alter engine formulas or optimizer behavior.
 
+Alpha 0.6.10 adds `engine/optimizers/lineup_objective.py` as the explicit
+optimizer objective and explainability boundary. It reuses `TeamRater`,
+`TacticOptimizer`, `MatchEvaluator` and `ResultProbabilityEvaluator` instead of
+duplicating formulas, records objective traces for diagnostics and exposes a
+head-to-head comparator for rival-aware marginal lineup decisions. Training is
+kept as a separate component and can only break close tactical ties in that
+comparison layer. See `docs/OPTIMIZER_OBJECTIVE.md` and
+`docs/LINEUP_EXPLAINABILITY.md`.
+
+Alpha 0.6.7 HF-07 adds two stabilization boundaries. Match identity is structured
+canonical history data, never a persisted display label: the record owns opponent,
+date, competition, venue and official Match ID, and views render titles through the
+application-level `MatchDisplayFormatter`. Retrospective PRE imports remain
+evidence/provenance only and cannot rename the historical record. Calendar behavior is
+also split deliberately: HT competitive season/week resolution uses the
+schema-versioned `SeasonCalendarConfig` and Monday-Sunday weeks, while Weekly Planner
+targeting remains the Sunday-Saturday training cycle and is driven by the match's own
+scheduled date.
+
+Alpha 0.6.7 HF-08 tightens official-evidence ownership. POST import is automatic
+only when no active historical record is being edited/viewed; once a record is
+active, POST evidence is attached or replaced on that record only. Official PRE/POST
+Match ID mismatch semantics remain strict, while retrospective PRE source IDs stay
+provenance-only. Match opponent selectors now carry structured identity data so a
+Saved Match whose opponent disappeared from Opponent Manager cannot silently analyze
+against another rival.
+
 Match Intelligence lives under `engine/match_intelligence`. It is a deterministic
 interpretation layer over already evaluated match results. It profiles both teams,
 classifies attack-versus-defense matchups, detects opportunities and risks, generates
@@ -69,6 +96,16 @@ classification, previous-equivalent snapshot selection, deterministic JSON persi
 and a small developer CLI. It does not compare ratings, generate insights, validate
 decisions, tune rating engines, call optimizers or modify any analytical formula.
 
+Alpha 0.6.4 tightens official Match Intelligence integrity. Official PRE and POST
+summaries are treated as different Hattrick documents with separate parser and
+validator entry points, even though both produce the same internal official-rating
+snapshot model. The Hattrick Match ID remains the canonical association key. When an
+imported POST has a different Match ID than the current PRE, the application must stop
+and ask the manager to review the IDs; it must not automatically associate documents
+from different official matches. Manual confirmation is preferred because Match IDs
+uniquely identify official Hattrick matches and a silent association would corrupt
+historical evidence.
+
 Alpha 0.5.6.2.1 refines `ht_coach_app/workspace` around manual intent. The initial
 optimizer result remains the global recommendation, but later valid manual slot
 assignments are authoritative. `WorkspaceService` is the canonical presentation-
@@ -83,6 +120,20 @@ coverage aggregation and constrained second-match lineup planning. It reuses the
 existing player analyzer, formation catalog, Formation Board mapper and automatic order
 optimization, and it must not retune ratings, probabilities, tactics, orders or
 optimizer formulas.
+
+Alpha 0.6.8 extends the desktop application around future Weekly Planner cycles without
+changing that engine layer. `WeeklyTrainingAppService` is the application boundary for
+current/+1/+2 cycle options, explicit `cycle_id` coverage queries, match-date training
+context and weekly revision hashing. Squad renders the selectable cycles and Match
+stores only serializable context metadata on `MatchAnalysisResult`; views never call
+the optimizer or planner engine directly.
+
+Alpha 0.6.9 adds portable Windows distribution support as an application shell concern.
+`ht_coach_app.core.paths.ApplicationPaths` owns mode detection, writable directories and
+resource roots. Repositories keep their existing contracts but receive paths rooted in
+AppData for development/installed mode or beside the executable for portable mode.
+Portable CSV handling copies roster imports into `data/rosters/` and stores relative
+paths so the folder remains relocatable across USB drive-letter changes.
 
 ## Target Layers
 
@@ -106,6 +157,7 @@ ht_coach_app/
 
 engine/
   advisor/
+  club_advisor/
   history/
     evolution/
     insights/
@@ -116,6 +168,7 @@ engine/
   rating_validation/
   squad_evolution/
   squad_health/
+  squad_intelligence/
   weekly_training/
 models/
 importers/
@@ -326,6 +379,257 @@ for transfer-planning context in Alpha 0.5.4, not Hattrick match prediction.
   the current import format does not provide enough information to exclude safely.
 - Suspension is represented in the domain model for future support, but no suspension
   status is inferred from the current CSV.
+
+### Squad Intelligence
+
+`engine/squad_intelligence/`
+
+Alpha 0.5.9.1 adds a deterministic, explainable player-classification layer over
+Squad, distinct from — and reusing rather than duplicating — both Squad Evolution
+(long-term roster structure) and the Complete Training System (Alpha 0.5.8.5).
+Qt- and localization-independent, like every domain package before it.
+
+Modules:
+
+- `enums.py`: `ClubStrategy` (currently only `SUSTAINABLE_GROWTH`, read from
+  context rather than hardcoded so a future sprint can add more without touching
+  rules), `RecommendedRole` (11 values), `ManagementStatus` (8 values,
+  deliberately no unconditional "sell"), the five dimension enums
+  (`CurrentPerformance`, `TrainingPotential`, `TrainingFit`, `SalaryEfficiency`,
+  `StrategicValue`), `MilestoneType`, `IntelligenceConfidence`, `StrengthType`,
+  `RiskType`, `LimitationType`.
+- `context.py`: `PositionEvidence` / `TrainingEvidence` (per-player) and
+  `SquadIntelligenceContext` (squad-relative: positional depth, active training
+  type, salary/age distributions) — built once per batch analysis.
+- `scoring.py`: internal normalized `[0, 1]` scores (`match_value` from
+  squad-relative positional rank, `training_fit_value` from the canonical
+  `TrainingEffect` weight, `training_value` combining fit with an age-based
+  development-runway factor, `salary_efficiency_value`, `strategic_value_score`,
+  `replacement_difficulty` from positional depth) and `ScoringThresholds`
+  (typed, constructor-validated, never a magic constant inside a rule).
+- `dimensions.py`: the five classifiers, each returning a qualitative category
+  plus the `IntelligenceEvidence` that produced it — never a raw score as the
+  primary output.
+- `roles.py` / `statuses.py`: one rule class per role/status (never a monolithic
+  if/elif chain). A guaranteed lowest-priority fallback (`DepthPlayerRule` /
+  `MonitorStatusRule`) ensures every player resolves to exactly one role and one
+  status. `KeyStarterRule` (priority 95) deliberately outranks
+  `PrimaryTraineeRule` (priority 90) for the documented "very-high performer who's
+  also an excellent-fit trainee" conflict — see docs/SQUAD_INTELLIGENCE.md.
+- `milestones.py`: deterministic next-review selection — never an exact calendar
+  date, never an invented skill sub-level.
+- `warnings.py`: `detect_strengths` / `detect_risks`, capped at 3 visible items
+  each, always evidenced.
+- `confidence.py`: the same documented-policy style as the Historical Insights
+  Engine's confidence classification.
+- `rule.py` / `rule_engine.py`: `RoleEvaluationContext`, `RoleRule` / `StatusRule`
+  base classes, `SquadIntelligenceRuleEngine` (highest-priority match wins, ties
+  broken by rule ID).
+- `service.py`: `generate_report()` / `generate_squad_reports()` — pure functions
+  of their context inputs, no I/O.
+
+App-layer bridge:
+
+- `ht_coach_app/services/squad_intelligence_service.py`'s
+  `SquadIntelligenceAppService` builds context objects from the current roster
+  using the app's *existing* positional-ranking infrastructure
+  (`PlayerAnalyzer.best_position()` / `rank_players()`) and the canonical
+  training provider (`rule_provider_for`) — never a second rating engine or
+  training matrix. Note: `PlayerAnalyzer.best_position()` returns a
+  `(position, score)` tuple, not a bare `Position` enum — a real bug caught while
+  building this service against a real CSV, now regression-tested.
+- `ht_coach_app/services/squad_intelligence_formatting.py`: stable
+  enum-to-localization-key mapping (e.g. `role_label_key`), so domain rules never
+  assemble translated sentences themselves.
+
+UI: no new navigation page. Squad's existing "Jugadores" tab player-selection flow
+(`player_selected` → `_show_player_detail`) now also renders a compact Squad
+Intelligence panel — recommended role, status, primary reason, the five
+dimensions, strengths, risks, next milestone, evidence, limitations — directly
+below the existing player-detail widgets. Changing the active training type
+recalculates the currently-shown report immediately.
+
+Static-import and structural tests confirm this package never invokes
+`FormationOptimizer` or `TacticOptimizer`, and that `PlayerIntelligenceReport` has
+no `overall_score`/`score` field at all.
+
+### HT Weekly Calendar (Alpha 0.6.5)
+
+`engine/calendar/`
+
+The single canonical source of truth for "what Hattrick week is this?" --
+strongly typed, Qt-independent, and deliberately the *only* place any module
+does `datetime`/`date` arithmetic tied to HT's own weekly rhythm.
+
+- `enums.py`: `HTWeekday` (Sunday-first, matching HT's own week -- not
+  Python's Monday-first `weekday()`), `HT_DAY_ACTIVITY` (the one place
+  "Thursday means training" is defined), `HTWeekState` (8 values, all
+  reachable, mapped directly onto the day-activity table).
+- `schedule.py`: `HTWeekScheduleConfig` -- every event's processing hour as
+  an overridable dataclass field, never a magic number.
+- `models.py`: `HTWeekSnapshot` (the one-call shape most consumers want);
+  `FinancialWeekSnapshot`/`YouthWeekSnapshot` -- pure, unimplemented
+  contracts for a future Finance/Youth module (every field defaults to
+  `None`, never a fabricated zero).
+- `service.py`: `HTCalendarService` -- `current_state()`,
+  `next_transition()`, `days_until_training()/finances()/match()`,
+  `training_week_id()`, `is_training_processed()`, `week_snapshot()`. `now`
+  is always an explicit, injectable parameter (or falls back to a
+  configurable clock) -- every method is deterministic and testable.
+
+`ht_coach_app/services/ht_week_context_provider.py`'s `get_calendar_service()`
+is the one shared instance the whole app reads from (Weekly Planner, Club
+Advisor, Match Intelligence, Evolution, History) -- `set_calendar_service()`
+is the test-only override hook. `ht_coach_app/services/ht_week_formatting.py`
+renders the compact "Current HT Week" header from a snapshot.
+
+**The core fix.** `engine/weekly_training/training_week.py` and
+`weekly_training_service.py`'s `load_state()` both used to decide "has this
+week's training processed?" by comparing bare `date` objects -- discarding
+whatever hour was actually available, so any moment on Thursday counted as
+processed. Both now delegate to `HTCalendarService.is_training_processed()`
+whenever a full `datetime` is available, with the original date-only
+comparison preserved as a fallback for callers that only ever pass a bare
+`date` (no time-of-day information at all).
+
+### Workflow Consolidation (Alpha 0.6.1 / UX-03)
+
+An integration sprint with two new small engine modules and one new page,
+rather than a new domain layer:
+
+- `engine/weekly_training/training_priority_policy.py`: `build_policy()`
+  derives a `TrainingPriorityPolicy` (policy type + per-tier `CapacityGroup`s)
+  entirely from the shape of a `TrainingDefinition` plus each canonical
+  formation's maximum position counts (`formation_position_maximums()`, also
+  reused by Squad Intelligence's role-calibration fix below) -- never hardcoded
+  per training type. `ht_coach_app/widgets/training_priority_wizard.py`
+  generates its steps directly from this policy.
+- `ht_coach_app/services/match_intelligence_service.py`'s
+  `MatchIntelligenceAppService` and the new
+  `ht_coach_app/views/match_intelligence_page.py` /
+  `ht_coach_app/controllers/match_intelligence_controller.py`: a thin
+  presentation layer over Alpha 0.5.9.0/UX-02's existing
+  `OfficialRatingImportService` and formatting functions -- no new parsing or
+  comparison logic.
+- `SquadIntelligenceContext.ages_by_position` (Alpha 0.6.0) and
+  `PositionEvidence.formation_slots` (this sprint) are both additive fields
+  enabling more accurate depth/performance reasoning without changing any
+  existing dimension's public shape.
+
+### Club Advisor
+
+`engine/club_advisor/`
+
+Alpha 0.6.0 adds the first club-level intelligence layer, deliberately built as
+an *aggregation* over Squad Intelligence and Training rather than a new scoring
+engine — enforced by static-import tests confirming this package never imports
+`PlayerRatingEngine`, `PlayerAnalyzer`, `FormationOptimizer`, `TacticOptimizer`
+or `LineupOptimizer`.
+
+Modules:
+
+- `enums.py`: `ProjectStatus` (5 values), `PriorityType` (8), `ClubStrengthType`
+  (6), `ClubRiskType` (8), `ClubWarningType` (6), `ClubConfidence` (4),
+  `ClubLimitationType` (8), `DepthStatus` (5).
+- `context.py`: `ClubAdvisorContext` — holds only already-computed inputs
+  (Squad Intelligence's `squad_reports`, `squad_context` from
+  `SquadIntelligenceAppService`, active training type).
+- `summary.py`: `build_training_summary` / `build_squad_summary` /
+  `build_depth_summary` / `build_sporting_summary` — pure aggregations
+  (counts and classifications) over already-computed data, never a new rating.
+- `dimensions.py`: `evaluate_project_status` — three independently evaluated
+  sub-assessments (training utilization, positional depth, squad composition);
+  the worst one caps the overall status. Never a single blended score.
+- `priorities.py` / `strengths.py` / `risks.py` / `warnings.py`: independent
+  evidenced detector functions. Unlike Squad Intelligence's role/status rules,
+  every detector here may fire independently and all findings are kept —
+  there's no single-winner conflict resolution to do. Priorities are then
+  sorted by urgency and assigned a 1-based rank.
+- `confidence.py`: the same documented-policy style used throughout HT Coach's
+  domain layers.
+- `rule_engine.py` / `service.py`: `ClubAdvisorRuleEngine.evaluate()` (thin
+  orchestration) and `generate_report()` (the only entry point most callers
+  need).
+
+App-layer bridge:
+
+- `ht_coach_app/services/club_advisor_service.py`'s `ClubAdvisorAppService`
+  reuses `SquadIntelligenceAppService` to build context — it does not rebuild
+  roster/training context a second time.
+- `ht_coach_app/services/club_advisor_formatting.py`: stable
+  enum-to-localization-key mapping.
+
+**Season-aware layer (Alpha 0.6.2).** Six additional modules, still inside
+`engine/club_advisor/`, no second engine:
+
+- `season_context.py`: `SeasonContext` — every field optional, defaults never
+  fabricated. `promotion_objective` defaults to `WELCOME_IF_NATURAL`.
+- `urgency.py`: `compute_urgency(strategic_need, season_context, inputs)` — the
+  only function that turns a `StrategicNeed` into an `OperationalUrgency`,
+  always via documented, evidenced reducers/increasers and a per-need-tier
+  floor (never straight equality).
+- `timing.py`: `determine_action_type(strategic_need, operational_urgency)` —
+  the only place both dimensions combine into one `ActionType`.
+- `horizons.py`: `default_horizon_for_action()` — every priority gets a
+  `RecommendationHorizon`, sharpened by season/promotion context.
+- `season_plan.py`: pure derivation functions reading Club Advisor's
+  *already-computed* `DepthSummary`/`TrainingSummary`/`SquadSummary` into a
+  `StrategicNeed` per area — never a recalculation.
+- `recommendation_policy.py`: `build_season_aware_priorities()` (strategic +
+  operational `ClubPriority` lists) and `assess_promotion_readiness()`
+  (preliminary, evidence-limited `PromotionReadiness`).
+
+`service.py`'s `generate_report()` gained an optional `season_context` keyword;
+`ClubAdvisorReport` gained four optional fields
+(`strategic_priorities`/`operational_priorities`/`promotion_readiness`/
+`season_context`) via a `with_season_data()` replace-helper. Both changes are
+fully backward compatible — every pre-Alpha-0.6.2 Club Advisor test passes
+unchanged. The existing three-independent-dimension project-status calculation
+is completely untouched by season context, per this sprint's explicit
+requirement.
+
+`ht_coach_app/services/season_plan_formatting.py` provides the
+enum-to-localization-key mapping for the new season enums, mirroring
+`club_advisor_formatting.py`'s existing pattern.
+
+`SquadIntelligenceContext` (from Alpha 0.5.9.1) gained an additive
+`ages_by_position` field to support genuine "future shortage" depth detection
+(a position where the only replacements are aging) — backward compatible,
+defaults to `{}`.
+
+UI: a new "Club Advisor" top-level navigation tab
+(`ht_coach_app/views/club_advisor_page.py`,
+`ht_coach_app/controllers/club_advisor_controller.py`) — the first genuinely
+new page since the original module set. A "Generate report" button reads the
+roster CSV already remembered by Squad's workspace settings, then renders one
+concise `workspacePanel`-styled card per section. No charts, no gauges, no
+overall score.
+
+Five limitations (`FINANCIAL_DATA_UNAVAILABLE`, `LEAGUE_COMPARISON_UNAVAILABLE`,
+`TRANSFER_MARKET_UNAVAILABLE`, `SALARY_BUDGET_UNAVAILABLE`,
+`PROMOTION_TARGET_UNKNOWN`) are always present in every report, by design —
+this sprint has no data source for any of them.
+
+**Grounding layer (Alpha 0.6.3).** `ClubAdvisorContext` gained
+`players_by_position` (built by `ClubAdvisorAppService` the same way the
+Training Priority Wizard builds its own eligibility map — never a new
+mapping mechanism). `SquadIntelligenceContext` gained
+`temporary_positional_depth`, built from the existing `AvailabilityService`;
+`PositionDepth` carries both structural (`player_count`/`status`) and
+temporary (`temporary_count`/`temporary_status`) readings. `ClubRisk` gained
+`position`/`reason_key`/`impact`/`urgency`/`affected_players`/
+`review_condition_key` — `risks.py` now reuses
+`formation_position_maximums()` (from `training_priority_policy.py`) to decide
+whether a depth gap has real formation-demand impact. `PLAYERS_WITHOUT_TRAINING`
+and `TOO_MANY_PLAYERS_PER_TRAINING_SLOT` moved from `risks.py` to `warnings.py`
+entirely, joined by three new training-plan-specific warning types.
+`SquadSummary` exposes the actual player names behind every count.
+`dimensions.explain_project_status()` identifies which independent health
+dimension drove the overall status and reads season-aware operational
+urgency to explain it. `ht_coach_app/widgets/drilldown_overlay.py`'s
+`DrillDownOverlay` is a reusable centered-modal-over-translucent-overlay
+widget; every relevant Club Advisor card is now clickable and opens its own
+drill-down built from the same report data already computed.
 
 ### Transfer Planner
 
@@ -807,6 +1111,27 @@ signals from Match Intelligence. It keeps within-team profile context and posses
 signals, and the Opponent Rating Calibration table continues to show the raw values with
 their source scales. No conversion factor is introduced.
 
+**Source-selection policy (HF-02.2).** `matchup.py`'s own left/right pairing
+dictionaries are now derived from `engine/ratings/sector_rating.py`'s
+`MATCHUP_PAIRS` directly (previously an independent, coincidentally-identical
+copy). `engine/ratings/rating_source_policy.py`'s `select_our_ratings()` is the
+single policy deciding which "our" ratings feed the comparison and tactical
+intelligence: Official PRE (when present for the match) beats a calibrated
+internal estimate (not yet confirmed comparable, so this tier is currently
+unreachable) beats the internal diagnostic estimate. Root cause this fixed:
+`MatchWorkspaceService._map_sector_comparisons` previously hardcoded
+`our_scale=SOURCE_HT_COACH_INTERNAL` unconditionally, so a comparison was
+*never* marked comparable for "our" side even when a real Official PRE existed
+on the same scale as the opponent estimate.
+`MatchWorkspaceService.apply_official_pre_override()` applies the policy as a
+pure post-processing step over an already-computed `MatchAnalysisResult` --
+substituting only the *recommended* formation's ratings and recomputing its
+`sector_rating_comparisons` and the top-level `match_intelligence` result via
+the unchanged `MatchIntelligenceEngine`. It never touches TeamRater,
+LineupOptimizer, TacticOptimizer, probabilities, xG or any rating formula.
+`AppEvents.official_ratings_changed` lets Match and Match Intelligence
+auto-refresh each other after an import from either page.
+
 ### Rating Validation
 
 `engine/rating_validation/`
@@ -870,9 +1195,10 @@ Modules:
 Workspace rules:
 
 - the original recommendation is immutable;
-- slots own tactical position, side and pitch coordinates; players move between slots
-  without carrying the old slot's tactical assignment, then receive an automatic valid
-  order for the assigned slot;
+- slots own tactical position, side, pitch coordinates and user-edited order intent;
+  players move between slots without carrying the old slot's tactical assignment;
+  starter swaps preserve each affected slot's current valid order, and only an
+  invalid affected slot is normalized back to `Normal`;
 - Bench is derived from loaded roster players minus the displayed Workspace Lineup and
   is never an independent source of truth;
 - valid click and drag edits commit immediately to the Workspace Lineup;
@@ -888,6 +1214,9 @@ Workspace rules:
 - manual state uses neutral manual-adjusted language and does not imply the lineup is
   wrong;
 - manual position choices are not contradicted by persistent position recommendations;
+- manual order edits are resolved by stable `slot_id` plus workspace revision, not
+  by player identity alone, so a stale inspector control cannot rewrite the wrong
+  occupant after a swap;
 - automatic orders enumerate existing `OrderOptimizer.ALLOWED_CONFIGURATIONS`, compare
   internal contribution totals and preserve the current valid order on ties;
 - Workspace creation applies the same automatic-order operation to every starter before
@@ -908,6 +1237,20 @@ Workspace rules:
 Assisted Lineup deliberately defers constraint-based lineup optimization. It does not
 implement mandatory players, rest lists, training-priority players, locked positions,
 minimum win probability, automatic formation changes or new optimizer scoring.
+
+### Input Behavior
+
+`ht_coach_app/ui/input_behavior.py`
+
+The desktop UI installs one centralized page-only mouse-wheel policy. Closed
+combo boxes, tab bars, spin boxes, date/time edits and sliders do not mutate from
+hover-wheel scrolling. Their wheel events are redirected to the nearest page
+scroll area, with the Match workspace scroll area preferred for Match controls.
+
+Explicitly open combo popups and genuine inner scroll areas keep native wheel
+scrolling. Keyboard navigation and deliberate clicks are unchanged. This layer is
+pure UI input handling and does not call or alter engine, optimizer, probability,
+persistence or official-evidence parsing code.
 
 ### Player Intelligence
 
@@ -1152,7 +1495,11 @@ User clicks Analyze Match
   -> Decision Lab creates deterministic explanations from those view models
   -> Match Intelligence creates tactical profiles, matchup classifications,
      opportunities, risks, three focuses, a summary and a matrix
-  -> MatchWorkspaceRepository persists the last successful result
+  -> MatchController stamps the result owner as either NEW_MATCH_DRAFT or
+     SAVED_MATCH before persistence
+  -> MatchWorkspaceRepository persists the last successful serializable result
+     and MatchController restores it only when that owner matches the active
+     workspace mode
   -> MatchPage renders Decision Lab, recommended summary, Formation Board,
      comparison table and detailed XI
   -> FormationBoard creates an editable Workspace Lineup copy for one-click
@@ -1167,6 +1514,36 @@ User clicks Analyze Match
 ```
 
 The engine remains unaware of the desktop application.
+
+When a saved Match workspace is linked to Weekly Planner, explicit save follows this
+additional app-layer flow:
+
+```text
+User saves edited saved match
+  -> MatchController persists the final lineup to the canonical Match Record
+  -> WeeklyTrainingAppService finds the weekly record by linked_match_record_id
+  -> WeeklyTrainingAppService rebuilds that weekly record from the final board
+  -> WeeklyTrainingRepository removes the old linked record and saves the replacement
+  -> Weekly coverage is recomputed from current Partido 1 + current Partido 2
+  -> AppEvents.weekly_plan_saved refreshes Squad/Weekly Planner views
+```
+
+HF-10.5 generalizes this into one controller transaction for all Match saves:
+`Guardar formacion`, `Guardar como Partido 1` and `Guardar como Partido 2` first
+persist the active workspace metadata and lineup to one canonical
+`HistoricalMatchSnapshot`, then weekly saves attach Partido 1/2 to that returned
+record ID. The view never reconstructs metadata from display labels, and a
+weekly-link failure leaves the saved Match workspace intact for retry.
+
+HF-10.6 adds the reverse path: Saved Match edit can rebuild a displayable Match
+workspace from the canonical snapshot when the transient last-result cache is
+missing. The controller maps persisted lineup/tactical setup into a restored
+view model, reloads the saved CSV source when available, preserves
+`EDIT_SAVED_MATCH` mode through Weekly Planner saves, and never asks the engine
+to recalculate just to show the saved formation.
+
+This is a persistence/source-integrity update only. Training factors, capacity rules,
+rating calculations, optimizer formulas and probability calculations are not touched.
 
 ## View Models
 

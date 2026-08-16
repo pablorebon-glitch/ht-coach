@@ -464,6 +464,39 @@ class DecisionLabRulesTest(unittest.TestCase):
         self.assertIn("Recommendation support", text)
         self.assertNotIn("Confidence: 85", text)
 
+    def test_decision_lab_carries_lineup_objective_payload(self):
+        recommended = formation("3-5-2", 0.58)
+        object.__setattr__(
+            recommended,
+            "objective_trace",
+            {
+                "candidate_id": "recommended-xi",
+                "components": {"win_probability": 0.58},
+            },
+        )
+        alternative = formation("4-5-1", 0.52)
+        object.__setattr__(
+            alternative,
+            "objective_trace",
+            {
+                "candidate_id": "alternative-xi",
+                "components": {"win_probability": 0.52},
+            },
+        )
+
+        analysis = DecisionLab().analyze(
+            result(recommended, alternative)
+        )
+
+        self.assertEqual(
+            analysis.lineup_decision["recommended"]["candidate_id"],
+            "recommended-xi"
+        )
+        self.assertEqual(
+            analysis.lineup_decision["strongest_alternative"]["candidate_id"],
+            "alternative-xi"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -173,3 +173,19 @@ def test_import_ratings_also_requires_confirmation_to_replace(tmp_path):
         snapshot.snapshot_id, SAMPLE_TEXT, slot=PRE, confirm_replace=True
     )
     assert outcome.snapshot.official_pre is not None
+
+
+def test_import_ratings_stamps_pre_match_id_on_explicit_target(tmp_path):
+    repository = HistoricalMatchRepository(tmp_path / "snapshots.json")
+    snapshot = HistoricalMatchSnapshot(
+        snapshot_id="planned-santa-cruz",
+        match_context=MatchContext(match_date="2026-08-05"),
+    )
+    repository.save(snapshot)
+    service = OfficialRatingImportService(repository=repository)
+
+    outcome = service.import_ratings(snapshot.snapshot_id, SAMPLE_TEXT, slot=PRE)
+
+    assert outcome.snapshot.snapshot_id == snapshot.snapshot_id
+    assert outcome.snapshot.match_context.official_match_id == "770131822"
+    assert outcome.snapshot.provenance.imported_match_id == "770131822"

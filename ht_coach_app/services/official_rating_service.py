@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import replace
 
-from engine.history.official_ratings.parser import parse_official_ratings
+from engine.history.official_ratings.parser import (
+    parse_official_post_ratings,
+    parse_official_pre_ratings,
+)
 from engine.history.official_ratings.validation import (
     OfficialRatingValidationError,
-    validate_official_rating_snapshot,
+    validate_official_post_rating_snapshot,
+    validate_official_pre_rating_snapshot,
 )
 from engine.history.models import (
     HistoricalMatchSnapshot,
@@ -48,6 +53,16 @@ class OfficialRatingAmbiguousMatch(OfficialRatingImportError):
         super().__init__(f"ambiguous_match_id:{hattrick_match_id}")
         self.hattrick_match_id = hattrick_match_id
         self.candidates = tuple(candidates)
+
+
+class OfficialRatingMatchIdMismatch(OfficialRatingImportError):
+    def __init__(self, pre_match_id, post_match_id, pre_snapshot_id, raw_text, language=""):
+        super().__init__(f"match_id_mismatch:{pre_match_id}:{post_match_id}")
+        self.pre_match_id = pre_match_id
+        self.post_match_id = post_match_id
+        self.pre_snapshot_id = pre_snapshot_id
+        self.raw_text = raw_text
+        self.language = language
 
 
 @dataclass(frozen=True)
@@ -108,14 +123,26 @@ class OfficialRatingImportService:
         if snapshot is None:
             raise OfficialRatingImportError(f"snapshot_not_found: {snapshot_id}")
 
-        parsed = self._parse_and_validate(raw_text, language)
+        parsed = self._parse_and_validate(raw_text, language, slot)
 
         field_name = "official_pre" if slot == PRE else "official_post"
         existing = getattr(snapshot, field_name)
         if existing is not None and not confirm_replace:
             raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
 
-        updated = snapshot.with_updates(**{field_name: parsed})
+        updates = {field_name: parsed}
+        if parsed.hattrick_match_id:
+            updates["match_context"] = replace(
+                snapshot.match_context,
+                official_match_id=parsed.hattrick_match_id,
+            )
+            updates["provenance"] = SnapshotProvenance.from_dict(
+                {
+                    **snapshot.provenance.to_dict(),
+                    "imported_match_id": parsed.hattrick_match_id,
+                }
+            )
+        updated = snapshot.with_updates(**updates)
         saved = self._repository.save(updated)
         return ImportOutcome(
             snapshot=saved,
@@ -153,12 +180,28 @@ class OfficialRatingImportService:
         if slot not in (PRE, POST):
             raise OfficialRatingImportError(f"invalid_slot: {slot}")
 
-        parsed = self._parse_and_validate(raw_text, language)
+        parsed = self._parse_and_validate(raw_text, language, slot)
 
         if not parsed.hattrick_match_id:
             raise OfficialRatingImportError("no_match_id_in_text")
 
         candidates = self.find_snapshots_by_hattrick_match_id(parsed.hattrick_match_id)
+
+        if slot == POST:
+            latest_pre = self._latest_snapshot_with_pre()
+            if (
+                latest_pre is not None
+                and parsed.hattrick_match_id
+                and latest_pre.provenance.imported_match_id
+                and parsed.hattrick_match_id != latest_pre.provenance.imported_match_id
+            ):
+                raise OfficialRatingMatchIdMismatch(
+                    latest_pre.provenance.imported_match_id,
+                    parsed.hattrick_match_id,
+                    latest_pre.snapshot_id,
+                    raw_text,
+                    language,
+                )
 
         if len(candidates) > 1:
             raise OfficialRatingAmbiguousMatch(parsed.hattrick_match_id, candidates)
@@ -175,7 +218,13 @@ class OfficialRatingImportService:
         if existing is not None and not confirm_replace:
             raise OfficialRatingReplaceConfirmationRequired(slot, snapshot)
 
-        updated = snapshot.with_updates(**{field_name: parsed})
+        updates = {field_name: parsed}
+        if parsed.hattrick_match_id:
+            updates["match_context"] = replace(
+                snapshot.match_context,
+                official_match_id=parsed.hattrick_match_id,
+            )
+        updated = snapshot.with_updates(**updates)
         saved = self._repository.save(updated)
         return ImportOutcome(
             snapshot=saved,
@@ -187,6 +236,58 @@ class OfficialRatingImportService:
 
     def get_snapshot(self, snapshot_id):
         return self._repository.get(snapshot_id)
+
+    def associate_post_after_match_id_confirmation(
+        self,
+        pre_snapshot_id,
+        raw_text,
+        match_id,
+        *,
+        language="",
+        confirm_replace=False,
+    ):
+        snapshot = self._repository.get(pre_snapshot_id)
+        if snapshot is None:
+            raise OfficialRatingImportError(f"snapshot_not_found: {pre_snapshot_id}")
+        parsed = self._parse_and_validate(raw_text, language, POST)
+        normalized_match_id = str(match_id or "").strip()
+        if not normalized_match_id:
+            raise OfficialRatingImportError("no_match_id_in_text")
+
+        parsed = replace(parsed, hattrick_match_id=normalized_match_id)
+        existing = snapshot.official_post
+        if existing is not None and not confirm_replace:
+            raise OfficialRatingReplaceConfirmationRequired(POST, snapshot)
+
+        provenance = SnapshotProvenance.from_dict(
+            {
+                **snapshot.provenance.to_dict(),
+                "imported_match_id": normalized_match_id,
+            }
+        )
+        updated_pre = (
+            replace(snapshot.official_pre, hattrick_match_id=normalized_match_id)
+            if snapshot.official_pre is not None
+            else None
+        )
+        saved = self._repository.save(
+            snapshot.with_updates(
+                official_pre=updated_pre,
+                official_post=parsed,
+                match_context=replace(
+                    snapshot.match_context,
+                    official_match_id=normalized_match_id,
+                ),
+                provenance=provenance,
+            )
+        )
+        return ImportOutcome(
+            snapshot=saved,
+            slot=POST,
+            was_linked_to_existing_match=True,
+            was_new_snapshot_created=False,
+            parsed=parsed,
+        )
 
     def _create_identifiable_snapshot(self, parsed):
         snapshot = HistoricalMatchSnapshot(
@@ -201,11 +302,24 @@ class OfficialRatingImportService:
         )
         return self._repository.save(snapshot)
 
+    def _latest_snapshot_with_pre(self):
+        candidates = [
+            snapshot for snapshot in self._repository.list_all()
+            if snapshot.official_pre is not None
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda snapshot: snapshot.updated_at or "")
+
     @staticmethod
-    def _parse_and_validate(raw_text, language):
+    def _parse_and_validate(raw_text, language, slot=PRE):
         try:
-            parsed = parse_official_ratings(raw_text, language=language)
-            validate_official_rating_snapshot(parsed)
+            if slot == POST:
+                parsed = parse_official_post_ratings(raw_text, language=language)
+                validate_official_post_rating_snapshot(parsed)
+            else:
+                parsed = parse_official_pre_ratings(raw_text, language=language)
+                validate_official_pre_rating_snapshot(parsed)
         except (ValueError, OfficialRatingValidationError) as exc:
             raise OfficialRatingImportError(str(exc)) from exc
         return parsed

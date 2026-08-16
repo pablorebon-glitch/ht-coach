@@ -34,6 +34,10 @@ optimized recommendation as the baseline.
 - A manager should be able to prepare a match in under five minutes.
 - Prefer conclusions over raw numbers where appropriate.
 - Preserve access to detailed numbers for advanced users.
+- A lineup recommendation should explain the marginal trade-off against the
+  actual rival, not just show isolated player or sector scores.
+- A manager should be able to carry the desktop workspace between Windows PCs without
+  losing local data when using the portable distribution.
 
 ## Alpha 0.4 Sequence
 
@@ -100,6 +104,57 @@ anticipated future extension — but it is not implemented, and no sprint before
 Alpha 0.6.0 should attempt a partial version of it. Until then, "sustainable
 growth" (principle 9) is the single implicit reference strategy.
 
+## The Club-Level View (Alpha 0.6.0)
+
+Squad Intelligence answers "who is this player, and what should I do with him?"
+one player at a time. Club Advisor is the first layer that steps back and asks
+the club-level version of the same question: how healthy is the project, what
+deserves attention first, what should this week's priorities be?
+
+It is deliberately an aggregation, not a new opinion-generating engine — every
+conclusion traces back to Squad Intelligence's or Training's already-computed
+evidence, never a recalculated player score. And it stays honest about what it
+doesn't know: financial data, league comparison, transfer-market context and a
+promotion target are permanent, disclosed limitations this sprint, not gaps
+papered over with a guess. The Club Advisor does not replace the manager — it
+helps the manager decide what to look at first.
+
+## Patience Is Also Intelligence (Alpha 0.6.2)
+
+A club-level advisor that treats every genuine weakness as an urgent call to
+action isn't actually helping a manager pursuing sustainable growth — it's just
+adding noise. This sprint's core addition: **what the club eventually needs and
+what the manager should do right now are two different questions**, and HT
+Coach must answer them separately rather than collapsing one into the other.
+
+A club can be dominant in its current league, facing mostly weaker or bot
+opponents, having just made a relevant signing, with promotion welcome but not
+pursued — and still have a real structural gap worth eventually addressing.
+The honest answer in that situation isn't "buy a defender now" or "ignore the
+gap" — it's "the need is real, the urgency is low, monitor it, and revisit
+before it actually matters (an injury, a promotion push, a rival strengthening)."
+Recommending deliberate inaction, with evidence and a review trigger, is just
+as much a product of intelligence as recommending action — and current
+dominance in one's own league is never treated as proof of readiness for a
+tougher one.
+
+## Understanding Every Player (Alpha 0.5.9.1)
+
+Principles 1 and 10 ("Hattrick is the source of truth" / "every feature must
+answer a concrete manager decision") became concrete for individual players with
+Squad Intelligence: for any current-roster player, HT Coach now answers, within
+five seconds and with evidence — not an opaque score — who they are within the
+sporting project, what to currently do with them, and why.
+
+This is deliberately still a *reporting* layer, not a decision-maker: recommended
+roles and management statuses (KEEP, TRAIN, MONITOR, EVALUATE_SALE, and so on)
+are inputs to the manager's own judgment, evaluated against the single reference
+strategy this sprint implements — sustainable growth — represented as a typed,
+swappable input rather than hardcoded, so a future club-strategy sprint can
+extend it without redesigning anything. There is deliberately no unconditional
+"sell" status yet: HT Coach doesn't know club finances, market prices or transfer
+deadlines, so it says "evaluate," not "sell."
+
 ## Official Ratings Are the Truth (Alpha 0.5.9.0)
 
 Principle 1 ("Hattrick is the source of truth") became concrete with Alpha 0.5.9.0:
@@ -132,3 +187,29 @@ it — the same "propose, don't replace" discipline extends to how it's presente
 when HT Coach's own predicted ratings and an imported official value are shown
 together, and the two scales aren't yet confirmed to align, HT Coach says so
 plainly instead of showing a number that implies more precision than it has.
+
+## One Real Calendar, Not Five Guesses (Alpha 0.6.5)
+
+Every module that has ever asked "is it too early to move to next week's
+training?" was answering that question a little differently -- and, in at
+least two real places, answering it wrong: treating any moment on Thursday as
+"training already processed," hours before Hattrick's own 21:00 update
+actually runs. A manager who checked the Weekly Planner Thursday morning
+could see next week's plan already active, before the club had even trained.
+
+Hattrick doesn't run on a Monday-to-Sunday week, and it doesn't process
+things at midnight. It has its own rhythm -- match Sunday, recovery Monday,
+a friendly Wednesday, training Thursday night, finances Friday morning, youth
+scouting Saturday -- and every module that cares "what week is this" now asks
+the same single, precise source rather than approximating it five different
+ways. Getting the club's own calendar right is unglamorous, foundational
+work, but a coach who can't correctly tell you whether this week's training
+has actually happened yet isn't ready to advise on anything else.
+
+## Match ID Integrity (Alpha 0.6.4)
+
+PRE and POST official summaries must share the same Hattrick Match ID before HT Coach
+associates them. If they differ, the manager reviews and corrects the IDs manually.
+This extra step is intentional: the Match ID uniquely identifies an official Hattrick
+match, and automatic association would risk turning two truthful documents into one
+false story.

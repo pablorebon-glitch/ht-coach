@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ht_coach_app.core.localization import t
+
 
 def _format_number(value):
     if value is None:
@@ -11,6 +13,10 @@ def format_sector_band(left, central, right):
     """"4.25 | 7.00 | 3.75" — the standard three-number Hattrick sector
     band. Any missing side shows "?" rather than a guessed number."""
     return " | ".join(_format_number(value) for value in (left, central, right))
+
+
+def format_official_sector_label(sector):
+    return t(f"official_match_intelligence.sector.{sector}")
 
 
 def format_rated_attribute(attribute):
@@ -55,17 +61,17 @@ def format_hattrick_notation(ratings, formation=None, tactic=None, team_attitude
     """
     lines = []
 
-    lines.append("Defense")
+    lines.append(t("official_match_intelligence.summary.defense"))
     lines.append(
         format_sector_band(ratings.left_defense, ratings.central_defense, ratings.right_defense)
     )
     lines.append("")
 
-    lines.append("Midfield")
+    lines.append(t("official_match_intelligence.summary.midfield"))
     lines.append(_format_number(ratings.midfield))
     lines.append("")
 
-    lines.append("Attack")
+    lines.append(t("official_match_intelligence.summary.attack"))
     lines.append(
         format_sector_band(ratings.left_attack, ratings.central_attack, ratings.right_attack)
     )
@@ -74,19 +80,19 @@ def format_hattrick_notation(ratings, formation=None, tactic=None, team_attitude
         formatted = format_rated_attribute(formation)
         if formatted:
             lines.append("")
-            lines.append("Formation")
+            lines.append(t("official_match_intelligence.summary.formation"))
             lines.append(formatted)
 
     if tactic is not None:
         formatted = format_rated_attribute(tactic)
         if formatted:
             lines.append("")
-            lines.append("Tactic")
+            lines.append(t("official_match_intelligence.summary.tactic"))
             lines.append(formatted)
 
     if team_attitude:
         lines.append("")
-        lines.append("Team Attitude")
+        lines.append(t("official_match_intelligence.summary.team_attitude"))
         lines.append(team_attitude)
 
     return "\n".join(lines)
@@ -113,7 +119,7 @@ def format_prediction_vs_official_comparison(comparison):
     for sector in comparison.sectors:
         rows.append(
             (
-                sector.sector,
+                format_official_sector_label(sector.sector),
                 _format_number(sector.predicted_value),
                 _format_number(sector.official_pre_value),
                 (

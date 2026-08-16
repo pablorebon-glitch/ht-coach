@@ -34,6 +34,13 @@ def make_controller(tmp_path, with_roster=True):
     controller = SquadController(
         page, SquadService(), settings_repo, weekly_training_service=weekly_service
     )
+    # These tests exercise the training-type combo directly, which now
+    # opens a confirmation dialog and the Training Priority Wizard (see
+    # UX-03). Neither should block a test waiting for real user
+    # interaction -- default to "wizard completed with no selections",
+    # which is a valid, empty-but-successful outcome. Tests that care
+    # about the wizard's own behavior override this explicitly.
+    controller._request_training_priority_selections = lambda *_args: {}
     if with_roster:
         controller._roster = type("FakeRoster", (), {"players": []})()
         controller._show_weekly_training()

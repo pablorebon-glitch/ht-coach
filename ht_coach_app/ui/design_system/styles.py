@@ -128,6 +128,54 @@ def application_stylesheet():
             border-radius: {metrics.CARD_RADIUS}px;
         }}
 
+        QFrame#drillDownPanel {{
+            background: {colors.SURFACE};
+            border: 1px solid {colors.BORDER_STRONG};
+            border-radius: {metrics.CARD_RADIUS}px;
+        }}
+
+        QFrame#drillDownPanel,
+        QFrame#drillDownPanel QWidget,
+        QFrame#drillDownDetailPanel {{
+            background: {colors.SURFACE};
+        }}
+
+        QFrame#drillDownPanel QListWidget {{
+            background: {colors.SURFACE};
+            border: 1px solid {colors.BORDER};
+            border-radius: {metrics.CARD_RADIUS}px;
+            outline: none;
+        }}
+
+        QFrame#drillDownPanel QListWidget::item {{
+            padding: 6px 8px;
+            border-radius: 6px;
+        }}
+
+        QFrame#drillDownPanel QListWidget::item:selected {{
+            background: {colors.PRIMARY_SOFT};
+            color: {colors.TEXT_PRIMARY};
+        }}
+
+        QLabel#drillDownFieldHeading {{
+            color: {colors.TEXT_SECONDARY};
+            font-weight: 600;
+        }}
+
+        QToolButton#drillDownCloseButton {{
+            background: transparent;
+            border: none;
+            color: {colors.TEXT_SECONDARY};
+            font-weight: 600;
+            font-size: 16px;
+        }}
+
+        QToolButton#drillDownCloseButton:hover {{
+            color: {colors.TEXT_PRIMARY};
+            background: {colors.BACKGROUND};
+            border-radius: 4px;
+        }}
+
         QFrame#dsCard[selected="true"] {{
             background: {colors.PRIMARY_SOFT};
             border: 2px solid {colors.PRIMARY};

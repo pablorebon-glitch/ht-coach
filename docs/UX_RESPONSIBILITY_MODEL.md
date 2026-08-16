@@ -13,12 +13,27 @@ quietly starts making its own tactical decisions.
 - Owns the active roster.
 - Exposes roster data (and the shared "recent CSVs" list) to the rest of the
   application via the shared workspace settings file.
+- Hosts Squad Intelligence (Alpha 0.5.9.1) — a deterministic, evidenced
+  per-player classification (role, management status, dimensions, strengths,
+  risks, milestone) shown when a player is selected. It reads the active
+  training context and the app's existing positional ranking; it does not
+  optimize match formations and does not make club-wide financial decisions —
+  those remain Match's and a future Club Advisor's job respectively.
 
 ### Match
 
 - Is the only module responsible for optimizing formations and individual orders.
 - Analyzes the opponent.
 - Produces the recommended XI for a given match (League or Cup/Friendly).
+- Owns the editable Formation Board. Local board edits are slot-authoritative:
+  players may move, but each tactical slot keeps its own valid order intent unless
+  that slot's assignment makes the order invalid.
+- Keeps Match workspace controls responsive in restored and maximized windows; the
+  Formation Board header may use multiple compact rows so primary actions remain
+  reachable without shrinking the pitch.
+- Treats mouse-wheel input as page scrolling, not as selector editing. Closed
+  Match combos, Formation Board order/tactic/attitude/formation selectors and
+  Match result tabs change only through deliberate click or keyboard actions.
 - Imports the official Hattrick Match Summary associated with the match (Alpha
   0.5.9.0 / UX-02) — parsing and attaching it never reruns the optimizer or any
   rating formula; the imported values are stored exactly as Hattrick provided them.
@@ -52,6 +67,13 @@ quietly starts making its own tactical decisions.
 
 ## Hard rules
 
+- **Do not let retrospective PRE evidence rename a match.** History owns the
+  canonical opponent/date/competition/venue/Match ID. Retrospective source
+  opponent and source Match ID remain provenance only, and visible match titles
+  are generated from canonical structured fields.
+- **Do not save historical weekly matches into the current week by default.**
+  Match must use the record's own scheduled date to choose the Sunday-Saturday
+  training cycle. Missing dates require user correction instead of guessing.
 - **Do not add a second CSV-loading workflow.** Match, Weekly Planner and History
   all consume the roster/CSV that Squad already owns; none of them get their own
   "Browse/Load" pair. Match's players-CSV control is a "recent files" picker, not an
@@ -61,6 +83,9 @@ quietly starts making its own tactical decisions.
   never triggers a new optimization.
 - **Do not let Weekly Planner make tactical decisions.** It surfaces priorities and
   coverage; Match decides how to satisfy them against a specific opponent.
+- **Do not bind tactical changes to hover-wheel input.** Wheel scrolling is page
+  navigation unless the user explicitly opened a popup or is inside a real
+  scrollable content area.
 
 ## Why this exists
 

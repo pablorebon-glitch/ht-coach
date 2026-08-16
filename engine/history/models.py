@@ -479,6 +479,15 @@ class HistoricalMatchSnapshot:
     cohort: MatchCohort = field(default_factory=MatchCohort)
     prediction_error: PredictionErrorPlaceholder | None = None
     provenance: SnapshotProvenance = field(default_factory=SnapshotProvenance)
+    # Alpha 0.6.6, Part 10: this snapshot doubles as the canonical
+    # OfficialMatchRecord -- rather than a parallel model needing its
+    # own migration, these are additive fields on the same
+    # already-persisted, already-tested container.
+    retrospective_pre: "OfficialRatingSnapshot | None" = None
+    provisional_identity: str = ""
+    training_cycle_id: str = ""
+    ht_season_number: int | None = None
+    ht_season_week: int | None = None
 
     def __post_init__(self):
         if not self.snapshot_id:
@@ -495,6 +504,39 @@ class HistoricalMatchSnapshot:
     @property
     def match_date_key(self) -> str:
         return self.match_context.match_date or self.created_at
+
+    @property
+    def season_week(self):
+        from engine.calendar import HTSeasonWeek
+
+        return HTSeasonWeek(
+            season_number=self.ht_season_number,
+            season_week=self.ht_season_week,
+        )
+
+    @property
+    def status(self):
+        """Alpha 0.6.6, Part 12 -- never persisted, always derived
+        fresh from whatever evidence this record actually has."""
+        from datetime import date as _date
+
+        from engine.history.match_record_status import derive_match_record_status
+
+        match_date = None
+        raw_date = self.match_context.match_date
+        if raw_date:
+            try:
+                match_date = _date.fromisoformat(raw_date[:10])
+            except ValueError:
+                match_date = None
+
+        return derive_match_record_status(
+            official_pre=self.official_pre,
+            official_post=self.official_post,
+            retrospective_pre=self.retrospective_pre,
+            match_date=match_date,
+            today=_date.today(),
+        )
 
     def with_updates(self, **changes) -> "HistoricalMatchSnapshot":
         changes["updated_at"] = utc_now()
@@ -525,6 +567,13 @@ class HistoricalMatchSnapshot:
                 self.prediction_error.to_dict() if self.prediction_error else None
             ),
             "provenance": self.provenance.to_dict(),
+            "retrospective_pre": (
+                self.retrospective_pre.to_dict() if self.retrospective_pre else None
+            ),
+            "provisional_identity": self.provisional_identity,
+            "training_cycle_id": self.training_cycle_id,
+            "ht_season_number": self.ht_season_number,
+            "ht_season_week": self.ht_season_week,
         }
 
     @classmethod
@@ -559,4 +608,9 @@ class HistoricalMatchSnapshot:
                 data.get("prediction_error")
             ),
             provenance=SnapshotProvenance.from_dict(data.get("provenance")),
+            retrospective_pre=OfficialRatingSnapshot.from_dict(data.get("retrospective_pre")),
+            provisional_identity=data.get("provisional_identity", ""),
+            training_cycle_id=data.get("training_cycle_id", ""),
+            ht_season_number=data.get("ht_season_number"),
+            ht_season_week=data.get("ht_season_week"),
         )

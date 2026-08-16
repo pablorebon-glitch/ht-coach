@@ -70,12 +70,17 @@ class RosterResult:
 
     @property
     def specialties(self):
-        values = {
-            row.speciality
+        """Every official HT specialty that appears in the current
+        roster, as canonical `Specialty` values -- never raw,
+        untranslated CSV text."""
+        from models.specialty import ORDERED_SPECIALTIES, Specialty
+
+        present = {
+            Specialty.parse(row.speciality)
             for row in self.rows
             if row.speciality
         }
-        return sorted(values)
+        return tuple(specialty for specialty in ORDERED_SPECIALTIES if specialty in present)
 
 
 class SquadService:
@@ -205,8 +210,11 @@ class SquadService:
             if row.stamina < int(minimum_stamina):
                 continue
 
-            if selected_speciality and row.speciality != selected_speciality:
-                continue
+            if selected_speciality:
+                from models.specialty import Specialty
+
+                if Specialty.parse(row.speciality) != Specialty.parse(selected_speciality):
+                    continue
 
             if (
                 availability_filter

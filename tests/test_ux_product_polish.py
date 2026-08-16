@@ -98,6 +98,28 @@ class UXProductPolishTest(unittest.TestCase):
         self.assertEqual(page._action_status("buy_now"), "critical")
         self.assertEqual(page._action_status("develop_internally"), "positive")
 
+    def test_squad_page_keeps_only_practical_player_filters(self):
+        page = SquadPage()
+
+        page.search_edit.setText("ignored")
+        page.minimum_form.setValue(7)
+        page.minimum_stamina.setValue(8)
+        page.training_fit_filter_combo.setCurrentIndex(
+            max(0, page.training_fit_filter_combo.findData("excellent"))
+        )
+        values = page.filter_values()
+
+        self.assertEqual(values["search_text"], "")
+        self.assertEqual(values["minimum_form"], 0)
+        self.assertEqual(values["minimum_stamina"], 0)
+        self.assertEqual(values["training_fit"], "all")
+        self.assertFalse(page.role_filter_combo.isHidden())
+        self.assertFalse(page.status_filter_combo.isHidden())
+        self.assertFalse(page.speciality_combo.isHidden())
+        self.assertTrue(page.search_edit.isHidden())
+        self.assertTrue(page.minimum_form.isHidden())
+        self.assertTrue(page.minimum_stamina.isHidden())
+
     def test_match_empty_state_uses_shared_component(self):
         page = MatchPage()
 
