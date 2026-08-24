@@ -18,9 +18,8 @@ class OpponentManager:
 
     def list_opponents(self):
 
-        return sorted(
-            self._load(),
-            key=lambda opponent: opponent.name.lower()
+        return self.list_sorted(
+            self._load()
         )
 
     def get(
@@ -61,15 +60,28 @@ class OpponentManager:
                 "opponent must be an Opponent"
             )
 
+        normalized_name = self._normalize_name(
+            opponent.name
+        )
+        loaded = self._load()
+        existing_created_at = next(
+            (
+                existing.created_at for existing in loaded
+                if existing.name.lower() == normalized_name.lower()
+            ),
+            "",
+        )
+
         opponent = Opponent(
             name=self._normalize_name(
                 opponent.name
             ),
-            ratings=opponent.ratings
+            ratings=opponent.ratings,
+            created_at=getattr(opponent, "created_at", "") or existing_created_at
         )
 
         opponents = [
-            existing for existing in self._load()
+            existing for existing in loaded
             if (
                 existing.name.lower()
                 != opponent.name.lower()
@@ -173,7 +185,11 @@ class OpponentManager:
 
         return sorted(
             opponents,
-            key=lambda opponent: opponent.name.lower()
+            key=lambda opponent: (
+                0 if getattr(opponent, "created_at", "") else 1,
+                _reverse_text(getattr(opponent, "created_at", "")),
+                opponent.name.lower(),
+            )
         )
 
     @staticmethod
@@ -200,7 +216,8 @@ class OpponentManager:
 
         return {
             "name": opponent.name,
-            "ratings": _ratings_to_dict(opponent.ratings)
+            "ratings": _ratings_to_dict(opponent.ratings),
+            "created_at": getattr(opponent, "created_at", "")
         }
 
     @staticmethod
@@ -219,7 +236,8 @@ class OpponentManager:
             name=data["name"],
             ratings=TeamRatings(
                 **rating_values
-            )
+            ),
+            created_at=data.get("created_at", "")
         )
 
 
@@ -246,3 +264,7 @@ def _ratings_to_dict(ratings):
 
 def _enum_value(value):
     return getattr(value, "value", value)
+
+
+def _reverse_text(value):
+    return tuple(-ord(char) for char in str(value or ""))

@@ -3,6 +3,7 @@ import math
 from models.opponent import Opponent
 from models.rating_scale import RatingScale, RatingSource
 from models.team_ratings import TeamRatings
+from ht_coach_app.services.ht_week_context_provider import get_calendar_service
 
 
 HATTRICK_SECTOR_ORDER = (
@@ -65,7 +66,8 @@ class OpponentService:
         return self._repository.save(
             Opponent(
                 name=normalized_name,
-                ratings=self._validate_ratings(ratings)
+                ratings=self._validate_ratings(ratings),
+                created_at=self._now_timestamp(),
             )
         )
 
@@ -92,7 +94,8 @@ class OpponentService:
         saved = self._repository.save(
             Opponent(
                 name=normalized_name,
-                ratings=self._validate_ratings(ratings)
+                ratings=self._validate_ratings(ratings),
+                created_at=getattr(original, "created_at", "") if original else "",
             )
         )
 
@@ -116,7 +119,8 @@ class OpponentService:
         return self._repository.save(
             Opponent(
                 name=duplicate_name,
-                ratings=source.ratings
+                ratings=source.ratings,
+                created_at=self._now_timestamp(),
             )
         )
 
@@ -220,3 +224,7 @@ class OpponentService:
             rating_scale=RatingScale.HT_OFFICIAL_DECIMAL,
             rating_source=RatingSource.OPPONENT_IMPORT,
         )
+
+    @staticmethod
+    def _now_timestamp():
+        return get_calendar_service().now().isoformat(timespec="seconds")

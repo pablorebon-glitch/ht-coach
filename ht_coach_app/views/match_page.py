@@ -58,7 +58,34 @@ from ht_coach_app.services.match_workspace_service import (
     MATCH_TYPE_LEAGUE,
 )
 from ht_coach_app.views.base_page import BasePage
+from ht_coach_app.widgets.clickable_combo_box import ClickableComboBox
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
+
+
+class MatchDateEdit(QDateEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCalendarPopup(True)
+        self.calendarWidget().installEventFilter(self)
+
+    def setDate(self, date):
+        super().setDate(date)
+        self.sync_calendar_page_to_selected_date()
+
+    def mousePressEvent(self, event):
+        self.sync_calendar_page_to_selected_date()
+        super().mousePressEvent(event)
+        QTimer.singleShot(0, self.sync_calendar_page_to_selected_date)
+
+    def eventFilter(self, watched, event):
+        if watched is self.calendarWidget() and event.type() == QEvent.Type.Show:
+            self.sync_calendar_page_to_selected_date()
+        return super().eventFilter(watched, event)
+
+    def sync_calendar_page_to_selected_date(self):
+        date = self.date()
+        if date.isValid():
+            self.calendarWidget().setCurrentPage(date.year(), date.month())
 
 
 class MatchPage(BasePage):
@@ -251,7 +278,7 @@ class MatchPage(BasePage):
 
         opponent_label = QLabel(t("match.opponent"))
         self.opponent_label = opponent_label
-        self.opponent_combo = QComboBox()
+        self.opponent_combo = ClickableComboBox()
         self.opponent_combo.setEditable(True)
         self.opponent_combo.currentTextChanged.connect(
             self._emit_workspace_changed
@@ -325,8 +352,7 @@ class MatchPage(BasePage):
 
         match_date_label = QLabel(t("match.match_date"))
         self.match_date_label = match_date_label
-        self.match_date_edit = QDateEdit()
-        self.match_date_edit.setCalendarPopup(True)
+        self.match_date_edit = MatchDateEdit()
         self.match_date_edit.setDisplayFormat("yyyy-MM-dd")
         self.match_date_edit.setDate(self._default_match_qdate())
         self.match_date_edit.dateChanged.connect(
@@ -688,6 +714,9 @@ class MatchPage(BasePage):
         if qdate.isValid():
             self.match_date_edit.setDate(qdate)
 
+    def reset_match_date_for_new_match(self):
+        self.match_date_edit.setDate(self._default_match_qdate())
+
     def _emit_match_date_changed(self, _qdate):
         self.match_date_changed.emit(self.match_date())
 
@@ -919,6 +948,7 @@ class MatchPage(BasePage):
     def reset_new_match_workspace(self):
         self.exit_saved_match_edit_mode()
         self.reset_new_match_selectors()
+        self.reset_match_date_for_new_match()
         if hasattr(self, "set_match_type"):
             self.set_match_type("")
         if hasattr(self, "set_venue_role"):

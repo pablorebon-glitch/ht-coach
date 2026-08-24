@@ -409,7 +409,9 @@ Expected controls:
 
 - File picker button.
 - Load Players button.
-- Opponent combo box.
+- Opponent combo box. In New Match, the whole editable Rival field opens the
+  dropdown, timestamped opponents appear newest-first, and legacy opponents with
+  no creation timestamp remain listed afterward in deterministic name order.
 - Formation checkboxes.
 - Formation preset buttons.
 - Primary Analyze Match button.

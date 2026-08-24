@@ -1,8 +1,11 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
+from engine.calendar import HTCalendarService
+from ht_coach_app.services import ht_week_context_provider
 from ht_coach_app.persistence.opponent_repository import OpponentRepository
 from ht_coach_app.services.opponent_service import (
     DEFAULT_RATINGS,
@@ -10,10 +13,13 @@ from ht_coach_app.services.opponent_service import (
     OpponentValidationError,
     RATING_FIELDS,
 )
+from models.opponent import Opponent
+from models.team_ratings import TeamRatings
 
 
 class OpponentServiceTest(unittest.TestCase):
     def setUp(self):
+        self.original_calendar_service = ht_week_context_provider.get_calendar_service()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.storage_path = (
             Path(self.temp_dir.name)
@@ -27,9 +33,13 @@ class OpponentServiceTest(unittest.TestCase):
         )
 
     def tearDown(self):
+        ht_week_context_provider.set_calendar_service(self.original_calendar_service)
         self.temp_dir.cleanup()
 
     def test_create_persists_opponent_to_json(self):
+        ht_week_context_provider.set_calendar_service(
+            HTCalendarService(clock=lambda: datetime(2026, 8, 20, 12, 0, 0))
+        )
         opponent = self.service.create_opponent(
             "Rival FC",
             DEFAULT_RATINGS
@@ -53,11 +63,50 @@ class OpponentServiceTest(unittest.TestCase):
             saved_data[0]["ratings"]["midfield"],
             DEFAULT_RATINGS["midfield"]
         )
+        self.assertEqual(
+            saved_data[0]["created_at"],
+            "2026-08-20T12:00:00"
+        )
+
+    def test_list_opponents_returns_recently_created_first(self):
+        self.repository.save(
+            Opponent(
+                name="Opponent A",
+                ratings=TeamRatings(),
+                created_at="2026-07-01T00:00:00",
+            )
+        )
+        self.repository.save(
+            Opponent(
+                name="Opponent B",
+                ratings=TeamRatings(),
+                created_at="2026-08-20T00:00:00",
+            )
+        )
+        self.repository.save(
+            Opponent(
+                name="Opponent C",
+                ratings=TeamRatings(),
+                created_at="2026-08-10T00:00:00",
+            )
+        )
+
+        self.assertEqual(
+            [opponent.name for opponent in self.service.list_opponents()],
+            ["Opponent B", "Opponent C", "Opponent A"],
+        )
 
     def test_update_can_rename_existing_opponent(self):
+        ht_week_context_provider.set_calendar_service(
+            HTCalendarService(clock=lambda: datetime(2026, 8, 20, 12, 0, 0))
+        )
         self.service.create_opponent(
             "Rival FC",
             DEFAULT_RATINGS
+        )
+        created_at = self.service.get_opponent("Rival FC").created_at
+        ht_week_context_provider.set_calendar_service(
+            HTCalendarService(clock=lambda: datetime(2026, 8, 24, 12, 0, 0))
         )
 
         updated = self.service.update_opponent(
@@ -79,6 +128,10 @@ class OpponentServiceTest(unittest.TestCase):
         self.assertEqual(
             self.service.get_opponent("Renamed FC").ratings.midfield,
             45
+        )
+        self.assertEqual(
+            self.service.get_opponent("Renamed FC").created_at,
+            created_at
         )
 
     def test_delete_removes_existing_opponent(self):
@@ -161,4 +214,3 @@ class OpponentServiceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

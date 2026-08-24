@@ -7,6 +7,12 @@
 - Display actual opponent POST context without inferring opponent formation.
 - Keep PRE as the primary calibration source and POST as validation evidence.
 
+## Alpha 0.6.13 UX-01
+
+- Improve Match Preparation daily usability: full-field Rival dropdown opening,
+  newest-added opponents first, and New Match calendar popup anchored to the
+  injected current month while saved-match edits keep their historical date.
+
 ## Current Position
 
 HT Coach has a stable optimization engine and an early desktop surface. Alpha 0.2 starts

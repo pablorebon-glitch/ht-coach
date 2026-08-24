@@ -681,6 +681,10 @@ Evolution. The view never calls Squad Evolution or optimization code directly; i
 receives a view-ready result from `SquadController` through `TransferPlannerService`.
 
 - `OpponentService`
+  - New opponents receive a `created_at` timestamp from the shared application
+    calendar service. Updates preserve the original creation timestamp; selecting,
+    analyzing or editing an opponent does not mutate it. Match Preparation uses
+    repository order so recently added opponents appear first.
   - Manages saved opponents.
   - Owns validation rules for opponent names and rating values.
   - Exposes the canonical Hattrick sector entry order:

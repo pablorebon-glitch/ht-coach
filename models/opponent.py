@@ -9,3 +9,5 @@ class Opponent:
     name: str
 
     ratings: TeamRatings
+
+    created_at: str = ""

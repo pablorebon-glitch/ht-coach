@@ -4,6 +4,15 @@
 
 ### Added
 
+- Added Alpha 0.6.13 UX-01 Match Preparation polish. The Rival selector now
+  opens when clicking anywhere in the editable field, saved opponents carry a
+  schema-compatible `created_at` timestamp for new entries, New Match lists
+  timestamped opponents newest-first with legacy opponents kept afterward in a
+  deterministic order, and the match-date calendar resets to the injected
+  current month for fresh New Match while saved-match edits still open on their
+  saved date. No analytical, optimizer, rating, PRE/POST, season-week or Weekly
+  Planner logic changed.
+
 - Added Alpha 0.6.12 bilateral Official POST support. The existing POST import
   action now auto-detects individual vs full-match POST exports, normalizes both
   into a unified `OfficialMatchPost`, preserves `official_post` as our-side
