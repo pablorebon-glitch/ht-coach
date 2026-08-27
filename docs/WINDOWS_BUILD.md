@@ -60,6 +60,12 @@ catalogs. Runtime path resolution remains centralized in
 `ht_coach_app.core.paths`; the application does not rely on the current working
 directory being the repository root.
 
+The build also installs `packaging/runtime_hook_pyside6_paths.py`. This hook runs
+before the application imports PySide6 and registers the bundled `PySide6` and
+`shiboken6` directories with the Windows DLL loader. That keeps QtGui startup
+stable when `HT Coach.exe` is launched from Windows Explorer or a Desktop shortcut
+without inheriting the development shell PATH.
+
 ## Diagnostics
 
 The normal desktop executable is windowed and does not leave a console open.

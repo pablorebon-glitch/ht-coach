@@ -32,7 +32,9 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[
+        str(repo_root / "packaging" / "runtime_hook_pyside6_paths.py"),
+    ],
     excludes=["tests", ".venv"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

@@ -4,6 +4,12 @@
 
 ### Added
 
+- Added Alpha 0.6.13 UX-03.1 Windows packaging hotfix. PyInstaller builds now
+  install an HT Coach runtime hook that registers bundled PySide6 and shiboken6
+  DLL/plugin directories before QtGui imports, making Explorer-style launches
+  less dependent on inherited shell PATH state. No analytical, optimizer, rating,
+  PRE/POST, Match, Opponent Manager or Weekly Planner behavior changed.
+
 - Added Alpha 0.6.13 UX-03 Windows desktop packaging. A normal PyInstaller
   one-folder build now produces `dist\HT Coach\HT Coach.exe`, includes runtime
   resources/i18n, keeps portable mode gated by `portable.flag`, and adds an
