@@ -750,6 +750,13 @@ Preferred patterns:
 - Combo boxes for saved opponent selection.
 - Dialogs only for confirmation or focused edits.
 
+Opponent Manager uses a compact two-panel layout. The left panel owns saved-list
+actions only: Delete, move up and move down. The right panel owns editor actions:
+New, Paste Ratings and Save. Duplicate remains a service capability for
+compatibility, but it is not exposed as a primary visible action. Manual ordering in
+the Opponents page is persisted separately from the `created_at` recency used by New
+Match.
+
 ## Error Handling
 
 All user-facing errors should be clear and actionable.

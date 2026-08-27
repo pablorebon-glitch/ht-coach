@@ -683,8 +683,13 @@ receives a view-ready result from `SquadController` through `TransferPlannerServ
 - `OpponentService`
   - New opponents receive a `created_at` timestamp from the shared application
     calendar service. Updates preserve the original creation timestamp; selecting,
-    analyzing or editing an opponent does not mutate it. Match Preparation uses
-    repository order so recently added opponents appear first.
+    analyzing or editing an opponent does not mutate it. Match Preparation reads
+    opponents through the explicit recency order so recently added opponents appear
+    first.
+  - Opponent Manager uses a separate manual `display_order` for its own saved list.
+    The repository migrates legacy opponents without an order after ordered entries,
+    places newly created opponents at the top of the manager list, and exposes
+    move-up/move-down operations without changing `created_at`.
   - Manages saved opponents.
   - Owns validation rules for opponent names and rating values.
   - Exposes the canonical Hattrick sector entry order:

@@ -1,4 +1,4 @@
-# HT Coach Portable Packaging
+# HT Coach Packaging
 
 Build target: Windows 10/11 x64, PyInstaller one-folder.
 
@@ -8,7 +8,20 @@ Build target: Windows 10/11 x64, PyInstaller one-folder.
 - Runtime requirements installed
 - `pyinstaller` installed in `.venv`
 
-## Build
+## Normal Desktop Build
+
+```powershell
+.\scripts\build_windows.ps1
+```
+
+Output:
+
+- `dist/HT Coach/HT Coach.exe`
+
+This build does not create `portable.flag`, so it uses the canonical Windows
+user-data folder rather than a portable data folder.
+
+## Portable Build
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packaging/build_portable.ps1

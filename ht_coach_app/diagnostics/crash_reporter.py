@@ -6,7 +6,6 @@ import platform
 import sys
 import traceback
 from datetime import datetime, timezone
-from pathlib import Path
 
 from ht_coach_app.core.constants import APP_VERSION
 from ht_coach_app.core.json_io import write_text_atomic
@@ -16,10 +15,7 @@ from ht_coach_app.diagnostics.event_buffer import recent_events
 
 
 def crash_log_directory():
-    paths = application_paths()
-    if paths.is_portable:
-        return paths.crash_log_dir
-    return Path("logs") / "crashes"
+    return application_paths().crash_log_dir
 
 
 def write_crash_report(exc_type, exc_value, exc_traceback, directory=None):

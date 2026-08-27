@@ -11,3 +11,5 @@ class Opponent:
     ratings: TeamRatings
 
     created_at: str = ""
+
+    display_order: int | None = None

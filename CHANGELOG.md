@@ -4,6 +4,20 @@
 
 ### Added
 
+- Added Alpha 0.6.13 UX-03 Windows desktop packaging. A normal PyInstaller
+  one-folder build now produces `dist\HT Coach\HT Coach.exe`, includes runtime
+  resources/i18n, keeps portable mode gated by `portable.flag`, and adds an
+  optional Desktop shortcut helper that targets the executable rather than
+  Python or PowerShell. No optimizer, rating, probability, PRE/POST, Match,
+  Opponent Manager, Weekly Planner or application-data semantics changed.
+
+- Added Alpha 0.6.13 UX-02 Opponent Manager polish. The Opponents page now
+  keeps list actions on the left and editing actions on the right, removes the
+  visible Duplicate button, supports persisted manual up/down ordering with legacy
+  opponents migrated safely, and keeps New Match opponent selection ordered by
+  `created_at` recency instead of the manual manager order. No optimizer,
+  rating, probability, PRE/POST, season-week or Weekly Planner logic changed.
+
 - Added Alpha 0.6.13 UX-01 Match Preparation polish. The Rival selector now
   opens when clicking anywhere in the editable field, saved opponents carry a
   schema-compatible `created_at` timestamp for new entries, New Match lists

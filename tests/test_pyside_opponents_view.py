@@ -40,6 +40,80 @@ class OpponentsPageSmokeTest(unittest.TestCase):
             page.ratings_grid
         )
 
+    def test_opponents_page_places_list_and_detail_actions(self):
+        page = OpponentsPage()
+
+        self.assertIs(
+            page.delete_button.parent(),
+            page.list_actions_widget
+        )
+        self.assertIs(
+            page.move_up_button.parent(),
+            page.list_actions_widget
+        )
+        self.assertIs(
+            page.move_down_button.parent(),
+            page.list_actions_widget
+        )
+        self.assertIs(
+            page.new_button.parent(),
+            page.details_actions_widget
+        )
+        self.assertIs(
+            page.paste_ratings_button.parent(),
+            page.details_actions_widget
+        )
+        self.assertIs(
+            page.save_button.parent(),
+            page.details_actions_widget
+        )
+        self.assertFalse(
+            hasattr(page, "duplicate_button")
+        )
+
+    def test_opponents_page_reorder_buttons_follow_selection_boundaries(self):
+        from models.opponent import Opponent
+        from models.team_ratings import TeamRatings
+
+        page = OpponentsPage()
+        page.set_opponents(
+            [
+                Opponent("Alpha", TeamRatings()),
+                Opponent("Bravo", TeamRatings()),
+                Opponent("Charlie", TeamRatings()),
+            ],
+            selected_name="Alpha",
+        )
+
+        self.assertFalse(page.move_up_button.isEnabled())
+        self.assertTrue(page.move_down_button.isEnabled())
+
+        page.opponent_list.setCurrentRow(1)
+        self.assertTrue(page.move_up_button.isEnabled())
+        self.assertTrue(page.move_down_button.isEnabled())
+
+        page.opponent_list.setCurrentRow(2)
+        self.assertTrue(page.move_up_button.isEnabled())
+        self.assertFalse(page.move_down_button.isEnabled())
+
+    def test_opponents_page_new_clears_selection_and_disables_list_actions(self):
+        from models.opponent import Opponent
+        from models.team_ratings import TeamRatings
+        from ht_coach_app.services.opponent_service import DEFAULT_RATINGS
+
+        page = OpponentsPage()
+        page.set_opponents(
+            [Opponent("Alpha", TeamRatings())],
+            selected_name="Alpha",
+        )
+
+        page.clear_editor(DEFAULT_RATINGS)
+
+        self.assertIsNone(page.selected_opponent_name())
+        self.assertFalse(page.delete_button.isEnabled())
+        self.assertFalse(page.move_up_button.isEnabled())
+        self.assertFalse(page.move_down_button.isEnabled())
+
 
 class MatchPageSmokeTest(unittest.TestCase):
     @classmethod

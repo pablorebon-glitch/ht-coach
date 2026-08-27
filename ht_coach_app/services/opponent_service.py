@@ -49,6 +49,11 @@ class OpponentService:
     def list_opponents(self):
         return self._repository.list_opponents()
 
+    def list_opponents_by_recency(self):
+        if hasattr(self._repository, "list_opponents_by_recency"):
+            return self._repository.list_opponents_by_recency()
+        return self._repository.list_opponents()
+
     def get_opponent(self, name):
         return self._repository.get(name)
 
@@ -96,6 +101,7 @@ class OpponentService:
                 name=normalized_name,
                 ratings=self._validate_ratings(ratings),
                 created_at=getattr(original, "created_at", "") if original else "",
+                display_order=getattr(original, "display_order", None) if original else None,
             )
         )
 
@@ -131,6 +137,21 @@ class OpponentService:
             raise OpponentValidationError(
                 "The selected opponent no longer exists."
             )
+
+    def move_opponent_up(self, name):
+        return self._move_opponent(name, direction="up")
+
+    def move_opponent_down(self, name):
+        return self._move_opponent(name, direction="down")
+
+    def _move_opponent(self, name, direction):
+        normalized_name = self._validate_name(name)
+        mover = (
+            self._repository.move_up
+            if direction == "up"
+            else self._repository.move_down
+        )
+        return mover(normalized_name)
 
     def _next_duplicate_name(self, name):
         candidate = f"{name} Copy"

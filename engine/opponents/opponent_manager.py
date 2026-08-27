@@ -18,7 +18,13 @@ class OpponentManager:
 
     def list_opponents(self):
 
-        return self.list_sorted(
+        return self.list_manual_order(
+            self._load()
+        )
+
+    def list_opponents_by_recency(self):
+
+        return self.list_by_recency(
             self._load()
         )
 
@@ -71,13 +77,32 @@ class OpponentManager:
             ),
             "",
         )
+        existing_exists = any(
+            existing.name.lower() == normalized_name.lower()
+            for existing in loaded
+        )
+        existing_display_order = next(
+            (
+                existing.display_order for existing in loaded
+                if existing.name.lower() == normalized_name.lower()
+            ),
+            None,
+        )
+        display_order = getattr(opponent, "display_order", None)
+        if display_order is None:
+            display_order = (
+                existing_display_order
+                if existing_exists
+                else self._next_new_display_order(loaded)
+            )
 
         opponent = Opponent(
             name=self._normalize_name(
                 opponent.name
             ),
             ratings=opponent.ratings,
-            created_at=getattr(opponent, "created_at", "") or existing_created_at
+            created_at=getattr(opponent, "created_at", "") or existing_created_at,
+            display_order=display_order,
         )
 
         opponents = [
@@ -127,6 +152,39 @@ class OpponentManager:
 
         return True
 
+    def move_up(self, name):
+        return self._move(name, -1)
+
+    def move_down(self, name):
+        return self._move(name, 1)
+
+    def _move(self, name, direction):
+        normalized_name = self._normalize_name(name)
+        opponents = self.list_manual_order(self._load())
+        index = next(
+            (
+                item_index for item_index, opponent in enumerate(opponents)
+                if opponent.name.lower() == normalized_name.lower()
+            ),
+            -1,
+        )
+        target_index = index + direction
+        if index < 0 or target_index < 0 or target_index >= len(opponents):
+            return False
+
+        opponents[index], opponents[target_index] = opponents[target_index], opponents[index]
+        opponents = [
+            Opponent(
+                name=opponent.name,
+                ratings=opponent.ratings,
+                created_at=opponent.created_at,
+                display_order=item_index,
+            )
+            for item_index, opponent in enumerate(opponents)
+        ]
+        self._save(opponents)
+        return True
+
     def _load(self):
 
         if not os.path.exists(
@@ -168,7 +226,7 @@ class OpponentManager:
 
         data = [
             self._to_dict(opponent)
-            for opponent in self.list_sorted(opponents)
+            for opponent in self.list_manual_order(opponents)
         ]
 
         temp_path = f"{self.storage_path}.tmp"
@@ -179,7 +237,25 @@ class OpponentManager:
         os.replace(temp_path, self.storage_path)
 
     @staticmethod
-    def list_sorted(
+    def list_manual_order(
+        opponents
+    ):
+
+        return sorted(
+            opponents,
+            key=lambda opponent: (
+                0 if getattr(opponent, "display_order", None) is not None else 1,
+                (
+                    getattr(opponent, "display_order", None)
+                    if getattr(opponent, "display_order", None) is not None
+                    else 0
+                ),
+                opponent.name.lower(),
+            )
+        )
+
+    @staticmethod
+    def list_by_recency(
         opponents
     ):
 
@@ -217,7 +293,8 @@ class OpponentManager:
         return {
             "name": opponent.name,
             "ratings": _ratings_to_dict(opponent.ratings),
-            "created_at": getattr(opponent, "created_at", "")
+            "created_at": getattr(opponent, "created_at", ""),
+            "display_order": getattr(opponent, "display_order", None),
         }
 
     @staticmethod
@@ -237,8 +314,27 @@ class OpponentManager:
             ratings=TeamRatings(
                 **rating_values
             ),
-            created_at=data.get("created_at", "")
+            created_at=data.get("created_at", ""),
+            display_order=_optional_int(data.get("display_order")),
         )
+
+    @staticmethod
+    def _next_new_display_order(opponents):
+        ordered = [
+            Opponent(
+                name=opponent.name,
+                ratings=opponent.ratings,
+                created_at=opponent.created_at,
+                display_order=(
+                    opponent.display_order + 1
+                    if opponent.display_order is not None
+                    else None
+                ),
+            )
+            for opponent in opponents
+        ]
+        opponents[:] = ordered
+        return 0
 
 
 def _ratings_to_dict(ratings):
@@ -268,3 +364,9 @@ def _enum_value(value):
 
 def _reverse_text(value):
     return tuple(-ord(char) for char in str(value or ""))
+
+
+def _optional_int(value):
+    if value is None or value == "":
+        return None
+    return int(value)

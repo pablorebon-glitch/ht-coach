@@ -8,7 +8,8 @@ Alpha 0.6.7 HF-03, Parts 13-16.
 called once, from `ht_coach_app/app.py`'s own `run()`, replacing
 `sys.excepthook`. On an unhandled exception:
 
-1. Writes `logs/crashes/crash_<timestamp>.log` (UTC timestamp) with:
+1. Writes `logs/crashes/crash_<timestamp>.log` under the active application log
+   directory (UTC timestamp) with:
    timestamp, app version, Python version, platform, active page, active
    match_record_id, opponent, official Match ID, current action, source
    CSV, workspace dirty state, the full traceback, and the last 20

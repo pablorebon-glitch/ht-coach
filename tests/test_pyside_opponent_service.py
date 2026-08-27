@@ -68,7 +68,7 @@ class OpponentServiceTest(unittest.TestCase):
             "2026-08-20T12:00:00"
         )
 
-    def test_list_opponents_returns_recently_created_first(self):
+    def test_list_opponents_by_recency_returns_recently_created_first(self):
         self.repository.save(
             Opponent(
                 name="Opponent A",
@@ -92,8 +92,40 @@ class OpponentServiceTest(unittest.TestCase):
         )
 
         self.assertEqual(
+            [opponent.name for opponent in self.service.list_opponents_by_recency()],
+            ["Opponent B", "Opponent C", "Opponent A"],
+        )
+
+    def test_list_opponents_returns_manual_order_with_new_entries_first(self):
+        self.service.create_opponent(
+            "Opponent A",
+            DEFAULT_RATINGS
+        )
+        self.service.create_opponent(
+            "Opponent B",
+            DEFAULT_RATINGS
+        )
+
+        self.assertEqual(
+            [opponent.name for opponent in self.service.list_opponents()],
+            ["Opponent B", "Opponent A"],
+        )
+
+    def test_move_opponent_up_and_down_uses_manual_order(self):
+        self.service.create_opponent("Opponent A", DEFAULT_RATINGS)
+        self.service.create_opponent("Opponent B", DEFAULT_RATINGS)
+        self.service.create_opponent("Opponent C", DEFAULT_RATINGS)
+
+        self.assertTrue(self.service.move_opponent_down("Opponent C"))
+        self.assertEqual(
             [opponent.name for opponent in self.service.list_opponents()],
             ["Opponent B", "Opponent C", "Opponent A"],
+        )
+
+        self.assertTrue(self.service.move_opponent_up("Opponent A"))
+        self.assertEqual(
+            [opponent.name for opponent in self.service.list_opponents()],
+            ["Opponent B", "Opponent A", "Opponent C"],
         )
 
     def test_update_can_rename_existing_opponent(self):

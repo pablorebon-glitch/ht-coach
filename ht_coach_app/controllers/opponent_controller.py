@@ -31,12 +31,21 @@ class OpponentController(QObject):
         self._view.save_requested.connect(
             self.save_opponent
         )
-        self._view.duplicate_requested.connect(
-            self.duplicate_opponent
-        )
+        if hasattr(self._view, "duplicate_requested"):
+            self._view.duplicate_requested.connect(
+                self.duplicate_opponent
+            )
         self._view.delete_requested.connect(
             self.delete_opponent
         )
+        if hasattr(self._view, "move_up_requested"):
+            self._view.move_up_requested.connect(
+                self.move_opponent_up
+            )
+        if hasattr(self._view, "move_down_requested"):
+            self._view.move_down_requested.connect(
+                self.move_opponent_down
+            )
         self._view.selection_changed.connect(
             self.load_opponent
         )
@@ -129,8 +138,9 @@ class OpponentController(QObject):
             return
 
         try:
+            next_selection = self._next_selection_after_delete(name)
             self._service.delete_opponent(name)
-            self.refresh()
+            self.refresh(selected_name=next_selection)
             self._publish_opponents_changed(
                 "deleted",
                 name,
@@ -143,6 +153,55 @@ class OpponentController(QObject):
             self._view.show_error(
                 str(exc)
             )
+
+    def move_opponent_up(self):
+        self._move_selected_opponent(
+            self._service.move_opponent_up,
+            "Moved opponent up."
+        )
+
+    def move_opponent_down(self):
+        self._move_selected_opponent(
+            self._service.move_opponent_down,
+            "Moved opponent down."
+        )
+
+    def _move_selected_opponent(self, mover, status_message):
+        name = self._view.current_opponent_name()
+
+        if not name:
+            self._view.show_error(
+                "Select an opponent to reorder."
+            )
+            return
+
+        try:
+            moved = mover(name)
+            if moved:
+                self.refresh(selected_name=name)
+                self._publish_opponents_changed(
+                    "reordered",
+                    name,
+                    name
+                )
+                self._view.show_status(status_message)
+        except OpponentValidationError as exc:
+            self._view.show_error(
+                str(exc)
+            )
+
+    def _next_selection_after_delete(self, name):
+        opponents = self._service.list_opponents()
+        names = [opponent.name for opponent in opponents]
+        try:
+            index = names.index(name)
+        except ValueError:
+            return None
+
+        remaining = names[:index] + names[index + 1:]
+        if not remaining:
+            return None
+        return remaining[min(index, len(remaining) - 1)]
 
     def _publish_opponents_changed(
         self,

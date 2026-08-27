@@ -14,6 +14,9 @@ class OpponentRepository:
     def list_opponents(self):
         return self._manager.list_opponents()
 
+    def list_opponents_by_recency(self):
+        return self._manager.list_opponents_by_recency()
+
     def get(self, name):
         return self._manager.get(name)
 
@@ -23,3 +26,8 @@ class OpponentRepository:
     def delete(self, name):
         return self._manager.delete(name)
 
+    def move_up(self, name):
+        return self._manager.move_up(name)
+
+    def move_down(self, name):
+        return self._manager.move_down(name)

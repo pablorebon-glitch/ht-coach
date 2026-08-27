@@ -223,6 +223,8 @@ class MatchWorkspaceService:
         return list(DEFAULT_FORMATION_NAMES)
 
     def list_opponents(self):
+        if hasattr(self._opponent_service, "list_opponents_by_recency"):
+            return self._opponent_service.list_opponents_by_recency()
         return self._opponent_service.list_opponents()
 
     def load_players_count(self, players_csv_path, availability_mode=CURRENT_AVAILABLE):

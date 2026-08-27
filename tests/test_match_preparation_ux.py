@@ -141,7 +141,7 @@ def test_match_opponent_selector_uses_recently_created_order(tmp_path):
     service = OpponentService(repository)
     page = MatchPage()
 
-    page.set_opponents([opponent.name for opponent in service.list_opponents()])
+    page.set_opponents([opponent.name for opponent in service.list_opponents_by_recency()])
 
     assert [page.opponent_combo.itemText(index) for index in range(1, 5)] == [
         "Opponent B",

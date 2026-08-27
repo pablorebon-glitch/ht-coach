@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from ht_coach_app.core.paths import (
     application_paths,
     configure_application_paths,
 )
+from ht_coach_app.diagnostics.crash_reporter import crash_log_directory
 from ht_coach_app.core.portable import (
     build_import_plan,
     import_data_directory,
@@ -50,6 +52,39 @@ def test_missing_flag_uses_development_data_dir(tmp_path, monkeypatch):
     assert paths.data_dir == local / "HT Coach" / "Alpha"
 
 
+def test_packaged_desktop_without_portable_flag_uses_canonical_data_dir(tmp_path, monkeypatch):
+    executable_root = tmp_path / "dist" / "HT Coach"
+    executable_root.mkdir(parents=True)
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "resources" / "i18n").mkdir(parents=True)
+    local = tmp_path / "localappdata"
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle_root), raising=False)
+
+    paths = ApplicationPaths.detect(executable_dir=executable_root)
+
+    assert paths.is_portable is False
+    assert paths.data_dir == local / "HT Coach" / "Alpha"
+    assert paths.resource_dir == bundle_root / "resources"
+
+
+def test_packaged_portable_flag_keeps_data_beside_executable_and_bundle_resources(tmp_path, monkeypatch):
+    executable_root = tmp_path / "dist" / "HT Coach Portable"
+    executable_root.mkdir(parents=True)
+    (executable_root / "portable.flag").write_text("", encoding="utf-8")
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "resources" / "i18n").mkdir(parents=True)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle_root), raising=False)
+
+    paths = ApplicationPaths.detect(executable_dir=executable_root)
+
+    assert paths.is_portable is True
+    assert paths.data_dir == executable_root / "data"
+    assert paths.resource_dir == bundle_root / "resources"
+
+
 def test_portable_paths_create_writable_directories(tmp_path):
     root = tmp_path / "portable"
     root.mkdir()
@@ -61,6 +96,16 @@ def test_portable_paths_create_writable_directories(tmp_path):
     assert paths.rosters_dir.exists()
     assert paths.crash_log_dir.exists()
     assert paths.recovery_log_dir.exists()
+
+
+def test_crash_logs_use_active_application_log_directory(tmp_path):
+    root = tmp_path / "portable"
+    root.mkdir()
+    (root / "portable.flag").write_text("", encoding="utf-8")
+    paths = ApplicationPaths.detect(executable_dir=root)
+    configure_application_paths(paths)
+
+    assert crash_log_directory() == root / "logs" / "crashes"
 
 
 def test_atomic_json_write_preserves_valid_file(tmp_path):

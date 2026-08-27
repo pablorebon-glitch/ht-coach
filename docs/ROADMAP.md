@@ -13,6 +13,12 @@
   newest-added opponents first, and New Match calendar popup anchored to the
   injected current month while saved-match edits keep their historical date.
 
+## Alpha 0.6.13 UX-02
+
+- Simplify Opponent Manager action placement, add persisted manual ordering for
+  saved rivals, and keep Match Preparation opponent selection ordered by creation
+  recency instead of the Opponent Manager display order.
+
 ## Current Position
 
 HT Coach has a stable optimization engine and an early desktop surface. Alpha 0.2 starts

@@ -83,3 +83,25 @@ class LocalizationServiceTest(unittest.TestCase):
         service.set_language("es")
 
         self.assertEqual(service.t("settings.title"), "Configuración")
+
+    def test_opponent_reorder_labels_resolve_in_both_languages(self):
+        expectations = {
+            "en": {
+                "opponents.move_up": "Move up",
+                "opponents.move_down": "Move down",
+            },
+            "es": {
+                "opponents.move_up": "Subir",
+                "opponents.move_down": "Bajar",
+            },
+        }
+
+        for language, labels in expectations.items():
+            service = LocalizationService(language=language)
+            for key, expected in labels.items():
+                with self.subTest(language=language, key=key):
+                    self.assertEqual(service.t(key), expected)
+                    self.assertNotEqual(
+                        service.t(f"{key}_tip"),
+                        TRANSLATION_UNAVAILABLE if language == "en" else "No disponible",
+                    )

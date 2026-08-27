@@ -173,7 +173,7 @@ def test_legacy_opponents_without_created_at_are_sorted_by_name(tmp_path):
     ]
 
 
-def test_timestamped_opponents_are_listed_newest_first_before_legacy(tmp_path):
+def test_timestamped_opponents_are_listed_newest_first_before_legacy_by_recency(tmp_path):
     storage_path = tmp_path / "opponents.json"
     manager = OpponentManager(storage_path)
 
@@ -205,11 +205,86 @@ def test_timestamped_opponents_are_listed_newest_first_before_legacy(tmp_path):
         )
     )
 
-    assert [opponent.name for opponent in manager.list_opponents()] == [
+    assert [opponent.name for opponent in manager.list_opponents_by_recency()] == [
         "Opponent B",
         "Opponent C",
         "Opponent A",
         "Legacy",
+    ]
+
+
+def test_new_opponent_appears_at_top_of_manual_order(tmp_path):
+    manager = OpponentManager(tmp_path / "opponents.json")
+
+    manager.save(Opponent(name="First", ratings=TeamRatings()))
+    manager.save(Opponent(name="Second", ratings=TeamRatings()))
+    manager.save(Opponent(name="Third", ratings=TeamRatings()))
+
+    assert [opponent.name for opponent in manager.list_opponents()] == [
+        "Third",
+        "Second",
+        "First",
+    ]
+
+
+def test_move_up_and_down_persist_manual_order(tmp_path):
+    storage_path = tmp_path / "opponents.json"
+    storage_path.write_text(
+        json.dumps(
+            [
+                {"name": "Alpha", "ratings": {}, "display_order": 0},
+                {"name": "Bravo", "ratings": {}, "display_order": 1},
+                {"name": "Charlie", "ratings": {}, "display_order": 2},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    manager = OpponentManager(storage_path)
+
+    assert manager.move_up("Bravo") is True
+    assert [opponent.name for opponent in manager.list_opponents()] == [
+        "Bravo",
+        "Alpha",
+        "Charlie",
+    ]
+
+    reloaded = OpponentManager(storage_path)
+    assert reloaded.move_down("Alpha") is True
+    assert [opponent.name for opponent in reloaded.list_opponents()] == [
+        "Bravo",
+        "Charlie",
+        "Alpha",
+    ]
+
+
+def test_manual_order_boundaries_do_not_move(tmp_path):
+    manager = OpponentManager(tmp_path / "opponents.json")
+    manager.save(Opponent(name="Alpha", ratings=TeamRatings()))
+    manager.save(Opponent(name="Bravo", ratings=TeamRatings()))
+
+    assert manager.move_up("Bravo") is False
+    assert manager.move_down("Alpha") is False
+
+
+def test_legacy_opponents_without_display_order_sort_after_ordered_names(tmp_path):
+    storage_path = tmp_path / "opponents.json"
+    storage_path.write_text(
+        json.dumps(
+            [
+                {"name": "Zulu", "ratings": {}},
+                {"name": "Alpha", "ratings": {}},
+                {"name": "Ordered", "ratings": {}, "display_order": 0},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    manager = OpponentManager(storage_path)
+
+    assert [opponent.name for opponent in manager.list_opponents()] == [
+        "Ordered",
+        "Alpha",
+        "Zulu",
     ]
 
 

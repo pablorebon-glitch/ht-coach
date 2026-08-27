@@ -30,6 +30,8 @@ class OpponentsPage(BasePage):
     save_requested = Signal()
     duplicate_requested = Signal()
     delete_requested = Signal()
+    move_up_requested = Signal()
+    move_down_requested = Signal()
     selection_changed = Signal(str)
 
     def __init__(self, parent=None):
@@ -62,6 +64,10 @@ class OpponentsPage(BasePage):
             self.opponent_list.setCurrentRow(selected_row)
         elif opponents:
             self.opponent_list.setCurrentRow(0)
+        else:
+            self._update_list_actions()
+
+        self._update_list_actions()
 
     def set_current_opponent(self, opponent):
         self._current_name = opponent.name
@@ -73,9 +79,17 @@ class OpponentsPage(BasePage):
         self.opponent_list.clearSelection()
         self.name_input.clear()
         self.ratings_grid.set_rating_values(ratings)
+        self._update_list_actions()
 
     def current_opponent_name(self):
         return self._current_name
+
+    def selected_opponent_name(self):
+        selected_items = self.opponent_list.selectedItems()
+        if not selected_items:
+            return None
+        item = selected_items[0]
+        return item.data(Qt.UserRole)
 
     def editor_data(self):
         return (
@@ -142,11 +156,36 @@ class OpponentsPage(BasePage):
         )
         layout.addWidget(self.opponent_list, 1)
 
-        self.new_button = QPushButton(t("opponents.new"))
-        self.new_button.clicked.connect(
-            self.new_requested.emit
+        self.list_actions_widget = QWidget()
+        button_row = QHBoxLayout(self.list_actions_widget)
+        button_row.setContentsMargins(0, 0, 0, 0)
+        button_row.setSpacing(8)
+
+        self.delete_button = QPushButton(t("opponents.delete"))
+        self.delete_button.clicked.connect(
+            self.delete_requested.emit
         )
-        layout.addWidget(self.new_button)
+
+        self.move_up_button = QPushButton("↑")
+        self.move_up_button.setAccessibleName(t("opponents.move_up"))
+        self.move_up_button.setToolTip(t("opponents.move_up_tip"))
+        self.move_up_button.clicked.connect(
+            self.move_up_requested.emit
+        )
+
+        self.move_down_button = QPushButton("↓")
+        self.move_down_button.setAccessibleName(t("opponents.move_down"))
+        self.move_down_button.setToolTip(t("opponents.move_down_tip"))
+        self.move_down_button.clicked.connect(
+            self.move_down_requested.emit
+        )
+
+        button_row.addWidget(self.delete_button)
+        button_row.addWidget(self.move_up_button)
+        button_row.addWidget(self.move_down_button)
+        button_row.addStretch(1)
+
+        layout.addWidget(self.list_actions_widget)
 
         return panel
 
@@ -177,8 +216,15 @@ class OpponentsPage(BasePage):
         layout.addWidget(self.ratings_grid)
         layout.addStretch(1)
 
-        button_row = QHBoxLayout()
+        self.details_actions_widget = QWidget()
+        button_row = QHBoxLayout(self.details_actions_widget)
+        button_row.setContentsMargins(0, 0, 0, 0)
         button_row.setSpacing(8)
+
+        self.new_button = QPushButton(t("opponents.new"))
+        self.new_button.clicked.connect(
+            self.new_requested.emit
+        )
 
         self.paste_ratings_button = QPushButton(t("opponents.paste_ratings"))
         self.paste_ratings_button.setAccessibleName(
@@ -196,33 +242,34 @@ class OpponentsPage(BasePage):
             self.save_requested.emit
         )
 
-        self.duplicate_button = QPushButton(t("opponents.duplicate"))
-        self.duplicate_button.clicked.connect(
-            self.duplicate_requested.emit
-        )
-
-        self.delete_button = QPushButton(t("opponents.delete"))
-        self.delete_button.clicked.connect(
-            self.delete_requested.emit
-        )
-
+        button_row.addWidget(self.new_button)
         button_row.addWidget(self.paste_ratings_button)
         button_row.addWidget(self.save_button)
-        button_row.addWidget(self.duplicate_button)
-        button_row.addWidget(self.delete_button)
         button_row.addStretch(1)
 
-        layout.addLayout(button_row)
+        layout.addWidget(self.details_actions_widget)
 
         return panel
 
     def _handle_selection_changed(self, current, previous):
+        self._update_list_actions()
         if self._building_list or current is None:
             return
 
         self.selection_changed.emit(
             current.data(Qt.UserRole)
         )
+
+    def _update_list_actions(self):
+        if not hasattr(self, "opponent_list"):
+            return
+
+        row = self.opponent_list.currentRow()
+        count = self.opponent_list.count()
+        has_selection = bool(self.opponent_list.selectedItems())
+        self.delete_button.setEnabled(has_selection)
+        self.move_up_button.setEnabled(has_selection and row > 0)
+        self.move_down_button.setEnabled(has_selection and row < count - 1)
 
     def _paste_ratings_from_clipboard(self):
         clipboard_text = QApplication.clipboard().text()
@@ -279,8 +326,11 @@ class OpponentsPage(BasePage):
         self.paste_ratings_button.setAccessibleName(t("opponents.paste_ratings"))
         self.paste_ratings_button.setToolTip(t("opponents.paste_ratings_tip"))
         self.save_button.setText(t("opponents.save"))
-        self.duplicate_button.setText(t("opponents.duplicate"))
         self.delete_button.setText(t("opponents.delete"))
+        self.move_up_button.setAccessibleName(t("opponents.move_up"))
+        self.move_up_button.setToolTip(t("opponents.move_up_tip"))
+        self.move_down_button.setAccessibleName(t("opponents.move_down"))
+        self.move_down_button.setToolTip(t("opponents.move_down_tip"))
         self.name_label.setText(t("opponents.name"))
         self.name_input.setPlaceholderText(t("opponents.name_placeholder"))
         self.ratings_label.setText(t("opponents.ratings"))

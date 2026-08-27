@@ -245,6 +245,40 @@ class OpponentSyncTest(unittest.TestCase):
             self.opponent_service.get_opponent("Rival FC")
         )
 
+    def test_deleting_from_opponent_manager_selects_adjacent_opponent(self):
+        self.opponent_service.create_opponent("Alpha", DEFAULT_RATINGS)
+        self.opponent_service.create_opponent("Bravo", DEFAULT_RATINGS)
+        self.opponent_service.create_opponent("Charlie", DEFAULT_RATINGS)
+        self.opponents_view.selected_name = "Bravo"
+
+        self.opponents_controller.delete_opponent()
+
+        self.assertEqual(
+            self.opponents_view.selected_name,
+            "Alpha",
+        )
+        self.assertNotIn(
+            "Bravo",
+            [opponent.name for opponent in self.opponent_service.list_opponents()],
+        )
+
+    def test_reordering_from_opponent_manager_preserves_selection(self):
+        self.opponent_service.create_opponent("Alpha", DEFAULT_RATINGS)
+        self.opponent_service.create_opponent("Bravo", DEFAULT_RATINGS)
+        self.opponent_service.create_opponent("Charlie", DEFAULT_RATINGS)
+        self.opponents_view.selected_name = "Charlie"
+
+        self.opponents_controller.move_opponent_down()
+
+        self.assertEqual(
+            [opponent.name for opponent in self.opponent_service.list_opponents()],
+            ["Bravo", "Charlie", "Alpha"],
+        )
+        self.assertEqual(
+            self.opponents_view.selected_name,
+            "Charlie",
+        )
+
     def test_match_workspace_persistence_tracks_synced_selection(self):
         self.opponent_service.create_opponent(
             "Rival FC",
