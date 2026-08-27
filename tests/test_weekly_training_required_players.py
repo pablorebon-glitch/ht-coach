@@ -1,11 +1,12 @@
 import os
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from engine.calendar import HTCalendarService
 from engine.weekly_training.models import (
     MatchRole,
     MatchStatus,
@@ -14,9 +15,13 @@ from engine.weekly_training.models import (
     WeeklyMatchLineupEntry,
     WeeklyMatchRecord,
 )
-from engine.weekly_training.persistence import WeeklyTrainingRepository
+from engine.weekly_training.persistence import WeeklyTrainingRepository, WeeklyTrainingState
 from engine.weekly_training.player_identity import player_training_id
 from engine.weekly_training.training_rules import PlaymakingTrainingRules, assumed_confidence
+from ht_coach_app.services.ht_week_context_provider import (
+    get_calendar_service,
+    set_calendar_service,
+)
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from models.player import Player
 
@@ -77,8 +82,22 @@ def played_record(entries, match_id="m1", minutes_known=False):
     )
 
 
+@pytest.fixture(autouse=True)
+def _fixed_calendar_service():
+    previous = get_calendar_service()
+    fixed_now = datetime(2026, 8, 1, 12, 0, 0)
+    set_calendar_service(HTCalendarService(clock=lambda: fixed_now))
+    yield
+    set_calendar_service(previous)
+
+
 def make_service(tmp_path):
+    from engine.weekly_training.training_week import active_training_week
+
     repository = WeeklyTrainingRepository(tmp_path / "planner.json")
+    repository.save(
+        WeeklyTrainingState(active_week=active_training_week(datetime(2026, 8, 1, 12, 0, 0)))
+    )
     return WeeklyTrainingAppService(repository=repository)
 
 
@@ -183,11 +202,18 @@ def test_second_match_record_updates_coverage(tmp_path):
     )
     board = FormationBoardMapper().to_board(result.recommended_formation)
 
-    service.record_second_match(board, opponent_name="Rival Copa", roster_players=roster)
+    service.record_second_match(
+        board,
+        opponent_name="Rival Copa",
+        roster_players=roster,
+        match_date=date_cls(2026, 8, 5),
+    )
 
     record = service.second_match_record()
     assert record is not None
     assert record.opponent_name == "Rival Copa"
+    assert record.match_id == "2026-08-02:PLAYMAKING:second"
+    assert record.match_date == date_cls(2026, 8, 5)
 
     coverage = {row.player_name: row for row in service.coverage(roster, service.active_cycle_id())}
     assert coverage["IM1"].planned_exposure == 100

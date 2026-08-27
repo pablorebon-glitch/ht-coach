@@ -2,10 +2,12 @@ import pytest
 
 QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
 
-from datetime import date
+from datetime import datetime
 
+from engine.calendar import HTCalendarService
 from engine.history.repository import HistoricalMatchRepository
-from engine.weekly_training.persistence import WeeklyTrainingRepository
+from engine.weekly_training.persistence import WeeklyTrainingRepository, WeeklyTrainingState
+from engine.weekly_training.training_week import active_training_week
 from ht_coach_app.controllers.match_controller import MatchController
 from ht_coach_app.controllers.squad_controller import SquadController
 from ht_coach_app.core.localization import configure_localization
@@ -21,6 +23,10 @@ from ht_coach_app.services.match_workspace_service import (
 from ht_coach_app.services.opponent_service import OpponentService
 from ht_coach_app.services.official_rating_service import OfficialRatingImportService
 from ht_coach_app.services.squad_service import SquadService
+from ht_coach_app.services.ht_week_context_provider import (
+    get_calendar_service,
+    set_calendar_service,
+)
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from ht_coach_app.state.app_events import AppEvents
 from ht_coach_app.views.match_page import MatchPage
@@ -61,6 +67,15 @@ def _analysis_result(match_type="LEAGUE"):
     )
 
 
+@pytest.fixture(autouse=True)
+def _fixed_calendar_service():
+    previous = get_calendar_service()
+    fixed_now = datetime(2026, 8, 1, 12, 0, 0)
+    set_calendar_service(HTCalendarService(clock=lambda: fixed_now))
+    yield
+    set_calendar_service(previous)
+
+
 def make_match_controller(tmp_path, app_events):
     opponent_repo = OpponentRepository(storage_path=tmp_path / "opponents.json")
     opponent_service = OpponentService(opponent_repo)
@@ -69,9 +84,11 @@ def make_match_controller(tmp_path, app_events):
         storage_path=tmp_path / "match_settings.json",
         result_storage_path=tmp_path / "match_result.json",
     )
-    weekly_service = WeeklyTrainingAppService(
-        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    weekly_repository = WeeklyTrainingRepository(tmp_path / "planner.json")
+    weekly_repository.save(
+        WeeklyTrainingState(active_week=active_training_week(datetime(2026, 8, 1, 12, 0, 0)))
     )
+    weekly_service = WeeklyTrainingAppService(repository=weekly_repository)
     hist_repo = HistoricalMatchRepository(tmp_path / "snapshots.json")
     official_service = OfficialRatingImportService(repository=hist_repo)
     page = MatchPage()
@@ -132,6 +149,7 @@ def test_squad_controller_refreshes_weekly_planner_after_external_save(tmp_path)
 def test_saved_first_match_is_planned_when_date_is_in_the_future(tmp_path):
     app_events = AppEvents()
     match_page, match_controller, weekly_service = make_match_controller(tmp_path, app_events)
+    match_page.set_match_date("2026-08-02")
     match_controller._settings_repository.save_last_result(_analysis_result())
     match_controller._roster_players = []
 
@@ -140,8 +158,9 @@ def test_saved_first_match_is_planned_when_date_is_in_the_future(tmp_path):
     record = weekly_service.first_match_record()
     assert record is not None
     assert record.opponent_name == "Rival FC"
-    if record.match_date > date.today():
-        assert record.planned_or_played.value == "PLANNED"
+    assert record.match_date.isoformat() == "2026-08-02"
+    assert record.match_id == "2026-08-02:PLAYMAKING:first"
+    assert record.planned_or_played.value == "PLANNED"
 
 
 def test_saving_first_match_twice_does_not_duplicate(tmp_path):

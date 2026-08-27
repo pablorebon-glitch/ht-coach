@@ -1430,7 +1430,11 @@ class WeeklyTrainingAppService:
 
     @staticmethod
     def temporal_status(match_date, today=None):
-        current = WeeklyTrainingAppService._date(today or date.today())
+        if today is None:
+            from ht_coach_app.services.ht_week_context_provider import get_calendar_service
+
+            today = get_calendar_service().now().date()
+        current = WeeklyTrainingAppService._date(today)
         target = WeeklyTrainingAppService._date(match_date)
         if target < current:
             return TemporalStatus.PAST

@@ -1,6 +1,6 @@
 import pytest
 
-from datetime import date
+from datetime import datetime
 
 QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
 
@@ -163,14 +163,39 @@ def test_todays_default_date_always_matches_active_week_even_across_rollover(tmp
     still agree with `active_week.week_id` in this case, since nothing
     about the date was ever deliberately changed by the user -- it's
     still just "today's default"."""
-    from engine.weekly_training.persistence import WeeklyTrainingRepository
+    from engine.calendar import HTCalendarService
+    from engine.weekly_training.persistence import WeeklyTrainingRepository, WeeklyTrainingState
+    from engine.weekly_training.training_week import active_training_week
+    from ht_coach_app.services import ht_week_context_provider
     from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 
-    service = WeeklyTrainingAppService(
-        repository=WeeklyTrainingRepository(tmp_path / "planner.json")
+    cases = (
+        (datetime(2026, 8, 6, 20, 59), "2026-08-02:PLAYMAKING"),
+        (datetime(2026, 8, 6, 21, 0), "2026-08-09:PLAYMAKING"),
     )
-    state = service.load_state()
-    resolved = service._week_id_for_target_date(
-        state.active_week, date.today(), state.active_training_type
-    )
-    assert resolved == state.active_week.week_id
+    original_service = ht_week_context_provider.get_calendar_service()
+    try:
+        for index, (fixed_now, expected_cycle_id) in enumerate(cases):
+            ht_week_context_provider.set_calendar_service(
+                HTCalendarService(clock=lambda fixed=fixed_now: fixed)
+            )
+            repository = WeeklyTrainingRepository(tmp_path / f"planner-{index}.json")
+            repository.save(
+                WeeklyTrainingState(
+                    active_week=active_training_week(fixed_now),
+                )
+            )
+            service = WeeklyTrainingAppService(repository=repository)
+            state = service.load_state()
+
+            assert state.active_week.week_id == expected_cycle_id
+            assert service.active_cycle_id() == expected_cycle_id
+            assert service.visible_cycle_options(state)[0].cycle_id == expected_cycle_id
+            resolved = service._week_id_for_target_date(
+                state.active_week,
+                state.active_week.first_match_date,
+                state.active_training_type,
+            )
+            assert resolved == expected_cycle_id
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
