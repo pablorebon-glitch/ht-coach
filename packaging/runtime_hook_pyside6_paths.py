@@ -34,15 +34,15 @@ def configure_pyside6_runtime_paths():
     shiboken_dir = root / "shiboken6"
     plugin_dir = pyside_dir / "plugins"
     platform_dir = plugin_dir / "platforms"
-    dll_dirs = [pyside_dir, shiboken_dir]
+    dll_dirs = [pyside_dir, shiboken_dir, root]
 
     _add_dll_directories(dll_dirs)
     _prepend_path(dll_dirs)
 
     if plugin_dir.exists():
-        os.environ.setdefault("QT_PLUGIN_PATH", str(plugin_dir))
+        os.environ["QT_PLUGIN_PATH"] = str(plugin_dir)
     if platform_dir.exists():
-        os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", str(platform_dir))
+        os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = str(platform_dir)
 
 
 configure_pyside6_runtime_paths()

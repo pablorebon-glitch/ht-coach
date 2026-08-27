@@ -17,6 +17,18 @@ hiddenimports = [
     "tzdata",
 ]
 
+
+def _without_conflicting_icu_binaries(binaries):
+    filtered = []
+    for destination, source, kind in binaries:
+        destination_name = Path(destination).name.lower()
+        source_text = str(source).lower()
+        if destination_name.startswith("icu") and "codex-primary-runtime" in source_text:
+            continue
+        filtered.append((destination, source, kind))
+    return filtered
+
+
 a = Analysis(
     [str(repo_root / "ht_coach_app" / "main.py")],
     pathex=[str(repo_root)],
@@ -34,6 +46,7 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+a.binaries = _without_conflicting_icu_binaries(a.binaries)
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,

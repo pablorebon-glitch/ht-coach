@@ -61,10 +61,14 @@ catalogs. Runtime path resolution remains centralized in
 directory being the repository root.
 
 The build also installs `packaging/runtime_hook_pyside6_paths.py`. This hook runs
-before the application imports PySide6 and registers the bundled `PySide6` and
-`shiboken6` directories with the Windows DLL loader. That keeps QtGui startup
-stable when `HT Coach.exe` is launched from Windows Explorer or a Desktop shortcut
-without inheriting the development shell PATH.
+before the application imports PySide6 and registers the bundled `PySide6`,
+`shiboken6`, and `_internal` directories with the Windows DLL loader. It also
+forces Qt plugin paths to the bundled PySide6 plugins, so Explorer launches do not
+inherit stale Qt paths from the user's environment.
+
+The spec filters out ICU DLLs pulled from the Codex primary runtime native tools.
+Those DLLs are built with suffixed ICU 78 exports and are incompatible with the
+unsuffixed ICU symbols expected by the packaged PySide6 Qt 6.11 runtime.
 
 ## Diagnostics
 
