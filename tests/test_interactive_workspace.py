@@ -1210,8 +1210,10 @@ class WorkspaceServiceTest(unittest.TestCase):
                 continue
             valid_orders = {
                 configuration.order.value
-                for configuration in self.service.valid_order_configurations_for_position(
-                    slot.player.position
+                for configuration in self.service.valid_order_configurations_for_slot(
+                    slot.player.position,
+                    slot.side,
+                    "3-5-2",
                 )
             }
             self.assertIn(slot.player.individual_order, valid_orders)

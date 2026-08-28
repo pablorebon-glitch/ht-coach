@@ -47,9 +47,9 @@ def _lineup():
     ]
 
 
-def _result(opponent="Rival", tactic="Attack in the Middle"):
+def _result(opponent="Rival", tactic="Attack in the Middle", formation_name="2-5-3"):
     formation = FormationAnalysisResult(
-        formation_name="2-5-3", recommended_tactic=tactic, tactic_level=5,
+        formation_name=formation_name, recommended_tactic=tactic, tactic_level=5,
         win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
         possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
         is_recommended=True, team_ratings=TeamRatingsResult(), lineup=_lineup(),
@@ -167,6 +167,45 @@ def test_importing_pre_never_overwrites_lineup_or_orders(tmp_path):
         s.player.player_id: s.player.individual_order for s in board_after.slots if s.player
     }
     assert orders_before == orders_after
+
+
+def test_official_refresh_preserves_saved_manual_formation_over_cached_recommendation(tmp_path):
+    page, controller, hist_repo = make_controller(tmp_path, known_opponents=["Rival"])
+    page.opponent_combo.setCurrentText("Rival")
+    page.set_match_type("LEAGUE")
+    page.set_venue_role("home")
+    page.set_match_date("2026-06-15")
+    controller._settings_repository.save_last_result(
+        _result(opponent="Rival", formation_name="2-5-3")
+    )
+    controller._save_formation()
+    record = hist_repo.list_all()[0]
+
+    controller._settings_repository.save_last_result(
+        _result(opponent="Rival", formation_name="3-5-2")
+    )
+    page2, controller2, _hist_repo2 = make_controller(
+        tmp_path,
+        known_opponents=["Rival"],
+    )
+    controller2.edit_record(record.snapshot_id)
+    assert page2._formation_board_widget.current_board().formation_name == "2-5-3"
+    consolidate_with_official_pre(
+        hist_repo,
+        record,
+        OfficialRatingSnapshot(
+            formation=RatedAttribute(label="3-5-2", level=8),
+            tactic=RatedAttribute(label="Normal", level=5),
+            canonical_tactic="Normal",
+        ),
+        "1",
+    )
+
+    controller2._refresh_after_official_import(record.snapshot_id)
+
+    board = page2._formation_board_widget.current_board()
+    assert board.formation_name == "2-5-3"
+    assert hist_repo.get(record.snapshot_id).tactical_setup.formation == "2-5-3"
 
 
 def test_mismatch_indicator_compares_only_the_correctly_resolved_record(tmp_path):

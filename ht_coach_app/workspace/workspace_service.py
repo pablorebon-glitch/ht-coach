@@ -3,8 +3,10 @@ from dataclasses import replace
 
 from engine.analyzers.player_analyzer import PlayerAnalyzer
 from engine.calculators.contribution_calculator import ContributionCalculator
+from engine.orders.legal_orders import is_legal_order_for_slot
+from engine.orders.legal_orders import legal_orders_for_slot
+from engine.orders.legal_orders import normal_order_for_slot
 from engine.orders.order_modifier import OrderModifier
-from engine.optimizers.order_optimizer import OrderOptimizer
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import format_position_abbreviation
 from ht_coach_app.core.position_formatting import normalize_position_key
@@ -987,6 +989,7 @@ class WorkspaceService:
                 board,
                 recommendation.player_id,
                 self._order(recommendation.recommended_order),
+                self._optional_side(recommendation.recommended_order_side),
             ),
             "order_recommendation",
         )
@@ -1041,8 +1044,22 @@ class WorkspaceService:
             return self._error(state, "Slot is empty.")
 
         normalized_order = self._order(order)
-        valid_orders = self.valid_orders_for_position(slot.player.position)
-        if normalized_order not in valid_orders:
+        normalized_side = self._optional_side(order_side)
+        configurations = self.valid_order_configurations_for_slot(
+            slot.player.position,
+            slot.side,
+            board.formation_name,
+        )
+        selected_configuration = next(
+            (
+                configuration
+                for configuration in configurations
+                if configuration.order == normalized_order
+                and configuration.order_side == normalized_side
+            ),
+            None,
+        )
+        if selected_configuration is None:
             return self._error(
                 state,
                 f"'{order}' is not a valid order for {slot.player.position}.",
@@ -1051,7 +1068,10 @@ class WorkspaceService:
         previous_order = self._order(slot.player.individual_order)
         previous_side = self._optional_side(slot.player.order_side)
         updated_board = self._board_with_order(
-            board, slot.player.player_id, normalized_order, order_side
+            board,
+            slot.player.player_id,
+            selected_configuration.order,
+            selected_configuration.order_side,
         )
         new_side = self._optional_side(
             next(
@@ -1272,20 +1292,32 @@ class WorkspaceService:
             if player_card is None:
                 continue
             current_order = self._order(player_card.individual_order)
+            current_side = self._optional_side(player_card.order_side)
             best_order = current_order
+            best_side = current_side
             best_score = score
             best_totals = totals
-            for order in self.valid_orders_for_position(player_card.position):
-                candidate = self._board_with_order(working, player_card.player_id, order)
+            for configuration in self.valid_order_configurations_for_slot(
+                player_card.position,
+                slot.side,
+                board.formation_name,
+            ):
+                candidate = self._board_with_order(
+                    working,
+                    player_card.player_id,
+                    configuration.order,
+                    configuration.order_side,
+                )
                 candidate_score, candidate_totals = self._board_score(
                     candidate,
                     roster_players,
                 )
                 if candidate_score > best_score + MIN_RECOMMENDATION_IMPROVEMENT:
-                    best_order = order
+                    best_order = configuration.order
+                    best_side = configuration.order_side
                     best_score = candidate_score
                     best_totals = candidate_totals
-            if best_order == current_order:
+            if best_order == current_order and best_side == current_side:
                 continue
             deltas = self._sector_deltas(totals, best_totals)
             recommendations.append(
@@ -1295,6 +1327,8 @@ class WorkspaceService:
                     slot_id=slot.slot_id,
                     current_order=current_order.value,
                     recommended_order=best_order.value,
+                    current_order_side=current_side.value if current_side else "",
+                    recommended_order_side=best_side.value if best_side else "",
                     position=player_card.position,
                     side=player_card.side,
                     impact=RecommendationImpact(
@@ -1304,7 +1338,12 @@ class WorkspaceService:
                     ),
                 )
             )
-            working = self._board_with_order(working, player_card.player_id, best_order)
+            working = self._board_with_order(
+                working,
+                player_card.player_id,
+                best_order,
+                best_side,
+            )
             score = best_score
             totals = best_totals
 
@@ -1321,10 +1360,23 @@ class WorkspaceService:
 
     @staticmethod
     def valid_order_configurations_for_position(position):
-        normalized = WorkspaceService._position(position)
-        return OrderOptimizer.ALLOWED_CONFIGURATIONS.get(
-            normalized,
-            OrderOptimizer.ALLOWED_CONFIGURATIONS[Position.GOALKEEPER],
+        return legal_orders_for_slot(
+            position,
+            Side.CENTER,
+        )
+
+    @staticmethod
+    def valid_order_configurations_for_slot(
+        position,
+        side=None,
+        formation="",
+        tactical_context=None,
+    ):
+        return legal_orders_for_slot(
+            position,
+            side,
+            formation,
+            tactical_context,
         )
 
     def _apply_best_orders_to_slots(self, board, roster_players, slot_ids):
@@ -1370,20 +1422,24 @@ class WorkspaceService:
                 continue
             current_order = self._order(slot.player.individual_order)
             current_side = self._optional_side(slot.player.order_side)
-            configurations = self.valid_order_configurations_for_position(
-                slot.player.position
+            configurations = self.valid_order_configurations_for_slot(
+                slot.player.position,
+                slot.side,
+                board.formation_name,
             )
-            is_valid = any(
-                configuration.order == current_order
-                and configuration.order_side == current_side
-                for configuration in configurations
+            is_valid = is_legal_order_for_slot(
+                slot.player.position,
+                slot.side,
+                current_order,
+                current_side,
+                board.formation_name,
             )
             if is_valid:
                 continue
-            normal = next(
-                configuration
-                for configuration in configurations
-                if configuration.order == Order.NORMAL
+            normal = normal_order_for_slot(
+                slot.player.position,
+                slot.side,
+                board.formation_name,
             )
             updated = self._board_with_order(
                 updated,
@@ -1411,8 +1467,10 @@ class WorkspaceService:
         best_side = current_side
         best_score = current_score
         current_configuration_seen = False
-        configurations = self.valid_order_configurations_for_position(
-            slot.player.position
+        configurations = self.valid_order_configurations_for_slot(
+            slot.player.position,
+            slot.side,
+            board.formation_name,
         )
         for configuration in configurations:
             if (

@@ -773,6 +773,12 @@ class MatchPage(BasePage):
         board = self._formation_board_widget
         return self._metadata_dirty or (board is not None and board.is_dirty())
 
+    def current_workspace_state(self):
+        board = self._formation_board_widget
+        if board is None:
+            return None
+        return board.workspace_state()
+
     def set_training_conflict_warning(self, message):
         text = (message or "").strip()
         self.training_conflict_label.setText(text)

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- Fixed Alpha 0.6.13 HF-02 formation state integrity. Saved Match reopen and
+  Official PRE/POST refresh now preserve the user-saved Formation Board state
+  before falling back to cached optimizer recommendations, and individual-order
+  legality now comes from one slot-aware policy shared by optimizer, workspace
+  service and Formation Board. Central forward slots expose only Normal and
+  Defensive orders. No rating, xG, probability or calibration formulas changed.
+
 ### Added
 
 - Added Alpha 0.6.13 UX-03.1 Windows packaging hotfix. PyInstaller builds now

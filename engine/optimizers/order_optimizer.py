@@ -2,6 +2,9 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from engine.analyzers.team_rater import TeamRater
+from engine.orders.legal_orders import OrderConfiguration
+from engine.orders.legal_orders import base_allowed_configurations
+from engine.orders.legal_orders import legal_orders_for_slot
 
 from engine.evaluators.match_evaluator import (
     MatchEvaluator
@@ -15,18 +18,9 @@ from engine.ratings.rating_scale_normalizer import RatingScaleNormalizer
 
 from models.order import Order
 from models.position import Position
-from models.side import Side
 
 
 DEFAULT_RATING_NORMALIZER = RatingScaleNormalizer()
-
-
-@dataclass(frozen=True)
-class OrderConfiguration:
-
-    order: Order
-
-    order_side: Side | None = None
 
 
 @dataclass
@@ -59,98 +53,7 @@ class OrderOptimizer:
 
     DEFAULT_BEAM_WIDTH = 100
 
-    ALLOWED_CONFIGURATIONS = {
-
-        Position.GOALKEEPER: (
-            OrderConfiguration(
-                Order.NORMAL
-            ),
-        ),
-
-        Position.CENTRAL_DEFENDER: (
-            OrderConfiguration(
-                Order.NORMAL
-            ),
-            OrderConfiguration(
-                Order.OFFENSIVE
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_WING,
-                Side.LEFT
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_WING,
-                Side.RIGHT
-            ),
-        ),
-
-        Position.WING_BACK: (
-            OrderConfiguration(
-                Order.NORMAL
-            ),
-            OrderConfiguration(
-                Order.OFFENSIVE
-            ),
-            OrderConfiguration(
-                Order.DEFENSIVE
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_MIDDLE
-            ),
-        ),
-
-        Position.INNER_MIDFIELDER: (
-            OrderConfiguration(
-                Order.NORMAL
-            ),
-            OrderConfiguration(
-                Order.OFFENSIVE
-            ),
-            OrderConfiguration(
-                Order.DEFENSIVE
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_WING,
-                Side.LEFT
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_WING,
-                Side.RIGHT
-            ),
-        ),
-
-        Position.WINGER: (
-            OrderConfiguration(
-                Order.NORMAL
-            ),
-            OrderConfiguration(
-                Order.OFFENSIVE
-            ),
-            OrderConfiguration(
-                Order.DEFENSIVE
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_MIDDLE
-            ),
-        ),
-
-        Position.FORWARD: (
-            OrderConfiguration(
-                Order.NORMAL
-            ),
-            OrderConfiguration(
-                Order.DEFENSIVE
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_WING,
-                Side.LEFT
-            ),
-            OrderConfiguration(
-                Order.TOWARDS_WING,
-                Side.RIGHT
-            ),
-        ),
-    }
+    ALLOWED_CONFIGURATIONS = base_allowed_configurations()
 
     @staticmethod
     def _evaluate_lineup(
@@ -266,15 +169,10 @@ class OrderOptimizer:
                     ]
                 )
 
-                configurations = (
-                    cls.ALLOWED_CONFIGURATIONS.get(
-                        lineup_player.position,
-                        (
-                            OrderConfiguration(
-                                Order.NORMAL
-                            ),
-                        )
-                    )
+                configurations = legal_orders_for_slot(
+                    lineup_player.position,
+                    lineup_player.side,
+                    tactical_context=config,
                 )
 
                 for configuration in configurations:

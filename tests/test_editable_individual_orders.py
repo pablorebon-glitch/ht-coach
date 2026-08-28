@@ -8,11 +8,11 @@ QComboBox = pytest.importorskip("PySide6.QtWidgets").QComboBox
 sys.path.insert(0, "tests")
 
 from test_interactive_workspace import (  # noqa: E402
-    board_with_selected_forward,
     formation_result,
     roster_for_result,
 )
 
+from ht_coach_app.services.formation_board_service import FormationBoardMapper  # noqa: E402
 from ht_coach_app.widgets.formation_board.formation_board import FormationBoard  # noqa: E402
 
 
@@ -21,16 +21,25 @@ def _qt_app():
     QApplication.instance() or QApplication([])
 
 
-def _board_widget():
-    result = formation_result()
+def _board_widget(formation_name="3-5-2"):
+    result = formation_result(name=formation_name)
     widget = FormationBoard()
-    widget.set_boards([board_with_selected_forward()], roster_players=roster_for_result(result))
+    widget.set_boards(
+        [FormationBoardMapper().to_board(result)],
+        roster_players=roster_for_result(result),
+    )
     return widget
 
 
-def _slot_for_position(board, position):
+def _slot_for_position(board, position, side=None):
     return next(
-        (s for s in board.slots if s.player is not None and s.player.position == position),
+        (
+            s
+            for s in board.slots
+            if s.player is not None
+            and s.player.position == position
+            and (side is None or s.side == side)
+        ),
         None,
     )
 
@@ -61,17 +70,28 @@ def test_central_defender_shows_normal_offensive_towards_wing_left_right():
     assert "Defensive" not in labels
 
 
-def test_forward_shows_normal_defensive_towards_wing():
-    widget = _board_widget()
+def test_central_forward_shows_only_normal_and_defensive():
+    widget = _board_widget("2-5-3")
     board = widget.current_board()
-    slot = _slot_for_position(board, "FORWARD")
+    slot = _slot_for_position(board, "FORWARD", "CENTER")
+    widget.select_player(slot.player.player_id)
+
+    combo = widget.inspector.findChildren(QComboBox)[0]
+    labels = {combo.itemText(i) for i in range(combo.count())}
+    assert labels == {"Normal", "Defensive"}
+
+
+def test_side_forward_can_still_show_towards_wing():
+    widget = _board_widget("2-5-3")
+    board = widget.current_board()
+    slot = _slot_for_position(board, "FORWARD", "LEFT")
     widget.select_player(slot.player.player_id)
 
     combo = widget.inspector.findChildren(QComboBox)[0]
     labels = {combo.itemText(i) for i in range(combo.count())}
     assert "Normal" in labels
     assert "Defensive" in labels
-    assert any("Towards Wing" in label for label in labels)
+    assert "Towards Wing (Left)" in labels
 
 
 def test_winger_shows_normal_and_towards_middle():

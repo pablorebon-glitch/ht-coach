@@ -408,6 +408,7 @@ class MatchController(QObject):
             self._require_active_saved_match_record_id(action)
         if result is None or not getattr(result, "formations", None):
             raise RuntimeError(t("match.save_as_first_match_no_result"))
+        result = self._result_with_active_workspace_lineup(result)
         if not self._confirm_match_type_for_save(result):
             return SaveActiveMatchResult(success=False, error=t("match.analysis_stale_match_type"))
 
@@ -889,6 +890,18 @@ class MatchController(QObject):
         after saving), restore it in full; otherwise, tell the user a
         fresh analysis is needed rather than silently showing nothing
         or stale data from an unrelated match."""
+        restored_result = self._result_from_saved_record(record)
+        if restored_result is not None:
+            self._pending_workspace_state = None
+            self._settings_repository.save_last_result(restored_result)
+            self._show_training_context_from_result(restored_result)
+            self._view.show_results(restored_result, restored=True)
+            self._restore_tactical_controls_from_record(record)
+            self._update_pre_status_and_ratings_panel()
+            if hasattr(self._view, "show_status"):
+                self._view.show_status(t("match.saved_formation_restored"))
+            return
+
         last_result = self._settings_repository.load_last_result()
         matches_this_record = self._analysis_result_belongs_to_saved_record(
             last_result,
@@ -900,18 +913,6 @@ class MatchController(QObject):
             self._view.show_results(last_result, restored=True)
             self._restore_tactical_controls_from_record(record)
             self._update_pre_status_and_ratings_panel()
-            return
-
-        restored_result = self._result_from_saved_record(record)
-        if restored_result is not None:
-            self._pending_workspace_state = None
-            self._settings_repository.save_last_result(restored_result)
-            self._show_training_context_from_result(restored_result)
-            self._view.show_results(restored_result, restored=True)
-            self._restore_tactical_controls_from_record(record)
-            self._update_pre_status_and_ratings_panel()
-            if hasattr(self._view, "show_status"):
-                self._view.show_status(t("match.saved_formation_restored"))
             return
 
         if hasattr(self._view, "show_status"):
@@ -1074,6 +1075,78 @@ class MatchController(QObject):
         ):
             return result
         return None
+
+    def _result_with_active_workspace_lineup(self, result):
+        """Return `result` with the Formation Board's visible lineup as
+        the active saved formation.
+
+        The optimizer recommendation and the user-editable workspace
+        are intentionally separate concepts. When the user saves or
+        imports official evidence, the visible board is the tactical
+        plan that must be preserved.
+        """
+        state_getter = getattr(self._view, "current_workspace_state", None)
+        state = state_getter() if callable(state_getter) else None
+        board = getattr(state, "current_board", None)
+        if board is None or not getattr(board, "slots", None):
+            return result
+
+        from ht_coach_app.services.match_workspace_service import LineupPlayerResult
+
+        lineup = [
+            LineupPlayerResult(
+                number=index + 1,
+                position=slot.player.position,
+                side=slot.side or slot.player.side,
+                order=slot.player.individual_order,
+                order_side=slot.player.order_side,
+                player_name=slot.player.player_name,
+            )
+            for index, slot in enumerate(board.slots)
+            if slot.player is not None
+        ]
+        if not lineup:
+            return result
+
+        formations = list(getattr(result, "formations", ()) or ())
+        base_formation = next(
+            (
+                formation
+                for formation in formations
+                if formation.formation_name == board.formation_name
+            ),
+            None,
+        )
+        if base_formation is None:
+            base_formation = getattr(result, "recommended_formation", None)
+        if base_formation is None:
+            return result
+
+        selected_tactic = (
+            self._view.tactic() if hasattr(self._view, "tactic") else ""
+        )
+        active_formation = replace(
+            base_formation,
+            formation_name=board.formation_name,
+            recommended_tactic=selected_tactic or base_formation.recommended_tactic,
+            tactic_level=getattr(board, "tactic_level", base_formation.tactic_level),
+            lineup=lineup,
+            is_recommended=True,
+        )
+        updated_formations = [
+            (
+                active_formation
+                if formation.formation_name == active_formation.formation_name
+                else replace(formation, is_recommended=False)
+            )
+            for formation in formations
+        ]
+        if not any(
+            formation.formation_name == active_formation.formation_name
+            for formation in formations
+        ):
+            updated_formations.insert(0, active_formation)
+        return replace(result, formations=updated_formations)
 
     def _analyze(self):
         if self._selected_opponent_requires_manager_restore():
@@ -2577,12 +2650,18 @@ class MatchController(QObject):
         result = self._current_workspace_result(include_legacy=True)
         if result is None:
             return
+        result = self._result_with_active_workspace_lineup(result)
         result = self._apply_official_pre_if_available(
             result, snapshot_id_override=imported_snapshot_id
         )
         self._settings_repository.save_last_result(result)
         self._show_training_context_from_result(result)
-        self._view.show_results(result, workspace_state=None)
+        workspace_state = (
+            self._view.current_workspace_state()
+            if hasattr(self._view, "current_workspace_state")
+            else None
+        )
+        self._view.show_results(result, workspace_state=workspace_state)
         self._update_pre_status_and_ratings_panel(snapshot_id_override=imported_snapshot_id)
 
     def _show_official_import_error(self, exc):

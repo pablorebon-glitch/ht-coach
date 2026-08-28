@@ -9,8 +9,9 @@ from engine.optimizers.lineup_optimizer import (
 from engine.optimizers.order_optimizer import (
     OrderOptimizer
 )
+from engine.orders.legal_orders import legal_orders_for_slot
 
-from models.formations import FORMATION_352
+from models.formations import FORMATION_253, FORMATION_352
 from models.order import Order
 from models.side import Side
 from models.team_ratings import TeamRatings
@@ -131,10 +132,9 @@ def test_optimizer_only_uses_allowed_configurations(
 
     for lineup_player in result.lineup.players:
 
-        allowed_configurations = (
-            OrderOptimizer.ALLOWED_CONFIGURATIONS[
-                lineup_player.position
-            ]
+        allowed_configurations = legal_orders_for_slot(
+            lineup_player.position,
+            lineup_player.side,
         )
 
         actual_configuration = (
@@ -175,6 +175,20 @@ def test_towards_wing_has_order_side(
                     Side.RIGHT,
                 }
             )
+
+
+def test_optimizer_never_emits_towards_wing_for_central_forward(players, opponent):
+    lineup = LineupOptimizer.optimize(players, FORMATION_253)
+    result = OrderOptimizer.optimize(lineup, opponent, beam_width=50)
+    central_forward = next(
+        player
+        for player in result.lineup.players
+        if getattr(player.position, "value", player.position) == "FORWARD"
+        and getattr(player.side, "value", player.side) == "CENTER"
+    )
+
+    assert central_forward.order != Order.TOWARDS_WING
+    assert central_forward.order_side is None
 
 
 def test_non_towards_wing_has_no_order_side(

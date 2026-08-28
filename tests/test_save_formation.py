@@ -1,6 +1,8 @@
 """Alpha 0.6.7 HF-03, Parts 5-6: "Guardar formación" -- the explicit save
 action independent of Weekly Planner.
 """
+from dataclasses import replace
+
 import pytest
 
 QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
@@ -13,6 +15,7 @@ from ht_coach_app.core.localization import configure_localization
 from ht_coach_app.persistence.match_workspace_repository import MatchWorkspaceRepository
 from ht_coach_app.persistence.opponent_repository import OpponentRepository
 from ht_coach_app.services.match_workspace_service import (
+    ANALYSIS_OWNER_SAVED_MATCH,
     FormationAnalysisResult,
     LineupPlayerResult,
     MatchAnalysisResult,
@@ -228,6 +231,36 @@ def test_reopening_after_save_formation_restores_everything(tmp_path):
     reloaded = hist_repo.get(record.snapshot_id)
     assert reloaded.tactical_setup.formation == "3-5-2"
     assert reloaded.tactical_setup.selected_tactic == "Presión"
+
+
+def test_reopening_saved_match_prefers_persisted_lineup_over_cached_recommendation(tmp_path):
+    page, controller, hist_repo, weekly_service = make_controller(
+        tmp_path, known_opponents=["Rival Histórico"]
+    )
+    page.opponent_combo.setCurrentText("Rival Histórico")
+    page.set_match_date("2026-06-15")
+    controller._settings_repository.save_last_result(
+        _result(formation_name="2-5-3")
+    )
+    controller._save_formation()
+    record = hist_repo.list_all()[0]
+
+    controller._settings_repository.save_last_result(
+        replace(
+            _result(formation_name="3-5-2"),
+            analysis_owner_type=ANALYSIS_OWNER_SAVED_MATCH,
+            analysis_owner_id=record.snapshot_id,
+        )
+    )
+
+    page2, controller2, _hist_repo2, _weekly_service2 = make_controller(
+        tmp_path, known_opponents=["Rival Histórico"]
+    )
+    controller2.edit_record(record.snapshot_id)
+
+    board = page2._formation_board_widget.current_board()
+    assert board.formation_name == "2-5-3"
+    assert hist_repo.get(record.snapshot_id).tactical_setup.formation == "2-5-3"
 
 
 def test_new_match_save_persists_canonical_metadata_and_reopens_exactly(tmp_path):

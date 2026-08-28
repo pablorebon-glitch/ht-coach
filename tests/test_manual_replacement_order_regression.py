@@ -74,7 +74,12 @@ class ManualReplacementOrderRegressionTests(unittest.TestCase):
         self.assertEqual(new_slot.player.player_name, "Forward Replacement")
 
         valid_orders = [
-            order.value for order in self.service.valid_orders_for_position(Position.FORWARD.value)
+            configuration.order.value
+            for configuration in self.service.valid_order_configurations_for_slot(
+                Position.FORWARD.value,
+                new_slot.side,
+                "3-5-2",
+            )
         ]
         self.assertIn("Towards Wing", valid_orders)
 

@@ -670,8 +670,10 @@ class FormationBoard(QWidget):
         if selected_slot is None:
             return
 
-        configurations = self._workspace_service.valid_order_configurations_for_position(
-            selected.position
+        configurations = self._workspace_service.valid_order_configurations_for_slot(
+            selected.position,
+            selected_slot.side,
+            board.formation_name,
         )
         if not configurations:
             return
