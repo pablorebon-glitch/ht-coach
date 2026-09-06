@@ -24,6 +24,12 @@ class TrainingPriority(str, Enum):
     REST = "REST"
 
 
+class TrainingSlotClass(str, Enum):
+    FULL_TRAINING = "FULL_TRAINING"
+    HALF_TRAINING = "HALF_TRAINING"
+    NO_TRAINING = "NO_TRAINING"
+
+
 class MatchRole(str, Enum):
     FIRST_WEEKLY_MATCH = "FIRST_WEEKLY_MATCH"
     SECOND_WEEKLY_MATCH = "SECOND_WEEKLY_MATCH"

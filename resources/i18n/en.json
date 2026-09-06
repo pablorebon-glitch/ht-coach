@@ -922,6 +922,8 @@
     "match_date": "Match date",
     "edit_requires_reanalysis": "This match has no recent analysis in memory. Press Analyze to rebuild the saved formation and lineup.",
     "metadata_official_evidence_warning": "This match has official Hattrick evidence. Metadata changes preserve the Match ID and official PRE/POST; review the identity before saving.",
+    "metadata_evidence_confirm_title": "Save metadata changes",
+    "metadata_evidence_confirm_message": "This match has official Hattrick evidence. The official Match ID, PRE and POST will remain linked to the same record. Verify that the edited date, opponent, competition and venue belong to this match before saving.",
     "venue_role": "Venue",
     "venue_role_home": "Home",
     "venue_role_away": "Away",

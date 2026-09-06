@@ -509,6 +509,8 @@ class SquadController:
                 player = players_by_id.get(player_id)
                 if player is not None:
                     self._weekly_training_service.save_priority(player, priority_value)
+        if self._app_events is not None:
+            self._app_events.weekly_plan_saved.emit()
 
     def _change_training_priority(self, player_id, priority):
         if self._roster is None:
@@ -523,6 +525,8 @@ class SquadController:
         if player is None:
             return
         self._weekly_training_service.save_priority(player, priority)
+        if self._app_events is not None:
+            self._app_events.weekly_plan_saved.emit()
         self._show_weekly_training()
 
     def _generate_training_plan(self, formation_name):

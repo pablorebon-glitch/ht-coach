@@ -103,6 +103,15 @@ The persistence model can still read the original values:
 - No priority;
 - Rest.
 
+HT Coach currently assumes every selected starter plays the full 90 minutes.
+Therefore the visible 100% and 50% priorities describe the requested training
+position class, not partial-match playing minutes:
+
+- 100% means the player should occupy a full-training position when constraints
+  are active.
+- 50% means the player should occupy a half-training position when constraints
+  are active.
+
 Priorities persist by a deterministic roster identity based on player name, age, days,
 TSI and salary. This avoids collapsing duplicated names while preserving importer
 compatibility.
@@ -124,6 +133,11 @@ Playmaking exposure is minute-aware:
 
 When exact played minutes are unavailable, the planner assumes 90 minutes for starters
 and marks exposure as assumed rather than confirmed.
+
+Actual training received and training-plan satisfaction are related but not identical.
+For example, a Required 50% player placed at Inner Midfielder receives full
+Playmaking exposure and does not need to be forced again in Match 2, but the requested
+half-training slot class was not respected.
 
 ## Match Records
 
@@ -229,7 +243,8 @@ Hard constraints:
 
 Soft objectives:
 
-- place remaining Required 100% and Required 50% targets first;
+- place remaining Required 100% and Required 50% targets in their requested
+  full-training or half-training slot class first;
 - prefer High and Secondary targets in trainable slots;
 - complete the lineup using the existing player ranking engine;
 - apply the existing automatic order optimizer to selected starters;
@@ -243,12 +258,13 @@ The 0.5.7.2 execution engine uses a best-effort strategy:
 2. Enforce hard availability, Rest, formation and goalkeeper constraints.
 3. Fill full-training slots with the highest-value remaining 100% targets where
    possible.
-4. Fill 50% training slots and non-training slots with the strongest legal remaining
-   players, giving training priorities extra weight without making them fatal.
-5. Optimize individual orders through the existing workspace/order behavior.
-6. Recalculate planned coverage by adding the proposed lineup as assumed 90-minute
+4. Fill half-training slots with the highest-value remaining 50% targets where
+   possible.
+5. Fill remaining slots with the strongest legal remaining players.
+6. Optimize individual orders through the existing workspace/order behavior.
+7. Recalculate planned coverage by adding the proposed lineup as assumed 90-minute
    second-match exposure.
-7. Compare the proposed lineup against the unconstrained baseline to produce internal
+8. Compare the proposed lineup against the unconstrained baseline to produce internal
    score, changed-starter and sector deltas.
 8. Generate explanations for selected, partially covered, omitted, unavailable or
    already-completed priorities.

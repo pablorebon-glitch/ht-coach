@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject, QThread, QTimer
 
 from dataclasses import dataclass, replace
+import os
 from uuid import uuid4
 
 from engine.squad_health.availability_service import CURRENT_AVAILABLE
@@ -8,6 +9,7 @@ from ht_coach_app.change_analysis.service import ChangeAnalysisService
 from ht_coach_app.core.localization import t
 from ht_coach_app.core.paths import application_paths
 from ht_coach_app.core.portable import portable_roster_copy
+from ht_coach_app.diagnostics.runtime_integrity_trace import RuntimeIntegrityTracer
 from ht_coach_app.persistence.match_workspace_repository import (
     MatchWorkspaceSettings,
 )
@@ -21,7 +23,6 @@ from ht_coach_app.services.match_workspace_service import (
     format_decision_lab,
     format_match_summary,
     format_recommended_lineup,
-    with_tactical_advisor,
 )
 from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppService
 from ht_coach_app.workers.match_analysis_worker import (
@@ -89,6 +90,9 @@ class MatchController(QObject):
         self._pending_training_context = None
         self._queued_workspace_state = None
         self._latest_workspace_revision = None
+        self._runtime_trace = RuntimeIntegrityTracer()
+        self._last_traced_board_formation = ""
+        self._last_traced_recommended_formation = ""
         self._workspace_recalc_timer = QTimer(self)
         self._workspace_recalc_timer.setSingleShot(True)
         self._workspace_recalc_timer.setInterval(300)
@@ -161,12 +165,375 @@ class MatchController(QObject):
                 self._sync_roster
             )
             self._app_events.official_ratings_changed.connect(
-                self._handle_external_official_ratings_changed
+                self._handle_official_ratings_changed_event
             )
             if hasattr(self._app_events, "weekly_plan_saved"):
                 self._app_events.weekly_plan_saved.connect(
-                    self._handle_weekly_plan_saved_for_match_context
+                    self._handle_weekly_plan_saved_event
                 )
+
+    def _handle_official_ratings_changed_event(self, changed_snapshot_id):
+        self._trace_runtime_integrity(
+            "MATCH_RECORDS_CHANGED",
+            caller="_handle_official_ratings_changed_event",
+            reason=f"official_ratings_changed:{changed_snapshot_id}",
+        )
+        self._handle_external_official_ratings_changed(changed_snapshot_id)
+
+    def _handle_weekly_plan_saved_event(self):
+        self._trace_runtime_integrity(
+            "WEEKLY_PLANNER_CHANGED",
+            caller="_handle_weekly_plan_saved_event",
+            reason="weekly_plan_saved",
+        )
+        self._handle_weekly_plan_saved_for_match_context()
+
+    def _trace_runtime_integrity(self, event_name, result=None, **extra):
+        if not self._runtime_trace.enabled:
+            return
+        board_state = None
+        try:
+            if hasattr(self._view, "current_workspace_state"):
+                board_state = self._view.current_workspace_state()
+        except Exception:
+            board_state = None
+        board = getattr(board_state, "current_board", None)
+        record = None
+        try:
+            record = self._current_workspace_record()
+        except Exception:
+            record = None
+        last_result = None
+        try:
+            last_result = self._settings_repository.load_last_result()
+        except Exception:
+            last_result = None
+        try:
+            match_date = self._current_match_date()
+        except Exception:
+            match_date = ""
+        cycle_id = ""
+        if match_date:
+            try:
+                cycle_id = self._weekly_training_service.cycle_id_for_match_date(match_date)
+            except Exception:
+                cycle_id = ""
+        cycle_id = (
+            cycle_id
+            or getattr(result, "training_cycle_id", "")
+            or getattr(last_result, "training_cycle_id", "")
+            or getattr(record, "training_cycle_id", "")
+            or ""
+        )
+
+        weekly_record = self._linked_weekly_trace_record(
+            getattr(record, "snapshot_id", "") if record is not None else "",
+            cycle_id,
+        )
+        board_formation = getattr(board, "formation_name", "")
+        recommended_formation = self._result_recommended_formation(result)
+        saved_formation = self._saved_record_formation(record)
+        weekly_formation = getattr(weekly_record, "formation", "")
+        payload = {
+            "active_match_record_id": self._active_match_record_id,
+            "editing_snapshot_id": self._editing_snapshot_id,
+            "workspace_mode": self._workspace_mode,
+            "cycle_id": cycle_id,
+            "weekly_revision": self._safe_weekly_revision(cycle_id),
+            "board_formation": board_formation,
+            "workspace_formation": getattr(board_state, "current_formation_name", ""),
+            "saved_formation": saved_formation,
+            "recommended_formation": recommended_formation,
+            "analysis_result_formation": recommended_formation,
+            "recommendation_id": getattr(result, "recommendation_id", ""),
+            "recommendation_revision": getattr(
+                result, "recommendation_revision", ""
+            ),
+            "manual_lineup_revision": getattr(
+                result, "manual_lineup_revision", ""
+            ),
+            "weekly_formation": weekly_formation,
+            "weekly_match_formation": weekly_formation,
+            "weekly_match_id": getattr(weekly_record, "match_id", ""),
+            "weekly_linked_match_record_id": getattr(
+                weekly_record, "linked_match_record_id", ""
+            ),
+            "last_result_formation": self._result_recommended_formation(last_result),
+            "training_state": self._trace_training_state(cycle_id, result=result),
+        }
+        payload.update(extra)
+        self._runtime_trace.emit(
+            event_name,
+            **payload,
+        )
+        self._trace_runtime_transitions(event_name, payload)
+
+    def _trace_runtime_transitions(self, source_event, payload):
+        board_formation = payload.get("board_formation", "")
+        if board_formation:
+            previous = self._last_traced_board_formation
+            if previous and previous != board_formation:
+                self._runtime_trace.emit(
+                    "FORMATION_TRANSITION",
+                    **payload,
+                    from_formation=previous,
+                    to_formation=board_formation,
+                    source_event=source_event,
+                )
+            self._last_traced_board_formation = board_formation
+
+        recommended_formation = payload.get("recommended_formation", "")
+        if recommended_formation:
+            previous = self._last_traced_recommended_formation
+            if previous and previous != recommended_formation:
+                self._runtime_trace.emit(
+                    "RECOMMENDATION_TRANSITION",
+                    **payload,
+                    from_formation=previous,
+                    to_formation=recommended_formation,
+                    source_event=source_event,
+                )
+                if not self._recommendation_transition_allowed(
+                    source_event,
+                    payload,
+                ):
+                    self._runtime_trace.emit(
+                        "ILLEGAL_RECOMMENDATION_MUTATION",
+                        **payload,
+                        old_id=previous,
+                        new_id=recommended_formation,
+                        source_event=source_event,
+                    )
+            self._last_traced_recommended_formation = recommended_formation
+        if (
+            source_event in {"RECOMMENDATION_RENDERED", "FORMATION_BOARD_REBUILT"}
+            and board_formation
+            and recommended_formation
+            and board_formation == recommended_formation
+        ):
+            self._runtime_trace.emit(
+                "RECOMMENDATION_APPLIED",
+                **payload,
+                source_event=source_event,
+            )
+
+    @staticmethod
+    def _recommendation_transition_allowed(source_event, payload):
+        return (
+            source_event == "ANALYSIS_RESULT_RECEIVED"
+            and payload.get("reason") == "primary_analysis"
+        )
+
+    def _safe_weekly_revision(self, cycle_id):
+        if not cycle_id:
+            return ""
+        try:
+            return self._weekly_training_service.weekly_cycle_revision(cycle_id)
+        except Exception as exc:
+            return f"error:{type(exc).__name__}"
+
+    @staticmethod
+    def _saved_record_formation(record):
+        if record is None:
+            return ""
+        setup = getattr(record, "tactical_setup", None)
+        return getattr(setup, "formation", "") or ""
+
+    @staticmethod
+    def _result_recommended_formation(result):
+        recommended = getattr(result, "recommended_formation", None)
+        return getattr(recommended, "formation_name", "") if recommended is not None else ""
+
+    def _linked_weekly_trace_record(self, snapshot_id, cycle_id):
+        try:
+            state = self._weekly_training_service.load_state()
+            records = tuple(getattr(state, "match_records", ()) or ())
+            linked = [
+                record for record in records
+                if getattr(record, "linked_match_record_id", "") == snapshot_id
+            ]
+            if cycle_id:
+                in_cycle = [
+                    record for record in linked
+                    if self._weekly_training_service._cycle_id_for_match_record(record)
+                    == cycle_id
+                ]
+                if in_cycle:
+                    return in_cycle[-1]
+            if linked:
+                return linked[-1]
+        except Exception:
+            return None
+        return None
+
+    def _trace_training_state(self, cycle_id, result=None):
+        if not cycle_id:
+            return {}
+        target_name = os.environ.get(
+            "HT_COACH_RUNTIME_TRACE_PLAYER",
+            "Michael Rushton",
+        )
+        player = next(
+            (
+                item for item in self._roster_players
+                if getattr(item, "name", "").casefold() == target_name.casefold()
+            ),
+            None,
+        )
+        state = None
+        try:
+            state = self._weekly_training_service.load_state()
+        except Exception:
+            state = None
+        raw_priorities = []
+        if state is not None:
+            for key, record in getattr(state, "priorities", {}).items():
+                if target_name.casefold() in str(key).casefold() or (
+                    target_name.casefold()
+                    in getattr(record, "player_name", "").casefold()
+                ):
+                    raw_priorities.append(
+                        {
+                            "stored_key": key,
+                            "player_id": getattr(record, "player_id", ""),
+                            "priority": getattr(
+                                getattr(record, "priority", ""), "value", ""
+                            ),
+                        }
+                    )
+        if player is None:
+            return {
+                "player_name": target_name,
+                "raw_priorities": raw_priorities,
+            }
+        try:
+            from engine.weekly_training.player_identity import player_training_id
+
+            player_id = player_training_id(player)
+            requirement = self._weekly_training_service.explain_training_requirement(
+                player_id,
+                cycle_id,
+                self._roster_players,
+            )
+            explanation = self._weekly_training_service.explain_weekly_player_state(
+                player_id,
+                cycle_id,
+                self._roster_players,
+            )
+        except Exception as exc:
+            return {
+                "player_name": target_name,
+                "raw_priorities": raw_priorities,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        selected_trace = self._trace_selected_player_state(target_name, result)
+        return {
+            "player_name": target_name,
+            "player_id": player_id,
+            "configured_priority": requirement.get("configured_priority", ""),
+            "normalized_priority": requirement.get("configured_priority", ""),
+            "required_slot_class": requirement.get("required_slot_class", ""),
+            "current_week_actual_training": requirement.get(
+                "current_week_actual_training", ()
+            ),
+            "plan_satisfied": requirement.get("plan_satisfied", False),
+            "coverage": requirement.get("coverage_so_far", ""),
+            "coverage_effective_minutes": requirement.get(
+                "coverage_effective_minutes", ""
+            ),
+            "remaining_effective_minutes": requirement.get(
+                "remaining_effective_minutes", ""
+            ),
+            "effective_optimizer_priority": requirement.get(
+                "effective_optimizer_priority", ""
+            ),
+            "priority_source": requirement.get("reason", ""),
+            "priority_revision": requirement.get("source_revision", ""),
+            "match_1": explanation.get("match_1", ()),
+            "match_2": explanation.get("match_2", ()),
+            "other_cycles": explanation.get("other_cycles", ()),
+            "selected_position": selected_trace.get("selected_position", ""),
+            "selected_side": selected_trace.get("selected_side", ""),
+            "selected_order": selected_trace.get("selected_order", ""),
+            "selected_order_side": selected_trace.get("selected_order_side", ""),
+            "candidate_position": selected_trace.get("selected_position", ""),
+            "candidate_slot_class": selected_trace.get("candidate_slot_class", ""),
+            "candidate_valid_for_priority": (
+                selected_trace.get("candidate_slot_class", "")
+                == requirement.get("required_slot_class", "")
+                if requirement.get("required_slot_class", "")
+                else ""
+            ),
+            "selected_formation": selected_trace.get("selected_formation", ""),
+            "training_contribution_to_objective": selected_trace.get(
+                "training_contribution_to_objective", ""
+            ),
+            "tactical_contribution_to_objective": selected_trace.get(
+                "tactical_contribution_to_objective", ""
+            ),
+            "objective_trace_available": selected_trace.get(
+                "objective_trace_available", False
+            ),
+            "raw_priorities": raw_priorities,
+        }
+
+    def _trace_selected_player_state(self, target_name, result):
+        if result is None:
+            return {}
+        formation = getattr(result, "recommended_formation", None)
+        if formation is None:
+            return {}
+        player = next(
+            (
+                lineup_player
+                for lineup_player in getattr(formation, "lineup", ()) or ()
+                if getattr(lineup_player, "player_name", "").casefold()
+                == target_name.casefold()
+            ),
+            None,
+        )
+        if player is None:
+            return {
+                "selected_formation": getattr(formation, "formation_name", ""),
+                "objective_trace_available": bool(
+                    getattr(formation, "objective_trace", None)
+                ),
+            }
+        objective_trace = getattr(formation, "objective_trace", {}) or {}
+        components = objective_trace.get("components", {})
+        final_score = components.get("final_objective_score", "")
+        training_score = components.get("training_component", "")
+        tactical_score = ""
+        try:
+            tactical_score = float(final_score) - float(training_score or 0.0)
+        except (TypeError, ValueError):
+            tactical_score = final_score
+        return {
+            "selected_formation": getattr(formation, "formation_name", ""),
+            "selected_position": getattr(player, "position", ""),
+            "selected_side": getattr(player, "side", ""),
+            "selected_order": getattr(player, "order", ""),
+            "selected_order_side": getattr(player, "order_side", ""),
+            "candidate_slot_class": self._slot_class_label_for_position(
+                getattr(player, "position", "")
+            ),
+            "training_contribution_to_objective": training_score,
+            "tactical_contribution_to_objective": tactical_score,
+            "objective_trace_available": bool(objective_trace),
+        }
+
+    def _slot_class_label_for_position(self, position):
+        try:
+            from ht_coach_app.core.position_formatting import normalize_position_key
+            from models.position import Position
+
+            rules = self._weekly_training_service.active_training_rules()
+            slot_class = rules.slot_class_for_position(
+                Position(normalize_position_key(position))
+            )
+            return getattr(slot_class, "value", str(slot_class or ""))
+        except Exception:
+            return ""
 
     def _handle_external_official_ratings_changed(self, changed_snapshot_id):
         """Alpha 0.6.7 HF-03, Part 17: a signal carrying match-scoped
@@ -203,6 +570,12 @@ class MatchController(QObject):
             self._view.show_results(
                 last_result,
                 restored=True
+            )
+            self._trace_runtime_integrity(
+                "WORKSPACE_RESTORED",
+                result=last_result,
+                caller="refresh",
+                reason="last_result",
             )
         elif hasattr(self._view, "clear_results"):
             self._view.clear_results()
@@ -446,6 +819,15 @@ class MatchController(QObject):
 
         record = self._save_metadata_to_canonical_record(record.snapshot_id, metadata)
         record = self._save_lineup_to_canonical_record(record.snapshot_id, result)
+        self._trace_runtime_integrity(
+            "HISTORICAL_MATCH_SAVED",
+            result=result,
+            caller="_save_active_match_workspace",
+            reason=action,
+            saved_match_record_id=record.snapshot_id,
+            saved_record_formation=self._saved_record_formation(record),
+            created=created,
+        )
 
         self._workspace_mode = WORKSPACE_MODE_EDIT_SAVED_MATCH
         self._editing_snapshot_id = record.snapshot_id
@@ -478,6 +860,12 @@ class MatchController(QObject):
             and self._app_events is not None
             and hasattr(self._app_events, "match_records_changed")
         ):
+            self._trace_runtime_integrity(
+                "MATCH_RECORDS_CHANGED",
+                result=result,
+                caller="_save_active_match_workspace",
+                reason=record.snapshot_id,
+            )
             self._app_events.match_records_changed.emit(record.snapshot_id)
 
         persisted = repository.get(record.snapshot_id)
@@ -637,7 +1025,7 @@ class MatchController(QObject):
                 )
             ),
             training_cycle_id=(
-                self._resolve_training_cycle_id(match_date)
+                self._training_cycle_id_for_match_date(match_date)
                 if match_date
                 else (
                     fallback_record.training_cycle_id
@@ -793,6 +1181,11 @@ class MatchController(QObject):
         if hasattr(self._view, "clear_results"):
             self._view.clear_results()
         self._record_app_event("switch_record", snapshot_id)
+        self._trace_runtime_integrity(
+            "MATCH_OPENED",
+            caller="edit_record",
+            reason=snapshot_id,
+        )
         self._update_app_context(
             active_match_record_id=snapshot_id,
             opponent_name=record.match_context.opponent.opponent_name,
@@ -819,8 +1212,11 @@ class MatchController(QObject):
                 match_type = ""
             self._view.set_match_type(match_type)
 
-        if hasattr(self._view, "set_match_date") and record.match_context.match_date:
-            self._view.set_match_date(record.match_context.match_date)
+        if record.match_context.match_date:
+            if hasattr(self._view, "set_match_date"):
+                self._view.set_match_date(record.match_context.match_date)
+        elif hasattr(self._view, "clear_match_date"):
+            self._view.clear_match_date()
 
         if hasattr(self._view, "set_venue_role"):
             venue_value = getattr(
@@ -840,6 +1236,11 @@ class MatchController(QObject):
     def _handle_workspace_changed(self):
         self._save_current_settings()
         self._update_metadata_evidence_warning()
+        self._trace_runtime_integrity(
+            "FORMATION_BOARD_CHANGED",
+            caller="_handle_workspace_changed",
+            reason="workspace_changed",
+        )
 
     def _update_metadata_evidence_warning(self):
         if not hasattr(self._view, "set_metadata_evidence_warning"):
@@ -876,6 +1277,21 @@ class MatchController(QObject):
             current_opponent != (record.match_context.opponent.opponent_name or "")
             or current_date != (record.match_context.match_date or "")
             or current_type != record_type
+            or (
+                (
+                    self._view.venue_role()
+                    if hasattr(self._view, "venue_role")
+                    else "unknown"
+                )
+                != str(
+                    getattr(
+                        record.match_context.home_away,
+                        "value",
+                        record.match_context.home_away,
+                    )
+                    or "unknown"
+                ).lower()
+            )
         )
 
     def _restore_full_workspace_if_available(self, record, opponent_name):
@@ -896,6 +1312,12 @@ class MatchController(QObject):
             self._settings_repository.save_last_result(restored_result)
             self._show_training_context_from_result(restored_result)
             self._view.show_results(restored_result, restored=True)
+            self._trace_runtime_integrity(
+                "WORKSPACE_RESTORED",
+                result=restored_result,
+                caller="_restore_full_workspace_if_available",
+                reason="saved_record",
+            )
             self._restore_tactical_controls_from_record(record)
             self._update_pre_status_and_ratings_panel()
             if hasattr(self._view, "show_status"):
@@ -911,6 +1333,12 @@ class MatchController(QObject):
             self._pending_workspace_state = None
             self._show_training_context_from_result(last_result)
             self._view.show_results(last_result, restored=True)
+            self._trace_runtime_integrity(
+                "WORKSPACE_RESTORED",
+                result=last_result,
+                caller="_restore_full_workspace_if_available",
+                reason="last_result_same_owner",
+            )
             self._restore_tactical_controls_from_record(record)
             self._update_pre_status_and_ratings_panel()
             return
@@ -1011,6 +1439,7 @@ class MatchController(QObject):
             match_type=match_type,
             analysis_owner_type=ANALYSIS_OWNER_SAVED_MATCH,
             analysis_owner_id=record.snapshot_id,
+            recommendation_id=record.tactical_setup.formation,
         )
 
     def _restore_tactical_controls_from_record(self, record):
@@ -1125,19 +1554,23 @@ class MatchController(QObject):
         selected_tactic = (
             self._view.tactic() if hasattr(self._view, "tactic") else ""
         )
+        recommendation_id = self._stable_recommendation_id(result)
         active_formation = replace(
             base_formation,
             formation_name=board.formation_name,
             recommended_tactic=selected_tactic or base_formation.recommended_tactic,
             tactic_level=getattr(board, "tactic_level", base_formation.tactic_level),
             lineup=lineup,
-            is_recommended=True,
+            is_recommended=(board.formation_name == recommendation_id),
         )
         updated_formations = [
             (
                 active_formation
                 if formation.formation_name == active_formation.formation_name
-                else replace(formation, is_recommended=False)
+                else replace(
+                    formation,
+                    is_recommended=(formation.formation_name == recommendation_id),
+                )
             )
             for formation in formations
         ]
@@ -1146,7 +1579,99 @@ class MatchController(QObject):
             for formation in formations
         ):
             updated_formations.insert(0, active_formation)
-        return replace(result, formations=updated_formations)
+        return replace(
+            result,
+            formations=updated_formations,
+            recommendation_id=recommendation_id,
+        )
+
+    def _active_workspace_formation(self, result):
+        state_getter = getattr(self._view, "current_workspace_state", None)
+        state = state_getter() if callable(state_getter) else None
+        board = getattr(state, "current_board", None)
+        if board is None or not getattr(board, "slots", None):
+            return getattr(result, "recommended_formation", None)
+
+        from ht_coach_app.services.match_workspace_service import LineupPlayerResult
+
+        lineup = [
+            LineupPlayerResult(
+                number=index + 1,
+                position=slot.player.position,
+                side=slot.side or slot.player.side,
+                order=slot.player.individual_order,
+                order_side=slot.player.order_side,
+                player_name=slot.player.player_name,
+            )
+            for index, slot in enumerate(board.slots)
+            if slot.player is not None
+        ]
+        if not lineup:
+            return getattr(result, "recommended_formation", None)
+
+        formations = list(getattr(result, "formations", ()) or ())
+        base_formation = next(
+            (
+                formation
+                for formation in formations
+                if formation.formation_name == board.formation_name
+            ),
+            None,
+        ) or getattr(result, "recommended_formation", None)
+        if base_formation is None:
+            return None
+        selected_tactic = (
+            self._view.tactic() if hasattr(self._view, "tactic") else ""
+        )
+        return replace(
+            base_formation,
+            formation_name=board.formation_name,
+            recommended_tactic=selected_tactic or base_formation.recommended_tactic,
+            tactic_level=getattr(board, "tactic_level", base_formation.tactic_level),
+            lineup=lineup,
+            is_recommended=False,
+        )
+
+    @staticmethod
+    def _stable_recommendation_id(result):
+        explicit_id = str(getattr(result, "recommendation_id", "") or "").strip()
+        if explicit_id:
+            return explicit_id
+        recommended = getattr(result, "recommended_formation", None)
+        return getattr(recommended, "formation_name", "")
+
+    def _capture_visible_lineup_board(self, result=None):
+        state_getter = getattr(self._view, "current_workspace_state", None)
+        state = state_getter() if callable(state_getter) else None
+        board = getattr(state, "current_board", None)
+        if board is not None:
+            return board
+        recommended = getattr(result, "recommended_formation", None)
+        if recommended is None:
+            return None
+        return self._formation_board_mapper.to_board(recommended)
+
+    @staticmethod
+    def _assert_visible_board_matches_weekly_record(board, state, linked_match_record_id=""):
+        if board is None:
+            return
+        records = tuple(getattr(state, "match_records", ()) or ())
+        if not records:
+            raise RuntimeError("weekly lineup save invariant failed: no weekly record")
+        saved = next(
+            (
+                record
+                for record in records
+                if linked_match_record_id
+                and record.linked_match_record_id == linked_match_record_id
+            ),
+            records[-1],
+        )
+        if saved.formation != board.formation_name:
+            raise RuntimeError(
+                "weekly lineup save invariant failed: "
+                f"visible={board.formation_name!r} persisted={saved.formation!r}"
+            )
 
     def _analyze(self):
         if self._selected_opponent_requires_manager_restore():
@@ -1173,6 +1698,7 @@ class MatchController(QObject):
         self._show_training_context(training_context)
         required_player_ids = None
         training_rules = None
+        required_slot_classes = None
         if match_type == MATCH_TYPE_CUP:
             training_rules = self._weekly_training_service.active_training_rules()
             if training_rules is None:
@@ -1185,6 +1711,31 @@ class MatchController(QObject):
                 if training_context is not None
                 else self._weekly_training_service.required_player_ids_for_match()
             )
+            required_slot_classes = (
+                self._weekly_training_service.required_player_training_slot_classes(
+                    getattr(training_context, "training_cycle_id", None),
+                    self._roster_players,
+                )
+            )
+
+        self._trace_runtime_integrity(
+            "ANALYZE_CLICKED",
+            caller="_analyze",
+            reason="primary_analysis",
+            match_type=match_type,
+            selected_formations=self._view.selected_formations(),
+            required_player_ids=tuple(sorted(required_player_ids or ())),
+            required_slot_classes=required_slot_classes or {},
+            training_context=(
+                {
+                    "cycle_id": training_context.training_cycle_id,
+                    "revision": training_context.weekly_cycle_revision,
+                    "role": training_context.suggested_role,
+                }
+                if training_context is not None
+                else {}
+            ),
+        )
 
         if hasattr(self._view, "set_training_conflict_warning"):
             self._view.set_training_conflict_warning("")
@@ -1194,7 +1745,6 @@ class MatchController(QObject):
 
         self._save_current_settings()
         self._pending_workspace_state = None
-        self._pending_training_context = None
         self._view.set_processing(
             True
         )
@@ -1212,6 +1762,7 @@ class MatchController(QObject):
             match_type=match_type,
             required_player_ids=required_player_ids,
             training_rules=training_rules,
+            required_slot_classes=required_slot_classes,
         )
         self._worker.moveToThread(
             self._thread
@@ -1250,6 +1801,13 @@ class MatchController(QObject):
     def _recalculate_workspace(self, workspace_state):
         self._queued_workspace_state = workspace_state
         self._latest_workspace_revision = workspace_state.revision
+        self._trace_runtime_integrity(
+            "MANUAL_PLAYER_CHANGE",
+            caller="_recalculate_workspace",
+            reason="workspace_modified",
+            workspace_revision=getattr(workspace_state, "revision", ""),
+            workspace_formation=getattr(workspace_state, "current_formation_name", ""),
+        )
         if hasattr(self._view, "show_workspace_updating"):
             self._view.show_workspace_updating()
         self._workspace_recalc_timer.start()
@@ -1280,9 +1838,19 @@ class MatchController(QObject):
         if match_type is None:
             return
 
+        training_context = self._training_context_for_current_match()
+        self._pending_training_context = training_context
+        self._show_training_context(training_context)
+
         self._save_current_settings()
         self._pending_workspace_state = workspace_state
-        self._pending_training_context = None
+        self._trace_runtime_integrity(
+            "ANALYSIS_REFRESH",
+            caller="_start_queued_workspace_recalculation",
+            reason="workspace_recalculation",
+            workspace_revision=getattr(workspace_state, "revision", ""),
+            workspace_boards=tuple(workspace_state.workspace_boards.keys()),
+        )
         if hasattr(self._view, "set_workspace_processing"):
             self._view.set_workspace_processing(True)
         else:
@@ -1343,6 +1911,16 @@ class MatchController(QObject):
 
     def _analysis_finished(self, result):
         finished_workspace_state = self._pending_workspace_state
+        self._trace_runtime_integrity(
+            "ANALYSIS_RESULT_RECEIVED",
+            result=result,
+            caller="_analysis_finished",
+            reason=(
+                "workspace_recalculation"
+                if finished_workspace_state is not None
+                else "primary_analysis"
+            ),
+        )
         if (
             finished_workspace_state is not None
             and self._latest_workspace_revision is not None
@@ -1355,7 +1933,13 @@ class MatchController(QObject):
                 self._view.set_processing(False)
             return
 
+        previous_result = self._current_workspace_result()
+
         if finished_workspace_state is not None:
+            result = self._preserve_recommendation_after_manual_reevaluation(
+                previous_result,
+                result,
+            )
             previous_result = self._current_workspace_result()
             change_analysis = self._change_analysis_service.analyze(
                 previous_result,
@@ -1366,7 +1950,12 @@ class MatchController(QObject):
                 result,
                 change_analysis=change_analysis,
             )
-            result = with_tactical_advisor(result)
+            result = self._service.refresh_presentational_analysis(result)
+        else:
+            result = self._mark_explicit_recommendation_revision(
+                previous_result,
+                result,
+            )
 
         if finished_workspace_state is not None and hasattr(
             self._view,
@@ -1375,7 +1964,6 @@ class MatchController(QObject):
             self._view.set_workspace_processing(False)
         else:
             self._view.set_processing(False)
-        previous_result = self._current_workspace_result()
         result = self._apply_official_pre_if_available(result)
         result = self._stamp_training_context(result)
         result = self._stamp_result_owner(result)
@@ -1393,10 +1981,67 @@ class MatchController(QObject):
             result,
             workspace_state=self._pending_workspace_state,
         )
+        self._trace_runtime_integrity(
+            "RECOMMENDATION_RENDERED",
+            result=result,
+            caller="_analysis_finished",
+            reason="show_results",
+        )
+        self._trace_runtime_integrity(
+            "FORMATION_BOARD_REBUILT",
+            result=result,
+            caller="_analysis_finished",
+            reason="show_results",
+        )
         self._pending_workspace_state = None
         self._pending_training_context = None
         self._view.show_status(
             "Match analysis complete."
+        )
+
+    @staticmethod
+    def _preserve_recommendation_after_manual_reevaluation(previous_result, result):
+        previous_recommended = getattr(previous_result, "recommended_formation", None)
+        previous_name = (
+            str(getattr(previous_result, "recommendation_id", "") or "").strip()
+            or getattr(previous_recommended, "formation_name", "")
+        )
+        formations = list(getattr(result, "formations", ()) or ())
+        if previous_name and any(
+            formation.formation_name == previous_name for formation in formations
+        ):
+            formations = [
+                replace(
+                    formation,
+                    is_recommended=(formation.formation_name == previous_name),
+                )
+                for formation in formations
+            ]
+            result = replace(result, formations=formations)
+
+        return replace(
+            result,
+            recommendation_id=previous_name,
+            recommendation_revision=getattr(
+                previous_result, "recommendation_revision", 0
+            ),
+            manual_lineup_revision=(
+                getattr(previous_result, "manual_lineup_revision", 0) + 1
+            ),
+        )
+
+    @staticmethod
+    def _mark_explicit_recommendation_revision(previous_result, result):
+        recommended = getattr(result, "recommended_formation", None)
+        return replace(
+            result,
+            recommendation_id=getattr(recommended, "formation_name", ""),
+            recommendation_revision=(
+                getattr(previous_result, "recommendation_revision", 0) + 1
+            ),
+            manual_lineup_revision=getattr(
+                previous_result, "manual_lineup_revision", 0
+            ),
         )
 
     def _training_context_for_current_match(self):
@@ -1672,6 +2317,52 @@ class MatchController(QObject):
             # actual save flow it's attached to.
             pass
 
+    def _save_metadata_only_to_canonical_record(self, snapshot_id):
+        repository = self._history_repository()
+        if repository is None:
+            self._view.show_error(t("match.save_workspace_error", reason="history repository unavailable"))
+            return False
+        record = repository.get(snapshot_id)
+        if record is None:
+            self._view.show_error(t("match.save_workspace_error", reason="match record not found"))
+            return False
+
+        metadata = self._current_workspace_metadata(fallback_record=record)
+        if not self._validate_metadata_for_save(metadata):
+            return False
+        if (
+            (record.official_pre or record.official_post or record.official_match_post)
+            and self._metadata_differs_from_record(record)
+            and hasattr(self._view, "confirm_metadata_evidence_save")
+            and not self._view.confirm_metadata_evidence_save()
+        ):
+            return False
+
+        try:
+            saved_record = self._save_metadata_to_canonical_record(
+                snapshot_id,
+                metadata,
+            )
+            self._assert_saved_metadata_matches_workspace(metadata, saved_record)
+        except Exception as exc:
+            self._save_failure_result("save_metadata", exc)
+            return False
+
+        if hasattr(self._view, "clear_metadata_dirty"):
+            self._view.clear_metadata_dirty()
+        self._update_metadata_evidence_warning()
+        self._update_season_preview(saved_record.match_context.match_date)
+        self._update_pre_status_and_ratings_panel(snapshot_id_override=snapshot_id)
+        if hasattr(self._view, "show_status"):
+            self._view.show_status(t("match.metadata_saved"))
+        self._record_app_event("save_metadata", snapshot_id)
+        if (
+            self._app_events is not None
+            and hasattr(self._app_events, "match_records_changed")
+        ):
+            self._app_events.match_records_changed.emit(snapshot_id)
+        return True
+
     def _save_lineup_to_canonical_record(self, snapshot_id, result):
         repository = self._history_repository()
         if repository is None:
@@ -1681,13 +2372,13 @@ class MatchController(QObject):
         record = repository.get(snapshot_id)
         if record is None:
             raise RuntimeError(f"match record not found: {snapshot_id}")
-        recommended = getattr(result, "recommended_formation", None)
-        if recommended is None:
+        active_formation = self._active_workspace_formation(result)
+        if active_formation is None:
             raise RuntimeError("recommended formation is required")
 
         from engine.history.lineup_snapshot import build_historical_lineup, build_tactical_setup
 
-        tactical_setup = build_tactical_setup(recommended)
+        tactical_setup = build_tactical_setup(active_formation)
         selected_tactic = (
             self._view.tactic() if hasattr(self._view, "tactic") else ""
         )
@@ -1707,7 +2398,7 @@ class MatchController(QObject):
                 tactical_setup, team_attitude=selected_attitude
             )
         updated = record.with_updates(
-            lineup=build_historical_lineup(recommended),
+            lineup=build_historical_lineup(active_formation),
             tactical_setup=tactical_setup,
         )
         return repository.save(updated)
@@ -2101,7 +2792,7 @@ class MatchController(QObject):
         from ht_coach_app.services.dual_week_formatting import format_dual_week_summary
         from ht_coach_app.core.localization import t
 
-        training_cycle_id = self._resolve_training_cycle_id(match_date_text)
+        training_cycle_id = self._training_cycle_id_for_match_date(match_date_text)
         if self._season_calendar_repository is None or not self._season_calendar_repository.load().is_configured:
             self._view.set_season_preview(
                 t("match.season_preview.not_configured") + "\n"
@@ -2127,6 +2818,12 @@ class MatchController(QObject):
             return result.season_week
         except Exception:
             return HTSeasonWeek()
+
+    def _training_cycle_id_for_match_date(self, match_date_text):
+        try:
+            return self._weekly_training_service.cycle_id_for_match_date(match_date_text)
+        except Exception:
+            return self._resolve_training_cycle_id(match_date_text)
 
     @staticmethod
     def _resolve_training_cycle_id(match_date_text):
@@ -2178,6 +2875,19 @@ class MatchController(QObject):
                 t("match.save_as_first_match_no_result")
             )
             return
+        result = self._result_with_active_workspace_lineup(result)
+        self._trace_runtime_integrity(
+            "SAVE_FORMATION_CLICKED",
+            result=result,
+            caller="_save_as_first_match",
+            reason="save_as_first_match",
+        )
+        self._trace_runtime_integrity(
+            "SAVE_PARTIDO_1_CLICKED",
+            result=result,
+            caller="_save_as_first_match",
+            reason="save_as_first_match",
+        )
         match_date = self._current_match_date()
         if not match_date:
             self._view.show_error(t("match.save_as_weekly_missing_match_date"))
@@ -2188,7 +2898,7 @@ class MatchController(QObject):
         if not self._validate_metadata_for_save(metadata):
             return
 
-        recommended = result.recommended_formation
+        board = self._capture_visible_lineup_board(result)
         canonical_save = self._try_save_active_match_workspace(
             result,
             "save_as_first_match_canonical",
@@ -2197,14 +2907,26 @@ class MatchController(QObject):
         if not canonical_save.success:
             return
         try:
-            board = self._formation_board_mapper.to_board(recommended)
-            self._weekly_training_service.record_first_match(
+            state = self._weekly_training_service.record_first_match(
                 board,
                 opponent_name=metadata.opponent_name,
                 roster_players=self._roster_players,
                 match_date=metadata.scheduled_date,
                 linked_match_record_id=canonical_save.match_record_id,
                 competition_type=self._weekly_competition_type_for_save(result),
+            )
+            self._assert_visible_board_matches_weekly_record(
+                board,
+                state,
+                canonical_save.match_record_id,
+            )
+            self._trace_runtime_integrity(
+                "WEEKLY_MATCH_SAVED",
+                result=result,
+                caller="_save_as_first_match",
+                reason="record_first_match",
+                saved_weekly_formation=getattr(board, "formation_name", ""),
+                saved_match_record_id=canonical_save.match_record_id,
             )
         except ValueError as exc:
             if str(exc) == "duplicate_match_id":
@@ -2283,17 +3005,24 @@ class MatchController(QObject):
         if not match_date:
             self._view.show_error(t("match.save_as_weekly_missing_match_date"))
             return
+        result = self._result_with_active_workspace_lineup(result)
+        board = self._capture_visible_lineup_board(result) or board
         metadata = self._current_workspace_metadata(result=result)
         if not self._validate_metadata_for_save(metadata):
             return
         try:
-            self._weekly_training_service.replace_first_match(
+            state = self._weekly_training_service.replace_first_match(
                 board,
                 opponent_name=metadata.opponent_name,
                 roster_players=self._roster_players,
                 match_date=metadata.scheduled_date,
                 linked_match_record_id=linked_match_record_id or self._linked_canonical_record_id(result),
                 competition_type=self._weekly_competition_type_for_save(result),
+            )
+            self._assert_visible_board_matches_weekly_record(
+                board,
+                state,
+                linked_match_record_id,
             )
         except Exception as exc:
             self._view.show_error(
@@ -2327,35 +3056,24 @@ class MatchController(QObject):
                 self._view.show_error(str(exc))
                 return
         result = self._current_workspace_result(include_legacy=True)
+        metadata_dirty = (
+            self._view.is_metadata_dirty()
+            if hasattr(self._view, "is_metadata_dirty")
+            else False
+        )
+        board = getattr(self._view, "_formation_board_widget", None)
+        board_dirty = bool(board is not None and board.is_dirty())
+        if (
+            self._workspace_mode == WORKSPACE_MODE_EDIT_SAVED_MATCH
+            and self._editing_snapshot_id
+            and metadata_dirty
+            and (result is None or not getattr(result, "formations", None) or not board_dirty)
+        ):
+            self._save_metadata_only_to_canonical_record(self._editing_snapshot_id)
+            return
         if result is None or not getattr(result, "formations", None):
             if self._editing_snapshot_id:
-                record = self._current_workspace_record()
-                if record is None:
-                    self._view.show_error(t("match.save_workspace_error", reason="match record not found"))
-                    return
-                metadata = self._current_workspace_metadata(fallback_record=record)
-                if not self._validate_metadata_for_save(metadata):
-                    return
-                try:
-                    saved_record = self._save_metadata_to_canonical_record(
-                        self._editing_snapshot_id,
-                        metadata,
-                    )
-                    self._assert_saved_metadata_matches_workspace(metadata, saved_record)
-                except Exception as exc:
-                    self._save_failure_result("save_metadata", exc)
-                    return
-                if hasattr(self._view, "clear_metadata_dirty"):
-                    self._view.clear_metadata_dirty()
-                self._update_metadata_evidence_warning()
-                if hasattr(self._view, "show_status"):
-                    self._view.show_status(t("match.metadata_saved"))
-                self._record_app_event("save_metadata", self._editing_snapshot_id)
-                if (
-                    self._app_events is not None
-                    and hasattr(self._app_events, "match_records_changed")
-                ):
-                    self._app_events.match_records_changed.emit(self._editing_snapshot_id)
+                self._save_metadata_only_to_canonical_record(self._editing_snapshot_id)
                 return
             self._view.show_error(
                 t("match.save_as_first_match_no_result")
@@ -2364,6 +3082,13 @@ class MatchController(QObject):
         if not self._confirm_match_type_for_save(result):
             return
 
+        result = self._result_with_active_workspace_lineup(result)
+        self._trace_runtime_integrity(
+            "SAVE_FORMATION_CLICKED",
+            result=result,
+            caller="_save_formation",
+            reason="save_formation",
+        )
         saved = self._try_save_active_match_workspace(
             result,
             "save_formation",
@@ -2381,10 +3106,10 @@ class MatchController(QObject):
         if not snapshot_id:
             return
         try:
-            recommended = getattr(result, "recommended_formation", None)
-            if recommended is None:
+            result = self._result_with_active_workspace_lineup(result)
+            board = self._capture_visible_lineup_board(result)
+            if board is None:
                 return
-            board = self._formation_board_mapper.to_board(recommended)
             metadata = self._current_workspace_metadata(result=result)
             state = self._weekly_training_service.replace_linked_match_lineup(
                 snapshot_id,
@@ -2393,6 +3118,19 @@ class MatchController(QObject):
                 roster_players=self._roster_players,
                 match_date=metadata.scheduled_date,
                 competition_type=self._weekly_competition_type_for_save(result),
+            )
+            self._assert_visible_board_matches_weekly_record(
+                board,
+                state,
+                snapshot_id,
+            )
+            self._trace_runtime_integrity(
+                "WEEKLY_MATCH_SAVED",
+                result=result,
+                caller="_refresh_linked_weekly_lineup",
+                reason="replace_linked_match_lineup",
+                saved_weekly_formation=getattr(board, "formation_name", ""),
+                saved_match_record_id=snapshot_id,
             )
             if (
                 self._app_events is not None
@@ -2412,6 +3150,19 @@ class MatchController(QObject):
                 t("match.save_as_first_match_no_result")
             )
             return
+        result = self._result_with_active_workspace_lineup(result)
+        self._trace_runtime_integrity(
+            "SAVE_FORMATION_CLICKED",
+            result=result,
+            caller="_save_as_second_match",
+            reason="save_as_second_match",
+        )
+        self._trace_runtime_integrity(
+            "SAVE_PARTIDO_2_CLICKED",
+            result=result,
+            caller="_save_as_second_match",
+            reason="save_as_second_match",
+        )
         match_date = self._current_match_date()
         if not match_date:
             self._view.show_error(t("match.save_as_weekly_missing_match_date"))
@@ -2422,7 +3173,7 @@ class MatchController(QObject):
         if not self._validate_metadata_for_save(metadata):
             return
 
-        recommended = result.recommended_formation
+        board = self._capture_visible_lineup_board(result)
         canonical_save = self._try_save_active_match_workspace(
             result,
             "save_as_second_match_canonical",
@@ -2431,14 +3182,26 @@ class MatchController(QObject):
         if not canonical_save.success:
             return
         try:
-            board = self._formation_board_mapper.to_board(recommended)
-            self._weekly_training_service.record_second_match(
+            state = self._weekly_training_service.record_second_match(
                 board,
                 opponent_name=metadata.opponent_name,
                 roster_players=self._roster_players,
                 match_date=metadata.scheduled_date,
                 linked_match_record_id=canonical_save.match_record_id,
                 competition_type=self._weekly_competition_type_for_save(result),
+            )
+            self._assert_visible_board_matches_weekly_record(
+                board,
+                state,
+                canonical_save.match_record_id,
+            )
+            self._trace_runtime_integrity(
+                "WEEKLY_MATCH_SAVED",
+                result=result,
+                caller="_save_as_second_match",
+                reason="record_second_match",
+                saved_weekly_formation=getattr(board, "formation_name", ""),
+                saved_match_record_id=canonical_save.match_record_id,
             )
         except ValueError as exc:
             if str(exc) == "duplicate_match_id":
@@ -2486,17 +3249,24 @@ class MatchController(QObject):
         if not match_date:
             self._view.show_error(t("match.save_as_weekly_missing_match_date"))
             return
+        result = self._result_with_active_workspace_lineup(result)
+        board = self._capture_visible_lineup_board(result) or board
         metadata = self._current_workspace_metadata(result=result)
         if not self._validate_metadata_for_save(metadata):
             return
         try:
-            self._weekly_training_service.replace_second_match(
+            state = self._weekly_training_service.replace_second_match(
                 board,
                 opponent_name=metadata.opponent_name,
                 roster_players=self._roster_players,
                 match_date=metadata.scheduled_date,
                 linked_match_record_id=linked_match_record_id or self._linked_canonical_record_id(result),
                 competition_type=self._weekly_competition_type_for_save(result),
+            )
+            self._assert_visible_board_matches_weekly_record(
+                board,
+                state,
+                linked_match_record_id,
             )
         except Exception as exc:
             self._view.show_error(
@@ -2527,6 +3297,12 @@ class MatchController(QObject):
         )
 
         slot = slot or PRE
+        if slot == PRE:
+            self._trace_runtime_integrity(
+                "PRE_IMPORT_STARTED",
+                caller="_import_official_ratings",
+                reason="official_rating_import_requested",
+            )
         self._save_recovery_snapshot_if_dirty()
         if self._official_rating_service is None:
             self._official_rating_service = OfficialRatingImportService()
@@ -2569,6 +3345,18 @@ class MatchController(QObject):
             else:
                 outcome = self._official_rating_service.import_and_link(
                     raw_text, slot=slot
+                )
+            if slot == PRE:
+                self._trace_runtime_integrity(
+                    "PRE_PARSED",
+                    caller="_import_official_ratings",
+                    reason="import_outcome",
+                    imported_snapshot_id=getattr(outcome.snapshot, "snapshot_id", ""),
+                    official_match_id=getattr(
+                        getattr(outcome, "parsed", None),
+                        "hattrick_match_id",
+                        "",
+                    ),
                 )
         except OfficialRatingMatchIdMismatch as exc:
             match_id = MatchIdMismatchDialog.request_match_id(
@@ -2627,6 +3415,12 @@ class MatchController(QObject):
         self._record_app_event(
             "import_official_ratings", outcome.snapshot.snapshot_id, detail=f"slot={slot}"
         )
+        if slot == PRE:
+            self._trace_runtime_integrity(
+                "PRE_LINKED",
+                caller="_import_official_ratings",
+                reason=getattr(outcome.snapshot, "snapshot_id", ""),
+            )
         self._refresh_after_official_import(outcome.snapshot.snapshot_id)
         if self._app_events is not None:
             self._app_events.official_ratings_changed.emit(outcome.snapshot.snapshot_id)
@@ -2651,6 +3445,12 @@ class MatchController(QObject):
         if result is None:
             return
         result = self._result_with_active_workspace_lineup(result)
+        self._trace_runtime_integrity(
+            "PRE_IMPORT_REFRESH",
+            result=result,
+            caller="_refresh_after_official_import",
+            reason=imported_snapshot_id or "",
+        )
         result = self._apply_official_pre_if_available(
             result, snapshot_id_override=imported_snapshot_id
         )
@@ -2662,6 +3462,18 @@ class MatchController(QObject):
             else None
         )
         self._view.show_results(result, workspace_state=workspace_state)
+        self._trace_runtime_integrity(
+            "RECOMMENDATION_RENDERED",
+            result=result,
+            caller="_refresh_after_official_import",
+            reason="show_results_after_pre",
+        )
+        self._trace_runtime_integrity(
+            "FORMATION_BOARD_REBUILT",
+            result=result,
+            caller="_refresh_after_official_import",
+            reason="show_results_after_pre",
+        )
         self._update_pre_status_and_ratings_panel(snapshot_id_override=imported_snapshot_id)
 
     def _show_official_import_error(self, exc):

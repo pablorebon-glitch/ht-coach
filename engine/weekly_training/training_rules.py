@@ -5,6 +5,7 @@ from engine.weekly_training.models import (
     ExposureConfidence,
     TrainingCapacity,
     TrainingExposure,
+    TrainingSlotClass,
 )
 from engine.weekly_training.training_catalog import definition_for
 from engine.weekly_training.training_types import TrainingType
@@ -19,6 +20,9 @@ class TrainingRuleProvider:
 
     def factor_for_position(self, position):
         raise NotImplementedError
+
+    def slot_class_for_position(self, position):
+        return slot_class_for_factor(self.factor_for_position(position))
 
     def exposure_for_entry(self, match_id, entry, source, confidence):
         factor = self.factor_for_position(entry.position)
@@ -70,6 +74,15 @@ def _coerce_position(position):
         return Position(str(value))
     except ValueError:
         return None
+
+
+def slot_class_for_factor(factor):
+    factor = Decimal(str(factor))
+    if factor == Decimal("1"):
+        return TrainingSlotClass.FULL_TRAINING
+    if factor == Decimal("0.5"):
+        return TrainingSlotClass.HALF_TRAINING
+    return TrainingSlotClass.NO_TRAINING
 
 
 class CatalogTrainingRules(TrainingRuleProvider):

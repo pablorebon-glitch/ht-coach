@@ -314,6 +314,7 @@ def test_editing_metadata_with_official_evidence_shows_warning_and_preserves_mat
 
     controller.edit_record(record.snapshot_id)
     page.opponent_combo.setCurrentText("Torres FC")
+    page.confirm_metadata_evidence_save = lambda: True
 
     assert page.metadata_evidence_warning_label.text() == t(
         "match.metadata_official_evidence_warning"

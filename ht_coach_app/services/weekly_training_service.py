@@ -10,6 +10,7 @@ from engine.weekly_training.models import (
     MatchStatus,
     TrainingPriority,
     TrainingPriorityRecord,
+    TrainingSlotClass,
     WeeklyMatchRecord,
 )
 from engine.weekly_training.persistence import WeeklyTrainingRepository
@@ -34,6 +35,13 @@ from ht_coach_app.widgets.formation_board.formation_board_models import (
 )
 from ht_coach_app.widgets.formation_board.formation_layouts import get_formation_layout
 from ht_coach_app.workspace.workspace_service import WorkspaceService
+
+
+def _decimal_text(value):
+    text = format(value.normalize(), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 @dataclass(frozen=True)
@@ -152,9 +160,8 @@ class WeeklyTrainingAppService:
         state = self.load_state()
         cycle_id = self._coerce_cycle_id(state, cycle_id)
         parts = [cycle_id, state.active_training_type]
-        for key in sorted(state.priorities):
-            record = state.priorities[key]
-            parts.append(f"p:{key}:{record.priority.value}:{record.player_name}")
+        for key, priority in sorted(self._current_priority_map(state).items()):
+            parts.append(f"p:{key}:{priority.value}")
         for record in sorted(
             self._weekly_match_records_for_cycle(state, cycle_id),
             key=lambda item: item.match_id,
@@ -587,6 +594,41 @@ class WeeklyTrainingAppService:
                 required_ids.update(legacy_ids)
         return frozenset(required_ids)
 
+    def required_player_training_slot_classes(self, cycle_id=None, players=()):
+        """Requested full-match training slot class for required players."""
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        required_ids = self.required_player_ids_for_match(cycle_id)
+        latest_by_id = self._latest_priority_by_normalized_id(state)
+        slot_classes = {}
+        for normalized_id, (record, legacy_ids) in latest_by_id.items():
+            if normalized_id not in required_ids and not (legacy_ids & required_ids):
+                continue
+            slot_class = self._required_slot_class_for_priority(record.priority)
+            if slot_class is None:
+                continue
+            slot_classes[normalized_id] = slot_class.value
+            for legacy_id in legacy_ids:
+                slot_classes[legacy_id] = slot_class.value
+
+        if not players:
+            return slot_classes
+
+        player_ids = {player_training_id(player) for player in players}
+        return {
+            key: value
+            for key, value in slot_classes.items()
+            if key in player_ids
+        }
+
+    @staticmethod
+    def _required_slot_class_for_priority(priority):
+        if priority == TrainingPriority.REQUIRED_100:
+            return TrainingSlotClass.FULL_TRAINING
+        if priority == TrainingPriority.REQUIRED_50:
+            return TrainingSlotClass.HALF_TRAINING
+        return None
+
     @staticmethod
     def _latest_priority_by_normalized_id(state):
         """Collapses state.priorities down to a single "latest" record
@@ -624,16 +666,26 @@ class WeeklyTrainingAppService:
             for normalized_id, bucket in grouped.items()
         }
 
+    @staticmethod
+    def _current_priority_map(state):
+        priorities = {}
+        for normalized_id, (record, stored_keys) in (
+            WeeklyTrainingAppService._latest_priority_by_normalized_id(state).items()
+        ):
+            if record is None:
+                continue
+            priorities[normalized_id] = record.priority
+            for stored_key in stored_keys:
+                priorities[stored_key] = record.priority
+        return priorities
+
     def coverage(self, players, cycle_id):
         state = self.load_state()
         cycle_id = self._coerce_cycle_id(state, cycle_id)
         rules = rule_provider_for(state.active_training_type)
         if rules is None:
             return ()
-        priorities = {
-            key: record.priority
-            for key, record in state.priorities.items()
-        }
+        priorities = self._current_priority_map(state)
         return WeeklyTrainingCoverageService(rules).aggregate(
             players,
             priorities,
@@ -644,10 +696,7 @@ class WeeklyTrainingAppService:
         state = self.load_state()
         cycle_id = self._coerce_cycle_id(state, cycle_id)
         week = self.training_week_for_cycle(cycle_id, state=state)
-        priorities = {
-            key: record.priority
-            for key, record in state.priorities.items()
-        }
+        priorities = self._current_priority_map(state)
         unavailable = [
             player_training_id(player)
             for player in players
@@ -985,14 +1034,15 @@ class WeeklyTrainingAppService:
             ),
             None,
         )
-        priority = state.priorities.get(player_id)
+        priority_map = self._current_priority_map(state)
+        priority = priority_map.get(player_id, TrainingPriority.NO_PRIORITY)
         provenance = self.participation_provenance(player_id, cycle_id)
         return {
             "player_id": player_id,
             "cycle_id": cycle_id,
             "displayed_symbol": displayed_symbol,
             "priority": (
-                priority.priority.value
+                priority.value
                 if priority is not None
                 else TrainingPriority.NO_PRIORITY.value
             ),
@@ -1031,6 +1081,90 @@ class WeeklyTrainingAppService:
                 state,
             ),
         }
+
+    def explain_training_requirement(self, player_id, cycle_id, players=()):
+        from decimal import Decimal
+
+        state = self.load_state()
+        cycle_id = self._coerce_cycle_id(state, cycle_id)
+        priority_map = self._current_priority_map(state)
+        configured = priority_map.get(player_id, TrainingPriority.NO_PRIORITY)
+        coverage = next(
+            (
+                row for row in self.coverage(players, cycle_id)
+                if row.player_id == player_id
+            ),
+            None,
+        )
+        confirmed = Decimal(str(getattr(coverage, "confirmed_exposure", "0") or "0"))
+        assumed = Decimal(str(getattr(coverage, "assumed_exposure", "0") or "0"))
+        planned = Decimal(str(getattr(coverage, "planned_exposure", "0") or "0"))
+        remaining = Decimal(str(getattr(coverage, "remaining_exposure", "0") or "0"))
+        coverage_minutes = ((confirmed + assumed + planned) / Decimal("100")) * Decimal("90")
+        remaining_minutes = (remaining / Decimal("100")) * Decimal("90")
+        required_slot_class = self._required_slot_class_for_priority(configured)
+        slot_evidence = self._slot_class_evidence_for_player(
+            player_id,
+            cycle_id,
+            state,
+        )
+        plan_satisfied = (
+            required_slot_class is not None
+            and required_slot_class.value in slot_evidence
+        )
+        if required_slot_class is None:
+            plan_satisfied = False
+        required_ids = self.required_player_ids_for_match(cycle_id)
+        if configured == TrainingPriority.REQUIRED_100:
+            reason = "Configured for 100% training and still below the weekly target."
+        elif configured == TrainingPriority.REQUIRED_50:
+            reason = "Configured for 50% training and still below the weekly target."
+        elif configured == TrainingPriority.REST:
+            reason = "Configured to rest; not passed as a required training player."
+        else:
+            reason = "No required training target remains for this player."
+        if player_id not in required_ids and configured in {
+            TrainingPriority.REQUIRED_100,
+            TrainingPriority.REQUIRED_50,
+        }:
+            reason = "Current coverage already satisfies this configured training target."
+        return {
+            "player_id": player_id,
+            "cycle_id": cycle_id,
+            "configured_priority": configured.value,
+            "required_slot_class": (
+                required_slot_class.value if required_slot_class is not None else ""
+            ),
+            "current_week_actual_training": tuple(slot_evidence),
+            "plan_satisfied": plan_satisfied,
+            "match_1_exposure": str(confirmed + assumed),
+            "match_2_exposure": str(planned),
+            "coverage_so_far": str(confirmed + assumed + planned),
+            "coverage_effective_minutes": _decimal_text(coverage_minutes),
+            "required_remaining_exposure": str(remaining),
+            "remaining_effective_minutes": _decimal_text(remaining_minutes),
+            "effective_optimizer_priority": (
+                configured.value if player_id in required_ids else "NONE"
+            ),
+            "candidate_position": "",
+            "candidate_training_factor": "",
+            "effective_training_score": "",
+            "tactical_score": "",
+            "source_revision": self.weekly_cycle_revision(cycle_id),
+            "reason": reason,
+        }
+
+    def _slot_class_evidence_for_player(self, player_id, cycle_id, state):
+        from engine.weekly_training.training_rules import slot_class_for_factor
+
+        evidence = []
+        for record in self._weekly_match_records_for_cycle(state, cycle_id):
+            for exposure in record.training_exposure_entries:
+                if exposure.player_id != player_id:
+                    continue
+                slot_class = slot_class_for_factor(exposure.training_factor)
+                evidence.append(slot_class.value)
+        return tuple(evidence)
 
     def _other_cycle_provenance(self, player_id, cycle_id, state):
         sources = []

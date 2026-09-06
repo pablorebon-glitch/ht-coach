@@ -405,6 +405,103 @@ class MatchResultsViewStateTest(unittest.TestCase):
         self.assertEqual(rows["formation"], "3-5-2")
         self.assertEqual(rows["confidence"], "MEDIUM")
 
+    def test_decision_lab_summary_prefers_stable_recommendation_identity(self):
+        from ht_coach_app.reasoning.decision_lab import DecisionLab
+
+        page = MatchPage()
+        stale_source = MatchAnalysisResult(
+            player_count=0,
+            opponent_name="",
+            formations=[
+                FormationAnalysisResult(
+                    formation_name="3-5-2",
+                    recommended_tactic="Normal",
+                    tactic_level=0,
+                    win_probability=0.61,
+                    draw_probability=0.20,
+                    loss_probability=0.19,
+                    possession=0.55,
+                    expected_goals=1.8,
+                    opponent_expected_goals=0.9,
+                    is_recommended=True,
+                ),
+                FormationAnalysisResult(
+                    formation_name="2-5-3",
+                    recommended_tactic="Normal",
+                    tactic_level=0,
+                    win_probability=0.50,
+                    draw_probability=0.25,
+                    loss_probability=0.25,
+                    possession=0.52,
+                    expected_goals=1.4,
+                    opponent_expected_goals=1.1,
+                ),
+            ],
+        )
+        result = MatchAnalysisResult(
+            player_count=0,
+            opponent_name="",
+            formations=stale_source.formations,
+            decision_lab=DecisionLab().analyze(stale_source),
+            recommendation_id="2-5-3",
+        )
+
+        self.assertIn("2-5-3", page._decision_lab_summary(result))
+        self.assertEqual(page.decision_lab_rows(result)["formation"], "2-5-3")
+
+    def test_show_results_normalizes_recommended_labels_from_identity(self):
+        page = MatchPage()
+        result = MatchAnalysisResult(
+            player_count=2,
+            opponent_name="Rival FC",
+            players_csv_filename="players.csv",
+            analyzed_formations=["3-5-2", "2-5-3"],
+            completed_at="2026-07-15 10:00:00",
+            recommendation_id="2-5-3",
+            formations=[
+                FormationAnalysisResult(
+                    formation_name="3-5-2",
+                    recommended_tactic="Normal",
+                    tactic_level=0,
+                    win_probability=0.61,
+                    draw_probability=0.20,
+                    loss_probability=0.19,
+                    possession=0.55,
+                    expected_goals=1.8,
+                    opponent_expected_goals=0.9,
+                    is_recommended=True,
+                    lineup=[
+                        LineupPlayerResult(1, "FORWARD", "CENTER", "NORMAL", "", "A")
+                    ],
+                ),
+                FormationAnalysisResult(
+                    formation_name="2-5-3",
+                    recommended_tactic="Normal",
+                    tactic_level=0,
+                    win_probability=0.50,
+                    draw_probability=0.25,
+                    loss_probability=0.25,
+                    possession=0.52,
+                    expected_goals=1.4,
+                    opponent_expected_goals=1.1,
+                    is_recommended=False,
+                    lineup=[
+                        LineupPlayerResult(1, "FORWARD", "CENTER", "NORMAL", "", "B")
+                    ],
+                ),
+            ],
+        )
+
+        page.show_results(result)
+
+        self.assertEqual(page.recommended_rows(page._last_result), ["2-5-3"])
+        labels = [
+            page._formation_board_widget.formation_combo.itemText(index)
+            for index in range(page._formation_board_widget.formation_combo.count())
+        ]
+        self.assertIn("2-5-3 (Recommended)", labels)
+        self.assertIn("3-5-2 (Alternative)", labels)
+
     def test_formation_selector_presets(self):
         page = MatchPage()
         formations = [

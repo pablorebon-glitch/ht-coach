@@ -189,12 +189,20 @@ class MatchAnalysisResult:
     training_context_timestamp: str = ""
     training_context_summary: str = ""
     training_context_stale: bool = False
+    recommendation_id: str = ""
+    recommendation_revision: int = 0
+    manual_lineup_revision: int = 0
     lineup_decision: dict | None = None
 
     @property
     def recommended_formation(self):
         if not self.formations:
             return None
+
+        recommendation_id = str(self.recommendation_id or "").strip()
+        for formation in self.formations:
+            if recommendation_id and formation.formation_name == recommendation_id:
+                return formation
 
         for formation in self.formations:
             if formation.is_recommended:
@@ -251,6 +259,7 @@ class MatchWorkspaceService:
         match_type=MATCH_TYPE_LEAGUE,
         required_player_ids=None,
         training_rules=None,
+        required_slot_classes=None,
     ):
         match_type = self._normalize_match_type(match_type)
         self.validate_inputs(
@@ -301,6 +310,7 @@ class MatchWorkspaceService:
                 opponent.ratings,
                 required_players,
                 training_rules,
+                required_slot_classes=required_slot_classes or {},
             )
             engine_results = [
                 item.formation_result for item in constrained_results
@@ -312,10 +322,19 @@ class MatchWorkspaceService:
                     for player in item.unplaced_required_players
                 }
             )
-            if unplaced_names:
+            conflict_names = sorted(
+                {
+                    conflict.get("player_name", "")
+                    for item in constrained_results[:1]
+                    for conflict in getattr(item, "training_conflicts", ())
+                    if conflict.get("player_name", "")
+                }
+            )
+            warning_names = sorted(set(unplaced_names) | set(conflict_names))
+            if warning_names:
                 training_conflict_warning = t(
                     "match.training_conflict_warning",
-                    players=", ".join(unplaced_names),
+                    players=", ".join(warning_names),
                 )
         else:
             engine_results = self._optimizer(
@@ -346,6 +365,11 @@ class MatchWorkspaceService:
             training_context_timestamp="",
             training_context_summary="",
             training_context_stale=False,
+            recommendation_id=(
+                mapped_results[0].formation_name if mapped_results else ""
+            ),
+            recommendation_revision=1,
+            manual_lineup_revision=0,
         )
 
         return self._with_decision_lab(
@@ -458,6 +482,9 @@ class MatchWorkspaceService:
             availability_warning=self._availability_warning(mode),
             unavailable_players_count=self._unavailable_count(all_players),
             match_type=match_type,
+            recommendation_id="",
+            recommendation_revision=0,
+            manual_lineup_revision=1,
         )
 
         return self._with_decision_lab(
@@ -883,8 +910,15 @@ class MatchWorkspaceService:
             training_context_timestamp=result.training_context_timestamp,
             training_context_summary=result.training_context_summary,
             training_context_stale=result.training_context_stale,
+            recommendation_id=result.recommendation_id,
+            recommendation_revision=result.recommendation_revision,
+            manual_lineup_revision=result.manual_lineup_revision,
+            lineup_decision=result.lineup_decision,
         )
         return with_tactical_advisor(enriched)
+
+    def refresh_presentational_analysis(self, result):
+        return self._with_decision_lab(result)
 
     @staticmethod
     def _map_team_ratings(ratings):
@@ -996,6 +1030,12 @@ def match_analysis_result_from_dict(data):
         training_context_timestamp=data.get("training_context_timestamp", ""),
         training_context_summary=data.get("training_context_summary", ""),
         training_context_stale=bool(data.get("training_context_stale", False)),
+        recommendation_id=(
+            data.get("recommendation_id", "")
+            or _recommended_formation_name_from_items(data.get("formations", []))
+        ),
+        recommendation_revision=int(data.get("recommendation_revision", 0)),
+        manual_lineup_revision=int(data.get("manual_lineup_revision", 0)),
         formations=[
             FormationAnalysisResult(
                 formation_name=item.get("formation_name", ""),
@@ -1130,6 +1170,10 @@ def match_analysis_result_from_dict(data):
             training_context_timestamp=result.training_context_timestamp,
             training_context_summary=result.training_context_summary,
             training_context_stale=result.training_context_stale,
+            recommendation_id=result.recommendation_id,
+            recommendation_revision=result.recommendation_revision,
+            manual_lineup_revision=result.manual_lineup_revision,
+            lineup_decision=result.lineup_decision,
         )
 
     return result
@@ -1164,7 +1208,20 @@ def with_tactical_advisor(result):
         training_context_timestamp=result.training_context_timestamp,
         training_context_summary=result.training_context_summary,
         training_context_stale=result.training_context_stale,
+        recommendation_id=result.recommendation_id,
+        recommendation_revision=result.recommendation_revision,
+        manual_lineup_revision=result.manual_lineup_revision,
+        lineup_decision=result.lineup_decision,
     )
+
+
+def _recommended_formation_name_from_items(items):
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("is_recommended", False):
+            return item.get("formation_name", "")
+    return ""
 
 
 def _team_ratings_from_dict(data):

@@ -9,6 +9,10 @@ QApplication = pytest.importorskip("PySide6.QtWidgets").QApplication
 QComboBox = pytest.importorskip("PySide6.QtWidgets").QComboBox
 
 from engine.history.repository import HistoricalMatchRepository
+from engine.history.enums import CompetitionType, HomeAway
+from engine.history.metadata_diagnostics import find_incomplete_match_metadata
+from engine.history.models import HistoricalMatchSnapshot, MatchContext, OpponentReference
+from engine.history.official_ratings.models import OfficialRatingSnapshot
 from engine.weekly_training.persistence import WeeklyTrainingRepository
 from ht_coach_app.controllers.match_controller import MatchController
 from ht_coach_app.core.localization import configure_localization
@@ -290,7 +294,7 @@ def test_new_match_save_persists_canonical_metadata_and_reopens_exactly(tmp_path
     assert record.match_context.match_date == "2026-08-05"
     assert record.ht_season_number == 95
     assert record.ht_season_week == 2
-    assert record.training_cycle_id
+    assert record.training_cycle_id == "2026-08-02:PLAYMAKING"
 
     saved_page = SavedMatchesPage()
     saved_controller = SavedMatchesController(saved_page, hist_repo)
@@ -316,6 +320,180 @@ def test_new_match_save_persists_canonical_metadata_and_reopens_exactly(tmp_path
     )
     controller2._save_formation()
     assert len(hist_repo.list_all()) == 1
+
+
+def test_saved_match_metadata_repair_persists_without_analysis_and_preserves_evidence(tmp_path):
+    from ht_coach_app.controllers.saved_matches_controller import SavedMatchesController
+    from ht_coach_app.views.saved_matches_page import SavedMatchesPage
+
+    page, controller, hist_repo, weekly_service = make_controller(
+        tmp_path,
+        known_opponents=["Santa Cruz Club"],
+    )
+    record = HistoricalMatchSnapshot(
+        snapshot_id="legacy-missing-metadata",
+        match_context=MatchContext(
+            official_match_id="770918226",
+            match_date="",
+            competition_type=CompetitionType.UNKNOWN,
+            home_away=HomeAway.UNKNOWN,
+            opponent=OpponentReference(
+                opponent_id="Santa Cruz Club",
+                opponent_name="Santa Cruz Club",
+            ),
+        ),
+        official_pre=OfficialRatingSnapshot(
+            team_name="Hit'em up",
+            hattrick_match_id="770918226",
+        ),
+    )
+    hist_repo.save(record)
+
+    page.confirm_metadata_evidence_save = lambda: True
+    controller.edit_record(record.snapshot_id)
+
+    assert page.selected_opponent_name() == "Santa Cruz Club"
+    assert page.match_type() == ""
+    assert page.venue_role() == "unknown"
+    assert page.match_date() == ""
+
+    page.set_match_type("CUP")
+    page.set_venue_role("home")
+    page.set_match_date("2026-08-05")
+
+    assert page.is_metadata_dirty() is True
+    assert page.save_metadata_button.isHidden() is False
+    assert page.save_metadata_button.isEnabled() is True
+
+    controller._save_formation()
+
+    records = hist_repo.list_all()
+    assert len(records) == 1
+    repaired = hist_repo.get(record.snapshot_id)
+    assert repaired.snapshot_id == record.snapshot_id
+    assert repaired.match_context.official_match_id == "770918226"
+    assert repaired.official_pre is not None
+    assert repaired.official_pre.hattrick_match_id == "770918226"
+    assert repaired.official_post is None
+    assert repaired.match_context.opponent.opponent_name == "Santa Cruz Club"
+    assert repaired.match_context.competition_type.value == "cup"
+    assert repaired.match_context.home_away.value == "home"
+    assert repaired.match_context.match_date == "2026-08-05"
+    assert repaired.ht_season_number == 95
+    assert repaired.ht_season_week == 2
+    assert repaired.training_cycle_id == "2026-08-02:PLAYMAKING"
+    assert page.is_metadata_dirty() is False
+
+    saved_page = SavedMatchesPage()
+    saved_controller = SavedMatchesController(saved_page, hist_repo)
+    saved_controller.refresh()
+    assert saved_page.table.rowCount() == 1
+    assert saved_page.table.item(0, 1).text() == "Copa / Amistoso"
+    assert saved_page.table.item(0, 2).text() == "05/08/2026"
+    assert saved_page.table.item(0, 4).text() == "Local"
+
+
+def test_saved_match_metadata_repair_can_be_cancelled_when_official_evidence_exists(tmp_path):
+    page, controller, hist_repo, weekly_service = make_controller(
+        tmp_path,
+        known_opponents=["Santa Cruz Club"],
+    )
+    record = HistoricalMatchSnapshot(
+        snapshot_id="legacy-cancelled-metadata",
+        match_context=MatchContext(
+            official_match_id="770918226",
+            match_date="",
+            competition_type=CompetitionType.UNKNOWN,
+            home_away=HomeAway.UNKNOWN,
+            opponent=OpponentReference(opponent_name="Santa Cruz Club"),
+        ),
+        official_pre=OfficialRatingSnapshot(hattrick_match_id="770918226"),
+    )
+    hist_repo.save(record)
+
+    page.confirm_metadata_evidence_save = lambda: False
+    controller.edit_record(record.snapshot_id)
+    page.set_match_type("CUP")
+    page.set_venue_role("home")
+    page.set_match_date("2026-08-05")
+
+    controller._save_formation()
+
+    unchanged = hist_repo.get(record.snapshot_id)
+    assert unchanged.match_context.match_date == ""
+    assert unchanged.match_context.competition_type.value == "unknown"
+    assert unchanged.match_context.home_away.value == "unknown"
+    assert unchanged.official_pre is not None
+
+
+def test_saved_match_metadata_repair_does_not_fallback_to_league_or_today(tmp_path):
+    page, controller, hist_repo, weekly_service = make_controller(
+        tmp_path,
+        known_opponents=["Santa Cruz Club"],
+    )
+    record = HistoricalMatchSnapshot(
+        snapshot_id="legacy-still-incomplete",
+        match_context=MatchContext(
+            official_match_id="770918226",
+            match_date="",
+            competition_type=CompetitionType.UNKNOWN,
+            home_away=HomeAway.UNKNOWN,
+            opponent=OpponentReference(opponent_name="Santa Cruz Club"),
+        ),
+        official_pre=OfficialRatingSnapshot(hattrick_match_id="770918226"),
+    )
+    hist_repo.save(record)
+
+    controller.edit_record(record.snapshot_id)
+    page.clear_match_date()
+    assert page.match_type() == ""
+    assert page.match_date() == ""
+
+    controller._save_formation()
+
+    unchanged = hist_repo.get(record.snapshot_id)
+    assert unchanged.match_context.match_date == ""
+    assert unchanged.match_context.competition_type.value == "unknown"
+
+
+def test_find_incomplete_match_metadata_reports_missing_fields_without_mutation(tmp_path):
+    hist_repo = HistoricalMatchRepository(tmp_path / "snapshots.json")
+    incomplete = HistoricalMatchSnapshot(
+        snapshot_id="legacy-missing-metadata",
+        match_context=MatchContext(
+            official_match_id="770918226",
+            match_date="",
+            competition_type=CompetitionType.UNKNOWN,
+            home_away=HomeAway.UNKNOWN,
+            opponent=OpponentReference(opponent_name="Santa Cruz Club"),
+        ),
+        official_pre=OfficialRatingSnapshot(hattrick_match_id="770918226"),
+    )
+    complete = HistoricalMatchSnapshot(
+        snapshot_id="complete",
+        match_context=MatchContext(
+            official_match_id="770000000",
+            match_date="2026-08-05",
+            competition_type=CompetitionType.CUP,
+            home_away=HomeAway.HOME,
+            opponent=OpponentReference(opponent_name="Rival Completo"),
+        ),
+    )
+    hist_repo.save(incomplete)
+    hist_repo.save(complete)
+
+    report = find_incomplete_match_metadata(hist_repo)
+
+    assert len(report) == 1
+    assert report[0].match_record_id == "legacy-missing-metadata"
+    assert report[0].opponent == "Santa Cruz Club"
+    assert report[0].official_match_id == "770918226"
+    assert report[0].missing_fields == (
+        "match_date",
+        "competition_type",
+        "venue",
+    )
+    assert hist_repo.get("legacy-missing-metadata").match_context.match_date == ""
 
 
 def test_save_formation_button_enabled_when_workspace_is_valid_after_analysis(tmp_path):

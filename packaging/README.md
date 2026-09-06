@@ -21,6 +21,24 @@ Output:
 This build does not create `portable.flag`, so it uses the canonical Windows
 user-data folder rather than a portable data folder.
 
+## Runtime Integrity Trace
+
+Normal launches keep tracing disabled. To reproduce a runtime state issue with
+the packaged app, run:
+
+```powershell
+.\scripts\run_windows_with_runtime_trace.cmd
+```
+
+The app prints the active JSONL trace location once at startup:
+
+```text
+Runtime integrity trace enabled: <absolute path>
+```
+
+For the normal desktop build, the trace is written under the canonical Windows
+app logs folder.
+
 ## Portable Build
 
 ```powershell

@@ -216,3 +216,81 @@ def test_future_saved_match_calendar_opens_on_saved_date_month(tmp_path):
 
     assert page.match_date() == "2027-07-15"
     assert _calendar_page(page) == (2027, 7)
+
+
+def test_clicking_match_date_field_center_opens_calendar_without_changing_date():
+    _app()
+    page = MatchPage()
+    page.set_match_date("2026-08-05")
+    _show(page)
+
+    before = page.match_date()
+    QTest.mouseClick(
+        page.match_date_edit,
+        Qt.MouseButton.LeftButton,
+        pos=page.match_date_edit.rect().center(),
+    )
+    QApplication.processEvents()
+
+    assert page.match_date_edit.calendarWidget().isVisible()
+    assert page.match_date() == before
+    assert _calendar_page(page) == (2026, 8)
+
+
+def test_clicking_match_date_internal_text_editor_opens_calendar_without_caret_edit():
+    _app()
+    page = MatchPage()
+    page.set_match_date("2026-08-05")
+    _show(page)
+
+    line_edit = page.match_date_edit.lineEdit()
+    line_edit.setCursorPosition(0)
+    before_date = page.match_date()
+    before_cursor = line_edit.cursorPosition()
+
+    QTest.mouseClick(
+        line_edit,
+        Qt.MouseButton.LeftButton,
+        pos=line_edit.rect().center(),
+    )
+    QApplication.processEvents()
+
+    assert page.match_date_edit.calendarWidget().isVisible()
+    assert page.match_date() == before_date
+    assert line_edit.cursorPosition() == before_cursor
+    assert _calendar_page(page) == (2026, 8)
+
+
+def test_clicking_match_date_arrow_still_opens_calendar_without_changing_date():
+    _app()
+    page = MatchPage()
+    page.set_match_date("2026-08-05")
+    _show(page)
+
+    before = page.match_date()
+    arrow_point = page.match_date_edit.rect().center()
+    arrow_point.setX(page.match_date_edit.rect().right() - 4)
+    QTest.mouseClick(
+        page.match_date_edit,
+        Qt.MouseButton.LeftButton,
+        pos=arrow_point,
+    )
+    QApplication.processEvents()
+
+    assert page.match_date_edit.calendarWidget().isVisible()
+    assert page.match_date() == before
+    assert _calendar_page(page) == (2026, 8)
+
+
+def test_opening_match_date_calendar_preserves_saved_month():
+    _app()
+    page = MatchPage()
+    page.set_match_date("2027-07-15")
+    _show(page)
+
+    page.match_date_edit.open_calendar_popup()
+    QApplication.processEvents()
+
+    assert page.match_date_edit.calendarWidget().isVisible()
+    assert page.match_date() == "2027-07-15"
+    assert _calendar_page(page) == (2027, 7)

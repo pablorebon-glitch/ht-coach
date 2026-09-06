@@ -19,6 +19,7 @@ class MatchAnalysisWorker(QObject):
         match_type=None,
         required_player_ids=None,
         training_rules=None,
+        required_slot_classes=None,
         parent=None
     ):
         super().__init__(parent)
@@ -31,6 +32,7 @@ class MatchAnalysisWorker(QObject):
         self._match_type = match_type
         self._required_player_ids = required_player_ids
         self._training_rules = training_rules
+        self._required_slot_classes = required_slot_classes
 
     @Slot()
     def run(self):
@@ -66,6 +68,7 @@ class MatchAnalysisWorker(QObject):
                 analyze_kwargs["match_type"] = self._match_type
             analyze_kwargs["required_player_ids"] = self._required_player_ids
             analyze_kwargs["training_rules"] = self._training_rules
+            analyze_kwargs["required_slot_classes"] = self._required_slot_classes
             result = self._service.analyze(
                 self._players_csv_path,
                 self._opponent_name,

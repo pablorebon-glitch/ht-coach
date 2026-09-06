@@ -151,9 +151,8 @@ def test_required_50_player_partially_covered_still_required(tmp_path):
 
     state = service.load_state()
     match_id = f"{state.active_week.week_id}:first"
-    # Played as a Winger (factor 0.5): 90 real minutes * 0.5 = 45
-    # effective minutes, which exactly meets the 45-minute Required 50%
-    # target.
+    # Played as a Winger (factor 0.5): this is the requested half-training
+    # slot class for a Required 50% player.
     record = played_record(
         [entry_for(partially_covered, "WINGER", minutes=90, match_id=match_id)],
         match_id=match_id,
@@ -337,6 +336,116 @@ def test_multiple_legacy_entries_for_same_player_use_the_most_recent(tmp_path):
 
     required_ids = service.required_player_ids_for_match()
     assert player_training_id(current) in required_ids
+
+
+def test_current_priority_overrides_legacy_required_100_for_optimizer_context(tmp_path):
+    service = make_service(tmp_path)
+    current = player("Michael Rushton")
+
+    legacy_id = "|".join(
+        [
+            current.name.casefold(),
+            str(current.age),
+            str(current.days - 4),
+            str(current.tsi - 200),
+            str(current.salary),
+        ]
+    )
+    state = service.load_state()
+    service._repository.save_priority(
+        state,
+        TrainingPriorityRecord(
+            player_id=legacy_id,
+            player_name=current.name,
+            priority=TrainingPriority.REQUIRED_100,
+        ),
+    )
+    revision_before = service.weekly_cycle_revision()
+
+    service.save_priority(current, TrainingPriority.REQUIRED_50.value)
+    revision_after = service.weekly_cycle_revision()
+
+    explanation = service.explain_training_requirement(
+        player_training_id(current),
+        service.active_cycle_id(),
+        [current],
+    )
+    assert revision_after != revision_before
+    assert explanation["configured_priority"] == TrainingPriority.REQUIRED_50.value
+    assert explanation["effective_optimizer_priority"] == TrainingPriority.REQUIRED_50.value
+    assert explanation["source_revision"] == revision_after
+    assert explanation["required_slot_class"] == "HALF_TRAINING"
+
+
+def test_required_training_slot_classes_follow_priority_semantics(tmp_path):
+    service = make_service(tmp_path)
+    required_50 = player("Half Target")
+    required_100 = player("Full Target")
+
+    service.save_priority(required_50, TrainingPriority.REQUIRED_50.value)
+    service.save_priority(required_100, TrainingPriority.REQUIRED_100.value)
+
+    slot_classes = service.required_player_training_slot_classes(
+        service.active_cycle_id(),
+        [required_50, required_100],
+    )
+
+    assert slot_classes[player_training_id(required_50)] == "HALF_TRAINING"
+    assert slot_classes[player_training_id(required_100)] == "FULL_TRAINING"
+
+
+def test_required_50_with_first_match_half_coverage_is_not_forced_into_match_two(tmp_path):
+    service = make_service(tmp_path)
+    current = player("Michael Rushton")
+    service.save_priority(current, TrainingPriority.REQUIRED_50.value)
+
+    state = service.load_state()
+    match_id = f"{state.active_week.week_id}:first"
+    record = played_record(
+        [entry_for(current, "WINGER", minutes=90, match_id=match_id)],
+        match_id=match_id,
+    )
+    service._repository.add_match_record(state, record)
+
+    explanation = service.explain_training_requirement(
+        player_training_id(current),
+        service.active_cycle_id(),
+        [current],
+    )
+    assert player_training_id(current) not in service.required_player_ids_for_match()
+    assert explanation["configured_priority"] == TrainingPriority.REQUIRED_50.value
+    assert explanation["effective_optimizer_priority"] == "NONE"
+    assert explanation["required_remaining_exposure"] == "0"
+    assert explanation["required_slot_class"] == "HALF_TRAINING"
+    assert explanation["current_week_actual_training"] == ("HALF_TRAINING",)
+    assert explanation["plan_satisfied"] is True
+
+
+def test_required_50_full_training_is_covered_but_marked_as_slot_mismatch(tmp_path):
+    service = make_service(tmp_path)
+    current = player("Michael Rushton")
+    service.save_priority(current, TrainingPriority.REQUIRED_50.value)
+
+    state = service.load_state()
+    match_id = f"{state.active_week.week_id}:first"
+    record = played_record(
+        [entry_for(current, "INNER_MIDFIELDER", minutes=90, match_id=match_id)],
+        match_id=match_id,
+    )
+    service._repository.add_match_record(state, record)
+
+    explanation = service.explain_training_requirement(
+        player_training_id(current),
+        service.active_cycle_id(),
+        [current],
+    )
+
+    assert player_training_id(current) not in service.required_player_ids_for_match()
+    assert explanation["effective_optimizer_priority"] == "NONE"
+    assert explanation["required_slot_class"] == "HALF_TRAINING"
+    assert explanation["current_week_actual_training"] == ("FULL_TRAINING",)
+    assert explanation["plan_satisfied"] is False
+    assert explanation["required_remaining_exposure"] == "0"
 
 
 def test_stale_week_rolls_over_automatically_on_load(tmp_path):

@@ -144,7 +144,7 @@ def make_match_controller(tmp_path):
     return page, controller, hist_repo, weekly_repo
 
 
-def _analysis_result(opponent="CA Chaco", match_type="LEAGUE"):
+def _analysis_result(opponent="CA Chaco", match_type="LEAGUE", formation_name="3-5-2"):
     from ht_coach_app.services.match_workspace_service import (
         FormationAnalysisResult,
         LineupPlayerResult,
@@ -153,7 +153,7 @@ def _analysis_result(opponent="CA Chaco", match_type="LEAGUE"):
     )
 
     formation = FormationAnalysisResult(
-        formation_name="3-5-2", recommended_tactic="Normal", tactic_level=5,
+        formation_name=formation_name, recommended_tactic="Normal", tactic_level=5,
         win_probability=0.5, draw_probability=0.3, loss_probability=0.2,
         possession=50.0, expected_goals=1.5, opponent_expected_goals=1.2,
         is_recommended=True, team_ratings=TeamRatingsResult(),
@@ -169,6 +169,23 @@ def _analysis_result(opponent="CA Chaco", match_type="LEAGUE"):
         player_count=18,
         opponent_name=opponent,
         formations=[formation],
+        match_type=match_type,
+    )
+
+
+def _analysis_result_with_recommendation_and_visible_option(match_type="CUP"):
+    from dataclasses import replace
+    from ht_coach_app.services.match_workspace_service import MatchAnalysisResult
+
+    recommended = _analysis_result(match_type=match_type, formation_name="3-5-2").formations[0]
+    visible = replace(
+        _analysis_result(match_type=match_type, formation_name="2-5-3").formations[0],
+        is_recommended=False,
+    )
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name="CA Chaco",
+        formations=[recommended, visible],
         match_type=match_type,
     )
 
@@ -269,6 +286,25 @@ def test_cup_analysis_saved_as_second_match_preserves_cup_metadata(tmp_path):
     assert record.competition_type == CompetitionType.CUP
     linked = hist_repo.get(record.linked_match_record_id)
     assert linked.match_context.competition_type.value == "cup"
+
+
+def test_saving_second_match_persists_visible_formation_not_cached_recommendation(tmp_path):
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    page.set_match_type("CUP")
+    controller._roster_players = []
+    controller._analysis_finished(_analysis_result_with_recommendation_and_visible_option())
+
+    combo = page._formation_board_widget.formation_combo
+    combo.setCurrentIndex(combo.findData("2-5-3"))
+    assert page._formation_board_widget.current_board().formation_name == "2-5-3"
+    assert controller._settings_repository.load_last_result().recommended_formation.formation_name == "3-5-2"
+
+    controller._save_as_second_match()
+
+    record = weekly_repo.load().match_records[0]
+    saved = hist_repo.get(record.linked_match_record_id)
+    assert record.formation == "2-5-3"
+    assert saved.tactical_setup.formation == "2-5-3"
 
 
 def test_league_analysis_saved_as_first_match_preserves_league_metadata(tmp_path):

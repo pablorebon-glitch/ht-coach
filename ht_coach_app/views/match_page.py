@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from dataclasses import replace
+
 from ht_coach_app.core.localization import t
 from ht_coach_app.ui.design_system.collapsible_section import CollapsibleSection
 from ht_coach_app.ui.design_system.empty_state import EmptyState
@@ -63,28 +65,75 @@ from ht_coach_app.widgets.formation_board.formation_board import FormationBoard
 
 
 class MatchDateEdit(QDateEdit):
+    _UNSET_DATE = QDate(1900, 1, 1)
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._date_is_set = True
+        self.setMinimumDate(self._UNSET_DATE)
+        self.setSpecialValueText("-")
         self.setCalendarPopup(True)
         self.calendarWidget().installEventFilter(self)
+        self.lineEdit().installEventFilter(self)
+        self.dateChanged.connect(self._handle_date_changed)
 
     def setDate(self, date):
+        self._date_is_set = date.isValid() and date != self._UNSET_DATE
         super().setDate(date)
         self.sync_calendar_page_to_selected_date()
 
+    def clear_match_date(self):
+        self._date_is_set = False
+        super().setDate(self._UNSET_DATE)
+        self.sync_calendar_page_to_selected_date()
+
+    def match_date_text(self):
+        if not self._date_is_set:
+            return ""
+        return self.date().toString("yyyy-MM-dd")
+
+    def _handle_date_changed(self, date):
+        self._date_is_set = date.isValid() and date != self._UNSET_DATE
+
     def mousePressEvent(self, event):
         self.sync_calendar_page_to_selected_date()
-        super().mousePressEvent(event)
-        QTimer.singleShot(0, self.sync_calendar_page_to_selected_date)
+        if event.button() == Qt.MouseButton.LeftButton:
+            event.accept()
+            self.setFocus(Qt.FocusReason.MouseFocusReason)
+            QTimer.singleShot(0, self.open_calendar_popup)
+        else:
+            super().mousePressEvent(event)
+            QTimer.singleShot(0, self.sync_calendar_page_to_selected_date)
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+    def open_calendar_popup(self):
+        self.sync_calendar_page_to_selected_date()
+        calendar = self.calendarWidget()
+        calendar.setWindowFlag(Qt.WindowType.Popup, True)
+        calendar.move(self.mapToGlobal(self.rect().bottomLeft()))
+        calendar.show()
+        calendar.raise_()
+        calendar.setFocus(Qt.FocusReason.MouseFocusReason)
 
     def eventFilter(self, watched, event):
+        if watched is self.lineEdit() and event.type() in {
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseButtonDblClick,
+        }:
+            if event.button() == Qt.MouseButton.LeftButton:
+                event.accept()
+                self.setFocus(Qt.FocusReason.MouseFocusReason)
+                QTimer.singleShot(0, self.open_calendar_popup)
+                return True
         if watched is self.calendarWidget() and event.type() == QEvent.Type.Show:
             self.sync_calendar_page_to_selected_date()
         return super().eventFilter(watched, event)
 
     def sync_calendar_page_to_selected_date(self):
         date = self.date()
-        if date.isValid():
+        if date.isValid() and date != self._UNSET_DATE:
             self.calendarWidget().setCurrentPage(date.year(), date.month())
 
 
@@ -414,6 +463,9 @@ class MatchPage(BasePage):
         self.official_import_button.clicked.connect(
             self._open_official_import_dialog
         )
+        self.save_metadata_button = QPushButton(t("match.save_changes"))
+        self.save_metadata_button.clicked.connect(self.save_formation_requested)
+        self.save_metadata_button.setVisible(False)
 
         layout.addWidget(csv_label, 0, 0)
         layout.addWidget(self.recent_csv_combo, 0, 1)
@@ -440,7 +492,8 @@ class MatchPage(BasePage):
         layout.addWidget(self.training_conflict_label, 12, 1, 1, 3)
         layout.addWidget(self.training_context_label, 13, 1, 1, 3)
         layout.addWidget(self.metadata_evidence_warning_label, 14, 1, 1, 3)
-        layout.addWidget(self.status_label, 15, 0, 1, 3)
+        layout.addWidget(self.status_label, 15, 0, 1, 2)
+        layout.addWidget(self.save_metadata_button, 15, 2)
         layout.addWidget(self.analyze_button, 15, 3)
         layout.setColumnStretch(1, 1)
 
@@ -705,6 +758,8 @@ class MatchPage(BasePage):
             self.show_error(message)
 
     def match_date(self):
+        if hasattr(self.match_date_edit, "match_date_text"):
+            return self.match_date_edit.match_date_text()
         return self.match_date_edit.date().toString("yyyy-MM-dd")
 
     def set_match_date(self, iso_date_text):
@@ -713,6 +768,10 @@ class MatchPage(BasePage):
         qdate = QDate.fromString(iso_date_text[:10], "yyyy-MM-dd")
         if qdate.isValid():
             self.match_date_edit.setDate(qdate)
+
+    def clear_match_date(self):
+        if hasattr(self.match_date_edit, "clear_match_date"):
+            self.match_date_edit.clear_match_date()
 
     def reset_match_date_for_new_match(self):
         self.match_date_edit.setDate(self._default_match_qdate())
@@ -772,6 +831,9 @@ class MatchPage(BasePage):
         formation has unsaved changes."""
         board = self._formation_board_widget
         return self._metadata_dirty or (board is not None and board.is_dirty())
+
+    def is_metadata_dirty(self):
+        return self._metadata_dirty
 
     def current_workspace_state(self):
         board = self._formation_board_widget
@@ -884,6 +946,13 @@ class MatchPage(BasePage):
             self,
             t("match.official_import.confirm_replace_title"),
             t(key),
+        ) == QMessageBox.Yes
+
+    def confirm_metadata_evidence_save(self):
+        return QMessageBox.question(
+            self,
+            t("match.metadata_evidence_confirm_title"),
+            t("match.metadata_evidence_confirm_message"),
         ) == QMessageBox.Yes
 
     def confirm_ambiguous_official_import(self, candidate_count):
@@ -1078,6 +1147,7 @@ class MatchPage(BasePage):
         self._stabilize_match_results_layout()
 
     def show_results(self, result, restored=False, workspace_state=None):
+        result = self._with_stable_recommendation_flags(result)
         viewport_state = self._capture_viewport_state()
         self._state = "success"
         self._last_result = result
@@ -1353,18 +1423,18 @@ class MatchPage(BasePage):
 
     def _decision_lab_summary(self, result):
         decision_lab = getattr(result, "decision_lab", None)
-        if decision_lab is None:
-            return t("common.not_available")
-        recommended = getattr(decision_lab, "recommended_formation", None)
-        formation = getattr(recommended, "formation", "") or ""
-        if formation:
-            return t("match.section_summary.recommended", formation=formation)
         result_recommended = getattr(result, "recommended_formation", None)
         if result_recommended is not None:
             return t(
                 "match.section_summary.recommended",
                 formation=result_recommended.formation_name,
             )
+        if decision_lab is None:
+            return t("common.not_available")
+        recommended = getattr(decision_lab, "recommended_formation", None)
+        formation = getattr(recommended, "formation", "") or ""
+        if formation:
+            return t("match.section_summary.recommended", formation=formation)
         return localized_decision_summary(decision_lab.summary)
 
     def _match_intelligence_summary(self, result):
@@ -2334,8 +2404,9 @@ class MatchPage(BasePage):
         )
 
         for row, formation in enumerate(result.formations):
+            is_recommended = self._is_recommended_formation(result, formation)
             row_values = [
-                "*" if formation.is_recommended else "",
+                "*" if is_recommended else "",
                 formation.formation_name,
                 formation.recommended_tactic,
                 (
@@ -2356,7 +2427,7 @@ class MatchPage(BasePage):
 
             for column, value in enumerate(row_values):
                 item = QTableWidgetItem(value)
-                if formation.is_recommended:
+                if is_recommended:
                     item.setData(256, "recommended")
                 table.setItem(row, column, item)
 
@@ -2650,6 +2721,7 @@ class MatchPage(BasePage):
         self.players_path_edit.setPlaceholderText(t("match.select_players_csv"))
         self.browse_button.setText(t("match.browse"))
         self.load_button.setText(t("match.load_players"))
+        self.save_metadata_button.setText(t("match.save_changes"))
         self.opponent_label.setText(t("match.opponent"))
         self.formation_label.setText(t("match.formations"))
         self.select_all_button.setText(t("match.select_all"))
@@ -2720,14 +2792,14 @@ class MatchPage(BasePage):
         return [
             formation.formation_name
             for formation in result.formations
-            if formation.is_recommended
+            if self._is_recommended_formation(result, formation)
         ]
 
     def comparison_rows(self, result):
         return [
             {
                 "formation": formation.formation_name,
-                "recommended": formation.is_recommended,
+                "recommended": self._is_recommended_formation(result, formation),
                 "win_delta": formation.win_probability_delta,
                 "xg_delta": formation.expected_goals_delta,
             }
@@ -2737,9 +2809,14 @@ class MatchPage(BasePage):
     def decision_lab_rows(self, result):
         if result.decision_lab is None:
             return {}
+        recommended = getattr(result, "recommended_formation", None)
 
         return {
-            "formation": result.decision_lab.recommended_formation.formation,
+            "formation": (
+                recommended.formation_name
+                if recommended is not None
+                else result.decision_lab.recommended_formation.formation
+            ),
             "confidence": result.decision_lab.confidence.level,
             "reasons": [
                 reason.title
@@ -2802,6 +2879,40 @@ class MatchPage(BasePage):
                 for item in intelligence.matrix.opponent_attack_rows
             ],
         }
+
+    @staticmethod
+    def _stable_recommendation_id(result):
+        explicit_id = str(getattr(result, "recommendation_id", "") or "").strip()
+        if explicit_id:
+            return explicit_id
+        recommended = getattr(result, "recommended_formation", None)
+        return getattr(recommended, "formation_name", "")
+
+    def _is_recommended_formation(self, result, formation):
+        recommendation_id = self._stable_recommendation_id(result)
+        if recommendation_id:
+            return formation.formation_name == recommendation_id
+        return bool(getattr(formation, "is_recommended", False))
+
+    def _with_stable_recommendation_flags(self, result):
+        formations = list(getattr(result, "formations", ()) or ())
+        if not formations:
+            return result
+        recommendation_id = self._stable_recommendation_id(result)
+        if not recommendation_id:
+            return result
+        updated = [
+            replace(
+                formation,
+                is_recommended=(formation.formation_name == recommendation_id),
+            )
+            for formation in formations
+        ]
+        return replace(
+            result,
+            formations=updated,
+            recommendation_id=recommendation_id,
+        )
 
     def lineup_rows(self, formation):
         return [
@@ -2934,19 +3045,43 @@ class MatchPage(BasePage):
 
     def _update_save_action_labels(self):
         board = getattr(self, "_formation_board_widget", None)
-        if board is None:
-            return
-        board.save_as_first_match_button.setText(t("match.save_as_first_match"))
-        board.save_as_second_match_button.setText(t("match.save_as_second_match"))
+        if board is not None:
+            board.save_as_first_match_button.setText(t("match.save_as_first_match"))
+            board.save_as_second_match_button.setText(t("match.save_as_second_match"))
         if self._editing_saved_match:
-            board.save_formation_button.setText(t("match.save_changes"))
+            if board is not None:
+                board.save_formation_button.setText(t("match.save_changes"))
+            self.save_metadata_button.setText(t("match.save_changes"))
         else:
-            board.save_formation_button.setText(t("match.save_formation"))
+            if board is not None:
+                board.save_formation_button.setText(t("match.save_formation"))
+            self.save_metadata_button.setText(t("match.save_changes"))
         reason = self._save_action_disabled_reason()
-        if hasattr(board, "set_save_action_validation"):
+        metadata_save_visible = (
+            self._editing_saved_match
+            and self._metadata_dirty
+            and (
+                board is None
+                or getattr(self, "_last_result", None) is None
+                or not getattr(getattr(self, "_last_result", None), "formations", None)
+                or not board.is_dirty()
+            )
+        )
+        self.save_metadata_button.setVisible(metadata_save_visible)
+        self.save_metadata_button.setEnabled(not reason)
+        self.save_metadata_button.setToolTip(reason)
+        if board is not None and hasattr(board, "set_save_action_validation"):
             board.set_save_action_validation(not reason, reason)
 
     def _save_action_disabled_reason(self):
+        if self._editing_saved_match and self._metadata_dirty:
+            if not self.selected_opponent_name():
+                return t("match.save_disabled_no_opponent")
+            if not self.match_type():
+                return t("match.save_disabled_no_match_type")
+            if not self.match_date():
+                return t("match.save_disabled_no_match_date")
+            return ""
         if self._analysis_stale:
             return t("match.analysis_stale_match_type")
         result = getattr(self, "_last_result", None)

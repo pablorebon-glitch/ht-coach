@@ -7,6 +7,7 @@ from datetime import datetime
 from engine.calendar import HTCalendarService
 from engine.history.repository import HistoricalMatchRepository
 from engine.weekly_training.persistence import WeeklyTrainingRepository, WeeklyTrainingState
+from engine.weekly_training.models import TrainingPriority
 from engine.weekly_training.training_week import active_training_week
 from ht_coach_app.controllers.match_controller import MatchController
 from ht_coach_app.controllers.squad_controller import SquadController
@@ -31,6 +32,7 @@ from ht_coach_app.services.weekly_training_service import WeeklyTrainingAppServi
 from ht_coach_app.state.app_events import AppEvents
 from ht_coach_app.views.match_page import MatchPage
 from ht_coach_app.views.squad_page import SquadPage
+from models.player import Player
 
 
 @pytest.fixture(autouse=True)
@@ -64,6 +66,29 @@ def _analysis_result(match_type="LEAGUE"):
         opponent_name="Rival FC",
         formations=[formation],
         match_type=match_type,
+    )
+
+
+def _player(name="Michael Rushton"):
+    return Player(
+        name=name,
+        age=23,
+        days=12,
+        speciality="",
+        form=7,
+        stamina=7,
+        goalkeeper=1,
+        defending=5,
+        playmaking=8,
+        winger=5,
+        passing=5,
+        scoring=5,
+        set_pieces=4,
+        experience=5,
+        leadership=4,
+        tsi=1200,
+        salary=1000,
+        injury=None,
     )
 
 
@@ -178,3 +203,25 @@ def test_saving_first_match_twice_does_not_duplicate(tmp_path):
         r for r in state.match_records if r.match_role.value == "FIRST_WEEKLY_MATCH"
     ]
     assert len(first_match_records) == 1
+
+
+def test_training_priority_change_marks_open_match_analysis_stale(tmp_path):
+    from dataclasses import replace
+
+    app_events = AppEvents()
+    match_page, match_controller, weekly_service = make_match_controller(tmp_path, app_events)
+    cycle_id = weekly_service.active_cycle_id()
+    result = match_controller._stamp_result_owner(replace(
+        _analysis_result(match_type="CUP"),
+        training_cycle_id=cycle_id,
+        weekly_cycle_revision_used=weekly_service.weekly_cycle_revision(cycle_id),
+        training_context_summary="context",
+    ))
+    match_controller._settings_repository.save_last_result(result)
+
+    player = _player()
+    weekly_service.save_priority(player, TrainingPriority.REQUIRED_50.value)
+    app_events.weekly_plan_saved.emit()
+
+    stale = match_controller._settings_repository.load_last_result()
+    assert stale.training_context_stale is True

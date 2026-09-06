@@ -11,6 +11,8 @@ from engine.optimizers.lineup_optimizer import (
 from engine.optimizers.lineup_objective import LineupObjectiveEvaluator
 from engine.optimizers.order_optimizer import OrderOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
+from engine.weekly_training.player_identity import player_training_id
+from engine.weekly_training.models import TrainingSlotClass
 from models.lineup import Lineup
 from models.lineup_player import LineupPlayer
 from models.tactic import Tactic
@@ -24,6 +26,8 @@ class ConstrainedOptimizationResult:
     locked_players: tuple
 
     unplaced_required_players: tuple
+
+    training_conflicts: tuple = ()
 
 
 class TrainingConstrainedLineupOptimizer:
@@ -62,6 +66,7 @@ class TrainingConstrainedLineupOptimizer:
         candidates_per_role=None,
         beam_width=None,
         config=None,
+        required_slot_classes=None,
     ):
         order_finalists = order_finalists or cls.DEFAULT_ORDER_FINALISTS
         order_beam_width = order_beam_width or cls.DEFAULT_ORDER_BEAM_WIDTH
@@ -74,6 +79,7 @@ class TrainingConstrainedLineupOptimizer:
             list(required_players),
             roles,
             rules,
+            required_slot_classes=required_slot_classes,
         )
 
         locked_ids = {
@@ -179,6 +185,11 @@ class TrainingConstrainedLineupOptimizer:
             objective_trace=LineupObjectiveEvaluator.evaluate_lineup(
                 best_lineup,
                 opponent_ratings,
+                training_score=cls._training_slot_class_score(
+                    best_lineup,
+                    rules,
+                    required_slot_classes,
+                ),
                 candidate_id="training-constrained",
                 config=config,
             ),
@@ -188,10 +199,23 @@ class TrainingConstrainedLineupOptimizer:
             optimization=optimization,
             locked_players=tuple(lineup_player.player for lineup_player in locked),
             unplaced_required_players=tuple(unplaced),
+            training_conflicts=tuple(
+                cls._training_slot_class_conflicts(
+                    best_lineup,
+                    rules,
+                    required_slot_classes,
+                )
+            ),
         )
 
-    @staticmethod
-    def _lock_required_players(required_players, roles, rules):
+    @classmethod
+    def _lock_required_players(
+        cls,
+        required_players,
+        roles,
+        rules,
+        required_slot_classes=None,
+    ):
         trainable_slots = []
         for position, side, amount in roles:
             factor = rules.factor_for_position(position)
@@ -200,24 +224,46 @@ class TrainingConstrainedLineupOptimizer:
             for _ in range(int(amount)):
                 trainable_slots.append((position, side, float(factor)))
 
-        # Fill the highest-value training slots (e.g. full-training
-        # midfield roles) before lower-value ones (e.g. half-training
-        # wingers), so required players land where their training counts
-        # for the most.
-        trainable_slots.sort(key=lambda slot: (-slot[2], slot[0].value, slot[1].value))
-
         remaining = list(required_players)
         locked = []
+        if not required_slot_classes:
+            trainable_slots.sort(
+                key=lambda slot: (-slot[2], slot[0].value, slot[1].value)
+            )
+            for position, side, _factor in trainable_slots:
+                if not remaining:
+                    break
 
-        for position, side, _factor in trainable_slots:
+                ranking = PlayerAnalyzer.rank_players(remaining, position.value, side)
+                if not ranking:
+                    continue
+
+                best_player = ranking[0].player
+                locked.append(
+                    LineupPlayer(player=best_player, position=position, side=side)
+                )
+                remaining = [
+                    player for player in remaining
+                    if CandidateLineupGenerator._player_key(player)
+                    != CandidateLineupGenerator._player_key(best_player)
+                ]
+
+            return locked, tuple(remaining)
+
+        for _index in range(len(trainable_slots)):
             if not remaining:
                 break
 
-            ranking = PlayerAnalyzer.rank_players(remaining, position.value, side)
-            if not ranking:
-                continue
+            best_candidate = cls._best_training_slot_assignment(
+                remaining,
+                trainable_slots,
+                rules,
+                required_slot_classes,
+            )
+            if best_candidate is None:
+                break
 
-            best_player = ranking[0].player
+            position, side, best_player = best_candidate
             locked.append(
                 LineupPlayer(player=best_player, position=position, side=side)
             )
@@ -226,8 +272,116 @@ class TrainingConstrainedLineupOptimizer:
                 if CandidateLineupGenerator._player_key(player)
                 != CandidateLineupGenerator._player_key(best_player)
             ]
+            trainable_slots.remove((position, side, float(rules.factor_for_position(position))))
 
         return locked, tuple(remaining)
+
+    @classmethod
+    def _best_training_slot_assignment(
+        cls,
+        players,
+        slots,
+        rules,
+        required_slot_classes=None,
+    ):
+        matching = []
+        relaxed = []
+        for position, side, factor in slots:
+            ranking = PlayerAnalyzer.rank_players(players, position.value, side)
+            for ranked in ranking:
+                player = ranked.player
+                candidate_valid = cls._slot_class_matches_requirement(
+                    player,
+                    rules.slot_class_for_position(position),
+                    required_slot_classes,
+                )
+                training_score = cls._slot_class_fit_score(
+                    player,
+                    rules.slot_class_for_position(position),
+                    required_slot_classes,
+                )
+                score = float(ranked.score) + training_score
+                candidate = (
+                    score,
+                    training_score,
+                    float(ranked.score),
+                    position.value,
+                    side.value,
+                    position,
+                    side,
+                    player,
+                )
+                if candidate_valid:
+                    matching.append(candidate)
+                else:
+                    relaxed.append(candidate)
+        candidates = matching or relaxed
+        if not candidates:
+            return None
+        best = max(candidates, key=lambda candidate: candidate[:5])
+        return best[5], best[6], best[7]
+
+    @staticmethod
+    def _slot_class_matches_requirement(player, slot_class, required_slot_classes=None):
+        if not required_slot_classes:
+            return True
+        required = _training_slot_class(required_slot_classes.get(player_training_id(player)))
+        if required is None:
+            return True
+        return _training_slot_class(slot_class) == required
+
+    @staticmethod
+    def _training_slot_class_conflicts(lineup, rules, required_slot_classes=None):
+        if not required_slot_classes:
+            return ()
+        conflicts = []
+        for lineup_player in getattr(lineup, "players", ()):
+            player_id = player_training_id(lineup_player.player)
+            required = _training_slot_class(required_slot_classes.get(player_id))
+            if required is None:
+                continue
+            actual = rules.slot_class_for_position(lineup_player.position)
+            if actual == required:
+                continue
+            conflicts.append(
+                {
+                    "player_id": player_id,
+                    "player_name": getattr(lineup_player.player, "name", ""),
+                    "position": getattr(lineup_player.position, "value", ""),
+                    "side": getattr(lineup_player.side, "value", ""),
+                    "required_slot_class": required.value,
+                    "actual_slot_class": getattr(actual, "value", str(actual)),
+                    "reason": "TRAINING_CLASS_MISMATCH",
+                }
+            )
+        return tuple(conflicts)
+
+    @staticmethod
+    def _slot_class_fit_score(player, slot_class, required_slot_classes=None):
+        if not required_slot_classes:
+            return 0.0
+        required = required_slot_classes.get(player_training_id(player))
+        required = _training_slot_class(required)
+        slot_class = _training_slot_class(slot_class)
+        if required is None:
+            return 0.0
+        if slot_class == required:
+            return 10000.0
+        return -10000.0
+
+    @staticmethod
+    def _training_slot_class_score(lineup, rules, required_slot_classes=None):
+        if not required_slot_classes:
+            return 0.0
+        score = 0.0
+        for lineup_player in getattr(lineup, "players", ()):
+            player_id = player_training_id(lineup_player.player)
+            required = _training_slot_class(required_slot_classes.get(player_id))
+            if required is None:
+                continue
+            actual = rules.slot_class_for_position(lineup_player.position)
+            score += 1.0 if actual == required else -1.0
+        return score
 
     @staticmethod
     def _reduced_roles(roles, locked):
@@ -352,6 +506,8 @@ class FormationTrainingConstraintResult:
 
     unplaced_required_players: tuple
 
+    training_conflicts: tuple = ()
+
 
 class TrainingConstrainedFormationOptimizer:
     """
@@ -372,6 +528,7 @@ class TrainingConstrainedFormationOptimizer:
         required_players,
         rules,
         config=None,
+        required_slot_classes=None,
     ):
         results = []
 
@@ -383,6 +540,7 @@ class TrainingConstrainedFormationOptimizer:
                 required_players,
                 rules,
                 config=config,
+                required_slot_classes=required_slot_classes,
             )
 
             lineup_optimization = constrained.optimization
@@ -420,12 +578,33 @@ class TrainingConstrainedFormationOptimizer:
                 FormationTrainingConstraintResult(
                     formation_result=formation_result,
                     unplaced_required_players=constrained.unplaced_required_players,
+                    training_conflicts=constrained.training_conflicts,
                 )
             )
 
-        results.sort(
-            key=lambda item: item.formation_result.probabilities.win,
-            reverse=True,
-        )
+        if required_slot_classes:
+            results.sort(
+                key=lambda item: (
+                    len(item.unplaced_required_players) + len(item.training_conflicts),
+                    -item.formation_result.probabilities.win,
+                )
+            )
+        else:
+            results.sort(
+                key=lambda item: item.formation_result.probabilities.win,
+                reverse=True,
+            )
 
         return results
+
+
+def _training_slot_class(value):
+    if value is None:
+        return None
+    if isinstance(value, TrainingSlotClass):
+        return value
+    raw = getattr(value, "value", value)
+    try:
+        return TrainingSlotClass(str(raw))
+    except ValueError:
+        return None

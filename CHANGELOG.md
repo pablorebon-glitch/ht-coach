@@ -4,6 +4,81 @@
 
 ### Fixed
 
+- Fixed Alpha 0.6.13 HF-11 historical match metadata repair. Existing Saved
+  Matches with official evidence but missing date, competition type or venue can
+  now be edited and saved back onto the same canonical Match Record without
+  rerunning analysis. Metadata repairs preserve Match ID, official PRE/POST,
+  lineup and weekly links, refresh Saved Matches immediately, avoid silent
+  League/today fallbacks, and include a read-only diagnostic for incomplete
+  historical metadata. No ratings, xG/WDL, optimizer, training-rule,
+  calibration, PRE/POST parser, calendar-calculation, recommendation identity or
+  Formation Board logic changed.
+
+- Fixed Alpha 0.6.13 HF-10 Match date field click handling. The internal
+  QDateEdit text editor now treats normal left-clicks as calendar-open actions,
+  so clicking either the visible date text or the arrow opens the popup without
+  moving the text cursor or changing the selected date. Wheel protection,
+  current/saved month behavior and all calendar calculations are unchanged.
+
+- Fixed Alpha 0.6.13 HF-09 recommendation display, training constraint
+  enforcement and match-date UX. Match recommendation labels continue to use the
+  stable coach `recommendation_id` after manual Formation Board edits, the
+  training-constrained optimizer now ranks slot-class-valid formations ahead of
+  conflicted stronger alternatives when Required 50%/100% constraints are active,
+  and clicking anywhere in the match-date field opens the calendar without
+  changing the saved date. No rating, xG, probability, calibration, PRE/POST
+  parser, calendar-calculation, packaging or legal-order logic changed.
+
+- Fixed Alpha 0.6.13 HF-08 recommendation mutation in the live Match UI.
+  Decision Lab summaries, comparison rows and Formation Board labels now derive
+  "Recommended" from the stable coach `recommendation_id` instead of stale
+  Decision Lab payloads, list position or transient `is_recommended` flags from
+  manual workspace reevaluation. Manual player swaps can update the current XI
+  evaluation without relabeling the original coach recommendation. No rating,
+  xG, probability, calibration, PRE/POST parser, training-rule, calendar,
+  packaging or legal-order logic changed.
+
+- Fixed Alpha 0.6.13 HF-07 recommendation state integrity. Match results now
+  persist a stable coach `recommendation_id`, manual workspace reevaluation
+  refreshes only the visible XI evaluation, and save/PRE refresh paths no longer
+  promote the currently visible formation to "Recommended". Runtime tracing now
+  emits `ILLEGAL_RECOMMENDATION_MUTATION` if recommendation identity changes
+  outside an explicit optimizer run. No rating, xG, probability, calibration,
+  PRE/POST parser, training-rule, calendar, packaging or legal-order logic
+  changed.
+
+- Fixed Alpha 0.6.13 HF-06 training slot semantics after HF-05 clarified the
+  wrong minute-target interpretation. Required 100% now means a full-training
+  position class, Required 50% means a half-training position class, and the
+  training-constrained optimizer satisfies those slot classes before tactical
+  ranking when a feasible lineup exists. Weekly diagnostics distinguish actual
+  training received from whether the requested training-plan slot class was
+  respected. No rating, xG, probability, calibration, PRE/POST parser, calendar,
+  formation persistence or legal-order logic changed.
+
+- Fixed Alpha 0.6.13 HF-05 manual-edit stability and recommendation revisioning.
+  Manual workspace edits now reevaluate the visible XI without replacing the
+  last explicit coach recommendation, and match results track separate
+  recommendation/manual-lineup revisions. No rating, xG, probability,
+  calibration, PRE/POST parser or legal-order logic changed.
+
+- Fixed Alpha 0.6.13 HF-04 runtime state trace and Match/Weekly cycle
+  alignment. Match workspace metadata now derives `training_cycle_id` from the
+  Weekly Training service, so saved matches and Weekly Planner records use the
+  same cycle identifier. Added an opt-in JSONL runtime integrity trace
+  (`HT_COACH_RUNTIME_TRACE=1`) for formation, saved-match, weekly-link and
+  training-priority state transitions. No rating, xG, probability, calibration,
+  PRE/POST parser or optimizer formulas changed.
+
+- Fixed Alpha 0.6.13 HF-03 workspace authority and training priority freshness.
+  Weekly Match 1/2 saves and linked weekly lineup refreshes now persist the
+  currently visible Formation Board state instead of rebuilding from the cached
+  optimizer recommendation. Match analysis now keeps the weekly training cycle
+  revision it used, priority changes emit the planner-change event, and weekly
+  coverage/plan diagnostics use the current normalized priority map so legacy
+  100% records cannot override a current 50% setting. No training formulas,
+  rating formulas, xG/WDL, calibration or parser logic changed.
+
 - Fixed Alpha 0.6.13 HF-02 formation state integrity. Saved Match reopen and
   Official PRE/POST refresh now preserve the user-saved Formation Board state
   before falling back to cached optimizer recommendations, and individual-order

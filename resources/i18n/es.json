@@ -922,6 +922,8 @@
     "match_date": "Fecha del partido",
     "edit_requires_reanalysis": "Este partido no tiene un análisis reciente en memoria. Presioná Analizar para reconstruir la formación y alineación guardadas.",
     "metadata_official_evidence_warning": "Este partido tiene evidencia oficial de Hattrick. Los cambios de metadatos conservan el Match ID y el PRE/POST oficial; revisá la identidad antes de guardar.",
+    "metadata_evidence_confirm_title": "Guardar cambios de metadatos",
+    "metadata_evidence_confirm_message": "Este partido tiene evidencia oficial de Hattrick. El Match ID, PRE y POST oficiales permanecerán vinculados al mismo registro. Verificá que la fecha, rival, tipo y localía editados correspondan a ese partido antes de guardar.",
     "venue_role": "Localía",
     "venue_role_home": "Local",
     "venue_role_away": "Visitante",

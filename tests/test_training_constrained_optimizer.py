@@ -4,6 +4,8 @@ from engine.optimizers.training_constrained_optimizer import (
     TrainingConstrainedFormationOptimizer,
     TrainingConstrainedLineupOptimizer,
 )
+from engine.weekly_training.player_identity import player_training_id
+from engine.weekly_training.models import TrainingSlotClass
 from engine.weekly_training.training_rules import PlaymakingTrainingRules
 from models.formations import FORMATION_352, FORMATIONS
 from models.player import Player
@@ -179,6 +181,177 @@ def test_no_required_players_behaves_like_a_normal_optimization(rules, weak_oppo
     assert result.unplaced_required_players == ()
     assert "StrongMid1" in selected_names
     assert "StrongMid2" in selected_names
+
+
+def test_required_50_requires_half_training_slot_when_feasible(
+    rules, weak_opponent
+):
+    players = full_squad()
+    required_half = make_player(
+        "Michael Rushton",
+        playmaking=8,
+        winger=5,
+        passing=5,
+        defending=5,
+    )
+    players.append(required_half)
+
+    result = TrainingConstrainedLineupOptimizer.optimize_against(
+        players,
+        FORMATION_352,
+        weak_opponent,
+        required_players=[required_half],
+        rules=rules,
+        required_slot_classes={
+            player_training_id(required_half): TrainingSlotClass.HALF_TRAINING.value,
+        },
+    )
+
+    selected = next(
+        lineup_player
+        for lineup_player in result.optimization.lineup.players
+        if lineup_player.player.name == "Michael Rushton"
+    )
+
+    assert selected.position.value == "WINGER"
+    assert (
+        result.optimization.objective_trace.components.training_component
+        == 1.0
+    )
+    assert result.training_conflicts == ()
+
+
+def test_required_100_requires_full_training_slot_when_feasible(rules, weak_opponent):
+    players = full_squad()
+    required_full = make_player(
+        "Full Target",
+        playmaking=8,
+        winger=5,
+        passing=5,
+        defending=5,
+    )
+    players.append(required_full)
+
+    result = TrainingConstrainedLineupOptimizer.optimize_against(
+        players,
+        FORMATION_352,
+        weak_opponent,
+        required_players=[required_full],
+        rules=rules,
+        required_slot_classes={
+            player_training_id(required_full): TrainingSlotClass.FULL_TRAINING.value,
+        },
+    )
+
+    selected = next(
+        lineup_player
+        for lineup_player in result.optimization.lineup.players
+        if lineup_player.player.name == "Full Target"
+    )
+
+    assert selected.position.value == "INNER_MIDFIELDER"
+    assert result.training_conflicts == ()
+
+
+def test_required_50_does_not_consume_full_slot_needed_by_required_100(
+    rules, weak_opponent
+):
+    players = full_squad()
+    required_full = make_player("Full Target", playmaking=8, winger=5)
+    required_half = make_player("Half Target", playmaking=8, winger=5)
+    players.extend([required_full, required_half])
+
+    result = TrainingConstrainedLineupOptimizer.optimize_against(
+        players,
+        FORMATION_352,
+        weak_opponent,
+        required_players=[required_full, required_half],
+        rules=rules,
+        required_slot_classes={
+            player_training_id(required_full): TrainingSlotClass.FULL_TRAINING.value,
+            player_training_id(required_half): TrainingSlotClass.HALF_TRAINING.value,
+        },
+    )
+
+    selected = {
+        lineup_player.player.name: lineup_player.position.value
+        for lineup_player in result.optimization.lineup.players
+        if lineup_player.player.name in {"Full Target", "Half Target"}
+    }
+
+    assert selected == {
+        "Full Target": "INNER_MIDFIELDER",
+        "Half Target": "WINGER",
+    }
+    assert result.training_conflicts == ()
+
+
+def test_required_50_full_training_slot_is_reported_as_conflict_when_unavoidable(
+    rules, weak_opponent
+):
+    players = full_squad()
+    required_half = make_player(
+        "Michael Rushton",
+        playmaking=8,
+        winger=5,
+        passing=5,
+        defending=5,
+    )
+    players.append(required_half)
+
+    result = TrainingConstrainedLineupOptimizer.optimize_against(
+        players,
+        # 4-3-3 has full Playmaking slots but no Winger half-training slots.
+        next(formation for formation in FORMATIONS if formation.name == "4-3-3"),
+        weak_opponent,
+        required_players=[required_half],
+        rules=rules,
+        required_slot_classes={
+            player_training_id(required_half): TrainingSlotClass.HALF_TRAINING.value,
+        },
+    )
+
+    selected = next(
+        lineup_player
+        for lineup_player in result.optimization.lineup.players
+        if lineup_player.player.name == "Michael Rushton"
+    )
+
+    assert selected.position.value == "INNER_MIDFIELDER"
+    assert result.training_conflicts
+    assert result.training_conflicts[0]["reason"] == "TRAINING_CLASS_MISMATCH"
+    assert result.training_conflicts[0]["required_slot_class"] == "HALF_TRAINING"
+    assert result.training_conflicts[0]["actual_slot_class"] == "FULL_TRAINING"
+
+
+def test_formation_level_prefers_training_valid_lineup_over_invalid_higher_win(
+    rules, weak_opponent
+):
+    players = full_squad()
+    required_half = make_player(
+        "Michael Rushton",
+        playmaking=8,
+        winger=5,
+        passing=5,
+        defending=5,
+    )
+    players.append(required_half)
+    formation_433 = next(formation for formation in FORMATIONS if formation.name == "4-3-3")
+
+    results = TrainingConstrainedFormationOptimizer.optimize_against(
+        players,
+        [formation_433, FORMATION_352],
+        weak_opponent,
+        required_players=[required_half],
+        rules=rules,
+        required_slot_classes={
+            player_training_id(required_half): TrainingSlotClass.HALF_TRAINING.value,
+        },
+    )
+
+    assert results[0].training_conflicts == ()
+    assert results[0].formation_result.formation.name == "3-5-2"
+    assert results[1].training_conflicts
 
 
 def test_formation_level_wrapper_locks_required_players_across_formations(
