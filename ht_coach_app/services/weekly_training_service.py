@@ -825,10 +825,8 @@ class WeeklyTrainingAppService:
             competition_type=competition_type,
         )
         if linked_match_record_id:
-            from dataclasses import replace as _dc_replace
-
-            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
-        return self._repository.add_match_record(state, record)
+            record = replace(record, linked_match_record_id=linked_match_record_id)
+        return self._save_new_weekly_record(state, record, linked_match_record_id)
 
     @staticmethod
     def _current_first_match_record(state):
@@ -864,6 +862,16 @@ class WeeklyTrainingAppService:
             None,
         )
 
+    def first_match_player_ids_for_cycle(self, cycle_id):
+        record = self.first_match_record_for_cycle(cycle_id)
+        if record is None:
+            return frozenset()
+        return frozenset(
+            str(entry.player_id)
+            for entry in getattr(record, "lineup", ()) or ()
+            if str(getattr(entry, "player_id", "") or "")
+        )
+
     def record_second_match(
         self,
         board,
@@ -889,10 +897,8 @@ class WeeklyTrainingAppService:
             competition_type=competition_type,
         )
         if linked_match_record_id:
-            from dataclasses import replace as _dc_replace
-
-            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
-        return self._repository.add_match_record(state, record)
+            record = replace(record, linked_match_record_id=linked_match_record_id)
+        return self._save_new_weekly_record(state, record, linked_match_record_id)
 
     def replace_second_match(
         self,
@@ -920,10 +926,8 @@ class WeeklyTrainingAppService:
             competition_type=competition_type,
         )
         if linked_match_record_id:
-            from dataclasses import replace as _dc_replace
-
-            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
-        return self._repository.replace_match_record(state, record)
+            record = replace(record, linked_match_record_id=linked_match_record_id)
+        return self._replace_weekly_record(state, record, linked_match_record_id)
 
     def delete_second_match(self):
         state = self.load_state()
@@ -1313,9 +1317,41 @@ class WeeklyTrainingAppService:
             competition_type=competition_type,
         )
         if linked_match_record_id:
-            from dataclasses import replace as _dc_replace
+            record = replace(record, linked_match_record_id=linked_match_record_id)
+        return self._replace_weekly_record(state, record, linked_match_record_id)
 
-            record = _dc_replace(record, linked_match_record_id=linked_match_record_id)
+    def _save_new_weekly_record(self, state, record, linked_match_record_id=""):
+        if not linked_match_record_id:
+            return self._repository.add_match_record(state, record)
+        existing_link = self._record_linked_to(state, linked_match_record_id)
+        if existing_link is not None:
+            target_occupied = next(
+                (
+                    item
+                    for item in state.match_records
+                    if item.match_id == record.match_id
+                    and item.match_id != existing_link.match_id
+                ),
+                None,
+            )
+            if target_occupied is not None:
+                raise ValueError("duplicate_match_id")
+            return self._repository.replace_match_record_by_original_id(
+                state,
+                existing_link.match_id,
+                record,
+            )
+        return self._repository.add_match_record(state, record)
+
+    def _replace_weekly_record(self, state, record, linked_match_record_id=""):
+        if linked_match_record_id:
+            existing_link = self._record_linked_to(state, linked_match_record_id)
+            if existing_link is not None:
+                return self._repository.replace_match_record_by_original_id(
+                    state,
+                    existing_link.match_id,
+                    record,
+                )
         return self._repository.replace_match_record(state, record)
 
     @staticmethod

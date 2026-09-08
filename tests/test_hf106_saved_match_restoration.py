@@ -202,7 +202,7 @@ def test_santa_cruz_saved_match_restores_and_saves_partido_2_without_new_match(t
     _assert_round_trip(page, controller, record.snapshot_id)
     saved_controller.refresh()
     assert saved_page.table.item(0, 0).text() == "Hit'em up vs. Santa Cruz Club"
-    assert saved_page.table.item(0, 1).text() == "Copa / Amistoso"
+    assert saved_page.table.item(0, 1).text() == "Copa"
     assert saved_page.table.item(0, 2).text() == "05/08/2026"
     assert saved_page.table.item(0, 4).text() == "Local"
 
@@ -281,7 +281,7 @@ def test_saved_match_pre_import_and_save_changes_update_same_santa_cruz_record(t
     assert record.match_context.match_date == "2026-08-05"
     assert saved_page.table.rowCount() == 1
     assert saved_page.table.item(0, 0).text() == "Hit'em up vs. Santa Cruz Club"
-    assert saved_page.table.item(0, 1).text() == "Copa / Amistoso"
+    assert saved_page.table.item(0, 1).text() == "Copa"
     assert saved_page.table.item(0, 2).text() == "05/08/2026"
     assert saved_page.table.item(0, 4).text() == "Local"
 
@@ -329,7 +329,7 @@ def test_saved_match_restores_from_snapshot_when_last_result_cache_is_missing(tm
     controller2.edit_record(record_id)
 
     _assert_round_trip(page2, controller2, record_id)
-    assert page2.status_label.text() == "Formación guardada restaurada"
+    assert page2.status_label.text() == "Formación histórica guardada"
 
 
 def test_saved_match_restores_every_venue_role(tmp_path):

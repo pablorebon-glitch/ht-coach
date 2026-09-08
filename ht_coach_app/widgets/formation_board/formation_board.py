@@ -66,6 +66,8 @@ class FormationBoard(QWidget):
         self._workspace_state = None
         self._save_action_enabled_override = None
         self._save_action_disabled_reason = ""
+        self._weekly_save_action_enabled_override = None
+        self._weekly_save_action_disabled_reason = ""
         self._boards = {}
         self._details_by_name = {}
         self._roster_players = []
@@ -382,6 +384,11 @@ class FormationBoard(QWidget):
     def set_save_action_validation(self, enabled, reason=""):
         self._save_action_enabled_override = bool(enabled)
         self._save_action_disabled_reason = "" if enabled else (reason or "")
+        self._update_workspace_toolbar()
+
+    def set_weekly_save_action_validation(self, enabled, reason=""):
+        self._weekly_save_action_enabled_override = bool(enabled)
+        self._weekly_save_action_disabled_reason = "" if enabled else (reason or "")
         self._update_workspace_toolbar()
 
     def current_board(self):
@@ -1005,6 +1012,7 @@ class FormationBoard(QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
+                widget.deleteLater()
 
     def _sync_boards_cache(self):
         if self._workspace_state is None:
@@ -1098,10 +1106,16 @@ class FormationBoard(QWidget):
             reason = self._save_action_disabled_reason
         self.save_formation_button.setEnabled(can_save)
         self.save_formation_button.setToolTip(reason)
-        self.save_as_first_match_button.setEnabled(can_save)
-        self.save_as_first_match_button.setToolTip(reason)
-        self.save_as_second_match_button.setEnabled(can_save)
-        self.save_as_second_match_button.setToolTip(reason)
+        if self._weekly_save_action_enabled_override is None:
+            weekly_can_save = can_save
+            weekly_reason = reason
+        else:
+            weekly_can_save = self._weekly_save_action_enabled_override
+            weekly_reason = self._weekly_save_action_disabled_reason
+        self.save_as_first_match_button.setEnabled(weekly_can_save)
+        self.save_as_first_match_button.setToolTip(weekly_reason)
+        self.save_as_second_match_button.setEnabled(weekly_can_save)
+        self.save_as_second_match_button.setToolTip(weekly_reason)
 
     def _emit_recalculate_requested(self):
         if self._workspace_state is not None:
@@ -1118,15 +1132,35 @@ class FormationBoard(QWidget):
                 target_slot_id,
             )
             if valid:
-                self._workspace_state = self._workspace_service.swap_slots_immediately(
-                    self._workspace_state,
-                    self._current_name,
-                    payload.get("source_slot_id", ""),
-                    target_slot_id,
-                    payload.get("revision", -1),
-                    roster_players=self._roster_players,
-                    interaction_source="DRAG",
+                board = self.current_board()
+                target_slot = next(
+                    (
+                        slot
+                        for slot in getattr(board, "slots", ()) or ()
+                        if slot.slot_id == target_slot_id
+                    ),
+                    None,
                 )
+                if target_slot is not None and target_slot.player is None:
+                    self._workspace_state = self._workspace_service.move_slot_immediately(
+                        self._workspace_state,
+                        self._current_name,
+                        payload.get("source_slot_id", ""),
+                        target_slot_id,
+                        payload.get("revision", -1),
+                        roster_players=self._roster_players,
+                        interaction_source="DRAG",
+                    )
+                else:
+                    self._workspace_state = self._workspace_service.swap_slots_immediately(
+                        self._workspace_state,
+                        self._current_name,
+                        payload.get("source_slot_id", ""),
+                        target_slot_id,
+                        payload.get("revision", -1),
+                        roster_players=self._roster_players,
+                        interaction_source="DRAG",
+                    )
                 self._selected_bench_player_id = ""
                 self._sync_boards_cache()
                 self._render_current_board()
@@ -1144,6 +1178,22 @@ class FormationBoard(QWidget):
                 payload,
                 target_slot_id,
             )
+            board = self.current_board()
+            target_slot = next(
+                (
+                    slot
+                    for slot in getattr(board, "slots", ()) or ()
+                    if slot.slot_id == target_slot_id
+                ),
+                None,
+            )
+            if valid and target_slot is not None and target_slot.player is None:
+                self._commit_bench_exchange(
+                    target_slot_id,
+                    payload.get("player_id", ""),
+                    "DRAG",
+                )
+                return
             candidate = (
                 self._workspace_service.candidate_for_player(
                     self._workspace_state,

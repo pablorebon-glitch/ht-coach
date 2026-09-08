@@ -149,10 +149,8 @@ class SavedMatchesController(QObject):
             "value",
             record.match_context.competition_type,
         )
-        competition = (
-            t("match.match_type_cup")
-            if str(competition_key).lower() == "cup"
-            else t(f"official_match_intelligence.history.competition.{competition_key}")
+        competition = t(
+            f"official_match_intelligence.history.competition.{competition_key}"
         )
         date_text = SavedMatchesController._format_date(record.match_context.match_date)
         season_week_text = format_season_week(record.season_week).replace("\n", " · ")

@@ -24,7 +24,7 @@ quietly starts making its own tactical decisions.
 
 - Is the only module responsible for optimizing formations and individual orders.
 - Analyzes the opponent.
-- Produces the recommended XI for a given match (League or Cup/Friendly).
+- Produces the recommended XI for a given match (League, Cup or Friendly).
 - Owns the editable Formation Board. Local board edits are slot-authoritative:
   players may move, but each tactical slot keeps its own valid order intent unless
   that slot's assignment makes the order invalid.
@@ -37,8 +37,11 @@ quietly starts making its own tactical decisions.
 - Imports the official Hattrick Match Summary associated with the match (Alpha
   0.5.9.0 / UX-02) — parsing and attaching it never reruns the optimizer or any
   rating formula; the imported values are stored exactly as Hattrick provided them.
-- Remains focused on winning the selected match — it does not manage training
-  priorities or long-term squad development.
+- Uses competition type as product intent: League and Cup are competitive after
+  training feasibility, while Friendly rotates away from Match 1 starters when
+  valid alternatives exist.
+- Remains focused on the selected match - it does not manage training priorities
+  or long-term squad development.
 
 ### Weekly Training Planner
 
@@ -46,9 +49,10 @@ quietly starts making its own tactical decisions.
 - Shows which players receive training and how much.
 - Calculates weekly training coverage.
 - Assigns and maintains player training priorities.
-- Does **not** independently optimize a match lineup — the Cup/Friendly
-  training-aware lineup is produced by Match (with Weekly Planner supplying which
-  players are still owed training minutes), not recomputed inside the Planner.
+- Does **not** independently optimize a match lineup - the competition-aware
+  lineup is produced by Match. Weekly Planner supplies which players are still
+  owed training minutes and, for Friendly rotation, the canonical Match 1 lineup
+  from the same training cycle.
 - Does not replace Match as the source of tactical decisions.
 
 ### History (`engine/history`, `engine/history/evolution`, `engine/history/insights`)

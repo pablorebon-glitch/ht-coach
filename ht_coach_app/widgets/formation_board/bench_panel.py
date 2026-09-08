@@ -204,6 +204,7 @@ class BenchPanel(QFrame):
                 player,
                 formation_name,
                 revision,
+                self.content,
             )
             card.selected.connect(self.player_selected)
             card.preview_requested.connect(self.preview_requested)
@@ -217,3 +218,4 @@ class BenchPanel(QFrame):
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
+                widget.deleteLater()

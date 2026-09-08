@@ -300,7 +300,7 @@ def test_new_match_save_persists_canonical_metadata_and_reopens_exactly(tmp_path
     saved_controller = SavedMatchesController(saved_page, hist_repo)
     saved_controller.refresh()
     assert saved_page.table.item(0, 0).text() == "Hit'em up vs. Santa Cruz Club"
-    assert saved_page.table.item(0, 1).text() == "Copa / Amistoso"
+    assert saved_page.table.item(0, 1).text() == "Copa"
     assert saved_page.table.item(0, 2).text() == "05/08/2026"
     assert saved_page.table.item(0, 3).text() == "Temporada HT 95 · Semana competitiva 2"
     assert saved_page.table.item(0, 4).text() == "Local"
@@ -388,7 +388,7 @@ def test_saved_match_metadata_repair_persists_without_analysis_and_preserves_evi
     saved_controller = SavedMatchesController(saved_page, hist_repo)
     saved_controller.refresh()
     assert saved_page.table.rowCount() == 1
-    assert saved_page.table.item(0, 1).text() == "Copa / Amistoso"
+    assert saved_page.table.item(0, 1).text() == "Copa"
     assert saved_page.table.item(0, 2).text() == "05/08/2026"
     assert saved_page.table.item(0, 4).text() == "Local"
 

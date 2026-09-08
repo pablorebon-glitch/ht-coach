@@ -7,6 +7,7 @@ from engine.orders.legal_orders import is_legal_order_for_slot
 from engine.orders.legal_orders import legal_orders_for_slot
 from engine.orders.legal_orders import normal_order_for_slot
 from engine.orders.order_modifier import OrderModifier
+from ht_coach_app.core.order_formatting import format_order
 from ht_coach_app.core.position_formatting import format_position
 from ht_coach_app.core.position_formatting import format_position_abbreviation
 from ht_coach_app.core.position_formatting import normalize_position_key
@@ -23,6 +24,9 @@ from ht_coach_app.workspace.workspace_models import (
     WorkspaceReplacementPreview,
     WorkspaceState,
     WorkspaceSwapPreview,
+)
+from ht_coach_app.widgets.formation_board.formation_board_models import (
+    PlayerCardViewModel,
 )
 from models.order import Order
 from models.position import Position
@@ -415,6 +419,19 @@ class WorkspaceService:
         if not valid:
             return self._error(state, message)
 
+        board = state.current_board
+        target_slot = self._slot_by_id(board, target_slot_id)
+        if target_slot is not None and target_slot.player is None:
+            return self.place_bench_player_in_empty_slot(
+                state,
+                roster_players,
+                formation_name,
+                target_slot_id,
+                incoming_player_id,
+                expected_revision,
+                interaction_source=interaction_source,
+            )
+
         previewed = self.preview_bench_exchange(
             state,
             roster_players,
@@ -464,13 +481,223 @@ class WorkspaceService:
         )
         return self._mark_ready(applied)
 
+    def move_slot_immediately(
+        self,
+        state,
+        formation_name,
+        source_slot_id,
+        target_slot_id,
+        expected_revision,
+        roster_players=(),
+        interaction_source="",
+    ):
+        valid, message = self._validate_immediate_intent(
+            state,
+            formation_name,
+            expected_revision,
+        )
+        if not valid:
+            return self._error(state, message)
+        board = state.current_board
+        source_slot = self._slot_by_id(board, source_slot_id)
+        target_slot = self._slot_by_id(board, target_slot_id)
+        source = source_slot.player if source_slot is not None else None
+        if source is None:
+            return self._error(state, "The dragged player is no longer in this lineup.")
+        if target_slot is None:
+            return self._error(state, "Choose a valid lineup slot.")
+        if target_slot.player is not None:
+            return self.swap_slots_immediately(
+                state,
+                formation_name,
+                source_slot_id,
+                target_slot_id,
+                expected_revision,
+                roster_players=roster_players,
+                interaction_source=interaction_source,
+            )
+        if source_slot_id == target_slot_id:
+            return self._error(state, "Drop onto a different slot to move players.")
+        if self._is_goalkeeper_slot(source_slot) != self._is_goalkeeper_slot(target_slot):
+            return self._error(state, "Goalkeepers can only move to goalkeeper slots.")
+
+        moved_player = self._assign_player_to_slot(
+            source,
+            target_slot,
+            selected=False,
+        )
+        updated_slots = []
+        for slot in board.slots:
+            if slot.slot_id == source_slot_id:
+                updated_slots.append(replace(slot, player=None))
+            elif slot.slot_id == target_slot_id:
+                updated_slots.append(replace(slot, player=moved_player))
+            else:
+                updated_slots.append(slot)
+        updated_board = replace(
+            board,
+            slots=tuple(updated_slots),
+            selected_player_id="",
+        )
+        updated_board, order_changes = self._normalize_invalid_orders_for_slots(
+            updated_board,
+            (target_slot_id,),
+        )
+        boards = dict(state.workspace_boards)
+        boards[updated_board.formation_name] = updated_board
+        modification = WorkspaceModification(
+            formation_name=formation_name,
+            slot_id=target_slot_id,
+            role=self._role_label(moved_player),
+            original_player_name="",
+            replacement_player_name=moved_player.player_name,
+            score_difference=0.0,
+            kind="move",
+            source_slot_id=source_slot_id,
+            target_slot_id=target_slot_id,
+            incoming_player_id=moved_player.player_id,
+            outgoing_player_id="",
+            before_lineup_ids=self._lineup_ids(board),
+            after_lineup_ids=self._lineup_ids(updated_board),
+            revision_before=state.revision,
+            revision_after=state.revision + 1,
+            interaction_source=interaction_source,
+            order_changes=order_changes,
+        )
+        return replace(
+            state,
+            workspace_boards=boards,
+            selected_player_id="",
+            replacement_preview=None,
+            swap_preview=None,
+            history=state.history + (modification,),
+            redo_stack=(),
+            evaluation_state="ready",
+            revision=state.revision + 1,
+            last_error="",
+            manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.MANUALLY_MODIFIED,
+                stale_revision=state.revision + 1,
+            ),
+        )
+
+    def place_bench_player_in_empty_slot(
+        self,
+        state,
+        roster_players,
+        formation_name,
+        target_slot_id,
+        incoming_player_id,
+        expected_revision,
+        interaction_source="",
+    ):
+        valid, message = self._validate_immediate_intent(
+            state,
+            formation_name,
+            expected_revision,
+        )
+        if not valid:
+            return self._error(state, message)
+        board = state.current_board
+        target_slot = self._slot_by_id(board, target_slot_id)
+        if target_slot is None:
+            return self._error(state, "Choose a valid lineup slot.")
+        if target_slot.player is not None:
+            return self.replace_slot_immediately(
+                state,
+                roster_players,
+                formation_name,
+                target_slot_id,
+                incoming_player_id,
+                expected_revision,
+                interaction_source=interaction_source,
+            )
+        bench_ids = {
+            item.player_id
+            for item in self.derive_bench(state, roster_players)
+        }
+        if incoming_player_id not in bench_ids:
+            return self._error(state, "This player is not available on the bench.")
+        incoming_player = self._find_player_by_id(roster_players, incoming_player_id)
+        if incoming_player is None:
+            return self._error(state, "The incoming player is no longer available in the roster.")
+
+        ranking = self._rank_players(
+            roster_players,
+            target_slot.position,
+            target_slot.side,
+        )
+        score = self._score_for(ranking, incoming_player.name)
+        card = self._card_from_roster_player(
+            incoming_player,
+            incoming_player_id,
+            target_slot,
+            score,
+            formation_name,
+        )
+        updated_slots = [
+            replace(slot, player=card)
+            if slot.slot_id == target_slot_id
+            else slot
+            for slot in board.slots
+        ]
+        updated_board = replace(
+            board,
+            slots=tuple(updated_slots),
+            selected_player_id="",
+        )
+        updated_board, order_changes = self._apply_best_orders_to_slots(
+            updated_board,
+            roster_players,
+            (target_slot_id,),
+        )
+        boards = dict(state.workspace_boards)
+        boards[updated_board.formation_name] = updated_board
+        modification = WorkspaceModification(
+            formation_name=formation_name,
+            slot_id=target_slot_id,
+            role=self._role_label(card),
+            original_player_name="",
+            replacement_player_name=card.player_name,
+            score_difference=0.0,
+            kind="placement",
+            target_slot_id=target_slot_id,
+            incoming_player_id=card.player_id,
+            outgoing_player_id="",
+            before_lineup_ids=self._lineup_ids(board),
+            after_lineup_ids=self._lineup_ids(updated_board),
+            revision_before=state.revision,
+            revision_after=state.revision + 1,
+            interaction_source=interaction_source,
+            current_slot_score=score,
+            order_changes=order_changes,
+        )
+        return replace(
+            state,
+            workspace_boards=boards,
+            selected_player_id="",
+            replacement_preview=None,
+            swap_preview=None,
+            history=state.history + (modification,),
+            redo_stack=(),
+            evaluation_state="ready",
+            revision=state.revision + 1,
+            last_error="",
+            manual_lineup_state=ManualLineupState.MANUALLY_MODIFIED,
+            recommendations=LineupRecommendationSet(
+                manual_state=ManualLineupState.MANUALLY_MODIFIED,
+                stale_revision=state.revision + 1,
+            ),
+        )
+
     def validate_bench_exchange(self, state, roster_players, target_slot_id, bench_player_id):
         board = state.current_board
         if board is None:
             return False, "No formation is selected."
         target_slot = self._slot_by_id(board, target_slot_id)
-        if target_slot is None or target_slot.player is None:
-            return False, "Drop onto an occupied lineup slot."
+        if target_slot is None:
+            return False, "Choose a valid lineup slot."
         bench_ids = {
             item.player_id
             for item in self.derive_bench(state, roster_players)
@@ -496,7 +723,13 @@ class WorkspaceService:
             return False, "Switch back to the source formation first."
         target_slot = self._slot_by_id(board, target_slot_id)
         if target_slot is None or target_slot.player is None:
-            return False, "Drop onto an occupied lineup slot."
+            if payload.get("source_type") in ("candidate", "bench"):
+                if not payload.get("player_id"):
+                    return False, "The replacement candidate is unavailable."
+                return True, ""
+            if payload.get("source_type") == "lineup" and target_slot is not None:
+                return True, ""
+            return False, "Choose a valid lineup slot."
         if payload.get("source_type") == "lineup":
             source_slot_id = payload.get("source_slot_id", "")
             source_slot = self._slot_by_id(board, source_slot_id)
@@ -606,7 +839,7 @@ class WorkspaceService:
                 ),
                 position_score=preview.replacement_score,
                 specialty=getattr(replacement_player, "speciality", ""),
-                is_selected=True,
+                is_selected=False,
                 is_modified=True,
                 is_replacement_preview=False,
             )
@@ -617,7 +850,7 @@ class WorkspaceService:
         updated_board = replace(
             board,
             slots=tuple(updated_slots),
-            selected_player_id=preview.replacement_player_id,
+            selected_player_id="",
         )
         updated_board, order_changes = self._apply_best_orders_to_slots(
             updated_board,
@@ -652,7 +885,7 @@ class WorkspaceService:
         return replace(
             state,
             workspace_boards=boards,
-            selected_player_id=preview.replacement_player_id,
+            selected_player_id="",
             replacement_preview=None,
             swap_preview=None,
             history=state.history + (modification,),
@@ -688,7 +921,7 @@ class WorkspaceService:
         source_for_target = self._assign_player_to_slot(
             source,
             target_slot,
-            selected=True,
+            selected=False,
             preserve_slot_order=True,
         )
         target_for_source = self._assign_player_to_slot(
@@ -709,7 +942,7 @@ class WorkspaceService:
         updated_board = replace(
             board,
             slots=tuple(updated_slots),
-            selected_player_id=source.player_id,
+            selected_player_id="",
         )
         updated_board, order_changes = self._normalize_invalid_orders_for_slots(
             updated_board,
@@ -742,7 +975,7 @@ class WorkspaceService:
         return replace(
             state,
             workspace_boards=boards,
-            selected_player_id=source.player_id,
+            selected_player_id="",
             replacement_preview=None,
             swap_preview=None,
             history=state.history + (modification,),
@@ -1847,6 +2080,12 @@ class WorkspaceService:
                 return player
         return None
 
+    def _find_player_by_id(self, players, player_id):
+        for player in players or []:
+            if self._player_id(getattr(player, "name", "")) == player_id:
+                return player
+        return None
+
     @staticmethod
     def _role_label(player):
         side = format_side(player.side)
@@ -1965,6 +2204,37 @@ class WorkspaceService:
             is_selected=selected,
             is_modified=True,
             is_replacement_preview=False,
+        )
+
+    def _card_from_roster_player(self, player, player_id, slot, score, formation_name=""):
+        normal_order = normal_order_for_slot(
+            slot.position,
+            slot.side,
+            formation_name,
+        )
+        return PlayerCardViewModel(
+            player_id=player_id,
+            player_name=player.name,
+            display_name=self._display_name(player.name),
+            position=normalize_position_key(slot.position),
+            position_label=format_position(slot.position),
+            position_abbreviation=format_position_abbreviation(slot.position),
+            side=getattr(slot, "side", ""),
+            side_label=getattr(slot, "side_label", format_side(getattr(slot, "side", ""))),
+            individual_order=getattr(normal_order.order, "value", normal_order.order),
+            order_label=format_order(normal_order.order),
+            order_side=(
+                getattr(normal_order.order_side, "value", normal_order.order_side)
+                if normal_order.order_side
+                else ""
+            ),
+            order_side_label=format_side(normal_order.order_side),
+            shirt_number=0,
+            position_score=round(float(score), 2),
+            specialty=getattr(player, "speciality", ""),
+            is_selected=False,
+            is_recommended=False,
+            is_modified=True,
         )
 
     @staticmethod

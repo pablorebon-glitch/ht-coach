@@ -452,6 +452,7 @@ class SnapshotProvenance:
     creation_workflow: str = ""
     roster_source: str = ""
     opponent_source: str = ""
+    lineup_source: str = ""
     notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:

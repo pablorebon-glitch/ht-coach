@@ -83,9 +83,19 @@ League by default.
 
 The selected weekly slot is never a competition-type source. `Guardar como
 Partido 1` and `Guardar como Partido 2` only identify the planner slot being
-written; they do not imply League or Cup/Friendly. `WeeklyMatchRecord.
+written; they do not imply League, Cup or Friendly. `WeeklyMatchRecord.
 competition_type` is copied from the current analysis provenance once it still
 matches the visible workspace selector.
+
+Alpha 0.6.14 SP-01 makes competition type part of the recommendation policy:
+League and Cup use the competitive policy, while Friendly uses the rotation
+policy. All three values remain distinct canonical metadata (`league`, `cup`,
+`friendly`) when saved and restored. Friendly rotation obtains Match 1
+participation only from the canonical Weekly Planner Match 1 record in the same
+training cycle as the current Match 2; it never reads the current board, a stale
+recommendation, PRE/POST evidence or another cycle. Required 100% and Required
+50% training targets still win over rotation, and manual board edits remain
+user-owned until a new explicit Analyze/Restore action.
 
 Policy for metadata changes after analysis: changing competition type marks the
 current analysis stale, marks the workspace dirty, and disables the weekly save

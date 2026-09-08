@@ -18,6 +18,7 @@ from ht_coach_app.services.match_workspace_service import (
     ANALYSIS_OWNER_NEW_MATCH_DRAFT,
     ANALYSIS_OWNER_SAVED_MATCH,
     MATCH_TYPE_CUP,
+    MATCH_TYPE_FRIENDLY,
     MATCH_TYPE_LEAGUE,
     MatchWorkspaceValidationError,
     format_decision_lab,
@@ -252,6 +253,12 @@ class MatchController(QObject):
             "manual_lineup_revision": getattr(
                 result, "manual_lineup_revision", ""
             ),
+            "competition_type": self._current_competition_type(
+                getattr(result, "match_type", ""),
+                show_error=False,
+            ),
+            "selection_policy": getattr(result, "selection_policy", ""),
+            "rotation_summary": getattr(result, "rotation_summary", {}),
             "weekly_formation": weekly_formation,
             "weekly_match_formation": weekly_formation,
             "weekly_match_id": getattr(weekly_record, "match_id", ""),
@@ -405,6 +412,10 @@ class MatchController(QObject):
             return {
                 "player_name": target_name,
                 "raw_priorities": raw_priorities,
+                "training_priority_players": self._trace_training_priority_players(
+                    cycle_id,
+                    result,
+                ),
             }
         try:
             from engine.weekly_training.player_identity import player_training_id
@@ -475,7 +486,177 @@ class MatchController(QObject):
                 "objective_trace_available", False
             ),
             "raw_priorities": raw_priorities,
+            "training_priority_players": self._trace_training_priority_players(
+                cycle_id,
+                result,
+            ),
         }
+
+    def _trace_training_priority_players(self, cycle_id, result=None):
+        if not cycle_id:
+            return ()
+        try:
+            from engine.weekly_training.models import TrainingPriority
+            from engine.weekly_training.player_identity import player_training_id
+            from engine.weekly_training.coverage import TARGET_MINUTES
+        except Exception:
+            return ()
+        try:
+            rows = self._weekly_training_service.priority_rows(self._roster_players)
+            required_ids = self._weekly_training_service.required_player_ids_for_match(
+                cycle_id
+            )
+            slot_classes = (
+                self._weekly_training_service.required_player_training_slot_classes(
+                    cycle_id,
+                    self._roster_players,
+                )
+            )
+        except Exception as exc:
+            return ({"error": f"{type(exc).__name__}: {exc}"},)
+
+        selected_names = set()
+        selected_by_name = {}
+        rotation_summary = getattr(result, "rotation_summary", {}) or {}
+        match_1_ids = set(rotation_summary.get("match_1_player_ids", ()) or ())
+        required_repeat_ids = set(
+            rotation_summary.get("required_repeat_player_ids", ()) or ()
+        )
+        unnecessary_repeat_ids = set(
+            rotation_summary.get("unnecessary_repeat_player_ids", ()) or ()
+        )
+        unused_selected_ids = set(
+            rotation_summary.get("unused_selected_player_ids", ()) or ()
+        )
+        formation = getattr(result, "recommended_formation", None)
+        if formation is not None:
+            for player in getattr(formation, "lineup", ()) or ():
+                name = getattr(player, "player_name", "")
+                selected_names.add(name.casefold())
+                selected_by_name[name.casefold()] = player
+
+        traces = []
+        for row in rows:
+            priority = getattr(row.priority, "value", row.priority)
+            if priority == TrainingPriority.NO_PRIORITY.value:
+                continue
+            player_id = row.player_id
+            try:
+                requirement = self._weekly_training_service.explain_training_requirement(
+                    player_id,
+                    cycle_id,
+                    self._roster_players,
+                )
+            except Exception:
+                requirement = {}
+            required_slot_class = (
+                requirement.get("required_slot_class", "")
+                or slot_classes.get(player_id, "")
+            )
+            selected_player = selected_by_name.get(row.player_name.casefold())
+            selected = selected_player is not None
+            eligible = str(row.availability).casefold() == "available"
+            played_match_1 = player_id in match_1_ids
+            target = TARGET_MINUTES.get(row.priority, 0)
+            remaining = requirement.get("required_remaining_exposure", "")
+            already_covered = (
+                priority in {
+                    TrainingPriority.REQUIRED_100.value,
+                    TrainingPriority.REQUIRED_50.value,
+                }
+                and player_id not in required_ids
+            )
+            candidate_slots = self._trace_candidate_slots_for_required_class(
+                required_slot_class
+            )
+            if selected:
+                rejection_reason = ""
+                if player_id in unused_selected_ids:
+                    rotation_class = "SELECTED_UNUSED_PLAYER"
+                elif player_id in required_repeat_ids:
+                    rotation_class = "SELECTED_REQUIRED_TRAINING_REPEAT"
+                elif player_id in unnecessary_repeat_ids:
+                    rotation_class = "SELECTED_LEGALITY_REQUIRED_REPEAT"
+                else:
+                    rotation_class = "SELECTED"
+            elif not eligible:
+                rejection_reason = "unavailable"
+                rotation_class = "REJECTED_INJURED"
+            elif already_covered:
+                rejection_reason = "already_covered_by_match_1_or_saved_coverage"
+                rotation_class = "REJECTED_UNNECESSARY_REPEAT"
+            elif required_slot_class and not candidate_slots:
+                rejection_reason = "no_matching_training_slot_in_selected_formations"
+                rotation_class = "REJECTED_TRAINING_SLOT_MISMATCH"
+            elif priority in {
+                TrainingPriority.REQUIRED_100.value,
+                TrainingPriority.REQUIRED_50.value,
+            }:
+                rejection_reason = "not_selected_despite_remaining_requirement"
+                rotation_class = "REJECTED_TRAINING_SLOT_MISMATCH"
+            else:
+                rejection_reason = "not_required_for_optimizer"
+                rotation_class = "REJECTED"
+            traces.append(
+                {
+                    "player_id": player_id,
+                    "player_name": row.player_name,
+                    "priority": priority,
+                    "required_slot_class": required_slot_class,
+                    "eligible": eligible,
+                    "played_match_1": played_match_1,
+                    "availability": row.availability,
+                    "already_covered_by_match_1": already_covered,
+                    "target_exposure": str(target),
+                    "remaining_required": remaining,
+                    "candidate_slots": candidate_slots,
+                    "selected": selected,
+                    "selected_position": (
+                        getattr(selected_player, "position", "") if selected else ""
+                    ),
+                    "rejection_reason": rejection_reason,
+                    "rotation_class": rotation_class,
+                    "effective_optimizer_priority": requirement.get(
+                        "effective_optimizer_priority",
+                        "",
+                    ),
+                }
+            )
+        return tuple(traces)
+
+    def _trace_candidate_slots_for_required_class(self, required_slot_class):
+        if not required_slot_class:
+            return ()
+        try:
+            from models.formations import FORMATION_BY_NAME
+            from models.position import Position
+        except Exception:
+            return ()
+        rules = self._weekly_training_service.active_training_rules()
+        slots = []
+        for formation_name in (
+            self._view.selected_formations()
+            if hasattr(self._view, "selected_formations")
+            else ()
+        ):
+            formation = FORMATION_BY_NAME.get(formation_name)
+            if formation is None:
+                continue
+            for position, amount in formation.positions.items():
+                position_value = getattr(position, "value", position)
+                try:
+                    slot_class = rules.slot_class_for_position(Position(position_value))
+                except Exception:
+                    continue
+                if getattr(slot_class, "value", slot_class) == required_slot_class:
+                    slots.append(
+                        {
+                            "formation": formation_name,
+                            "position": str(position_value),
+                            "count": int(amount),
+                        }
+                    )
+        return tuple(slots)
 
     def _trace_selected_player_state(self, target_name, result):
         if result is None:
@@ -1039,7 +1220,7 @@ class MatchController(QObject):
         if not metadata.opponent_name:
             self._view.show_error(t("match.save_as_first_match_no_result"))
             return False
-        if metadata.competition_type not in {"league", "cup"}:
+        if metadata.competition_type not in {"league", "cup", "friendly"}:
             self._view.show_error(t("match.invalid_match_type"))
             return False
         if metadata.venue_role not in {"home", "away", "neutral", "unknown"}:
@@ -1208,6 +1389,8 @@ class MatchController(QObject):
                 match_type = MATCH_TYPE_CUP
             elif competition_value == "league":
                 match_type = MATCH_TYPE_LEAGUE
+            elif competition_value == "friendly":
+                match_type = MATCH_TYPE_FRIENDLY
             else:
                 match_type = ""
             self._view.set_match_type(match_type)
@@ -1307,6 +1490,10 @@ class MatchController(QObject):
         fresh analysis is needed rather than silently showing nothing
         or stale data from an unrelated match."""
         restored_result = self._result_from_saved_record(record)
+        restored_from_weekly_link = False
+        if restored_result is None:
+            restored_result = self._result_from_linked_weekly_record(record)
+            restored_from_weekly_link = restored_result is not None
         if restored_result is not None:
             self._pending_workspace_state = None
             self._settings_repository.save_last_result(restored_result)
@@ -1321,7 +1508,11 @@ class MatchController(QObject):
             self._restore_tactical_controls_from_record(record)
             self._update_pre_status_and_ratings_panel()
             if hasattr(self._view, "show_status"):
-                self._view.show_status(t("match.saved_formation_restored"))
+                self._view.show_status(
+                    t("match.saved_formation_restored")
+                    if record.lineup or restored_from_weekly_link
+                    else t("match.historical_lineup_missing")
+                )
             return
 
         last_result = self._settings_repository.load_last_result()
@@ -1343,9 +1534,21 @@ class MatchController(QObject):
             self._update_pre_status_and_ratings_panel()
             return
 
+        reconstruction_result = self._empty_historical_reconstruction_result(record)
+        if reconstruction_result is not None:
+            self._pending_workspace_state = None
+            self._settings_repository.save_last_result(reconstruction_result)
+            self._show_training_context_from_result(reconstruction_result)
+            self._view.show_results(reconstruction_result, restored=True)
+            self._restore_tactical_controls_from_record(record)
+            self._update_pre_status_and_ratings_panel()
+            if hasattr(self._view, "show_status"):
+                self._view.show_status(t("match.historical_lineup_missing"))
+            return
+
         if hasattr(self._view, "show_status"):
             self._view.show_status(
-                t("match.edit_requires_reanalysis")
+                t("match.historical_lineup_missing")
             )
 
     def _restore_saved_roster(self, record):
@@ -1378,7 +1581,7 @@ class MatchController(QObject):
             self._view.set_players_loaded_count(len(players))
 
     def _result_from_saved_record(self, record):
-        if not record.lineup or not record.tactical_setup.formation:
+        if not record.tactical_setup.formation:
             return None
         from pathlib import Path
 
@@ -1441,6 +1644,142 @@ class MatchController(QObject):
             analysis_owner_id=record.snapshot_id,
             recommendation_id=record.tactical_setup.formation,
         )
+
+    def _result_from_linked_weekly_record(self, record):
+        linked = None
+        if self._weekly_training_service is not None:
+            state = self._weekly_training_service.load_state()
+            linked = next(
+                (
+                    item
+                    for item in getattr(state, "match_records", ()) or ()
+                    if item.linked_match_record_id == record.snapshot_id
+                ),
+                None,
+            )
+        if linked is None or not linked.formation:
+            return None
+
+        from pathlib import Path
+
+        from ht_coach_app.services.match_workspace_service import (
+            FormationAnalysisResult,
+            LineupPlayerResult,
+            MatchAnalysisResult,
+            TeamRatingsResult,
+        )
+
+        lineup = [
+            LineupPlayerResult(
+                number=index + 1,
+                position=entry.position,
+                side=entry.side,
+                order=entry.order,
+                order_side=entry.order_side,
+                player_name=entry.player_name,
+            )
+            for index, entry in enumerate(linked.lineup)
+        ]
+        formation = FormationAnalysisResult(
+            formation_name=linked.formation,
+            recommended_tactic=record.tactical_setup.selected_tactic or "Normal",
+            tactic_level=float(record.tactical_setup.tactic_level or 0.0),
+            win_probability=0.0,
+            draw_probability=0.0,
+            loss_probability=0.0,
+            possession=0.0,
+            expected_goals=0.0,
+            opponent_expected_goals=0.0,
+            is_recommended=True,
+            team_ratings=TeamRatingsResult(),
+            lineup=lineup,
+        )
+        csv_path = getattr(record.provenance, "roster_source", "") or ""
+        return MatchAnalysisResult(
+            player_count=len(self._roster_players) if self._roster_players else len(lineup),
+            opponent_name=record.match_context.opponent.opponent_name,
+            formations=[formation],
+            players_csv_filename=Path(csv_path).name if csv_path else "",
+            analyzed_formations=[linked.formation],
+            completed_at=record.updated_at,
+            match_type=self._match_type_from_record(record),
+            analysis_owner_type=ANALYSIS_OWNER_SAVED_MATCH,
+            analysis_owner_id=record.snapshot_id,
+            recommendation_id=linked.formation,
+        )
+
+    def _empty_historical_reconstruction_result(self, record):
+        if not record.tactical_setup.formation and not self._roster_players:
+            return None
+        from pathlib import Path
+
+        from models.formations import DEFAULT_FORMATION_NAMES
+        from ht_coach_app.services.match_workspace_service import (
+            FormationAnalysisResult,
+            MatchAnalysisResult,
+            TeamRatingsResult,
+        )
+
+        selected = (
+            self._view.selected_formations()
+            if hasattr(self._view, "selected_formations")
+            else ()
+        )
+        formation_names = list(
+            selected
+            or (
+                [record.tactical_setup.formation]
+                if record.tactical_setup.formation
+                else DEFAULT_FORMATION_NAMES
+            )
+        )
+        if not formation_names:
+            return None
+        formations = [
+            FormationAnalysisResult(
+                formation_name=name,
+                recommended_tactic=record.tactical_setup.selected_tactic or "Normal",
+                tactic_level=float(record.tactical_setup.tactic_level or 0.0),
+                win_probability=0.0,
+                draw_probability=0.0,
+                loss_probability=0.0,
+                possession=0.0,
+                expected_goals=0.0,
+                opponent_expected_goals=0.0,
+                is_recommended=index == 0,
+                team_ratings=TeamRatingsResult(),
+                lineup=[],
+            )
+            for index, name in enumerate(formation_names)
+        ]
+        csv_path = getattr(record.provenance, "roster_source", "") or ""
+        return MatchAnalysisResult(
+            player_count=len(self._roster_players),
+            opponent_name=record.match_context.opponent.opponent_name,
+            formations=formations,
+            players_csv_filename=Path(csv_path).name if csv_path else "",
+            analyzed_formations=formation_names,
+            completed_at=record.updated_at,
+            match_type=self._match_type_from_record(record),
+            analysis_owner_type=ANALYSIS_OWNER_SAVED_MATCH,
+            analysis_owner_id=record.snapshot_id,
+            recommendation_id=formation_names[0],
+        )
+
+    @staticmethod
+    def _match_type_from_record(record):
+        competition_value = getattr(
+            record.match_context.competition_type,
+            "value",
+            record.match_context.competition_type,
+        )
+        if str(competition_value).lower() == "cup":
+            return MATCH_TYPE_CUP
+        if str(competition_value).lower() == "league":
+            return MATCH_TYPE_LEAGUE
+        if str(competition_value).lower() == "friendly":
+            return MATCH_TYPE_FRIENDLY
+        return ""
 
     def _restore_tactical_controls_from_record(self, record):
         if hasattr(self._view, "set_tactic"):
@@ -1505,6 +1844,15 @@ class MatchController(QObject):
             return result
         return None
 
+    def _current_or_saved_workspace_result(self, include_legacy=False):
+        result = self._current_workspace_result(include_legacy=include_legacy)
+        if result is not None:
+            return result
+        record = self._current_workspace_record()
+        if record is None:
+            return None
+        return self._result_from_saved_record(record) or self._result_from_linked_weekly_record(record)
+
     def _result_with_active_workspace_lineup(self, result):
         """Return `result` with the Formation Board's visible lineup as
         the active saved formation.
@@ -1522,6 +1870,9 @@ class MatchController(QObject):
 
         from ht_coach_app.services.match_workspace_service import LineupPlayerResult
 
+        original_lineup = tuple(
+            getattr(getattr(result, "recommended_formation", None), "lineup", ()) or ()
+        )
         lineup = [
             LineupPlayerResult(
                 number=index + 1,
@@ -1534,6 +1885,16 @@ class MatchController(QObject):
             for index, slot in enumerate(board.slots)
             if slot.player is not None
         ]
+        if (
+            len(lineup) != 11
+            and len(original_lineup) == 11
+            and board.formation_name == getattr(
+                getattr(result, "recommended_formation", None),
+                "formation_name",
+                "",
+            )
+        ):
+            return result
         if not lineup:
             return result
 
@@ -1594,6 +1955,8 @@ class MatchController(QObject):
 
         from ht_coach_app.services.match_workspace_service import LineupPlayerResult
 
+        original = getattr(result, "recommended_formation", None)
+        original_lineup = tuple(getattr(original, "lineup", ()) or ())
         lineup = [
             LineupPlayerResult(
                 number=index + 1,
@@ -1606,8 +1969,14 @@ class MatchController(QObject):
             for index, slot in enumerate(board.slots)
             if slot.player is not None
         ]
+        if (
+            len(lineup) != 11
+            and len(original_lineup) == 11
+            and board.formation_name == getattr(original, "formation_name", "")
+        ):
+            return original
         if not lineup:
-            return getattr(result, "recommended_formation", None)
+            return original
 
         formations = list(getattr(result, "formations", ()) or ())
         base_formation = next(
@@ -1645,7 +2014,20 @@ class MatchController(QObject):
         state = state_getter() if callable(state_getter) else None
         board = getattr(state, "current_board", None)
         if board is not None:
-            return board
+            board_count = len(
+                [
+                    slot
+                    for slot in getattr(board, "slots", ()) or ()
+                    if getattr(slot, "player", None) is not None
+                ]
+            )
+            recommended = getattr(result, "recommended_formation", None)
+            if (
+                board_count == 11
+                or len(getattr(recommended, "lineup", ()) or ()) != 11
+                or board.formation_name != getattr(recommended, "formation_name", "")
+            ):
+                return board
         recommended = getattr(result, "recommended_formation", None)
         if recommended is None:
             return None
@@ -1699,7 +2081,7 @@ class MatchController(QObject):
         required_player_ids = None
         training_rules = None
         required_slot_classes = None
-        if match_type == MATCH_TYPE_CUP:
+        if match_type in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP, MATCH_TYPE_FRIENDLY}:
             training_rules = self._weekly_training_service.active_training_rules()
             if training_rules is None:
                 self._view.show_error(
@@ -1717,15 +2099,22 @@ class MatchController(QObject):
                     self._roster_players,
                 )
             )
+        match_1_player_ids = self._match_1_player_ids_for_context(training_context)
 
         self._trace_runtime_integrity(
             "ANALYZE_CLICKED",
             caller="_analyze",
             reason="primary_analysis",
             match_type=match_type,
+            selection_policy=(
+                "friendly_rotation"
+                if match_type == MATCH_TYPE_FRIENDLY
+                else "competitive"
+            ),
             selected_formations=self._view.selected_formations(),
             required_player_ids=tuple(sorted(required_player_ids or ())),
             required_slot_classes=required_slot_classes or {},
+            match_1_player_ids=tuple(sorted(match_1_player_ids)),
             training_context=(
                 {
                     "cycle_id": training_context.training_cycle_id,
@@ -1763,6 +2152,7 @@ class MatchController(QObject):
             required_player_ids=required_player_ids,
             training_rules=training_rules,
             required_slot_classes=required_slot_classes,
+            match_1_player_ids=match_1_player_ids,
         )
         self._worker.moveToThread(
             self._thread
@@ -2397,9 +2787,23 @@ class MatchController(QObject):
             tactical_setup = _dc_replace(
                 tactical_setup, team_attitude=selected_attitude
             )
+        provenance = record.provenance
+        historical_reconstruction = (
+            self._workspace_mode == WORKSPACE_MODE_EDIT_SAVED_MATCH
+            and not record.lineup
+            and float(getattr(active_formation, "win_probability", 0.0) or 0.0) == 0.0
+            and float(getattr(active_formation, "draw_probability", 0.0) or 0.0) == 0.0
+            and float(getattr(active_formation, "loss_probability", 0.0) or 0.0) == 0.0
+        )
+        if historical_reconstruction:
+            provenance = replace(
+                provenance,
+                lineup_source="MANUAL_HISTORICAL_RECONSTRUCTION",
+            )
         updated = record.with_updates(
             lineup=build_historical_lineup(active_formation),
             tactical_setup=tactical_setup,
+            provenance=provenance,
         )
         return repository.save(updated)
 
@@ -2751,7 +3155,7 @@ class MatchController(QObject):
 
     def _current_match_type(self, show_error=True):
         match_type = self._view.match_type() if hasattr(self._view, "match_type") else None
-        if match_type in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP}:
+        if match_type in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP, MATCH_TYPE_FRIENDLY}:
             return match_type
         if show_error and hasattr(self._view, "show_error"):
             self._view.show_error(t("match.invalid_match_type"))
@@ -2763,6 +3167,8 @@ class MatchController(QObject):
             return "league"
         if match_type == MATCH_TYPE_CUP:
             return "cup"
+        if match_type == MATCH_TYPE_FRIENDLY:
+            return "friendly"
         value = getattr(fallback, "value", fallback)
         return str(value or "").lower()
 
@@ -2774,7 +3180,20 @@ class MatchController(QObject):
             return "cup"
         if match_type == MATCH_TYPE_LEAGUE:
             return "league"
+        if match_type == MATCH_TYPE_FRIENDLY:
+            return "friendly"
         return self._current_competition_type(show_error=False) or "unknown"
+
+    def _match_1_player_ids_for_context(self, training_context):
+        cycle_id = getattr(training_context, "training_cycle_id", "") if training_context else ""
+        if not cycle_id:
+            return frozenset()
+        try:
+            return self._weekly_training_service.first_match_player_ids_for_cycle(
+                cycle_id
+            )
+        except Exception:
+            return frozenset()
 
     def _update_season_preview(self, match_date_text=None):
         """Alpha 0.6.7 HF-02, Part 14: after picking a date, preview
@@ -2869,7 +3288,7 @@ class MatchController(QObject):
         return t("match.save_as_second_match_success")
 
     def _save_as_first_match(self):
-        result = self._current_workspace_result(include_legacy=True)
+        result = self._current_or_saved_workspace_result(include_legacy=True)
         if result is None or not getattr(result, "formations", None):
             self._view.show_error(
                 t("match.save_as_first_match_no_result")
@@ -2899,6 +3318,9 @@ class MatchController(QObject):
             return
 
         board = self._capture_visible_lineup_board(result)
+        if not self._has_usable_lineup(board, result):
+            self._view.show_error(t("match.save_disabled_no_lineup"))
+            return
         canonical_save = self._try_save_active_match_workspace(
             result,
             "save_as_first_match_canonical",
@@ -2987,6 +3409,8 @@ class MatchController(QObject):
             return "league"
         if match_type == MATCH_TYPE_CUP:
             return "cup"
+        if match_type == MATCH_TYPE_FRIENDLY:
+            return "friendly"
         return self._current_competition_type(show_error=False) or "unknown"
 
     def _replace_first_match_after_confirmation(self, board, result, linked_match_record_id=""):
@@ -3007,6 +3431,9 @@ class MatchController(QObject):
             return
         result = self._result_with_active_workspace_lineup(result)
         board = self._capture_visible_lineup_board(result) or board
+        if not self._has_usable_lineup(board, result):
+            self._view.show_error(t("match.save_disabled_no_lineup"))
+            return
         metadata = self._current_workspace_metadata(result=result)
         if not self._validate_metadata_for_save(metadata):
             return
@@ -3144,7 +3571,7 @@ class MatchController(QObject):
             pass
 
     def _save_as_second_match(self):
-        result = self._current_workspace_result(include_legacy=True)
+        result = self._current_or_saved_workspace_result(include_legacy=True)
         if result is None or not getattr(result, "formations", None):
             self._view.show_error(
                 t("match.save_as_first_match_no_result")
@@ -3174,6 +3601,9 @@ class MatchController(QObject):
             return
 
         board = self._capture_visible_lineup_board(result)
+        if not self._has_usable_lineup(board, result):
+            self._view.show_error(t("match.save_disabled_no_lineup"))
+            return
         canonical_save = self._try_save_active_match_workspace(
             result,
             "save_as_second_match_canonical",
@@ -3251,6 +3681,9 @@ class MatchController(QObject):
             return
         result = self._result_with_active_workspace_lineup(result)
         board = self._capture_visible_lineup_board(result) or board
+        if not self._has_usable_lineup(board, result):
+            self._view.show_error(t("match.save_disabled_no_lineup"))
+            return
         metadata = self._current_workspace_metadata(result=result)
         if not self._validate_metadata_for_save(metadata):
             return
@@ -3281,6 +3714,22 @@ class MatchController(QObject):
         )
         if self._app_events is not None:
             self._app_events.weekly_plan_saved.emit()
+
+    @staticmethod
+    def _has_usable_lineup(board, result=None):
+        board_count = 0
+        if board is not None:
+            board_count = len(
+                [
+                    slot
+                    for slot in getattr(board, "slots", ()) or ()
+                    if getattr(slot, "player", None) is not None
+                ]
+            )
+        if board_count == 11:
+            return True
+        formation = getattr(result, "recommended_formation", None)
+        return len(getattr(formation, "lineup", ()) or ()) == 11
 
     def _import_official_ratings(self, raw_text, slot=None):
         from ht_coach_app.services.official_rating_service import (

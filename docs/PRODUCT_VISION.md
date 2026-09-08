@@ -67,7 +67,11 @@ coherent rather than accidental:
    the only source of truth for who is currently on the team. See
    docs/UX_RESPONSIBILITY_MODEL.md for the full boundary.
 4. **Match owns lineup optimization.** It is the only module that produces a
-   recommended XI, formation, individual orders or tactic.
+   recommended XI, formation, individual orders or tactic. The manager's
+   competition intent matters here: League and Cup recommendations are
+   competitive first after legal/training constraints, while Friendly
+   recommendations rotate away from unnecessary same-cycle Match 1 repetitions
+   once required training is protected.
 5. **Training evaluates coverage and priorities.** It tracks who trains, under
    which of the (now twelve) senior training types, and whether prioritized
    players are covered — it does not compete with Match to pick a lineup.

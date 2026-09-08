@@ -1504,11 +1504,19 @@ Match analysis should flow like this:
 ```text
 User clicks Analyze Match
   -> MatchPage emits analyze_requested
-  -> MatchController validates selected CSV, opponent, and formations
+  -> MatchController validates selected CSV, opponent, formations, and
+     canonical competition type
   -> MatchAnalysisWorker runs MatchWorkspaceService off the UI thread
   -> MatchWorkspaceService loads players with importers.csv_importer
   -> MatchWorkspaceService applies Squad Health eligibility for Current Available mode
-  -> MatchWorkspaceService calls FormationOptimizer.optimize_against
+  -> MatchWorkspaceService applies the competition-aware selection policy:
+     League/Cup prioritize training feasibility and competitive quality;
+     Friendly prioritizes training feasibility, rotates away from same-cycle
+     Match 1 players when alternatives exist, then competitive quality
+  -> Friendly rotation reads only Weekly Planner Match 1 player ids from the
+     same explicit training cycle
+  -> MatchWorkspaceService calls the existing formation, lineup, order, tactic
+     and probability engine APIs without changing their formulas
   -> Service maps engine result to serializable MatchAnalysisResult view models
   -> Decision Lab creates deterministic explanations from those view models
   -> Match Intelligence creates tactical profiles, matchup classifications,
@@ -1532,6 +1540,13 @@ User clicks Analyze Match
 ```
 
 The engine remains unaware of the desktop application.
+
+Alpha 0.6.14 SP-01 keeps the competition policy at the application layer.
+`LEAGUE`, `CUP` and `FRIENDLY` are the desktop/service values; historical
+metadata persists them as `league`, `cup` and `friendly`. Legacy direct service
+calls for League/Cup without training rules remain compatible, while the primary
+desktop flow always supplies Weekly Planner context so required 100% and 50%
+training priorities override Friendly rotation.
 
 When a saved Match workspace is linked to Weekly Planner, explicit save follows this
 additional app-layer flow:

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Changed
+
+- Added Alpha 0.6.14 SP-01 competition-aware Match recommendation policy.
+  Match now exposes three explicit sporting competition types: League, Cup and
+  Friendly. League and Cup use the competitive policy (legal/available players,
+  weekly training feasibility, then tactical strength). Friendly uses the
+  rotation policy (legal/available players, weekly training feasibility,
+  minimize avoidable Match 1 repetitions from the same training cycle, then
+  tactical strength). Saved Match records persist and restore Cup and Friendly
+  as distinct canonical values. No rating formulas, xG/WDL probabilities,
+  official PRE/POST parsers, Weekly calendar rules, training slot semantics or
+  manual Formation Board editing behavior changed.
+
 ### Fixed
 
 - Fixed Alpha 0.6.13 HF-11 historical match metadata repair. Existing Saved

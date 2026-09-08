@@ -7,7 +7,11 @@ from engine.squad_health.availability_service import (
     CURRENT_AVAILABLE,
     FULL_STRENGTH,
 )
+from engine.weekly_training.models import TrainingSlotClass
+from engine.weekly_training.player_identity import player_training_id
+from engine.weekly_training.training_rules import PlaymakingTrainingRules
 from ht_coach_app.services.match_workspace_service import (
+    MATCH_TYPE_CUP,
     MatchWorkspaceService,
     MatchWorkspaceValidationError,
     match_analysis_result_from_dict,
@@ -258,6 +262,50 @@ class MatchAvailabilityIntegrationTest(unittest.TestCase):
             restored.availability_warning,
             result.availability_warning,
         )
+
+    def test_required_50_available_player_beats_injured_competitor_for_half_training_slot(self):
+        required_half = make_player("Required Half", skill=5, injury=0)
+        injured_competitor = make_player("Injured Half Star", skill=20, injury=3)
+        players = [
+            make_player("Goalkeeper", skill=12),
+            make_player("Defender 1", skill=10),
+            make_player("Defender 2", skill=10),
+            make_player("Defender 3", skill=10),
+            make_player("Inner Mid 1", skill=10),
+            make_player("Inner Mid 2", skill=10),
+            make_player("Inner Mid 3", skill=10),
+            required_half,
+            injured_competitor,
+            make_player("Forward 1", skill=10),
+            make_player("Forward 2", skill=10),
+            make_player("Reserve 1", skill=8),
+            make_player("Reserve 2", skill=8),
+        ]
+        service = self.service(players)
+
+        result = service.analyze(
+            self.csv_path,
+            "Rival FC",
+            ["3-5-2"],
+            availability_mode=CURRENT_AVAILABLE,
+            match_type=MATCH_TYPE_CUP,
+            required_player_ids=(player_training_id(required_half),),
+            training_rules=PlaymakingTrainingRules(),
+            required_slot_classes={
+                player_training_id(required_half): TrainingSlotClass.HALF_TRAINING.value,
+                player_training_id(injured_competitor): TrainingSlotClass.HALF_TRAINING.value,
+            },
+        )
+
+        lineup = {
+            player.player_name: player
+            for player in result.recommended_formation.lineup
+        }
+        self.assertIn("Required Half", lineup)
+        self.assertEqual(lineup["Required Half"].position, "Winger (W)")
+        self.assertNotIn("Injured Half Star", lineup)
+        self.assertEqual(result.unavailable_players_count, 1)
+        self.assertFalse(result.training_conflict_warning)
 
 
 if __name__ == "__main__":

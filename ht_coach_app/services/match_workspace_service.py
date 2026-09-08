@@ -1,5 +1,6 @@
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
+from itertools import combinations
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from engine.advisor.recommendation_types import (
     RecommendationCategory,
     RecommendationConfidence,
 )
+from engine.analyzers.player_analyzer import PlayerAnalyzer
 from engine.analyzers.team_rater import TeamRater
 from engine.squad_health.availability_service import (
     CURRENT_AVAILABLE,
@@ -17,9 +19,14 @@ from engine.squad_health.availability_service import (
     AvailabilityService,
 )
 from engine.optimizers.formation_optimizer import FormationOptimizer
+from engine.optimizers.formation_optimizer import FormationMatchResult
+from engine.optimizers.lineup_objective import LineupObjectiveEvaluator
+from engine.optimizers.lineup_optimizer import LineupOptimizer
+from engine.optimizers.order_optimizer import OrderOptimizer
 from engine.optimizers.tactic_optimizer import TacticOptimizer
 from engine.optimizers.training_constrained_optimizer import (
     TrainingConstrainedFormationOptimizer,
+    TrainingConstrainedLineupOptimizer,
 )
 from engine.weekly_training.player_identity import player_training_id
 from engine.match_intelligence import MatchIntelligenceEngine
@@ -85,8 +92,14 @@ class MatchWorkspaceValidationError(ValueError):
 
 MATCH_TYPE_LEAGUE = "LEAGUE"
 MATCH_TYPE_CUP = "CUP"
+MATCH_TYPE_FRIENDLY = "FRIENDLY"
 ANALYSIS_OWNER_NEW_MATCH_DRAFT = "NEW_MATCH_DRAFT"
 ANALYSIS_OWNER_SAVED_MATCH = "SAVED_MATCH"
+
+COMPETITIVE_MATCH_TYPES = frozenset({MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP})
+TRAINING_AWARE_MATCH_TYPES = frozenset(
+    {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP, MATCH_TYPE_FRIENDLY}
+)
 
 
 @dataclass(frozen=True)
@@ -181,6 +194,9 @@ class MatchAnalysisResult:
     availability_warning: str = ""
     unavailable_players_count: int = 0
     match_type: str = MATCH_TYPE_LEAGUE
+    selection_policy: str = "competitive"
+    selection_policy_description: str = ""
+    rotation_summary: dict = field(default_factory=dict)
     training_conflict_warning: str = ""
     analysis_owner_type: str = ""
     analysis_owner_id: str = ""
@@ -209,6 +225,394 @@ class MatchAnalysisResult:
                 return formation
 
         return self.formations[0]
+
+
+@dataclass(frozen=True)
+class FriendlyRotationResult:
+    formation_result: FormationMatchResult
+    unplaced_required_players: tuple
+    training_conflicts: tuple = ()
+
+
+class FriendlyRotationFormationOptimizer:
+    """Competition policy wrapper for friendlies.
+
+    It reuses the existing candidate generation, rating evaluation,
+    order optimization and tactic optimization pipeline. The only
+    difference is candidate ordering: training feasibility first,
+    avoidable Match 1 repetition second, tactical strength third.
+    """
+
+    FRIENDLY_CANDIDATES_PER_ROLE = 12
+    FRIENDLY_BEAM_WIDTH = 300
+
+    @staticmethod
+    def optimize_against(
+        players,
+        formations,
+        opponent_ratings,
+        required_players,
+        rules,
+        config=None,
+        required_slot_classes=None,
+        match_1_player_ids=(),
+    ):
+        results = []
+        played_ids = {
+            str(player_id)
+            for player_id in (match_1_player_ids or ())
+            if str(player_id)
+        }
+        required_ids = {
+            player_training_id(player)
+            for player in required_players
+        }
+
+        for formation in formations:
+            result = FriendlyRotationFormationOptimizer._optimize_formation(
+                players,
+                formation,
+                opponent_ratings,
+                required_players,
+                rules,
+                config=config,
+                required_slot_classes=required_slot_classes or {},
+                match_1_player_ids=played_ids,
+                required_player_ids=required_ids,
+            )
+            results.append(result)
+
+        results.sort(
+            key=lambda item: FriendlyRotationFormationOptimizer._formation_sort_key(
+                item
+            )
+        )
+        return results
+
+    @staticmethod
+    def _formation_sort_key(item):
+        trace = getattr(item.formation_result, "objective_trace", {}) or {}
+        rotation = trace.get("rotation", {}) if isinstance(trace, dict) else {}
+        return (
+            len(item.unplaced_required_players) + len(item.training_conflicts),
+            int(rotation.get("unnecessary_repeat_count", 0) or 0),
+            -float(item.formation_result.probabilities.win),
+        )
+
+    @staticmethod
+    def _optimize_formation(
+        players,
+        formation,
+        opponent_ratings,
+        required_players,
+        rules,
+        config=None,
+        required_slot_classes=None,
+        match_1_player_ids=frozenset(),
+        required_player_ids=frozenset(),
+    ):
+        roles = LineupOptimizer._build_roles(formation)
+        locked, unplaced = TrainingConstrainedLineupOptimizer._lock_required_players(
+            list(required_players),
+            roles,
+            rules,
+            required_slot_classes=required_slot_classes,
+        )
+        locked_ids = {
+            player_training_id(lineup_player.player)
+            for lineup_player in locked
+        }
+        remaining_players = [
+            player for player in players
+            if player_training_id(player) not in locked_ids
+        ]
+        reduced_roles = TrainingConstrainedLineupOptimizer._reduced_roles(
+            roles,
+            locked,
+        )
+        candidate_partials = FriendlyRotationFormationOptimizer._generate_rotation_candidates(
+            remaining_players,
+            reduced_roles,
+            FriendlyRotationFormationOptimizer.FRIENDLY_CANDIDATES_PER_ROLE,
+            FriendlyRotationFormationOptimizer.FRIENDLY_BEAM_WIDTH,
+            match_1_player_ids,
+            required_player_ids,
+        )
+        baseline_players = TrainingConstrainedLineupOptimizer._build_baseline(
+            remaining_players,
+            reduced_roles,
+        )
+        full_lineups = [
+            Lineup(players=list(locked) + list(partial))
+            for partial in candidate_partials
+        ]
+        baseline_lineup = Lineup(players=list(locked) + list(baseline_players))
+        full_lineups.append(baseline_lineup)
+        (
+            _baseline_ratings,
+            _baseline_match_evaluation,
+            baseline_probabilities,
+        ) = LineupOptimizer._evaluate_lineup(
+            baseline_lineup,
+            opponent_ratings,
+            config=config,
+        )
+
+        evaluated = []
+        seen = set()
+        for index, lineup in enumerate(full_lineups):
+            key = FriendlyRotationFormationOptimizer._lineup_key(lineup)
+            if key in seen:
+                continue
+            seen.add(key)
+            ratings, match_evaluation, probabilities = (
+                LineupOptimizer._evaluate_lineup(
+                    lineup,
+                    opponent_ratings,
+                    config=config,
+                )
+            )
+            conflicts = TrainingConstrainedLineupOptimizer._training_slot_class_conflicts(
+                lineup,
+                rules,
+                required_slot_classes,
+            )
+            rotation = FriendlyRotationFormationOptimizer._rotation_metrics(
+                lineup,
+                match_1_player_ids,
+                required_player_ids,
+            )
+            trace = LineupObjectiveEvaluator.build_trace(
+                ratings,
+                opponent_ratings,
+                match_evaluation,
+                probabilities,
+                lineup=lineup,
+                training_score=TrainingConstrainedLineupOptimizer._training_slot_class_score(
+                    lineup,
+                    rules,
+                    required_slot_classes,
+                ),
+                candidate_id=f"friendly-candidate-{index + 1}",
+            ).to_dict()
+            trace["selection_policy"] = "friendly_rotation"
+            trace["rotation"] = rotation
+            evaluated.append(
+                SimpleNamespace(
+                    lineup=lineup,
+                    ratings=ratings,
+                    match_evaluation=match_evaluation,
+                    probabilities=probabilities,
+                    training_conflicts=conflicts,
+                    objective_trace=trace,
+                )
+            )
+
+        if not evaluated:
+            raise MatchWorkspaceValidationError(
+                "No legal lineup could be generated for the selected formation."
+            )
+
+        evaluated.sort(
+            key=lambda item: (
+                len(unplaced) + len(item.training_conflicts),
+                int(item.objective_trace["rotation"]["unnecessary_repeat_count"]),
+                -float(item.probabilities.win),
+            )
+        )
+        best_normal = evaluated[0]
+        best = best_normal
+        best_order_win_probability = float(best_normal.probabilities.win)
+
+        finalists = [
+            item for item in evaluated
+            if (
+                len(item.training_conflicts) == len(best_normal.training_conflicts)
+                and int(item.objective_trace["rotation"]["unnecessary_repeat_count"])
+                == int(best_normal.objective_trace["rotation"]["unnecessary_repeat_count"])
+            )
+        ][:TrainingConstrainedLineupOptimizer.DEFAULT_ORDER_FINALISTS]
+        tested_order_configurations = 0
+        for finalist in finalists:
+            order_optimization = OrderOptimizer.optimize(
+                finalist.lineup,
+                opponent_ratings,
+                beam_width=TrainingConstrainedLineupOptimizer.DEFAULT_ORDER_BEAM_WIDTH,
+                config=config,
+            )
+            tested_order_configurations += order_optimization.tested_configurations
+            if order_optimization.probabilities.win > best_order_win_probability:
+                best_order_win_probability = order_optimization.probabilities.win
+                rotation = FriendlyRotationFormationOptimizer._rotation_metrics(
+                    order_optimization.lineup,
+                    match_1_player_ids,
+                    required_player_ids,
+                )
+                trace = LineupObjectiveEvaluator.evaluate_lineup(
+                    order_optimization.lineup,
+                    opponent_ratings,
+                    training_score=TrainingConstrainedLineupOptimizer._training_slot_class_score(
+                        order_optimization.lineup,
+                        rules,
+                        required_slot_classes,
+                    ),
+                    candidate_id="friendly-best-order",
+                ).to_dict()
+                trace["selection_policy"] = "friendly_rotation"
+                trace["rotation"] = rotation
+                best = SimpleNamespace(
+                    lineup=order_optimization.lineup,
+                    ratings=order_optimization.ratings,
+                    match_evaluation=order_optimization.match_evaluation,
+                    probabilities=order_optimization.probabilities,
+                    training_conflicts=TrainingConstrainedLineupOptimizer._training_slot_class_conflicts(
+                        order_optimization.lineup,
+                        rules,
+                        required_slot_classes,
+                    ),
+                    objective_trace=trace,
+                )
+
+        tactic_optimization = TacticOptimizer.optimize(
+            best.ratings,
+            opponent_ratings,
+            lineup=best.lineup,
+            **({"config": config} if config is not None else {}),
+        )
+        trace = dict(best.objective_trace)
+        trace["rotation"] = FriendlyRotationFormationOptimizer._rotation_metrics(
+            best.lineup,
+            match_1_player_ids,
+            required_player_ids,
+        )
+        formation_result = FormationMatchResult(
+            formation=formation,
+            lineup=best.lineup,
+            tactic=tactic_optimization.tactic,
+            tactic_level=tactic_optimization.tactic_level,
+            ratings=tactic_optimization.ratings,
+            match_evaluation=tactic_optimization.match_evaluation,
+            probabilities=tactic_optimization.probabilities,
+            tested_lineups=len(evaluated),
+            tested_order_configurations=tested_order_configurations,
+            order_finalists=len(finalists),
+            tested_tactics=tactic_optimization.tested_tactics,
+            baseline_win_probability=float(baseline_probabilities.win),
+            best_normal_win_probability=float(best_normal.probabilities.win),
+            best_order_win_probability=best_order_win_probability,
+            objective_trace=trace,
+        )
+        return FriendlyRotationResult(
+            formation_result=formation_result,
+            unplaced_required_players=tuple(unplaced),
+            training_conflicts=tuple(best.training_conflicts),
+        )
+
+    @staticmethod
+    def _lineup_key(lineup):
+        return tuple(
+            sorted(
+                (
+                    player_training_id(lineup_player.player),
+                    lineup_player.position.value,
+                    lineup_player.side.value,
+                )
+                for lineup_player in lineup.players
+            )
+        )
+
+    @staticmethod
+    def _generate_rotation_candidates(
+        players,
+        roles,
+        candidates_per_role,
+        beam_width,
+        match_1_player_ids,
+        required_player_ids,
+    ):
+        beam = [(0, 0.0, [], frozenset())]
+        for position, side, amount in roles:
+            ranking = PlayerAnalyzer.rank_players(
+                players,
+                position.value,
+                side,
+            )
+            ranking.sort(
+                key=lambda player_score: (
+                    (
+                        player_training_id(player_score.player)
+                        in set(match_1_player_ids or ())
+                        and player_training_id(player_score.player)
+                        not in set(required_player_ids or ())
+                    ),
+                    -float(player_score.score),
+                )
+            )
+            ranking = ranking[:candidates_per_role]
+            player_combinations = list(combinations(ranking, int(amount)))
+            next_beam = []
+            for repeat_count, score, players_list, used_ids in beam:
+                for player_scores in player_combinations:
+                    selected_ids = frozenset(
+                        player_training_id(player_score.player)
+                        for player_score in player_scores
+                    )
+                    if used_ids & selected_ids:
+                        continue
+                    unnecessary_repeats = len(
+                        selected_ids
+                        & set(match_1_player_ids or ())
+                        - set(required_player_ids or ())
+                    )
+                    lineup_players = [
+                        LineupPlayer(
+                            player=player_score.player,
+                            position=position,
+                            side=side,
+                        )
+                        for player_score in player_scores
+                    ]
+                    next_beam.append(
+                        (
+                            repeat_count + unnecessary_repeats,
+                            score + sum(player_score.score for player_score in player_scores),
+                            players_list + lineup_players,
+                            used_ids | selected_ids,
+                        )
+                    )
+            next_beam.sort(key=lambda item: (item[0], -item[1]))
+            beam = next_beam[:beam_width]
+            if not beam:
+                break
+
+        expected_player_count = sum(int(amount) for _, _, amount in roles)
+        return [
+            players_list
+            for _repeat_count, _score, players_list, _used_ids in beam
+            if len(players_list) == expected_player_count
+        ]
+
+    @staticmethod
+    def _rotation_metrics(lineup, match_1_player_ids, required_player_ids):
+        selected_ids = {
+            player_training_id(lineup_player.player)
+            for lineup_player in lineup.players
+        }
+        repeated_ids = selected_ids & set(match_1_player_ids or ())
+        required_repeat_ids = repeated_ids & set(required_player_ids or ())
+        unnecessary_repeat_ids = repeated_ids - required_repeat_ids
+        unused_selected_ids = selected_ids - set(match_1_player_ids or ())
+        return {
+            "match_1_context_available": bool(match_1_player_ids),
+            "match_1_player_ids": sorted(match_1_player_ids or ()),
+            "selected_player_ids": sorted(selected_ids),
+            "required_repeat_player_ids": sorted(required_repeat_ids),
+            "unnecessary_repeat_player_ids": sorted(unnecessary_repeat_ids),
+            "unused_selected_player_ids": sorted(unused_selected_ids),
+            "rotation_count": len(unused_selected_ids),
+            "repeat_count": len(repeated_ids),
+            "unnecessary_repeat_count": len(unnecessary_repeat_ids),
+        }
 
 
 class MatchWorkspaceService:
@@ -260,6 +664,7 @@ class MatchWorkspaceService:
         required_player_ids=None,
         training_rules=None,
         required_slot_classes=None,
+        match_1_player_ids=None,
     ):
         match_type = self._normalize_match_type(match_type)
         self.validate_inputs(
@@ -295,23 +700,35 @@ class MatchWorkspaceService:
 
         training_conflict_warning = ""
 
-        if match_type == MATCH_TYPE_CUP:
-            if training_rules is None:
-                raise MatchWorkspaceValidationError(
-                    "Automatic training rules unavailable for Cup/Friendly analysis."
-                )
+        if match_type == MATCH_TYPE_FRIENDLY and training_rules is None:
+            raise MatchWorkspaceValidationError(
+                "Automatic training rules unavailable for this match type."
+            )
+
+        if match_type in TRAINING_AWARE_MATCH_TYPES and training_rules is not None:
             required_players = self._resolve_required_players(
                 players,
                 required_player_ids or (),
             )
-            constrained_results = TrainingConstrainedFormationOptimizer.optimize_against(
-                players,
-                formations,
-                opponent.ratings,
-                required_players,
-                training_rules,
-                required_slot_classes=required_slot_classes or {},
-            )
+            if match_type == MATCH_TYPE_FRIENDLY:
+                constrained_results = FriendlyRotationFormationOptimizer.optimize_against(
+                    players,
+                    formations,
+                    opponent.ratings,
+                    required_players,
+                    training_rules,
+                    required_slot_classes=required_slot_classes or {},
+                    match_1_player_ids=match_1_player_ids or (),
+                )
+            else:
+                constrained_results = TrainingConstrainedFormationOptimizer.optimize_against(
+                    players,
+                    formations,
+                    opponent.ratings,
+                    required_players,
+                    training_rules,
+                    required_slot_classes=required_slot_classes or {},
+                )
             engine_results = [
                 item.formation_result for item in constrained_results
             ]
@@ -359,6 +776,9 @@ class MatchWorkspaceService:
             availability_warning=self._availability_warning(mode),
             unavailable_players_count=self._unavailable_count(all_players),
             match_type=match_type,
+            selection_policy=self._selection_policy(match_type),
+            selection_policy_description=self._selection_policy_description(match_type),
+            rotation_summary=self._rotation_summary(engine_results, match_type),
             training_conflict_warning=training_conflict_warning,
             training_cycle_id="",
             weekly_cycle_revision_used="",
@@ -482,6 +902,9 @@ class MatchWorkspaceService:
             availability_warning=self._availability_warning(mode),
             unavailable_players_count=self._unavailable_count(all_players),
             match_type=match_type,
+            selection_policy=self._selection_policy(match_type),
+            selection_policy_description=self._selection_policy_description(match_type),
+            rotation_summary={},
             recommendation_id="",
             recommendation_revision=0,
             manual_lineup_revision=1,
@@ -533,9 +956,31 @@ class MatchWorkspaceService:
     @staticmethod
     def _normalize_match_type(match_type):
         value = getattr(match_type, "value", match_type)
-        if value in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP}:
+        value = str(value or "").upper()
+        if value in {MATCH_TYPE_LEAGUE, MATCH_TYPE_CUP, MATCH_TYPE_FRIENDLY}:
             return value
         raise MatchWorkspaceValidationError("Select a valid match type.")
+
+    @staticmethod
+    def _selection_policy(match_type):
+        return "friendly_rotation" if match_type == MATCH_TYPE_FRIENDLY else "competitive"
+
+    @staticmethod
+    def _selection_policy_description(match_type):
+        if match_type == MATCH_TYPE_FRIENDLY:
+            return t("match.policy_friendly")
+        if match_type == MATCH_TYPE_CUP:
+            return t("match.policy_cup")
+        return t("match.policy_league")
+
+    @staticmethod
+    def _rotation_summary(engine_results, match_type):
+        if match_type != MATCH_TYPE_FRIENDLY or not engine_results:
+            return {}
+        trace = getattr(engine_results[0], "objective_trace", {}) or {}
+        if hasattr(trace, "to_dict"):
+            trace = trace.to_dict()
+        return dict(trace.get("rotation", {}) if isinstance(trace, dict) else {})
 
     def validate_players_csv_path(self, players_csv_path):
         normalized_path = str(players_csv_path).strip()
@@ -902,6 +1347,9 @@ class MatchWorkspaceService:
             availability_warning=result.availability_warning,
             unavailable_players_count=result.unavailable_players_count,
             match_type=result.match_type,
+            selection_policy=result.selection_policy,
+            selection_policy_description=result.selection_policy_description,
+            rotation_summary=result.rotation_summary,
             training_conflict_warning=result.training_conflict_warning,
             analysis_owner_type=result.analysis_owner_type,
             analysis_owner_id=result.analysis_owner_id,
@@ -1024,6 +1472,9 @@ def match_analysis_result_from_dict(data):
         availability_warning=data.get("availability_warning", ""),
         unavailable_players_count=int(data.get("unavailable_players_count", 0)),
         match_type=data.get("match_type", MATCH_TYPE_LEAGUE),
+        selection_policy=data.get("selection_policy", "competitive"),
+        selection_policy_description=data.get("selection_policy_description", ""),
+        rotation_summary=dict(data.get("rotation_summary", {})),
         training_conflict_warning=data.get("training_conflict_warning", ""),
         training_cycle_id=data.get("training_cycle_id", ""),
         weekly_cycle_revision_used=data.get("weekly_cycle_revision_used", ""),
@@ -1162,6 +1613,9 @@ def match_analysis_result_from_dict(data):
             availability_warning=result.availability_warning,
             unavailable_players_count=result.unavailable_players_count,
             match_type=result.match_type,
+            selection_policy=result.selection_policy,
+            selection_policy_description=result.selection_policy_description,
+            rotation_summary=result.rotation_summary,
             training_conflict_warning=result.training_conflict_warning,
             analysis_owner_type=result.analysis_owner_type,
             analysis_owner_id=result.analysis_owner_id,
@@ -1200,6 +1654,9 @@ def with_tactical_advisor(result):
         availability_warning=result.availability_warning,
         unavailable_players_count=result.unavailable_players_count,
         match_type=result.match_type,
+        selection_policy=result.selection_policy,
+        selection_policy_description=result.selection_policy_description,
+        rotation_summary=result.rotation_summary,
         training_conflict_warning=result.training_conflict_warning,
         analysis_owner_type=result.analysis_owner_type,
         analysis_owner_id=result.analysis_owner_id,

@@ -57,6 +57,7 @@ from ht_coach_app.reasoning.explanation_formatter import (
 from ht_coach_app.services.formation_board_service import FormationBoardMapper
 from ht_coach_app.services.match_workspace_service import (
     MATCH_TYPE_CUP,
+    MATCH_TYPE_FRIENDLY,
     MATCH_TYPE_LEAGUE,
 )
 from ht_coach_app.views.base_page import BasePage
@@ -394,6 +395,10 @@ class MatchPage(BasePage):
         self.match_type_combo.addItem(
             t("match.match_type_cup"),
             MATCH_TYPE_CUP,
+        )
+        self.match_type_combo.addItem(
+            t("match.match_type_friendly"),
+            MATCH_TYPE_FRIENDLY,
         )
         self.match_type_combo.currentIndexChanged.connect(
             self._emit_workspace_changed
@@ -1854,7 +1859,7 @@ class MatchPage(BasePage):
                     self.workspace_recalculate_requested.emit
                 )
                 board.workspace_modified.connect(
-                    self.workspace_recalculate_requested.emit
+                    self._handle_formation_board_modified
                 )
                 board.set_save_as_first_match_visible(True)
                 board.save_as_first_match_requested.connect(
@@ -2360,6 +2365,31 @@ class MatchPage(BasePage):
             (t("match.opponent"), result.opponent_name),
             (t("match.formations"), str(len(result.analyzed_formations))),
         ]
+        if getattr(result, "selection_policy_description", ""):
+            items.append(
+                (
+                    t("match.selection_policy"),
+                    result.selection_policy_description,
+                )
+            )
+        rotation = getattr(result, "rotation_summary", {}) or {}
+        if rotation:
+            items.extend(
+                [
+                    (
+                        t("match.rotation_repeated"),
+                        str(rotation.get("repeat_count", 0)),
+                    ),
+                    (
+                        t("match.rotation_rotated"),
+                        str(rotation.get("rotation_count", 0)),
+                    ),
+                    (
+                        t("match.rotation_unnecessary_repeats"),
+                        str(rotation.get("unnecessary_repeat_count", 0)),
+                    ),
+                ]
+            )
 
         for label, value in items:
             value_label = QLabel(f"{label}: {value}")
@@ -2732,6 +2762,7 @@ class MatchPage(BasePage):
         self.match_type_combo.setItemText(0, t("match.match_type_select"))
         self.match_type_combo.setItemText(1, t("match.match_type_league"))
         self.match_type_combo.setItemText(2, t("match.match_type_cup"))
+        self.match_type_combo.setItemText(3, t("match.match_type_friendly"))
         self.match_date_label.setText(t("match.match_date"))
         self.venue_role_label.setText(t("match.venue_role"))
         self._update_save_action_labels()
@@ -3031,6 +3062,11 @@ class MatchPage(BasePage):
             self.workspace_changed.emit()
         self._last_workspace_match_type = self.match_type()
 
+    def _handle_formation_board_modified(self, workspace_state):
+        self._update_save_action_labels()
+        self.workspace_recalculate_requested.emit(workspace_state)
+        self.workspace_changed.emit()
+
     def _can_analyze(self):
         return bool(
             self.players_csv_path()
@@ -3072,6 +3108,9 @@ class MatchPage(BasePage):
         self.save_metadata_button.setToolTip(reason)
         if board is not None and hasattr(board, "set_save_action_validation"):
             board.set_save_action_validation(not reason, reason)
+        weekly_reason = self._weekly_save_action_disabled_reason()
+        if board is not None and hasattr(board, "set_weekly_save_action_validation"):
+            board.set_weekly_save_action_validation(not weekly_reason, weekly_reason)
 
     def _save_action_disabled_reason(self):
         if self._editing_saved_match and self._metadata_dirty:
@@ -3088,7 +3127,24 @@ class MatchPage(BasePage):
         if result is None or not getattr(result, "formations", None):
             return t("match.save_disabled_no_analysis")
         recommended = getattr(result, "recommended_formation", None)
-        if recommended is None or not getattr(recommended, "lineup", None):
+        board = getattr(self, "_formation_board_widget", None)
+        visible_lineup_count = 0
+        if board is not None:
+            current_board = board.current_board()
+            visible_lineup_count = len(
+                [
+                    slot
+                    for slot in getattr(current_board, "slots", ()) or ()
+                    if getattr(slot, "player", None) is not None
+                ]
+            )
+        if (
+            recommended is None
+            or (
+                not getattr(recommended, "lineup", None)
+                and visible_lineup_count != 11
+            )
+        ):
             return t("match.save_disabled_no_lineup")
         if not self.selected_opponent_name():
             return t("match.save_disabled_no_opponent")
@@ -3096,6 +3152,37 @@ class MatchPage(BasePage):
             return t("match.save_disabled_no_match_type")
         if not self.match_date():
             return t("match.save_disabled_no_match_date")
+        return ""
+
+    def _weekly_save_action_disabled_reason(self):
+        if not self._editing_saved_match:
+            return self._save_action_disabled_reason()
+        if self._analysis_stale:
+            return t("match.analysis_stale_match_type")
+        if not self.selected_opponent_name():
+            return t("match.save_disabled_no_opponent")
+        if not self.match_type():
+            return t("match.save_disabled_no_match_type")
+        if not self.match_date():
+            return t("match.save_disabled_no_match_date")
+        board = getattr(self, "_formation_board_widget", None)
+        visible_lineup_count = 0
+        if board is not None:
+            current_board = board.current_board()
+            visible_lineup_count = len(
+                [
+                    slot
+                    for slot in getattr(current_board, "slots", ()) or ()
+                    if getattr(slot, "player", None) is not None
+                ]
+            )
+        result = getattr(self, "_last_result", None)
+        recommended = getattr(result, "recommended_formation", None)
+        if (
+            visible_lineup_count != 11
+            and len(getattr(recommended, "lineup", ()) or ()) != 11
+        ):
+            return t("match.save_disabled_no_lineup")
         return ""
 
     def _update_availability_warning(self):

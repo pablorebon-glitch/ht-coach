@@ -56,6 +56,29 @@ Deliverables:
 No player-specific exceptions, PRE/POST parser changes, calendar changes,
 portable-distribution changes or probability formula changes.
 
+### Alpha 0.6.14 SP-01: Competition-Aware Match Recommendation Policy
+
+Goal: make Match recommendations respect the manager's competition intent without
+changing engine formulas.
+
+Deliverables:
+
+- Match exposes three sporting competition types: League, Cup and Friendly.
+- History persists those values separately as `league`, `cup` and `friendly`
+  instead of collapsing Cup and Friendly into one UI label.
+- League and Cup keep the competitive policy: valid/available lineup, training
+  feasibility, then tactical quality.
+- Friendly uses the rotation policy: valid/available lineup, training feasibility,
+  avoid unnecessary same-cycle Match 1 repetitions, then tactical quality.
+- Friendly reads Match 1 participation only from the canonical Weekly Planner
+  Match 1 record for the selected training cycle; global or stale weekly records
+  cannot influence rotation.
+- Required 100% and required 50% training priorities override rotation.
+
+No rating formulas, optimizer formulas, order/tactic formulas, probabilities,
+official parsers, Weekly calendar rules or manual Formation Board edit semantics
+are changed.
+
 ### Alpha 0.6.9: Portable Windows Distribution
 
 Goal: make HT Coach usable from a copied folder or USB drive on Windows 10/11 without
@@ -496,12 +519,12 @@ Shipped:
 Deliberately not shipped in this pass (tracked as follow-up work under this same
 sprint number, not pushed to 0.5.9.0):
 
-- The Match optimizer's typed `TrainingContext` and sporting-vs-training trade-off
-  modes (`SPORTING_ONLY` / `BALANCED` / `PRIORITIZE_TRAINING` /
-  `REQUIRE_SELECTED_PRIORITIES`) — the Copa/Amistoso optimizer still only
-  understands Playmaking's IM/Winger split; generalizing it to lock the correct
-  positions for all 12 types safely (without risking the live Cup-analysis
-  behavior already in production use) needs its own dedicated pass.
+- Broader typed `TrainingContext` trade-off modes
+  (`SPORTING_ONLY` / `BALANCED` / `PRIORITIZE_TRAINING` /
+  `REQUIRE_SELECTED_PRIORITIES`) remain follow-up work. Alpha 0.6.14 SP-01
+  separates League, Cup and Friendly recommendation policy at the desktop
+  application layer while preserving the existing training rule provider and
+  engine calculation contracts.
 - The structured `PlayerTrainingResult` weekly-aggregation model and multi-skill
   coverage tracking (Shooting's Scoring and Set Pieces coverage are only tracked
   as a single combined number today, scoped to the primary skill).

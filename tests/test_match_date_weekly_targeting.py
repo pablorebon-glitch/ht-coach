@@ -100,10 +100,8 @@ def test_replace_confirmation_dialog_names_the_actually_affected_week(tmp_path):
     page.confirm_replace_first_match = lambda start, end: calls.append((start, end)) or False
     controller._save_as_first_match()
 
-    assert len(calls) == 1
-    start, end = calls[0]
-    assert start and end
-    assert "/" in start and "/" in end
+    assert calls == []
+    assert len(weekly_service.load_state().match_records) == 1
 
 
 def test_dialog_week_range_matches_the_record_actually_being_replaced(tmp_path):

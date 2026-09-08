@@ -328,7 +328,7 @@ class PitchWidget(QWidget):
     def _slot_id_at(self, point):
         child = self.childAt(point)
         for slot, widget in self._slot_widgets:
-            if widget is child and slot.player is not None:
+            if widget is child:
                 return slot.slot_id
         return ""
 

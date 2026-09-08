@@ -1,13 +1,25 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
 from engine.history.match_deletion import find_linked_weekly_match_records
-from engine.history.models import HistoricalMatchSnapshot, MatchContext, OpponentReference
+from engine.history.models import (
+    HistoricalMatchSnapshot,
+    MatchContext,
+    OpponentReference,
+    TacticalSetup,
+)
+from engine.history.official_ratings.models import OfficialRatingSnapshot
 from engine.history.provisional_record import find_or_create_provisional_record
 from engine.history.repository import HistoricalMatchRepository
-from engine.weekly_training.models import CompetitionType, MatchRole, WeeklyMatchRecord
+from engine.weekly_training.models import (
+    CompetitionType,
+    MatchRole,
+    MatchStatus,
+    WeeklyMatchRecord,
+)
 from engine.weekly_training.persistence import WeeklyTrainingRepository, WeeklyTrainingState
+from models.player import Player
 
 
 @pytest.fixture()
@@ -188,6 +200,100 @@ def _analysis_result_with_recommendation_and_visible_option(match_type="CUP"):
         formations=[recommended, visible],
         match_type=match_type,
     )
+
+
+def _historical_253_result(match_type="CUP"):
+    from ht_coach_app.services.match_workspace_service import (
+        FormationAnalysisResult,
+        LineupPlayerResult,
+        MatchAnalysisResult,
+        TeamRatingsResult,
+    )
+
+    slots = (
+        ("GOALKEEPER", "CENTER"),
+        ("CENTRAL_DEFENDER", "LEFT"),
+        ("CENTRAL_DEFENDER", "RIGHT"),
+        ("INNER_MIDFIELDER", "LEFT"),
+        ("INNER_MIDFIELDER", "CENTER"),
+        ("INNER_MIDFIELDER", "RIGHT"),
+        ("WINGER", "LEFT"),
+        ("WINGER", "RIGHT"),
+        ("FORWARD", "LEFT"),
+        ("FORWARD", "CENTER"),
+        ("FORWARD", "RIGHT"),
+    )
+    formation = FormationAnalysisResult(
+        formation_name="2-5-3",
+        recommended_tactic="Normal",
+        tactic_level=5,
+        win_probability=0.5,
+        draw_probability=0.3,
+        loss_probability=0.2,
+        possession=50.0,
+        expected_goals=1.5,
+        opponent_expected_goals=1.2,
+        is_recommended=True,
+        team_ratings=TeamRatingsResult(),
+        lineup=[
+            LineupPlayerResult(
+                number=index,
+                position=position,
+                side=side,
+                order="Normal",
+                order_side="",
+                player_name=f"Historico {index}",
+            )
+            for index, (position, side) in enumerate(slots, start=1)
+        ],
+    )
+    return MatchAnalysisResult(
+        player_count=18,
+        opponent_name="Santa Cruz Club",
+        formations=[formation],
+        match_type=match_type,
+    )
+
+
+def _manual_roster(count=11):
+    return [
+        Player(
+            name=f"Manual Player {index}",
+            age=25,
+            days=0,
+            speciality="",
+            form=7,
+            stamina=7,
+            goalkeeper=8 if index == 1 else 1,
+            defending=9,
+            playmaking=9,
+            winger=9,
+            passing=7,
+            scoring=9,
+            set_pieces=5,
+            experience=5,
+            leadership=4,
+            tsi=1000 + index,
+            salary=1000,
+        )
+        for index in range(1, count + 1)
+    ]
+
+
+def _fill_visible_board_from_roster(board_widget, roster):
+    for slot, player in zip(board_widget.current_board().slots, roster):
+        state = board_widget.workspace_state()
+        board_widget._workspace_state = board_widget._workspace_service.place_bench_player_in_empty_slot(
+            state,
+            roster,
+            "2-5-3",
+            slot.slot_id,
+            player.name.lower().replace(" ", "_"),
+            state.revision,
+            interaction_source="TEST",
+        )
+        board_widget._sync_boards_cache()
+    board_widget.workspace_modified.emit(board_widget.workspace_state())
 
 
 def test_saving_first_match_populates_the_canonical_link(tmp_path):
@@ -388,6 +494,300 @@ def test_saved_match_restores_its_canonical_match_type(tmp_path):
     controller.edit_record(record.snapshot_id)
 
     assert page.match_type() == "CUP"
+
+
+def test_saved_historical_sunday_can_be_assigned_as_match_one_without_reanalysis(tmp_path):
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.core.localization import t
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    ht_week_context_provider.set_calendar_service(
+        HTCalendarService(clock=lambda: datetime(2026, 9, 7, 12, 0))
+    )
+    try:
+        page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+        page.set_match_type("CUP")
+        page.set_match_date("2026-09-06")
+        controller._analysis_finished(_historical_253_result())
+        controller._save_formation()
+        record = hist_repo.list_all()[0]
+        controller._settings_repository.clear_last_result()
+        controller._editing_snapshot_id = ""
+        controller._active_match_record_id = ""
+
+        controller.edit_record(record.snapshot_id)
+
+        assert page.status_label.text() == t("match.saved_formation_restored")
+        controller._settings_repository.clear_last_result()
+
+        controller._save_as_first_match()
+
+        weekly_state = weekly_repo.load()
+        saved = next(
+            item
+            for item in weekly_state.match_records
+            if item.linked_match_record_id == record.snapshot_id
+        )
+        assert saved.match_id == "2026-09-06:PLAYMAKING:first"
+        assert saved.match_role == MatchRole.FIRST_WEEKLY_MATCH
+        assert saved.match_date.isoformat() == "2026-09-06"
+        assert saved.planned_or_played == MatchStatus.PLAYED
+        assert saved.formation == "2-5-3"
+        assert len(saved.lineup) == 11
+        assert len(saved.training_exposure_entries) == 11
+        assert len(hist_repo.list_all()) == 1
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
+
+
+def test_historical_weekly_link_moves_between_slots_without_duplicate_exposure(tmp_path):
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    ht_week_context_provider.set_calendar_service(
+        HTCalendarService(clock=lambda: datetime(2026, 9, 7, 12, 0))
+    )
+    try:
+        page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+        page.set_match_type("CUP")
+        page.set_match_date("2026-09-06")
+        controller._analysis_finished(_historical_253_result())
+        controller._save_formation()
+        record = hist_repo.list_all()[0]
+        controller.edit_record(record.snapshot_id)
+
+        controller._save_as_second_match()
+        controller._save_as_first_match()
+
+        linked_records = [
+            item
+            for item in weekly_repo.load().match_records
+            if item.linked_match_record_id == record.snapshot_id
+        ]
+        assert len(linked_records) == 1
+        assert linked_records[0].match_id == "2026-09-06:PLAYMAKING:first"
+        assert linked_records[0].match_role == MatchRole.FIRST_WEEKLY_MATCH
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
+
+
+def test_saved_match_without_lineup_opens_reconstructable_board(tmp_path):
+    from ht_coach_app.core.localization import t
+
+    page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+    record = find_or_create_provisional_record(
+        hist_repo,
+        opponent_name="Santa Cruz Club",
+        match_date="2026-09-06",
+        competition_type="cup",
+    )
+    hist_repo.save(
+        record.with_updates(
+            tactical_setup=TacticalSetup(
+                formation="2-5-3",
+                selected_tactic="Normal",
+                tactic_level=0,
+            )
+        )
+    )
+
+    controller.edit_record(record.snapshot_id)
+
+    assert page.status_label.text() == t("match.historical_lineup_missing")
+    assert page._formation_board_widget is not None
+    assert page._formation_board_widget.current_board().formation_name == "2-5-3"
+    assert [
+        slot
+        for slot in page._formation_board_widget.current_board().slots
+        if slot.player is not None
+    ] == []
+    controller._save_as_first_match()
+    assert weekly_repo.load().match_records == ()
+
+
+def test_manual_historical_reconstruction_persists_and_links_with_pre_evidence(tmp_path):
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    ht_week_context_provider.set_calendar_service(
+        HTCalendarService(clock=lambda: datetime(2026, 9, 7, 12, 0))
+    )
+    try:
+        page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+        record = find_or_create_provisional_record(
+            hist_repo,
+            opponent_name="Santa Cruz Club",
+            match_date="2026-09-06",
+            competition_type="cup",
+        )
+        hist_repo.save(
+            record.with_updates(
+                official_pre=OfficialRatingSnapshot(hattrick_match_id="pre-1"),
+                tactical_setup=TacticalSetup(
+                    formation="2-5-3",
+                    selected_tactic="Normal",
+                    tactic_level=0,
+                ),
+            )
+        )
+        roster = _manual_roster()
+        controller._roster_players = roster
+        controller._set_view_roster_players(roster)
+        controller.edit_record(record.snapshot_id)
+
+        board_widget = page._formation_board_widget
+        _fill_visible_board_from_roster(board_widget, roster)
+
+        assert board_widget.is_dirty()
+        controller._save_formation()
+
+        saved = hist_repo.get(record.snapshot_id)
+        assert len(hist_repo.list_all()) == 1
+        assert saved.official_pre is not None
+        assert len(saved.lineup) == 11
+        assert saved.provenance.lineup_source == "MANUAL_HISTORICAL_RECONSTRUCTION"
+
+        controller._settings_repository.clear_last_result()
+        controller._editing_snapshot_id = ""
+        controller._active_match_record_id = ""
+        controller.edit_record(record.snapshot_id)
+        assert len(page._formation_board_widget.current_board().slots) == 11
+
+        controller._save_as_first_match()
+        weekly = next(
+            item
+            for item in weekly_repo.load().match_records
+            if item.linked_match_record_id == record.snapshot_id
+        )
+        assert weekly.match_id == "2026-09-06:PLAYMAKING:first"
+        assert len(weekly.lineup) == 11
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
+
+
+def test_reconstructed_saved_match_enables_and_clicks_match_one_without_analysis(tmp_path):
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.core.localization import t
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    ht_week_context_provider.set_calendar_service(
+        HTCalendarService(clock=lambda: datetime(2026, 9, 7, 12, 0))
+    )
+    try:
+        page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+        record = find_or_create_provisional_record(
+            hist_repo,
+            opponent_name="Santa Cruz Club",
+            match_date="2026-09-06",
+            competition_type="cup",
+        )
+        hist_repo.save(
+            record.with_updates(
+                tactical_setup=TacticalSetup(
+                    formation="2-5-3",
+                    selected_tactic="Normal",
+                    tactic_level=0,
+                ),
+            )
+        )
+        roster = _manual_roster()
+        controller._roster_players = roster
+        controller._set_view_roster_players(roster)
+        controller.edit_record(record.snapshot_id)
+        controller._settings_repository.clear_last_result()
+
+        board_widget = page._formation_board_widget
+        assert board_widget.save_as_first_match_button.isEnabled() is False
+
+        _fill_visible_board_from_roster(board_widget, roster)
+
+        assert page._last_result is not None
+        assert controller._settings_repository.load_last_result() is None
+        assert board_widget.save_as_first_match_button.isEnabled() is True
+        board_widget.save_as_first_match_button.click()
+
+        weekly = next(
+            item
+            for item in weekly_repo.load().match_records
+            if item.linked_match_record_id == record.snapshot_id
+        )
+        assert weekly.match_id == "2026-09-06:PLAYMAKING:first"
+        assert weekly.match_role == MatchRole.FIRST_WEEKLY_MATCH
+        assert weekly.planned_or_played == MatchStatus.PLAYED
+        assert len(weekly.lineup) == 11
+        saved = hist_repo.get(record.snapshot_id)
+        assert len(saved.lineup) == 11
+        assert page.status_label.text() == t(
+            "match.save_as_weekly_success_with_range",
+            slot=1,
+            week_start="06/09/2026",
+            week_end="12/09/2026",
+        )
+        assert len(hist_repo.list_all()) == 1
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
+
+
+def test_reconstructed_saved_match_enables_and_clicks_match_two_without_analysis(tmp_path):
+    from engine.calendar import HTCalendarService
+    from ht_coach_app.core.localization import t
+    from ht_coach_app.services import ht_week_context_provider
+
+    original_service = ht_week_context_provider.get_calendar_service()
+    ht_week_context_provider.set_calendar_service(
+        HTCalendarService(clock=lambda: datetime(2026, 9, 7, 12, 0))
+    )
+    try:
+        page, controller, hist_repo, weekly_repo = make_match_controller(tmp_path)
+        record = find_or_create_provisional_record(
+            hist_repo,
+            opponent_name="Santa Cruz Club",
+            match_date="2026-09-06",
+            competition_type="cup",
+        )
+        hist_repo.save(
+            record.with_updates(
+                tactical_setup=TacticalSetup(
+                    formation="2-5-3",
+                    selected_tactic="Normal",
+                    tactic_level=0,
+                ),
+            )
+        )
+        roster = _manual_roster()
+        controller._roster_players = roster
+        controller._set_view_roster_players(roster)
+        controller.edit_record(record.snapshot_id)
+        controller._settings_repository.clear_last_result()
+
+        board_widget = page._formation_board_widget
+        _fill_visible_board_from_roster(board_widget, roster)
+
+        assert board_widget.save_as_second_match_button.isEnabled() is True
+        board_widget.save_as_second_match_button.click()
+
+        weekly = next(
+            item
+            for item in weekly_repo.load().match_records
+            if item.linked_match_record_id == record.snapshot_id
+        )
+        assert weekly.match_id == "2026-09-06:PLAYMAKING:second"
+        assert weekly.match_role == MatchRole.SECOND_WEEKLY_MATCH
+        assert weekly.planned_or_played == MatchStatus.PLAYED
+        assert len(weekly.lineup) == 11
+        assert page.status_label.text() == t(
+            "match.save_as_weekly_success_with_range",
+            slot=2,
+            week_start="06/09/2026",
+            week_end="12/09/2026",
+        )
+        assert len(hist_repo.list_all()) == 1
+    finally:
+        ht_week_context_provider.set_calendar_service(original_service)
 
 
 def test_match_type_uses_combo_item_data_not_visible_label(tmp_path):
